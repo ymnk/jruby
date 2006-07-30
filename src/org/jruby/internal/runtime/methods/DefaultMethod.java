@@ -96,7 +96,7 @@ public final class DefaultMethod extends AbstractMethod {
             scope.resetLocalVariables(body.getLocalNames());
         }
         
-        if (argsNode.getBlockArgNode() != null && context.isBlockGivenAndAvailable()) {
+        if (argsNode.getBlockArgNode() != null && context.isBlockGiven()) {
             scope.setValue(argsNode.getBlockArgNode().getCount(), runtime.newProc());
         }
 

@@ -70,7 +70,7 @@ public class Parser {
         SinglyLinkedList cref) {
         config.setLocalVariables(runtime.getCurrentContext().getCurrentScope().getLocalNames());
         
-        // search for an ITER_CUR; this lets us know we're parsing from within a block and should bring dvars along
+        // FIXME: hack; search for an ITER_CUR; this lets us know we're parsing from within a block and should bring dvars along
         for (Iterator iter = runtime.getCurrentContext().getIterStack().iterator(); iter.hasNext();) {
             if ((Iter)iter.next() == Iter.ITER_CUR) {
                 config.setDynamicVariables(runtime.getCurrentContext().getCurrentDynamicVars().names());

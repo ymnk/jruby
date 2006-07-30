@@ -255,7 +255,7 @@ public class DefinedVisitor extends AbstractVisitor {
 	 * @see AbstractVisitor#visitYieldNode(YieldNode)
 	 */
 	public Instruction visitYieldNode(YieldNode iVisited) {
-		if (state.getThreadContext().isBlockGivenAndAvailable()) {
+		if (state.getThreadContext().isBlockGiven()) {
 			definition = "yield";
 		}
 		return null;

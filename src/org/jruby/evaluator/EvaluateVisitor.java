@@ -359,14 +359,15 @@ public final class EvaluateVisitor implements NodeVisitor {
     	public void execute(EvaluationState state, InstructionContext ctx) {
     		BlockPassNode iVisited = (BlockPassNode)ctx;
             IRubyObject proc = state.begin(iVisited.getBodyNode());
+            ThreadContext tc = state.getThreadContext();
 
             if (proc.isNil()) {
-                state.getThreadContext().pushIter(Iter.ITER_NOT);
+                tc.setNoBlock();
                 try {
                     state.begin(iVisited.getIterNode());
                     return;
                 } finally {
-                    state.getThreadContext().popIter();
+                    tc.clearNoBlock();
                 }
             }
             
@@ -388,11 +389,11 @@ public final class EvaluateVisitor implements NodeVisitor {
                 // block for it.  Just eval!
                 if (blockObject != null && blockObject == proc) {
             	    try {
-                	    state.getThreadContext().pushIter(Iter.ITER_PRE);
+                        tc.setBlockAvailable();
                 	    state.begin(iVisited.getIterNode());
                 	    return;
             	    } finally {
-                        state.getThreadContext().popIter();
+                        tc.clearBlockAvailable();
             	    }
                 }
             }
@@ -1302,11 +1303,12 @@ public final class EvaluateVisitor implements NodeVisitor {
     private static class IterNodeVisitor implements Instruction {
     	public void execute(EvaluationState state, InstructionContext ctx) {
     		IterNode iVisited = (IterNode)ctx;
-            state.getThreadContext().preIterEval(Block.createBlock(iVisited.getVarNode(), iVisited.getCallable(), state.getSelf()));
+            ThreadContext tc = state.getThreadContext();
+            tc.preIterEval(Block.createBlock(iVisited.getVarNode(), iVisited.getCallable(), state.getSelf()));
                 try {
                     while (true) {
                         try {
-                            state.getThreadContext().pushIter(Iter.ITER_PRE);
+                            tc.setBlockAvailable();
                             state.setResult(state.begin(iVisited.getIterNode()));
                             return;
                         } catch (JumpException je) {
@@ -1317,7 +1319,7 @@ public final class EvaluateVisitor implements NodeVisitor {
                         		throw je;
                         	}
                         } finally {
-                            state.getThreadContext().popIter();
+                            tc.clearBlockAvailable();
                         }
                     }
                 } catch (JumpException je) {

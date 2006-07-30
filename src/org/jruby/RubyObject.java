@@ -447,11 +447,13 @@ public class RubyObject implements Cloneable, IRubyObject {
     }
 
     public void callInit(IRubyObject[] args) {
-        getRuntime().getCurrentContext().pushIter(getRuntime().getCurrentContext().isBlockGiven() ? Iter.ITER_PRE : Iter.ITER_NOT);
+        ThreadContext tc = getRuntime().getCurrentContext();
+        
+        tc.setIfBlockAvailable();
         try {
             callMethod("initialize", args);
         } finally {
-            getRuntime().getCurrentContext().popIter();
+            tc.clearIfBlockAvailable();
         }
     }
 
@@ -644,7 +646,6 @@ public class RubyObject implements Cloneable, IRubyObject {
         
         try {
             savedPosition = threadContext.getPosition();
-            iter = threadContext.getCurrentFrame().getIter();
             
             // make sure we have a file
             if (file == null) {
@@ -656,9 +657,14 @@ public class RubyObject implements Cloneable, IRubyObject {
             }
             IRubyObject newSelf = null;
             if (scope.isNil() || !(scope instanceof RubyBinding)) {
+                // no binding, just eval in "current" frame (caller's frame)
+                iter = threadContext.getCurrentFrame().getIter();
+                
+                // hack to avoid using previous frame if we're the first frame, since this eval is used to start execution too
                 if (threadContext.getPreviousFrame() != null) {
                     threadContext.getCurrentFrame().setIter(threadContext.getPreviousFrame().getIter());
                 }
+                
                 newSelf = this;
             } else {
                 // Binding provided for scope, use it
@@ -1073,12 +1079,14 @@ public class RubyObject implements Cloneable, IRubyObject {
 
         IRubyObject[] newArgs = new IRubyObject[args.length - 1];
         System.arraycopy(args, 1, newArgs, 0, newArgs.length);
-
-        getRuntime().getCurrentContext().pushIter(getRuntime().getCurrentContext().isBlockGiven() ? Iter.ITER_PRE : Iter.ITER_NOT);
+        
+        ThreadContext tc = getRuntime().getCurrentContext();
+        
+        tc.setIfBlockAvailable();
         try {
             return callMethod(name, newArgs, CallType.FUNCTIONAL);
         } finally {
-            getRuntime().getCurrentContext().popIter();
+            tc.clearIfBlockAvailable();
         }
     }
     

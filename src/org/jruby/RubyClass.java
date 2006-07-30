@@ -202,7 +202,7 @@ public class RubyClass extends RubyModule {
         // call "inherited" method of the superclass
         newClass.inheritedBy(superClass);
 
-		if (runtime.getCurrentContext().isBlockGivenAndAvailable()) {
+		if (runtime.getCurrentContext().isBlockGiven()) {
 			runtime.getCurrentContext().yield(null, newClass, newClass, false);
 		}
 
