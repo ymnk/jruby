@@ -217,17 +217,17 @@ public class ThreadContext {
         pushFrame(getCurrentFrame().duplicate());
     }
     
-    private void pushFrame(IRubyObject self, IRubyObject[] args, 
+    private void pushCallFrame(IRubyObject self, IRubyObject[] args, 
             String lastFunc, RubyModule lastClass) {
-        pushFrame(new Frame(this, self, args, lastFunc, lastClass));
+        pushFrame(new Frame(this, self, args, lastFunc, lastClass, getPosition(), getCurrentIter(), getCurrentBlock()));
     }
     
     private void pushFrame() {
-        pushFrame(new Frame(this));
+        pushFrame(new Frame(this, getCurrentIter(), getCurrentBlock()));
     }
     
-    private void pushFrame(Iter iter) {
-        pushFrame(new Frame(this, iter));
+    private void pushFrameNoBlock() {
+        pushFrame(new Frame(this, Iter.ITER_NOT, null));
     }
     
     private void pushFrame(Frame frame) {
@@ -724,7 +724,7 @@ public class ThreadContext {
     
     public void preAdoptThread() {
         setNoBlock();
-        pushFrame();
+        pushFrameNoBlock();
         getCurrentFrame().newScope(null);
         pushRubyClass(runtime.getObject());
         pushCRef(runtime.getObject());
@@ -754,7 +754,7 @@ public class ThreadContext {
     }
     
     public void preBsfApply(String[] localNames) {
-        pushFrame();
+        pushFrameNoBlock();
         pushDynamicVars();
         getCurrentFrame().newScope(localNames);
     }
@@ -767,7 +767,7 @@ public class ThreadContext {
     public void preMethodCall(RubyModule implementationClass, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
         pushRubyClass((RubyModule)implementationClass.getCRef().getValue());
         setInBlockIfBlock();
-        pushFrame(recv, args, name, noSuper ? null : lastClass);
+        pushCallFrame(recv, args, name, noSuper ? null : lastClass);
     }
     
     public void postMethodCall() {
@@ -780,7 +780,7 @@ public class ThreadContext {
         RubyModule implementationClass = (RubyModule)cref.getValue();
         setCRef(cref);
         setInBlockIfBlock();
-        pushFrame(recv, args, name, noSuper ? null : lastClass);
+        pushCallFrame(recv, args, name, noSuper ? null : lastClass);
         getCurrentFrame().newScope(null);
         pushDynamicVars();
         pushRubyClass(implementationClass);
@@ -799,7 +799,7 @@ public class ThreadContext {
     public void preReflectedMethodInternalCall(RubyModule implementationClass, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
         pushRubyClass((RubyModule)implementationClass.getCRef().getValue());
         setInBlockIfBlock();
-        pushFrame(recv, args, name, noSuper ? null : lastClass);
+        pushCallFrame(recv, args, name, noSuper ? null : lastClass);
         getCurrentFrame().setScope(getPreviousFrame().getScope());
     }
     
@@ -811,7 +811,7 @@ public class ThreadContext {
     
     public void preInitCoreClasses() {
         setNoBlock();
-        pushFrame();
+        pushFrameNoBlock();
         getCurrentFrame().newScope(null);
         setCurrentVisibility(Visibility.PRIVATE);
     }
@@ -829,7 +829,7 @@ public class ThreadContext {
         pushDynamicVars();
         setWrapper(newWrapper);
         pushRubyClass(rubyClass);
-        pushFrame(self, IRubyObject.NULL_ARRAY, null, null);
+        pushCallFrame(self, IRubyObject.NULL_ARRAY, null, null);
         getCurrentFrame().newScope(null);
         setCRef(rubyClass.getCRef());
     }
@@ -848,7 +848,7 @@ public class ThreadContext {
         
         pushRubyClass(executeUnderClass);
         pushCRef(executeUnderClass);
-        pushFrame(null, frame.getArgs(), frame.getLastFunc(), frame.getLastClass());
+        pushCallFrame(null, frame.getArgs(), frame.getLastFunc(), frame.getLastClass());
         getCurrentFrame().setScope(getPreviousFrame().getScope());
     }
     
@@ -884,12 +884,12 @@ public class ThreadContext {
     }
     
     public void postKernelEval() {
-        // push a frame back to the stack for the method call to pop
-        pushFrame();
+        // push a dummy frame back to the stack for the method call to pop
+        pushFrameNoBlock();
     }
     
     public void preTrace() {
-        pushFrame(Iter.ITER_NOT);
+        pushFrameNoBlock();
     }
     
     public void postTrace() {

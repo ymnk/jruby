@@ -50,25 +50,22 @@ public class Frame {
     private Iter iter;
     private IRuby runtime;
     private EvaluationState evalState;
+    private Block blockArg;
 
     private Scope scope;
     
-    public Frame(ThreadContext threadContext) {
-        this(threadContext, threadContext.getCurrentIter());
-    }
-
-    public Frame(ThreadContext threadContext, Iter iter) {
+    public Frame(ThreadContext threadContext, Iter iter, Block blockArg) {
         this(threadContext.getRuntime(), null, IRubyObject.NULL_ARRAY, null, null, threadContext.getPosition(), 
-             iter);   
+             iter, blockArg);   
     }
 
     public Frame(ThreadContext threadContext, IRubyObject self, IRubyObject[] args, 
-    		String lastFunc, RubyModule lastClass) {
-    	this(threadContext.getRuntime(), self, args, lastFunc, lastClass, threadContext.getPosition(), threadContext.getCurrentIter());
+    		String lastFunc, RubyModule lastClass, ISourcePosition position, Iter iter, Block blockArg) {
+    	this(threadContext.getRuntime(), self, args, lastFunc, lastClass, position, iter, blockArg);
     }
 
     private Frame(IRuby runtime, IRubyObject self, IRubyObject[] args, String lastFunc,
-                 RubyModule lastClass, ISourcePosition position, Iter iter) {
+                 RubyModule lastClass, ISourcePosition position, Iter iter, Block blockArg) {
         this.self = self;
         this.args = args;
         this.lastFunc = lastFunc;
@@ -76,6 +73,7 @@ public class Frame {
         this.position = position;
         this.iter = iter;
         this.runtime = runtime;
+        this.blockArg = blockArg;
     }
     
     public void begin(Node node) {
@@ -180,7 +178,7 @@ public class Frame {
         	newArgs = args;
         }
 
-        return new Frame(runtime, self, newArgs, lastFunc, lastClass, position, iter);
+        return new Frame(runtime, self, newArgs, lastFunc, lastClass, position, iter, blockArg);
     }
 
     /* (non-Javadoc)
