@@ -19,6 +19,7 @@
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2004 David Corbin <dcorbin@users.sourceforge.net>
  * Copyright (C) 2005 Tim Azzopardi <tim@tigerfive.com>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -174,9 +175,6 @@ public class RubyString extends RubyObject {
 		return toString();
 	}
 
-	public RubySymbol to_sym() {
-		return RubySymbol.newSymbol(getRuntime(), toString());
-	}
 	
 	/** Create a new String which uses the same Ruby runtime and the same
 	 *  class like this String.
@@ -718,9 +716,8 @@ public class RubyString extends RubyObject {
 	    if (checkArgumentCount(args, 1, 2) == 2) {
             if (args[0] instanceof RubyRegexp) {
                 IRubyObject match = RubyRegexp.regexpValue(args[0]).match(toString(), 0);
-                
-                return match.isNil() ? getRuntime().getNil() :
-                    ((RubyMatchData) match).group(args[1].convertToInteger().getLongValue());
+                long idx = args[1].convertToInteger().getLongValue();
+                return RubyRegexp.nth_match((int) idx, match);
             } 
 	        return substr(RubyNumeric.fix2int(args[0]), RubyNumeric.fix2int(args[1]));
 	    }
@@ -744,7 +741,42 @@ public class RubyString extends RubyObject {
 	    return idx < 0 || idx >= getValue().length() ? getRuntime().getNil() : 
 	    	getRuntime().newFixnum(getValue().charAt(idx));
 	}
+    
+    /**
+     * rb_str_subpat_set
+     * 
+     */
+    private void subpatSet(RubyRegexp regexp, int nth, IRubyObject repl) {
+        int found = regexp.search(this.toString(), 0);
+        if (found == -1) {
+            throw getRuntime().newIndexError("regexp not matched");
+        }
 
+        RubyMatchData match = (RubyMatchData) getRuntime().getCurrentContext()
+                .getBackref();
+
+        if (nth >= match.getSize()) {
+            throw getRuntime().newIndexError("index " + nth + " out of regexp");
+        }
+        if (nth < 0) {
+            if (-nth >= match.getSize()) {
+                throw getRuntime().newIndexError("index " + nth + " out of regexp");
+            }
+            nth += match.getSize();
+        }
+
+        IRubyObject group = match.group(nth);
+        if (getRuntime().getNil().equals(group)) {
+            throw getRuntime().newIndexError(
+                    "regexp group " + nth + " not matched");
+        }
+
+        int beg = (int) match.begin(nth);
+        int len = (int) (match.end(nth) - beg);
+
+        replace(beg, len, stringValue(repl));
+
+    }
 
 	/** rb_str_aset, rb_str_aset_m
 	 *
@@ -753,23 +785,32 @@ public class RubyString extends RubyObject {
 		testFrozen("class");
 		int strLen = getValue().length();
 		if (checkArgumentCount(args, 2, 3) == 3) {
-			RubyString repl = stringValue(args[2]);
-			int beg = RubyNumeric.fix2int(args[0]);
-			int len = RubyNumeric.fix2int(args[1]);
-			if (len < 0) {
-				throw getRuntime().newIndexError("negative length");
-			}
-			if (beg < 0) {
-				beg += strLen;
-			}
-            if (beg < 0 || (beg > 0 && beg >= strLen)) {
-				throw getRuntime().newIndexError("string index out of bounds");
-			}
-			if (beg + len > strLen) {
-				len = strLen - beg;
-			}
-			replace(beg, len, repl);
-			return repl;
+            if (args[0] instanceof RubyFixnum) {
+                RubyString repl = stringValue(args[2]);
+                int beg = RubyNumeric.fix2int(args[0]);
+                int len = RubyNumeric.fix2int(args[1]);
+                if (len < 0) {
+                    throw getRuntime().newIndexError("negative length");
+                }
+                if (beg < 0) {
+                    beg += strLen;
+                }
+                if (beg < 0 || (beg > 0 && beg >= strLen)) {
+                    throw getRuntime().newIndexError(
+                            "string index out of bounds");
+                }
+                if (beg + len > strLen) {
+                    len = strLen - beg;
+                }
+                replace(beg, len, repl);
+                return repl;
+            }
+            if (args[0] instanceof RubyRegexp) {
+                RubyString repl = stringValue(args[2]);
+                int nth = RubyNumeric.fix2int(args[1]);
+                subpatSet((RubyRegexp) args[0], nth, repl); 
+                return repl;
+            }
 		}
 		if (args[0] instanceof RubyFixnum) { // RubyNumeric?
 			int idx = RubyNumeric.fix2int(args[0]); // num2int?
@@ -884,25 +925,39 @@ public class RubyString extends RubyObject {
 		return upto(str, false);
 	}
 
-	/* rb_str_upto */
-	public IRubyObject upto(IRubyObject str, boolean excl) {
-		RubyString current = (RubyString) dup();
-		RubyString end = stringValue(str);
-        int endLength = end.getValue().length();
+    /* rb_str_upto */
+    public IRubyObject upto(IRubyObject str, boolean excl) {
+        // alias 'this' to 'beg' for ease of comparison with MRI
+        RubyString beg = this;
+        RubyString end = stringValue(str);
 
-        for (int cmp = current.cmp(end); cmp <= 0;) {
-			getRuntime().getCurrentContext().yield(current);
-			if (cmp == 0) {
-				break;
-			}
-			current = (RubyString) current.succ();
-            cmp = current.cmp(end);
-			if ((excl && cmp == 0) || current.getValue().length() > endLength) {
-				break;
-			}
-		}
-		return this;
-	}
+        int n = beg.cmp(end);
+        if (n > 0 || (excl && n == 0)) {
+            return beg;
+        }
+        
+        RubyString afterEnd = stringValue(end.succ());
+        RubyString current = beg;
+
+        while (!current.equals(afterEnd)) {
+            getRuntime().getCurrentContext().yield(current);
+            if (!excl && current.equals(afterEnd)) {
+                break;
+            }
+            
+            current = (RubyString) current.succ();
+            if (excl && current.equals(afterEnd)) {
+                break;
+            }
+            if (current.length().getLongValue() > end.length().getLongValue()) {
+                break;
+            }
+        }
+
+        return beg;
+
+    }
+
 
 	/** rb_str_include
 	 *
@@ -998,31 +1053,71 @@ public class RubyString extends RubyObject {
 		}
 		return this;
 	}
+    
+    private IRubyObject justify(IRubyObject [] args, boolean leftJustify) {
+        checkArgumentCount(args, 1, 2);
+        int length = RubyNumeric.fix2int(args[0]);
+        if (length <= getValue().length()) {
+            return dup();
+        }
+        
+        String paddingArg;
+        
+        if (args.length == 2) {
+            paddingArg = args[1].convertToString().toString();
+            if (paddingArg.length() == 0) {
+                throw getRuntime().newArgumentError("zero width padding");
+            }
+        } else {
+            paddingArg = " ";
+        }
+            
+        StringBuffer sbuf = new StringBuffer(length);
+        String thisStr = toString();
+        
+        if (leftJustify) {
+            sbuf.append(thisStr);
+        }
+        
+        // Add n whole paddings
+        int whole = (length - thisStr.length()) / paddingArg.length();
+        for (int w = 0; w < whole; w++ ) {
+            sbuf.append(paddingArg);
+        }
+        
+        // Add fractional amount of padding to make up difference
+        int fractionalLength = (length - thisStr.length()) % paddingArg.length();
+        if (fractionalLength > 0) {
+            sbuf.append(paddingArg.substring(0, fractionalLength));
+        }
+        
+        if (!leftJustify) {
+            sbuf.append(thisStr);
+        }
+        
+        RubyString ret = newString(sbuf.toString());
+        
+        if (args.length == 2) {
+            ret.infectBy(args[1]);
+        }
+        
+        return ret;
+    }
 
 	/** rb_str_ljust
 	 *
 	 */
-	public IRubyObject ljust(IRubyObject arg) {
-		int len = RubyNumeric.fix2int(arg);
-		if (len <= getValue().length()) {
-			return dup();
-		}
-		Object[] args = new Object[] { getValue(), new Integer(-len)};
-		return newString(new PrintfFormat("%*2$s").sprintf(args));
+	public IRubyObject ljust(IRubyObject [] args) {
+        return justify(args, true);
 	}
 
 	/** rb_str_rjust
 	 *
 	 */
-	public IRubyObject rjust(IRubyObject arg) {
-		int len = RubyNumeric.fix2int(arg);
-		if (len <= getValue().length()) {
-			return dup();
-		}
-		Object[] args = new Object[] { getValue(), new Integer(len)};
-		return newString(new PrintfFormat("%*2$s").sprintf(args));
-	}
-
+    public IRubyObject rjust(IRubyObject [] args) {
+        return justify(args, false);
+    }
+    
 	public IRubyObject center(IRubyObject[] args) {
         checkArgumentCount(args, 1, 2);
 		int len = RubyNumeric.fix2int(args[0]);
@@ -1504,9 +1599,20 @@ public class RubyString extends RubyObject {
 	 *
 	 */
 	public RubySymbol intern() {
-		return RubySymbol.newSymbol(getRuntime(), toString());
-	}
+        String s = toString();
+        if (s.equals("")) {
+            throw getRuntime().newArgumentError("interning empty string");
+        }
+        if (s.contains("\0")) {
+            throw getRuntime().newArgumentError("symbol string may not contain '\\0'");
+        }
+        return RubySymbol.newSymbol(getRuntime(), toString());
+    }
 
+    public RubySymbol to_sym() {
+        return intern();
+    }
+    
     public RubyInteger sum(IRubyObject[] args) {
         long bitSize = 16;
         if (args.length > 0) {

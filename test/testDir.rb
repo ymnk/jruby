@@ -46,8 +46,24 @@ Dir.chdir(save_dir)
 test_equal([], Dir.glob("{"))
 
 # Test that glob expansion of ** works ok with non-patterns as path elements. This used to throw NPE.
-Dir.mkdir("./testDir_2")
-open("./testDir_2/testDir_tmp1", "w").close
-test_equal(['./testDir_2/testDir_tmp1'], Dir.glob('./**/testDir_tmp1'))
-File.delete("./testDir_2/testDir_tmp1")
-Dir.delete("./testDir_2")
+Dir.mkdir("testDir_2")
+open("testDir_2/testDir_tmp1", "w").close
+Dir.glob('./**/testDir_tmp1').each { |f| test_equal(true, File.exist?(f)) }
+File.delete("testDir_2/testDir_tmp1")
+Dir.delete("testDir_2")
+
+# begin JIRA 31 issues
+
+# works with MRI though not JRuby ('.' gets globbed)
+# test_equal(['.'], Dir['.'])
+
+# Dir.mkdir('DirTest')
+# also works with MRI though not JRuby ('./' stripped off front)
+# test_equal(['./DirTest'], Dir['./DirTest'])
+# Dir.delete('DirTest')
+
+# just makes sure this doesn't throw a Java exception 
+Dir['.']
+
+# end JIRA 31 issues
+

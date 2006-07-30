@@ -24,13 +24,20 @@ test_equal("ell", s[1..3])
 test_equal("el", s[1...3])
 test_equal("er", s[-3, 2])
 test_equal("her", s[-4..-2])
-# Bug #1467286
-#test_equal("", s[-2..-4])
-#test_equal("", s[6..2])
+test_equal("", s[-2..-4])
+test_equal("", s[6..2])
+t = ""
+test_equal(nil, t[6..2])
+test_equal(nil, t[-2..-4])
 test_equal("ell", s[/[aeiow](.)\1/])
 test_equal("ell", s[/[aeiow](.)\1/, 0])
 test_equal("l", s[/[aeiow](.)\1/, 1])
 test_equal(nil, s[/[aeiow](.)\1/, 2])
+# negative subscripts exercising rubicon test case
+test_equal("o", s[/[aeiow](.)\1(.)/, -1])
+test_equal("l", s[/[aeiow](.)\1(.)/, -2])
+# zero subscript should capture whole matched pattern
+test_equal("ello", s[/[aeiow](.)\1(.)/, 0])
 test_equal("the", s[/(..)e/])
 test_equal("th", s[/(..)e/, 1])
 test_equal("lo", s["lo"])
@@ -49,6 +56,21 @@ s = ""
 s[0,0]="foo"
 
 test_equal("foo", s)
+
+# regexp, integer asets from rubicon
+
+s="BarFoo"
+test_equal("Foo", s[/([A-Z]..)([A-Z]..)/, 1] = "Foo")
+test_equal("FooFoo", s)
+test_equal("Bar", s[/([A-Z]..)([A-Z]..)/, 2] = "Bar")
+test_equal("FooBar", s)
+test_exception(IndexError) { s[/([A-Z]..)([A-Z]..)/, 3] = "None" }
+test_equal("FooBar", s)
+test_equal("Foo", s[/([A-Z]..)([A-Z]..)/, -1] = "Foo")
+test_equal("FooFoo", s)
+test_equal("Bar", s[/([A-Z]..)([A-Z]..)/, -2] = "Bar")
+test_equal("BarFoo", s)
+test_exception(IndexError) { s[/([A-Z]..)([A-Z]..)/, -3] = "None" }
 
 ##### capitalize/capitalize! ######
 
@@ -141,6 +163,47 @@ test_exception(IndexError) { "".insert(-100, 'X') }
 test_exception(IndexError) { "".insert(100, 'X') }
 test_exception(TypeError) { "abcd".insert(1, nil) }
 
+
+##### intern #####
+for method in [:intern, :to_sym] do
+    test_equal(:koala, "koala".send(method))
+    test_ok(:koala != "Koala".send(method))
+   
+    for str in ["identifier", "with spaces", "9with_digits", "9and spaces"]
+      sym = str.send(method)
+      test_equal(Symbol, sym.class)
+      test_equal(str, sym.to_s)
+    end
+   
+    test_exception(ArgumentError) { "".send(method) }
+    test_exception(ArgumentError) { "with\0null\0inside".send(method) }
+end
+
+
+##### ljust,rjust #####
+
+test_equal("hello", "hello".ljust(4))
+test_equal("hello      ", "hello".ljust(11))
+
+# with explicit padding
+test_equal("hi111111111", "hi".ljust(11, "1"))
+test_equal("hi121212121", "hi".ljust(11, "12"))
+test_equal("hi123412341", "hi".ljust(11, "1234"))
+
+# zero width padding
+test_exception(ArgumentError)  { "hello".ljust(11, "") }
+
+test_equal("hello", "hello".rjust(4))
+test_equal("      hello", "hello".rjust(11))
+
+# with explicit padding
+test_equal("111111111hi", "hi".rjust(11, "1"))
+test_equal("121212121hi", "hi".rjust(11, "12"))
+test_equal("123412341hi", "hi".rjust(11, "1234"))
+
+# zero width padding
+test_exception(ArgumentError)  { "hi".rjust(11, "") }
+
 ##### oct #####
 # oct should return zero in appropriate cases
 test_equal(0, "b".oct)
@@ -161,6 +224,8 @@ test_equal("abc", s)
 test_equal("cba", s.reverse!)
 test_equal("cba", s)
 
+##### rjust (see ljust) #####
+
 ##### scan
 
 s = "cruel world"
@@ -175,6 +240,71 @@ test_equal(["<<cruel>>", "<<world>>"], l)
 l = ""
 s.scan(/(.)(.)/) { |a,b|  l << b; l << a }
 test_equal("rceu lowlr", l)
+
+##### slice! ######
+
+o = "FooBar"
+
+s = o.dup
+test_equal(?F, s.slice!(0))
+test_equal("ooBar", s)
+test_equal("FooBar", o)
+s = o.dup
+test_equal(?r, s.slice!(-1))
+test_equal("FooBa", s)
+
+s = o.dup
+test_equal(nil, s.slice!(6))
+test_equal("FooBar", s)
+s = o.dup
+test_equal(nil, s.slice!(-7))
+test_equal("FooBar", s)
+
+s = o.dup
+test_equal("Foo", s.slice!(0,3))
+test_equal("Bar", s)
+s = o.dup
+test_equal("Bar", s.slice!(-3,3))
+test_equal("Foo", s)
+
+s = o.dup
+test_equal(nil, s.slice!(7,2))      # Maybe should be six?
+test_equal("FooBar", s)
+s = o.dup
+test_equal(nil, s.slice!(-7,10))
+test_equal("FooBar", s)
+
+s = o.dup
+test_equal("Foo", s.slice!(0..2))
+test_equal("Bar", s)
+s = o.dup
+test_equal("Bar", s.slice!(-3..-1))
+test_equal("Foo", s)
+
+s = o.dup
+test_equal("", s.slice!(6..2))
+test_equal("FooBar", s)
+s = o.dup
+test_equal(nil, s.slice!(-10..-7))
+test_equal("FooBar", s)
+
+s = o.dup
+test_equal("Foo", s.slice!(/^F../))
+test_equal("Bar", s)
+s = o.dup
+test_equal("Bar", s.slice!(/..r$/))
+test_equal("Foo", s)
+
+s = o.dup
+test_equal(nil, s.slice!(/xyzzy/))
+test_equal("FooBar", s)
+
+s = o.dup
+test_equal("Foo", s.slice!("Foo"))
+test_equal("Bar", s)
+s = o.dup
+test_equal("Bar", s.slice!("Bar"))
+test_equal("Foo", s)
 
 ##### split ######
 
@@ -264,6 +394,9 @@ test_equal(1100101, "1100101".to_i(10))
 test_equal(17826049, "1100101".to_i(16))
 test_equal(199066177, "1100101".to_i(24))
 
+
+##### to_sym (see intern) #####
+
 ##### upcase/upcase! ######
 
 test_equal("HELLO", "HELlo".upcase)
@@ -279,3 +412,11 @@ ans = []
 s.upto("b0") { |e| ans << e }
 test_equal(UPTO_ANS, ans)
 test_equal("a8", s)
+
+##### formatting with % and a string #####
+test_equal(" 5", '%02s' % '5')
+# FIXME: JRUBY-39
+#test_equal("5.000000", '%02f' % '5')
+test_equal("05", '%02d' % '5')
+test_equal("05", '%02g' % '5')
+test_equal("05", '%02G' % '5')
