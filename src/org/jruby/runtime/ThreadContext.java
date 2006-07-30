@@ -746,6 +746,7 @@ public class ThreadContext {
     }
     
     public void preScopedBody(String[] localNames) {
+        assert false;
         getCurrentFrame().newScope(localNames);
     }
     
@@ -808,10 +809,20 @@ public class ThreadContext {
         popRubyClass();
     }
     
-    public void preInit() {
+    public void preInitCoreClasses() {
         setNoBlock();
         pushFrame();
         getCurrentFrame().newScope(null);
+        setCurrentVisibility(Visibility.PRIVATE);
+    }
+    
+    public void preInitBuiltinClasses(RubyClass objectClass, IRubyObject topSelf) {
+        pushRubyClass(objectClass);
+        setCRef(objectClass.getCRef());
+        
+        Frame frame = getCurrentFrame();
+        frame.setSelf(topSelf);
+        frame.getEvalState().setSelf(topSelf);
     }
     
     public void preNodeEval(RubyModule newWrapper, RubyModule rubyClass, IRubyObject self) {

@@ -168,19 +168,7 @@ public final class Ruby implements IRuby {
     	this.in = in;
     	this.out = out;
     	this.err = err;
-    	init();
     }
-    
-    /**
-     * Retrieve mappings of cached methods to where they have been cached.  When a cached
-     * method needs to be invalidated this map can be used to remove all places it has been
-     * cached.
-     * 
-     * @return the mappings of where cached methods have been stored
-     */
-	public CacheMap getCacheMap() {
-		return cacheMap;
-	}
 
     /**
      * Returns a default instance of the JRuby runtime.
@@ -188,7 +176,10 @@ public final class Ruby implements IRuby {
      * @return the JRuby runtime
      */
     public static IRuby getDefaultInstance() {
-        return new Ruby(System.in, System.out, System.err);
+        Ruby ruby = new Ruby(System.in, System.out, System.err);
+        ruby.init();
+        
+        return ruby;
     }
 
     /**
@@ -197,7 +188,10 @@ public final class Ruby implements IRuby {
      * @return the JRuby runtime
      */
     public static IRuby newInstance(InputStream in, PrintStream out, PrintStream err) {
-        return new Ruby(in, out, err);
+        Ruby ruby = new Ruby(in, out, err);
+        ruby.init();
+        
+        return ruby;
     }
 
     /**
@@ -209,8 +203,6 @@ public final class Ruby implements IRuby {
 
     public IRubyObject eval(Node node) {
         try {
-            // in all cases where this is called, Ruby() and init() will have prepared an EvalState to use in the frame
-            //return new EvaluationState(this, topSelf).begin(node);
             return getCurrentContext().getCurrentFrame().getEvalState().begin(node);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
@@ -344,6 +336,17 @@ public final class Ruby implements IRuby {
             throw newSecurityError("Insecure operation '" + getCurrentContext().getCurrentFrame().getLastFunc() + "' at level " + safeLevel);
         }
     }
+    
+    /**
+     * Retrieve mappings of cached methods to where they have been cached.  When a cached
+     * method needs to be invalidated this map can be used to remove all places it has been
+     * cached.
+     * 
+     * @return the mappings of where cached methods have been stored
+     */
+    public CacheMap getCacheMap() {
+        return cacheMap;
+    }
 
     /** rb_define_global_const
      *
@@ -394,9 +397,9 @@ public final class Ruby implements IRuby {
         
         initLibraries();
         
-        getCurrentContext().preInit();
-
-        getCurrentContext().setCurrentVisibility(Visibility.PRIVATE);
+        ThreadContext threadContext = getCurrentContext();
+        
+        threadContext.preInitCoreClasses();
 
         initCoreClasses();
 
@@ -404,16 +407,11 @@ public final class Ruby implements IRuby {
 
         topSelf = TopSelfFactory.createTopSelf(this);
 
-        getCurrentContext().pushRubyClass(objectClass);
-        getCurrentContext().setCRef(getObject().getCRef());
-        
-        Frame frame = getCurrentContext().getCurrentFrame();
-        frame.setSelf(topSelf);
-        frame.getEvalState().setSelf(topSelf);
-        
-        getObject().defineConstant("TOPLEVEL_BINDING", newBinding());
+        threadContext.preInitBuiltinClasses(objectClass, topSelf);
 
         initBuiltinClasses();
+        
+        getObject().defineConstant("TOPLEVEL_BINDING", newBinding());
         
         // Load additional definitions and hacks from etc.rb
         getLoadService().smartLoad("builtin/etc.rb");
