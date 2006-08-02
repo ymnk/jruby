@@ -379,41 +379,15 @@ public class ThreadContext {
         return yield(value, self, klass, false, checkArguments);
     }
 
-    // FIXME: This badly needs refactoring
     public IRubyObject yield(IRubyObject value, IRubyObject self, RubyModule klass, boolean yieldProc, boolean aValue) {
         if (! isBlockGiven()) {
             throw runtime.newLocalJumpError("yield called out of block");
         }
 
-        Block currentBlock = preYield(klass);
-        // block is executed under its own self, so save the old one (use a stack?)
-        IRubyObject oldSelf = getCurrentFrame().getEvalState().getSelf();
-
-        setCRef(currentBlock.getCRef());
+        Block currentBlock = preYieldCurrentBlock(klass);
 
         try {
-            if (klass == null) {
-                self = currentBlock.getSelf();               
-            }
-
-            getCurrentFrame().getEvalState().setSelf(getCurrentFrame().getSelf()); 
-            
-            IRubyObject[] args = getBlockArgs(value, self, yieldProc, aValue, currentBlock);
-
-            while (true) {
-                try {
-                    // FIXME: is it appropriate to use the current frame's (the block's frame's) lastClass?
-                    IRubyObject result = currentBlock.getMethod().call(runtime, self, getCurrentFrame().getLastClass(), null, args, false);
-                    
-                    return result;
-                } catch (JumpException je) {
-                	if (je.getJumpType() == JumpException.JumpType.RedoJump) {
-                		// do nothing, allow loop to redo
-                	} else {
-                		throw je;
-                	}
-                }
-            }
+            return yieldInternal(currentBlock, value, self, klass, yieldProc, aValue);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.NextJump) {
 	            IRubyObject nextValue = (IRubyObject)je.getPrimaryData();
@@ -422,9 +396,63 @@ public class ThreadContext {
         		throw je;
         	}
         } finally {
+            postYieldCurrentBlock(currentBlock);
+        }
+    }
+
+    public IRubyObject yield(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean yieldProc, boolean aValue) {
+        if (! isBlockGiven()) {
+            throw runtime.newLocalJumpError("yield called out of block");
+        }
+
+        preYieldSpecificBlock(yieldBlock, klass);
+
+        try {
+            return yieldInternal(yieldBlock, value, self, klass, yieldProc, aValue);
+        } catch (JumpException je) {
+            if (je.getJumpType() == JumpException.JumpType.NextJump) {
+                IRubyObject nextValue = (IRubyObject)je.getPrimaryData();
+                return nextValue == null ? runtime.getNil() : nextValue;
+            } else {
+                throw je;
+            }
+        } finally {
+            postYieldSpecificBlock();
+        }
+    }
+    
+    private IRubyObject yieldInternal(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean yieldProc, boolean aValue) {
+        // block is executed under its own self, so save the old one (use a stack?)
+        IRubyObject oldSelf = getCurrentFrame().getEvalState().getSelf();
+        
+        try {
+            setCRef(yieldBlock.getCRef());
+            
+            if (klass == null) {
+                self = yieldBlock.getSelf();               
+            }
+    
+            getCurrentFrame().getEvalState().setSelf(getCurrentFrame().getSelf()); 
+            
+            IRubyObject[] args = getBlockArgs(value, self, yieldProc, aValue, yieldBlock);
+    
+            while (true) {
+                try {
+                    // FIXME: is it appropriate to use the current frame's (the block's frame's) lastClass?
+                    IRubyObject result = yieldBlock.getMethod().call(runtime, self, getCurrentFrame().getLastClass(), null, args, false);
+                    
+                    return result;
+                } catch (JumpException je) {
+                    if (je.getJumpType() == JumpException.JumpType.RedoJump) {
+                        // do nothing, allow loop to redo
+                    } else {
+                        throw je;
+                    }
+                }
+            }
+        } finally {
             getCurrentFrame().getEvalState().setSelf(oldSelf);
             unsetCRef();
-            postYield(currentBlock);
         }
     }
 
@@ -938,29 +966,36 @@ public class ThreadContext {
         popBlock();
     }
     
-    public void preBlockYield(Block newBlock) {
-        pushdownBlocks(newBlock);
+    public void preProcBlockCall() {
         setInBlock();
         getCurrentFrame().setIter(Iter.ITER_CUR);
     }
     
-    public void postBlockYield() {
+    public void postProcBlockCall() {
         clearInBlock();
-        popupBlocks();
     }
 
-    private Block preYield(RubyModule klass) {
-        Block currentBlock = popBlock();
+    private Block preYieldCurrentBlock(RubyModule klass) {
+        Block currentBlock = getCurrentFrame().getBlockArg();
+        if (getCurrentFrame().getBlockArg() != currentBlock) {
+            Thread.dumpStack();
+        }
 
         restoreBlockState(currentBlock, klass);
 
         return currentBlock;
     }
 
-    private void postYield(Block currentBlock) {
+    private void postYieldCurrentBlock(Block currentBlock) {
         flushBlockState();
-        
-        pushBlock(currentBlock);
+    }
+    
+    private void preYieldSpecificBlock(Block specificBlock, RubyModule klass) {
+        restoreBlockState(specificBlock, klass);
+    }
+    
+    private void postYieldSpecificBlock() {
+        flushBlockState();
     }
 
     public void preEvalWithBinding(RubyBinding binding) {

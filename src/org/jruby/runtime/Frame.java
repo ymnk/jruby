@@ -202,4 +202,8 @@ public class Frame {
     public void setEvalState(EvaluationState evalState) {
         this.evalState = evalState;
     }
+    
+    public Block getBlockArg() {
+        return blockArg;
+    }
 }
