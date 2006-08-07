@@ -379,11 +379,21 @@ public class ThreadContext {
         return yield(value, self, klass, false, checkArguments);
     }
 
+    /**
+     * Yield to the block passed to the current frame.
+     * 
+     * @param value The value to yield, either a single value or an array of values
+     * @param self The current self
+     * @param klass
+     * @param yieldProc
+     * @param aValue
+     * @return
+     */
     public IRubyObject yield(IRubyObject value, IRubyObject self, RubyModule klass, boolean yieldProc, boolean aValue) {
         if (! isBlockGiven()) {
             throw runtime.newLocalJumpError("yield called out of block");
         }
-
+        
         Block currentBlock = preYieldCurrentBlock(klass);
 
         try {
@@ -400,6 +410,17 @@ public class ThreadContext {
         }
     }
 
+    /**
+     * Yield to a specific block.
+     * 
+     * @param yieldBlock The block to which to yield
+     * @param value
+     * @param self
+     * @param klass
+     * @param yieldProc
+     * @param aValue
+     * @return
+     */
     public IRubyObject yield(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean yieldProc, boolean aValue) {
         if (! isBlockGiven()) {
             throw runtime.newLocalJumpError("yield called out of block");
@@ -977,9 +998,6 @@ public class ThreadContext {
 
     private Block preYieldCurrentBlock(RubyModule klass) {
         Block currentBlock = getCurrentFrame().getBlockArg();
-        if (getCurrentFrame().getBlockArg() != currentBlock) {
-            Thread.dumpStack();
-        }
 
         restoreBlockState(currentBlock, klass);
 
