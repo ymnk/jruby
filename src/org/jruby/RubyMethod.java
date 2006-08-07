@@ -109,10 +109,10 @@ public class RubyMethod extends RubyObject {
      */
     public IRubyObject call(IRubyObject[] args) {
     	assert args != null;
+        ThreadContext tc = getRuntime().getCurrentContext();
 
     	method.getArity().checkArity(getRuntime(), args);
         
-        ThreadContext tc = getRuntime().getCurrentContext();
         tc.setIfBlockAvailable();
         try {
             // FIXME: should lastClass be implementation module for a Method?
@@ -136,7 +136,8 @@ public class RubyMethod extends RubyObject {
     public IRubyObject to_proc() {
     	CallbackFactory f = getRuntime().callbackFactory(RubyMethod.class);
 		IRuby r = getRuntime();
-        r.getCurrentContext().preToProc(Block.createBlock(null, new IterateCallable(f.getBlockMethod("bmcall"), this), r.getTopSelf()));
+        ThreadContext tc = r.getCurrentContext();
+        tc.preToProc(Block.createBlock(null, new IterateCallable(f.getBlockMethod("bmcall"), this), r.getTopSelf()));
 		
 		try {
 		    while (true) {
@@ -157,7 +158,7 @@ public class RubyMethod extends RubyObject {
 		        }
 		    }
 		} finally {
-            r.getCurrentContext().postToProc();
+            tc.postToProc();
 		}
     }
 
@@ -168,13 +169,14 @@ public class RubyMethod extends RubyObject {
      */
     public static IRubyObject mproc(IRubyObject recv) {
     	IRuby runtime = recv.getRuntime();
-
-        runtime.getCurrentContext().preMproc();
+    	ThreadContext tc = runtime.getCurrentContext();
+        
+        tc.preMproc();
         
         try {
             return RubyKernel.proc(recv);
         } finally {
-            runtime.getCurrentContext().postMproc();
+            tc.postMproc();
         }
     }
 
