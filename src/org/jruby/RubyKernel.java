@@ -607,22 +607,33 @@ public class RubyKernel {
     public static IRubyObject eval(IRubyObject recv, IRubyObject[] args) {
         IRuby runtime = recv.getRuntime();
         RubyString src = (RubyString) args[0];
-        IRubyObject scope = args.length > 1 ? args[1] : runtime.getNil();
-        String file = args.length > 2 ? args[2].toString() : "(eval)";
-        int line = args.length > 3 ? RubyNumeric.fix2int(args[3]) : 1;
+        IRubyObject scope = null;
+        String file = "(eval)";
+        
+        if (args.length > 1) {
+            if (!args[1].isNil()) {
+                scope = args[1];
+            }
+            
+            if (args.length > 2) {
+                file = args[2].toString();
+            }
+        }
+        // FIXME: line number is not supported yet
+        //int line = args.length > 3 ? RubyNumeric.fix2int(args[3]) : 1;
 
         src.checkSafeString();
         ThreadContext tc = runtime.getCurrentContext();
 
-        if (scope.isNil() && tc.getPreviousFrame() != null) {
+        if (scope == null && tc.getPreviousFrame() != null) {
             try {
                 tc.preKernelEval();
-                return recv.eval(src, scope, file, line);
+                return recv.evalSimple(src, file);
             } finally {
                 tc.postKernelEval();
             }
         }
-        return recv.eval(src, scope, file, line);
+        return recv.evalWithBinding(src, scope, file);
     }
 
     public static IRubyObject caller(IRubyObject recv, IRubyObject[] args) {
@@ -830,7 +841,7 @@ public class RubyKernel {
 		}
 		
         public void run() {
-            result = new Main(in, out, out).run(argArray);
+            result = new Main(in, out, err).run(argArray);
         }
     }
 

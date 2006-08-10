@@ -591,11 +591,11 @@ public class RubyObject implements Cloneable, IRubyObject {
             public IRubyObject execute(IRubyObject self, IRubyObject[] args) {
                 IRubyObject source = args[1];
                 IRubyObject filename = args[2];
-                IRubyObject lineNumber = args[3];
-                return args[0].eval(source,
-                                  self.getRuntime().getNil(),
-                                  ((RubyString) filename).toString(),
-                                  RubyNumeric.fix2int(lineNumber));
+                // FIXME: lineNumber is not supported
+                //IRubyObject lineNumber = args[3];
+                
+                return args[0].evalSimple(source,
+                                  ((RubyString) filename).toString());
             }
 
             public Arity getArity() {
@@ -637,66 +637,89 @@ public class RubyObject implements Cloneable, IRubyObject {
         }, new IRubyObject[] { this });
     }
 
-    public IRubyObject eval(IRubyObject src, IRubyObject scope, String file, int line) {
+    /* (non-Javadoc)
+     * @see org.jruby.runtime.builtin.IRubyObject#evalWithBinding(org.jruby.runtime.builtin.IRubyObject, org.jruby.runtime.builtin.IRubyObject, java.lang.String)
+     */
+    public IRubyObject evalWithBinding(IRubyObject src, IRubyObject scope, String file) {
+        // both of these are ensured by the (very few) callers
+        assert !scope.isNil();
+        assert file != null;
+        
         ThreadContext threadContext = getRuntime().getCurrentContext();
         
-        ISourcePosition savedPosition = null;
-        Iter iter = null;
+        ISourcePosition savedPosition = threadContext.getPosition();
         IRubyObject oldSelf = null;
         EvaluationState state = null;
-        
         IRubyObject result = getRuntime().getNil();
         
-        try {
-            savedPosition = threadContext.getPosition();
-            
-            // make sure we have a file
-            if (file == null) {
-                file = threadContext.getSourceFile();
-            }
-            
+        IRubyObject newSelf = null;
+
+        if (!(scope instanceof RubyBinding)) {
             if (scope instanceof RubyProc) {
-            	scope = ((RubyProc) scope).binding();
-            }
-            IRubyObject newSelf = null;
-            if (scope.isNil() || !(scope instanceof RubyBinding)) {
-                // no binding, just eval in "current" frame (caller's frame)
-                iter = threadContext.getCurrentFrame().getIter();
-                
-                // hack to avoid using previous frame if we're the first frame, since this eval is used to start execution too
-                if (threadContext.getPreviousFrame() != null) {
-                    threadContext.getCurrentFrame().setIter(threadContext.getPreviousFrame().getIter());
-                }
-                
-                newSelf = this;
+                scope = ((RubyProc) scope).binding();
             } else {
-                // Binding provided for scope, use it
-                threadContext.preEvalWithBinding((RubyBinding)scope);
-                
-                newSelf = threadContext.getCurrentFrame().getSelf();
+                // bomb out, it's not a binding or a proc
+                throw getRuntime().newTypeError("wrong argument type " + scope.getMetaClass() + " (expected Proc/Binding)");
             }
+        }
+        
+        try {
+            // Binding provided for scope, use it
+            threadContext.preEvalWithBinding((RubyBinding)scope);            
+            newSelf = threadContext.getCurrentFrame().getSelf();
 
             state = threadContext.getCurrentFrame().getEvalState();
             oldSelf = state.getSelf();
             state.setSelf(newSelf);
             
-            Node node = getRuntime().parse(src.toString(), file);
-            
-            result = state.begin(node);
+            result = state.begin(getRuntime().parse(src.toString(), file));
         } finally {
             // return the eval state to its original self
             state.setSelf(oldSelf);
-            
-            if (scope.isNil() || !(scope instanceof RubyBinding)) {
-//              FIXME: this is broken for Proc, see above
-                threadContext.getCurrentFrame().setIter(iter);
-            } else if (scope instanceof RubyBinding) {
-                threadContext.postEvalWithBinding();
-            }
+            threadContext.postEvalWithBinding();
             
             // restore position
             threadContext.setPosition(savedPosition);
         }
+        return result;
+    }
+
+    /* (non-Javadoc)
+     * @see org.jruby.runtime.builtin.IRubyObject#evalSimple(org.jruby.runtime.builtin.IRubyObject, java.lang.String)
+     */
+    public IRubyObject evalSimple(IRubyObject src, String file) {
+        // this is ensured by the callers
+        assert file != null;
+        
+        ThreadContext threadContext = getRuntime().getCurrentContext();
+        
+        ISourcePosition savedPosition = threadContext.getPosition();
+        // no binding, just eval in "current" frame (caller's frame)
+        Iter iter = threadContext.getCurrentFrame().getIter();
+        EvaluationState state = threadContext.getCurrentFrame().getEvalState();
+        IRubyObject oldSelf = state.getSelf();
+        IRubyObject result = getRuntime().getNil();
+        
+        try {
+            // hack to avoid using previous frame if we're the first frame, since this eval is used to start execution too
+            if (threadContext.getPreviousFrame() != null) {
+                threadContext.getCurrentFrame().setIter(threadContext.getPreviousFrame().getIter());
+            }
+            
+            state.setSelf(this);
+            
+            result = state.begin(getRuntime().parse(src.toString(), file));
+        } finally {
+            // return the eval state to its original self
+            state.setSelf(oldSelf);
+            
+            // FIXME: this is broken for Proc, see above
+            threadContext.getCurrentFrame().setIter(iter);
+            
+            // restore position
+            threadContext.setPosition(savedPosition);
+        }
+        
         return result;
     }
 
