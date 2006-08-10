@@ -111,7 +111,7 @@ public class Block implements StackElement {
         }
         context.preProcBlockCall();
         try {
-            return context.yield(newBlock, runtime.newArray(args), null, null, false, true);
+            return context.yieldSpecificBlock(newBlock, runtime.newArray(args), null, null, true);
         } finally {
             context.postProcBlockCall();
         }

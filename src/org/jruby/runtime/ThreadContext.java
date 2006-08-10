@@ -168,7 +168,7 @@ public class ThreadContext {
         
         getCurrentFrame().setScope(block.getScope());
 
-        dynamicVarsStack.push(block.getDynamicVariables());
+        pushDynamicVars(block.getDynamicVariables());
 
         pushRubyClass((klass != null) ? klass : block.getKlass()); 
 
@@ -177,8 +177,8 @@ public class ThreadContext {
 
     private void flushBlockState() {
         popIter();
-        dynamicVarsStack.pop();
-        frameStack.pop();
+        popDynamicVars();
+        popFrame();
         
         unsetCRef();
         
@@ -191,6 +191,10 @@ public class ThreadContext {
 
     private void pushDynamicVars() {
         dynamicVarsStack.push(new DynamicVariableSet());
+    }
+
+    private void pushDynamicVars(DynamicVariableSet dynVars) {
+        dynamicVarsStack.push(dynVars);
     }
 
     private void popDynamicVars() {
@@ -372,11 +376,7 @@ public class ThreadContext {
     }
 
     public IRubyObject yield(IRubyObject value) {
-        return yield(value, null, null, false);
-    }
-
-    public IRubyObject yield(IRubyObject value, IRubyObject self, RubyModule klass, boolean checkArguments) {
-        return yield(value, self, klass, false, checkArguments);
+        return yieldCurrentBlock(value, null, null, false);
     }
 
     /**
@@ -389,7 +389,7 @@ public class ThreadContext {
      * @param aValue
      * @return
      */
-    public IRubyObject yield(IRubyObject value, IRubyObject self, RubyModule klass, boolean yieldProc, boolean aValue) {
+    public IRubyObject yieldCurrentBlock(IRubyObject value, IRubyObject self, RubyModule klass, boolean aValue) {
         if (! isBlockGiven()) {
             throw runtime.newLocalJumpError("yield called out of block");
         }
@@ -397,7 +397,7 @@ public class ThreadContext {
         Block currentBlock = preYieldCurrentBlock(klass);
 
         try {
-            return yieldInternal(currentBlock, value, self, klass, yieldProc, aValue);
+            return yieldInternal(currentBlock, value, self, klass, aValue);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.NextJump) {
 	            IRubyObject nextValue = (IRubyObject)je.getPrimaryData();
@@ -421,7 +421,7 @@ public class ThreadContext {
      * @param aValue
      * @return
      */
-    public IRubyObject yield(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean yieldProc, boolean aValue) {
+    public IRubyObject yieldSpecificBlock(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean aValue) {
         if (! isBlockGiven()) {
             throw runtime.newLocalJumpError("yield called out of block");
         }
@@ -429,7 +429,7 @@ public class ThreadContext {
         preYieldSpecificBlock(yieldBlock, klass);
 
         try {
-            return yieldInternal(yieldBlock, value, self, klass, yieldProc, aValue);
+            return yieldInternal(yieldBlock, value, self, klass, aValue);
         } catch (JumpException je) {
             if (je.getJumpType() == JumpException.JumpType.NextJump) {
                 IRubyObject nextValue = (IRubyObject)je.getPrimaryData();
@@ -442,7 +442,7 @@ public class ThreadContext {
         }
     }
     
-    private IRubyObject yieldInternal(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean yieldProc, boolean aValue) {
+    private IRubyObject yieldInternal(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean aValue) {
         // block is executed under its own self, so save the old one (use a stack?)
         IRubyObject oldSelf = getCurrentFrame().getEvalState().getSelf();
         
@@ -455,7 +455,8 @@ public class ThreadContext {
     
             getCurrentFrame().getEvalState().setSelf(getCurrentFrame().getSelf()); 
             
-            IRubyObject[] args = getBlockArgs(value, self, yieldProc, aValue, yieldBlock);
+            // FIXME: during refactoring, it was determined that all calls to yield are passing false for yieldProc; is this still needed?
+            IRubyObject[] args = getBlockArgs(value, self, false, aValue, yieldBlock);
     
             while (true) {
                 try {

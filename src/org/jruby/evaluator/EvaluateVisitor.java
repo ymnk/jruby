@@ -2054,7 +2054,7 @@ public final class EvaluateVisitor implements NodeVisitor {
                 state.setResult(null);
             }
                 
-            state.setResult(state.getThreadContext().yield(state.getResult(), null, null, false, iVisited.getCheckState()));
+            state.setResult(state.getThreadContext().yieldCurrentBlock(state.getResult(), null, null, iVisited.getCheckState()));
         }
     }
     private static final Yield2 yield2 = new Yield2();
