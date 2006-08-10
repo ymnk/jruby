@@ -115,6 +115,16 @@ test_equal("string", "string\n".chop)
 test_equal("strin", "string".chop)
 test_equal("", "x".chop.chop)
 
+
+##### <=> (cmp) #####
+
+test_equal(-1, 'A' <=> 'B')
+test_equal(0, 'A' <=> 'A')
+test_equal(1, 'B' <=> 'A')
+test_equal(nil, 'A' <=> 3)
+test_equal(nil, 'A' <=> 3.to_f)
+
+
 ##### <</concat ######
 s = "a"
 test_equal("aa", s << "a")
@@ -415,8 +425,6 @@ test_equal("a8", s)
 
 ##### formatting with % and a string #####
 test_equal(" 5", '%02s' % '5')
-# FIXME: JRUBY-39
-#test_equal("5.000000", '%02f' % '5')
 test_equal("05", '%02d' % '5')
 test_equal("05", '%02g' % '5')
 test_equal("05", '%02G' % '5')
