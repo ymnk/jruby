@@ -141,7 +141,7 @@ public class ScriptTestSuite extends TestSuite {
             
             if (!lastFailed.isEmpty()) {
 				RubyString message = (RubyString) lastFailed.callMethod("to_s");
-                fail(message.toString());
+                fail(scriptName() + " failed, complete failure list follows:\n" + message.toString());
             }
 
             System.out.flush(); // Without a flush Ant will miss some of our output
