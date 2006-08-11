@@ -422,12 +422,8 @@ public class ThreadContext {
      * @return
      */
     public IRubyObject yieldSpecificBlock(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean aValue) {
-        if (! isBlockGiven()) {
-            throw runtime.newLocalJumpError("yield called out of block");
-        }
-
         preYieldSpecificBlock(yieldBlock, klass);
-
+        preProcBlockCall();
         try {
             return yieldInternal(yieldBlock, value, self, klass, aValue);
         } catch (JumpException je) {
@@ -438,6 +434,7 @@ public class ThreadContext {
                 throw je;
             }
         } finally {
+            postProcBlockCall();
             postYieldSpecificBlock();
         }
     }
@@ -457,7 +454,6 @@ public class ThreadContext {
             
             // FIXME: during refactoring, it was determined that all calls to yield are passing false for yieldProc; is this still needed?
             IRubyObject[] args = getBlockArgs(value, self, false, aValue, yieldBlock);
-    
             while (true) {
                 try {
                     // FIXME: is it appropriate to use the current frame's (the block's frame's) lastClass?

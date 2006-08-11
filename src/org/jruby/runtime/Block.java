@@ -109,12 +109,8 @@ public class Block implements StackElement {
         if (replacementSelf != null) {
             newBlock.self = replacementSelf;
         }
-        context.preProcBlockCall();
-        try {
-            return context.yieldSpecificBlock(newBlock, runtime.newArray(args), null, null, true);
-        } finally {
-            context.postProcBlockCall();
-        }
+
+        return context.yieldSpecificBlock(newBlock, runtime.newArray(args), null, null, true);
     }
 
     public Block cloneBlock() {

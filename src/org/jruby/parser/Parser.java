@@ -73,8 +73,10 @@ public class Parser {
         config.setLocalVariables(tc.getCurrentScope().getLocalNames());
         
         // FIXME: hack; search for an ITER_CUR; this lets us know we're parsing from within a block and should bring dvars along
-        for (Iterator iter = tc.getIterStack().iterator(); iter.hasNext();) {
-            if ((Iter)iter.next() == Iter.ITER_CUR) {
+        for (Iterator iterator = tc.getIterStack().iterator(); iterator.hasNext();) {
+            Iter iter = (Iter)iterator.next();
+            
+            if (iter == Iter.ITER_CUR) {
                 config.setDynamicVariables(tc.getCurrentDynamicVars().names());
                 break;
             }

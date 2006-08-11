@@ -121,6 +121,10 @@ public class RubyObject implements Cloneable, IRubyObject {
     public Class getJavaClass() {
         return IRubyObject.class;
     }
+    
+    public static void puts(Object obj) {
+        System.out.println(obj.toString());
+    }
 
     /**
      * This method is just a wrapper around the Ruby "==" method,
