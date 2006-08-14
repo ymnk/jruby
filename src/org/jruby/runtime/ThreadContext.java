@@ -61,7 +61,7 @@ import org.jruby.util.collections.SinglyLinkedList;
 public class ThreadContext {
     private final IRuby runtime;
 
-    private UnsynchronizedStack blockStack;
+    private Block blockStack;
     private UnsynchronizedStack dynamicVarsStack;
 
     private RubyThread thread;
@@ -82,8 +82,6 @@ public class ThreadContext {
     public ThreadContext(IRuby runtime) {
         this.runtime = runtime;
 
-        this.blockStack = new UnsynchronizedStack();
-        pushdownBlocks(null);
         this.dynamicVarsStack = new UnsynchronizedStack();
         this.frameStack = new UnsynchronizedStack();
         this.iterStack = new UnsynchronizedStack();
@@ -118,35 +116,23 @@ public class ThreadContext {
     }
     
     private void pushBlock(Block block) {
-        block.setNext((Block)blockStack.pop());
-        blockStack.push(block);
+        block.setNext(this.blockStack);
+        this.blockStack = block;
     }
     
     private Block popBlock() {
-        if (blockStack.peek() == null) {
+        if (blockStack == null) {
             return null;
         }
         
-        Block current = (Block)blockStack.pop();
-        blockStack.push(current.getNext());
+        Block current = blockStack;
+        blockStack = (Block)blockStack.getNext();
         
         return current;
     }
     
     public Block getCurrentBlock() {
-        return (Block)blockStack.peek();
-    }
-    
-    private void pushdownBlocks(Block block) {
-        blockStack.push(block);
-    }
-    
-    private void popupBlocks() {
-        if (blockStack.size() == 1) {
-            // do not pop last slot
-            return;
-        }
-        blockStack.pop();
+        return blockStack;
     }
     
     public boolean isBlockGiven() {
@@ -753,9 +739,9 @@ public class ThreadContext {
     public void beginCallArgs() {
         //Block block = getCurrentBlock();
 
-        if (getCurrentIter().isPre() && getCurrentBlock() != null) {
-            pushdownBlocks((Block)getCurrentBlock().getNext());
-        }
+        //if (getCurrentIter().isPre() && getCurrentBlock() != null) {
+            //pushdownBlocks((Block)getCurrentBlock().getNext());
+        //}
         setNoBlock();
         //return block;
     }
@@ -763,9 +749,9 @@ public class ThreadContext {
     public void endCallArgs(){//Block block) {
         //setCurrentBlock(block);
         clearNoBlock();
-        if (getCurrentIter().isPre() && !blockStack.isEmpty()) {
-            popupBlocks();
-        }
+        //if (getCurrentIter().isPre() && !blockStack.isEmpty()) {
+            //popupBlocks();
+        //}
     }
     
     public void preAdoptThread() {
@@ -920,7 +906,7 @@ public class ThreadContext {
         // XXX: this is kind of a hack, since eval state holds ThreadContext, and when it's created it's in the other thread :(
         // we'll want to revisit these issues of block ownership since the block is created in one thread and used in another
         //currentBlock.getFrame().setEvalState(new EvaluationState(runtime, currentBlock.getFrame().getSelf()));
-        pushdownBlocks(currentBlock);
+        blockStack = currentBlock;
     }
     
     public void preKernelEval() {
