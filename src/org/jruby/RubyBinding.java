@@ -78,8 +78,8 @@ public class RubyBinding extends RubyObject {
         Frame frame = context.getCurrentFrame();
         
         if (context.getPreviousFrame() != null) {
-            frame = context.getPreviousFrame();
-            iter = frame.getIter();
+            
+            iter = context.getPreviousFrameIter();
         }
 
         DynamicVariableSet dynVars = context.getCurrentDynamicVars();

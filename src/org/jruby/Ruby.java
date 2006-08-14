@@ -202,7 +202,7 @@ public final class Ruby implements IRuby {
 
     public IRubyObject eval(Node node) {
         try {
-            return getCurrentContext().getCurrentFrame().getEvalState().begin(node);
+            return getCurrentContext().getFrameEvalState().begin(node);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
 	            return (IRubyObject)je.getSecondaryData();
@@ -333,7 +333,7 @@ public final class Ruby implements IRuby {
 
     public void secure(int level) {
         if (level <= safeLevel) {
-            throw newSecurityError("Insecure operation '" + getCurrentContext().getCurrentFrame().getLastFunc() + "' at level " + safeLevel);
+            throw newSecurityError("Insecure operation '" + getCurrentContext().getFrameLastFunc() + "' at level " + safeLevel);
         }
     }
     
@@ -782,9 +782,9 @@ public final class Ruby implements IRuby {
 	private void printErrorPos(PrintStream errorStream) {
         ThreadContext tc = getCurrentContext();
         if (tc.getSourceFile() != null) {
-            if (tc.getCurrentFrame().getLastFunc() != null) {
+            if (tc.getFrameLastFunc() != null) {
             	errorStream.print(tc.getPosition());
-            	errorStream.print(":in '" + tc.getCurrentFrame().getLastFunc() + '\'');
+            	errorStream.print(":in '" + tc.getFrameLastFunc() + '\'');
             } else if (tc.getSourceLine() != 0) {
                 errorStream.print(tc.getPosition());
             } else {

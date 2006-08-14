@@ -89,67 +89,67 @@ public class Frame {
     /** Getter for property args.
      * @return Value of property args.
      */
-    public IRubyObject[] getArgs() {
+    IRubyObject[] getArgs() {
         return args;
     }
 
     /** Setter for property args.
      * @param args New value of property args.
      */
-    public void setArgs(IRubyObject[] args) {
+    void setArgs(IRubyObject[] args) {
         this.args = args;
     }
 
     /**
      * @return the frames current position
      */
-    public ISourcePosition getPosition() {
+    ISourcePosition getPosition() {
         return position;
     }
 
     /** Getter for property iter.
      * @return Value of property iter.
      */
-    public Iter getIter() {
+    Iter getIter() {
         return iter;
     }
 
     /** Setter for property iter.
      * @param iter New value of property iter.
      */
-    public void setIter(Iter iter) {
+    void setIter(Iter iter) {
         this.iter = iter;
     }
 
-    public boolean isBlockGiven() {
+    boolean isBlockGiven() {
         return iter.isBlockGiven();
     }
 
     /** Getter for property lastClass.
      * @return Value of property lastClass.
      */
-    public RubyModule getLastClass() {
+    RubyModule getLastClass() {
         return lastClass;
     }
 
     /** Getter for property lastFunc.
      * @return Value of property lastFunc.
      */
-    public String getLastFunc() {
+    String getLastFunc() {
         return lastFunc;
     }
 
     /** Getter for property self.
      * @return Value of property self.
      */
-    public IRubyObject getSelf() {
+    IRubyObject getSelf() {
         return self;
     }
 
     /** Setter for property self.
      * @param self New value of property self.
      */
-    public void setSelf(IRubyObject self) {
+    void setSelf(IRubyObject self) {
         this.self = self;
     }
     
@@ -195,15 +195,15 @@ public class Frame {
         return sb.toString();
     }
 
-    public EvaluationState getEvalState() {
+    EvaluationState getEvalState() {
         return evalState != null ? evalState : (evalState = new EvaluationState(runtime, self));
     }
 
-    public void setEvalState(EvaluationState evalState) {
+    void setEvalState(EvaluationState evalState) {
         this.evalState = evalState;
     }
     
-    public Block getBlockArg() {
+    Block getBlockArg() {
         return blockArg;
     }
 }

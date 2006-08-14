@@ -155,7 +155,6 @@ import org.jruby.internal.runtime.methods.WrapperCallable;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
-import org.jruby.runtime.Frame;
 import org.jruby.runtime.ICallable;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
@@ -185,8 +184,8 @@ public final class EvaluateVisitor implements NodeVisitor {
 
     private static void callTraceFunction(EvaluationState state, String event, IRubyObject zelf) {
         ThreadContext tc = state.getThreadContext();
-        String name = tc.getCurrentFrame().getLastFunc();
-        RubyModule type = tc.getCurrentFrame().getLastClass();
+        String name = tc.getFrameLastFunc();
+        RubyModule type = tc.getFrameLastClass();
         state.runtime.callTraceFunction(event, tc.getPosition(), zelf, name, type);
     }
     
@@ -1089,28 +1088,28 @@ public final class EvaluateVisitor implements NodeVisitor {
     		FlipNode iVisited = (FlipNode)ctx;
             ThreadContext tc = state.runtime.getCurrentContext();
             if (iVisited.isExclusive()) {
-                if (! tc.getCurrentScope().getValue(iVisited.getCount()).isTrue()) {
+                if (! tc.getFrameScope().getValue(iVisited.getCount()).isTrue()) {
                     //Benoit: I don't understand why the state.result is inversed
                     state.setResult(state.begin(iVisited.getBeginNode()).isTrue() ? state.runtime.getFalse() : state.runtime.getTrue());
-                    tc.getCurrentScope().setValue(iVisited.getCount(), state.getResult());
+                    tc.getFrameScope().setValue(iVisited.getCount(), state.getResult());
                 } else {
                     if (state.begin(iVisited.getEndNode()).isTrue()) {
-                        tc.getCurrentScope().setValue(iVisited.getCount(), state.runtime.getFalse());
+                        tc.getFrameScope().setValue(iVisited.getCount(), state.runtime.getFalse());
                     }
                     state.setResult(state.runtime.getTrue());
                 }
             } else {
-                if (! tc.getCurrentScope().getValue(iVisited.getCount()).isTrue()) {
+                if (! tc.getFrameScope().getValue(iVisited.getCount()).isTrue()) {
                     if (state.begin(iVisited.getBeginNode()).isTrue()) {
                         //Benoit: I don't understand why the state.result is inversed
-                        tc.getCurrentScope().setValue(iVisited.getCount(), state.begin(iVisited.getEndNode()).isTrue() ? state.runtime.getFalse() : state.runtime.getTrue());
+                        tc.getFrameScope().setValue(iVisited.getCount(), state.begin(iVisited.getEndNode()).isTrue() ? state.runtime.getFalse() : state.runtime.getTrue());
                         state.setResult(state.runtime.getTrue());
                     } else {
                         state.setResult(state.runtime.getFalse());
                     }
                 } else {
                     if (state.begin(iVisited.getEndNode()).isTrue()) {
-                        tc.getCurrentScope().setValue(iVisited.getCount(), state.runtime.getFalse());
+                        tc.getFrameScope().setValue(iVisited.getCount(), state.runtime.getFalse());
                     }
                     state.setResult(state.runtime.getTrue());
                 }
@@ -1356,7 +1355,7 @@ public final class EvaluateVisitor implements NodeVisitor {
     private static class LocalAsgnNodeVisitor1 implements Instruction {
     	public void execute(EvaluationState state, InstructionContext ctx) {
     		LocalAsgnNode iVisited = (LocalAsgnNode)ctx;
-            state.runtime.getCurrentContext().getCurrentScope().setValue(iVisited.getCount(), state.getResult());
+            state.runtime.getCurrentContext().getFrameScope().setValue(iVisited.getCount(), state.getResult());
         }
 	}
     private static final LocalAsgnNodeVisitor1 localAsgnNodeVisitor1 = new LocalAsgnNodeVisitor1();
@@ -1374,7 +1373,7 @@ public final class EvaluateVisitor implements NodeVisitor {
     private static class LocalVarNodeVisitor implements Instruction {
     	public void execute(EvaluationState state, InstructionContext ctx) {
     		LocalVarNode iVisited = (LocalVarNode)ctx;
-            state.setResult(state.runtime.getCurrentContext().getCurrentScope().getValue(iVisited.getCount()));
+            state.setResult(state.runtime.getCurrentContext().getFrameScope().getValue(iVisited.getCount()));
     	}
     }
     private static final LocalVarNodeVisitor localVarNodeVisitor = new LocalVarNodeVisitor();
@@ -1890,8 +1889,8 @@ public final class EvaluateVisitor implements NodeVisitor {
     		SuperNode iVisited = (SuperNode)ctx;
             ThreadContext tc = state.getThreadContext();
             
-            if (tc.getCurrentFrame().getLastClass() == null) {
-                throw state.runtime.newNameError("Superclass method '" + tc.getCurrentFrame().getLastFunc() + "' disabled.");
+            if (tc.getFrameLastClass() == null) {
+                throw state.runtime.newNameError("Superclass method '" + tc.getFrameLastFunc() + "' disabled.");
             }
 
             tc.beginCallArgs();
@@ -2082,13 +2081,12 @@ public final class EvaluateVisitor implements NodeVisitor {
     private static class ZSuperNodeVisitor implements Instruction {
     	public void execute(EvaluationState state, InstructionContext ctx) {
             ThreadContext tc = state.getThreadContext();
-    		Frame frame = tc.getCurrentFrame();
     		
-            if (frame.getLastClass() == null) {
-                throw state.runtime.newNameError("superclass method '" + frame.getLastFunc() + "' disabled");
+            if (tc.getFrameLastClass() == null) {
+                throw state.runtime.newNameError("superclass method '" + tc.getFrameLastFunc() + "' disabled");
             }
 
-            state.setResult(tc.callSuper(frame.getArgs()));
+            state.setResult(tc.callSuper(tc.getFrameArgs()));
     	}
     }
     private static final ZSuperNodeVisitor zSuperNodeVisitor = new ZSuperNodeVisitor();

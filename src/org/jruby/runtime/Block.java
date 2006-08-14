@@ -64,7 +64,7 @@ public class Block implements StackElement {
                          self,
                          context.getCurrentFrame(),
                          context.peekCRef(),
-                         context.getCurrentScope(),
+                         context.getFrameScope(),
                          context.getRubyClass(),
                          context.getCurrentIter(),
                          context.getCurrentDynamicVars());

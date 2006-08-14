@@ -340,7 +340,7 @@ public class RubyObject implements Cloneable, IRubyObject {
 
         if (method.isUndefined() ||
             !(name.equals("method_missing") ||
-              method.isCallableFrom(getRuntime().getCurrentContext().getCurrentFrame().getSelf(), callType))) {
+              method.isCallableFrom(getRuntime().getCurrentContext().getFrameSelf(), callType))) {
             if (callType == CallType.SUPER) {
                 throw getRuntime().newNameError("super: no superclass method '" + name + "'");
             }
@@ -440,7 +440,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public IRubyObject eval(Node n) {
         //return new EvaluationState(getRuntime(), this).begin(n);
         // need to continue evaluation with a new self, so save the old one (should be a stack?)
-        EvaluationState state = getRuntime().getCurrentContext().getCurrentFrame().getEvalState();
+        EvaluationState state = getRuntime().getCurrentContext().getFrameEvalState();
         IRubyObject oldSelf = state.getSelf();
         state.setSelf(this);
         try {
@@ -533,8 +533,8 @@ public class RubyObject implements Cloneable, IRubyObject {
     public void checkSafeString() {
         if (getRuntime().getSafeLevel() > 0 && isTaint()) {
             ThreadContext tc = getRuntime().getCurrentContext();
-            if (tc.getCurrentFrame().getLastFunc() != null) {
-                throw getRuntime().newSecurityError("Insecure operation - " + tc.getCurrentFrame().getLastFunc());
+            if (tc.getFrameLastFunc() != null) {
+                throw getRuntime().newSecurityError("Insecure operation - " + tc.getFrameLastFunc());
             }
             throw getRuntime().newSecurityError("Insecure operation: -r");
         }
@@ -560,7 +560,7 @@ public class RubyObject implements Cloneable, IRubyObject {
 		if (args.length == 0) {
 		    throw getRuntime().newArgumentError("block not supplied");
 		} else if (args.length > 3) {
-		    String lastFuncName = tc.getCurrentFrame().getLastFunc();
+		    String lastFuncName = tc.getFrameLastFunc();
 		    throw getRuntime().newArgumentError(
 		        "wrong # of arguments: " + lastFuncName + "(src) or " + lastFuncName + "{..}");
 		}
@@ -670,9 +670,9 @@ public class RubyObject implements Cloneable, IRubyObject {
         try {
             // Binding provided for scope, use it
             threadContext.preEvalWithBinding((RubyBinding)scope);            
-            newSelf = threadContext.getCurrentFrame().getSelf();
+            newSelf = threadContext.getFrameSelf();
 
-            state = threadContext.getCurrentFrame().getEvalState();
+            state = threadContext.getFrameEvalState();
             oldSelf = state.getSelf();
             state.setSelf(newSelf);
             
@@ -699,15 +699,15 @@ public class RubyObject implements Cloneable, IRubyObject {
         
         ISourcePosition savedPosition = threadContext.getPosition();
         // no binding, just eval in "current" frame (caller's frame)
-        Iter iter = threadContext.getCurrentFrame().getIter();
-        EvaluationState state = threadContext.getCurrentFrame().getEvalState();
+        Iter iter = threadContext.getFrameIter();
+        EvaluationState state = threadContext.getFrameEvalState();
         IRubyObject oldSelf = state.getSelf();
         IRubyObject result = getRuntime().getNil();
         
         try {
             // hack to avoid using previous frame if we're the first frame, since this eval is used to start execution too
             if (threadContext.getPreviousFrame() != null) {
-                threadContext.getCurrentFrame().setIter(threadContext.getPreviousFrame().getIter());
+                threadContext.setFrameIter(threadContext.getPreviousFrameIter());
             }
             
             state.setSelf(this);
@@ -718,7 +718,7 @@ public class RubyObject implements Cloneable, IRubyObject {
             state.setSelf(oldSelf);
             
             // FIXME: this is broken for Proc, see above
-            threadContext.getCurrentFrame().setIter(iter);
+            threadContext.setFrameIter(iter);
             
             // restore position
             threadContext.setPosition(savedPosition);

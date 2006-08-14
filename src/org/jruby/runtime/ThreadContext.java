@@ -48,6 +48,7 @@ import org.jruby.ast.StarNode;
 import org.jruby.ast.ZeroArgNode;
 import org.jruby.ast.util.ArgsUtil;
 import org.jruby.evaluator.AssignmentVisitor;
+import org.jruby.evaluator.EvaluationState;
 import org.jruby.exceptions.JumpException;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.lexer.yacc.SourcePositionFactory;
@@ -196,13 +197,14 @@ public class ThreadContext {
     }
 
     public IRubyObject getLastline() {
-        return getCurrentScope().getLastLine();
+        return getFrameScope().getLastLine();
     }
 
     public void setLastline(IRubyObject value) {
-        getCurrentScope().setLastLine(value);
+        getFrameScope().setLastLine(value);
     }
     
+    //////////////////// FRAME MANAGEMENT ////////////////////////
     private void pushFrameCopy() {
         pushFrame(getCurrentFrame().duplicate());
     }
@@ -231,7 +233,7 @@ public class ThreadContext {
     }
     
     public Frame getCurrentFrame() {
-        return (Frame) frameStack.peek();
+        return (Frame)frameStack.peek();
     }
     
     public Frame getPreviousFrame() {
@@ -243,6 +245,51 @@ public class ThreadContext {
         return frameStack.size();
     }
     
+    public EvaluationState getFrameEvalState() {
+        return getCurrentFrame().getEvalState();
+    }
+    
+    public String getFrameLastFunc() {
+        return getCurrentFrame().getLastFunc();
+    }
+    
+    public Iter getFrameIter() {
+        return getCurrentFrame().getIter();
+    }
+    
+    public void setFrameIter(Iter iter) {
+        getCurrentFrame().setIter(iter);
+    }
+    
+    public Iter getPreviousFrameIter() {
+        return getPreviousFrame().getIter();
+    }
+    
+    public IRubyObject[] getFrameArgs() {
+        return getCurrentFrame().getArgs();
+    }
+    
+    public void setFrameArgs(IRubyObject[] args) {
+        getCurrentFrame().setArgs(args);
+    }
+    
+    public IRubyObject getFrameSelf() {
+        return getCurrentFrame().getSelf();
+    }
+    
+    public RubyModule getFrameLastClass() {
+        return getCurrentFrame().getLastClass();
+    }
+    
+    public ISourcePosition getFramePosition() {
+        return getCurrentFrame().getPosition();
+    }
+    
+    public ISourcePosition getPreviousFramePosition() {
+        return getPreviousFrame().getPosition();
+    }
+    
+    /////////////////////////// ITER MANAGEMENT //////////////////////////
     private Iter popIter() {
         return (Iter) iterStack.pop();
     }
@@ -299,7 +346,7 @@ public class ThreadContext {
         return iterStack;
     }
 
-    public Scope getCurrentScope() {
+    public Scope getFrameScope() {
         return getCurrentFrame().getScope();
     }
 
@@ -320,15 +367,15 @@ public class ThreadContext {
     }
 
     public IRubyObject getBackref() {
-        return getCurrentScope().getBackref();
+        return getFrameScope().getBackref();
     }
 
     public void setBackref(IRubyObject backref) {
-        getCurrentScope().setBackref(backref);
+        getFrameScope().setBackref(backref);
     }
 
     public Visibility getCurrentVisibility() {
-        return getCurrentScope().getVisibility();
+        return getFrameScope().getVisibility();
     }
 
     public Visibility getPreviousVisibility() {
@@ -336,7 +383,7 @@ public class ThreadContext {
     }
     
     public void setCurrentVisibility(Visibility vis) {
-        getCurrentScope().setVisibility(vis);
+        getFrameScope().setVisibility(vis);
     }
 
     public IRubyObject callSuper(IRubyObject[] args) {
