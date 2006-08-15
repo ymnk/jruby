@@ -455,8 +455,8 @@ public class ThreadContext {
      * @return
      */
     public IRubyObject yieldSpecificBlock(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean aValue) {
-        preYieldSpecificBlock(yieldBlock, klass);
         preProcBlockCall();
+        preYieldSpecificBlock(yieldBlock, klass);
         try {
             return yieldInternal(yieldBlock, value, self, klass, aValue);
         } catch (JumpException je) {
@@ -467,8 +467,8 @@ public class ThreadContext {
                 throw je;
             }
         } finally {
-            postProcBlockCall();
             postYieldSpecificBlock();
+            postProcBlockCall();
         }
     }
     
