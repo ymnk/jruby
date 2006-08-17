@@ -14,10 +14,11 @@
  * Copyright (C) 2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2002-2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
- * Copyright (C) 2004-2005 Charles O Nutter <headius@headius.com>
- * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2004-2006 Charles O Nutter <headius@headius.com>
+ * Copyright (C) 2004-2006 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 David Corbin <dcorbin@users.sourceforge.net>
+ * Copyright (C) 2006 Ola Bini <ola.bini@ki.se>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -2839,14 +2840,20 @@ public final class EvaluateVisitor implements NodeVisitor {
         return array.getLength() == 1 ? array.first(IRubyObject.NULL_ARRAY) : array;
     }
 
-    /* HACK: .... */
     private static RubyArray arrayValue(EvaluationState state, IRubyObject value) {
         IRubyObject newValue = value.convertToType("Array", "to_ary", false);
 
         if (newValue.isNil()) {
-            // XXXEnebo: We should call to_a except if it is kernel def....
-            // but we will forego for now.
-            newValue = state.runtime.newArray(value);
+            // Object#to_a is obsolete.  We match Ruby's hack until to_a goes away.  Then we can 
+            // remove this hack too.
+            if (value.getType().searchMethod("to_a").getImplementationClass() != state.runtime.getKernel()) {
+                newValue = value.convertToType("Array", "to_a", false);
+                if(newValue.getType() != state.runtime.getClass("Array")) {
+                    throw state.runtime.newTypeError("`to_a' did not return Array");
+                }
+            } else {
+                newValue = state.runtime.newArray(value);
+            }
         }
         
         return (RubyArray) newValue;

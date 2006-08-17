@@ -151,7 +151,7 @@ public class RubyKernel {
         module.defineAlias("eql?", "==");
         module.definePublicModuleFunction("to_s", objectCallbackFactory.getMethod("to_s"));
         module.definePublicModuleFunction("nil?", objectCallbackFactory.getMethod("nil_p"));
-        module.definePublicModuleFunction("to_a", objectCallbackFactory.getMethod("to_a"));
+        module.defineModuleFunction("to_a", callbackFactory.getSingletonMethod("to_a"));
         module.definePublicModuleFunction("hash", objectCallbackFactory.getMethod("hash"));
         module.definePublicModuleFunction("id", objectCallbackFactory.getMethod("id"));
         module.defineAlias("__id__", "id");
@@ -980,5 +980,10 @@ public class RubyKernel {
         int resultCode = runInShell(runtime, args, output);
         recv.getRuntime().getGlobalVariables().set("$?", RubyProcess.RubyStatus.newProcessStatus(runtime, resultCode));
         return runtime.newBoolean(resultCode == 0);
+    }
+    
+    public static RubyArray to_a(IRubyObject recv) {
+        recv.getRuntime().getWarnings().warn("default 'to_a' will be obsolete");
+        return recv.getRuntime().newArray(recv);
     }
 }
