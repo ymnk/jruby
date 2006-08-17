@@ -516,6 +516,11 @@ public class RubyModule extends RubyObject {
         return null;
     }
     
+    public void addModuleFunction(String name, ICallable method) {
+        addMethod(name, method);
+        addSingletonMethod(name, method);
+    }   
+
     /** rb_define_module_function
      *
      */

@@ -464,7 +464,7 @@ public final class Ruby implements IRuby {
         RubyBoolean.createFalseClass(this);
         RubyBoolean.createTrueClass(this);
         RubyComparable.createComparable(this);
-        defineModule("Enumerable"); // Impl: src/builtin/enumerable.rb
+        RubyEnumerable.createEnumerableModule(this);
         stringClass = new StringMetaClass(this);
         stringClass.initializeClass();
         new SymbolMetaClass(this).initializeClass();
@@ -551,7 +551,6 @@ public final class Ruby implements IRuby {
     	try {
 	        new BuiltinScript("FalseClass").load(this);
 	        new BuiltinScript("TrueClass").load(this);
-	        new BuiltinScript("Enumerable").load(this);
     	} catch (IOException e) {
     		throw new Error("builtin scripts are missing", e);
     	}

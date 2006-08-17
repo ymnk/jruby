@@ -285,6 +285,10 @@ public class RubyObject implements Cloneable, IRubyObject {
         getSingletonClass().defineMethod(name, method);
     }
 
+    public void addSingletonMethod(String name, ICallable method) {
+        getSingletonClass().addMethod(name, method);
+    }
+
     /* rb_init_ccopy */
     public void initCopy(IRubyObject original) {
         assert original != null;
