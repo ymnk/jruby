@@ -190,7 +190,7 @@ public class IOHandlerProcess extends IOHandlerJavaIO {
             return 0;
         }
         
-        output.write(buf.getBytes());
+        output.write(buf.getBytes("ISO8859_1"));
 
         // Should syswrite sync?
         if (isSync) {

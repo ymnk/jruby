@@ -185,7 +185,7 @@ public class TimeMetaClass extends ObjectMetaClass {
         calendar.setTimeZone(TimeZone.getTimeZone(RubyTime.UTC));
         byte[] fromAsBytes = null;
         try {
-            fromAsBytes = from.toString().getBytes("iso8859-1");
+            fromAsBytes = from.toString().getBytes("ISO8859_1");
         } catch(final java.io.UnsupportedEncodingException uee) {
             throw getRuntime().newTypeError("marshaled time format differ");
         }
