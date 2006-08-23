@@ -36,7 +36,6 @@ import java.util.Collections;
 import java.util.Iterator;
 
 import org.jruby.IRuby;
-import org.jruby.IncludedModuleWrapper;
 import org.jruby.RubyArray;
 import org.jruby.RubyBinding;
 import org.jruby.RubyClass;
@@ -632,10 +631,7 @@ public class ThreadContext {
     }
     
     public RubyModule popCRef() {
-        if (crefStack.isEmpty()) {
-            Thread.dumpStack();
-            return null;
-        }
+        assert !crefStack.isEmpty() : "Tried to pop from empty CRef stack";
         
         RubyModule module = (RubyModule)peekCRef().getValue();
         
@@ -648,21 +644,10 @@ public class ThreadContext {
         return module;
     }
 
-    public void dumpRubyClasses() {
-        for (int i = parentStack.size() - 1; i >= 0; i--) {
-            System.out.println("parent: " + parentStack.get(i));
-        }
-    }
-
-    public RubyModule pushRubyClass(RubyModule currentModule) {
-        RubyModule previousModule = null;
-        if (!parentStack.isEmpty()) {
-            previousModule = (RubyModule)parentStack.peek();
-        }
+    public void pushRubyClass(RubyModule currentModule) {
+        assert currentModule != null : "Can't push null RubyClass";
         
         parentStack.push(currentModule);
-        
-        return previousModule;
     }
     
     public RubyModule popRubyClass() {
@@ -670,20 +655,11 @@ public class ThreadContext {
     }
 	
     public RubyModule getRubyClass() {
-        if (parentStack.isEmpty()) {
-            return null;
-        }
+        assert !parentStack.isEmpty() : "Trying to get RubyClass from empty stack";
         
         RubyModule parentModule = (RubyModule)parentStack.peek();
-        
-        if (parentModule == null) {
-            return null;
-        }
 
-        if (parentModule.isIncluded()) {
-            return ((IncludedModuleWrapper) parentModule).getDelegate();
-        }
-        return parentModule;
+        return parentModule.getNonIncludedClass();
     }
 
     public RubyModule getWrapper() {

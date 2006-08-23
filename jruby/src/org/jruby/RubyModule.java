@@ -142,6 +142,10 @@ public class RubyModule extends RubyObject {
     public boolean isIncluded() {
         return false;
     }
+    
+    public RubyModule getNonIncludedClass() {
+        return this;
+    }
  
     public String getBaseName() {
         return classId;
@@ -939,7 +943,7 @@ public class RubyModule extends RubyObject {
     }
     
     protected IRubyObject cloneMethods(RubyModule clone) {
-    	RubyModule realType = isIncluded() ? ((IncludedModuleWrapper) this).getDelegate() : this;
+    	RubyModule realType = isIncluded() ? ((IncludedModuleWrapper) this).getNonIncludedClass() : this;
         for (Iterator iter = getMethods().entrySet().iterator(); iter.hasNext(); ) {
             Map.Entry entry = (Map.Entry) iter.next();
             ICallable method = (ICallable) entry.getValue();
@@ -983,7 +987,7 @@ public class RubyModule extends RubyObject {
 
         for (RubyModule p = getSuperClass(); p != null; p = p.getSuperClass()) {
             if (p.isIncluded()) {
-                ary.append(((IncludedModuleWrapper) p).getDelegate());
+                ary.append(((IncludedModuleWrapper) p).getNonIncludedClass());
             }
         }
 
@@ -998,7 +1002,7 @@ public class RubyModule extends RubyObject {
 
         for (RubyModule p = this; p != null; p = p.getSuperClass()) {
             if (p.isIncluded()) {
-                ary.append(((IncludedModuleWrapper) p).getDelegate());
+                ary.append(((IncludedModuleWrapper) p).getNonIncludedClass());
             } else {
                 ary.append(p);
             }
@@ -1195,7 +1199,7 @@ public class RubyModule extends RubyObject {
         HashMap undefinedMethods = new HashMap();
 
         for (RubyModule type = this; type != null; type = type.getSuperClass()) {
-        	RubyModule realType = type.isIncluded() ? ((IncludedModuleWrapper) type).getDelegate() : type;
+        	RubyModule realType = type.isIncluded() ? ((IncludedModuleWrapper) type).getNonIncludedClass() : type;
             for (Iterator iter = type.getMethods().entrySet().iterator(); iter.hasNext();) {
                 Map.Entry entry = (Map.Entry) iter.next();
                 ICallable method = (ICallable) entry.getValue();
