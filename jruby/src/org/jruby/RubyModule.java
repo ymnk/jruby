@@ -841,9 +841,9 @@ public class RubyModule extends RubyObject {
             throw getRuntime().newArgumentError("wrong # of arguments(" + args.length + " for 1)");
         }
 
-        String name = args[0].asSymbol();
         IRubyObject body;
-        ICallable newMethod;
+        String name = args[0].asSymbol();
+        ICallable newMethod = null;
         ThreadContext tc = getRuntime().getCurrentContext();
         Visibility visibility = tc.getCurrentVisibility();
 
@@ -851,17 +851,22 @@ public class RubyModule extends RubyObject {
             visibility = Visibility.PRIVATE;
         }
         
-        if (args.length == 1) {
-            body = getRuntime().newProc();
-            ((RubyProc)body).getBlock().isLambda = true;
-            newMethod = new ProcMethod(this, (RubyProc)body, visibility);
+        
+        if (args.length == 1 || args[1].isKindOf(getRuntime().getClass("Proc"))) {
+            // double-testing args.length here, but it avoids duplicating the proc-setup code in two places
+            RubyProc proc = (args.length == 1) ? getRuntime().newProc() : (RubyProc)args[1];
+            body = proc;
+            
+            proc.getBlock().isLambda = true;
+            proc.getBlock().getFrame().setLastClass(this);
+            proc.getBlock().getFrame().setLastFunc(name);
+            
+            newMethod = new ProcMethod(this, proc, visibility);
         } else if (args[1].isKindOf(getRuntime().getClass("Method"))) {
-            body = args[1];
-            newMethod = new MethodMethod(this, ((RubyMethod)body).unbind(), visibility);
-        } else if (args[1].isKindOf(getRuntime().getClass("Proc"))) {
-            body = args[1];
-            ((RubyProc)body).getBlock().isLambda = true;
-            newMethod = new ProcMethod(this, (RubyProc)body, visibility);
+            RubyMethod method = (RubyMethod)args[1];
+            body = method;
+            
+            newMethod = new MethodMethod(this, method.unbind(), visibility);
         } else {
             throw getRuntime().newTypeError("wrong argument type " + args[0].getType().getName() + " (expected Proc/Method)");
         }

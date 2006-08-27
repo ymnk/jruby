@@ -280,6 +280,10 @@ public class ThreadContext {
         return getCurrentFrame().getLastClass();
     }
     
+    public RubyModule getPreviousFrameLastClass() {
+        return getPreviousFrame().getLastClass();
+    }
+    
     public ISourcePosition getFramePosition() {
         return getCurrentFrame().getPosition();
     }
