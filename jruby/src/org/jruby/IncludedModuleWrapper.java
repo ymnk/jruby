@@ -116,4 +116,8 @@ public final class IncludedModuleWrapper extends RubyClass {
     public RubyClass getRealClass() {
         return getSuperClass().getRealClass();
     }
+
+    public boolean isSame(RubyModule module) {
+        return delegate.isSame(module);
+    }
 }

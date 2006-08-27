@@ -333,8 +333,7 @@ public class RubyModule extends RubyObject {
         Map moduleMethods = module.getMethods();
 
         // Make sure the module we include does not already exist
-        // FIXME: Enebo - Lame equality check (cause: IncludedModule?)
-    	if (getMethods() == moduleMethods) {
+        if (isSame(module)) {
     		return;
     	}
         
@@ -505,15 +504,10 @@ public class RubyModule extends RubyObject {
      * @param name The name of the method to search for
      * @return The method, or UndefinedMethod if not found
      */
-    public RubyModule findImplementer(String name) {
+    public RubyModule findImplementer(RubyModule clazz) {
         for (RubyModule searchModule = this; searchModule != null; searchModule = searchModule.getSuperClass()) {
-            // included modules use delegates methods for we need to synchronize on result of getMethods
-            synchronized(searchModule.getMethods()) {
-                // See if current class has method or if it has been cached here already
-                ICallable method = (ICallable) searchModule.retrieveMethod(name);
-                if (method != null) {
-                    return searchModule;
-                }
+            if (searchModule.isSame(clazz)) {
+                return searchModule;
             }
         }
 
@@ -1093,13 +1087,17 @@ public class RubyModule extends RubyObject {
 
    public boolean isKindOfModule(RubyModule type) {
        for (RubyModule p = this; p != null; p = p.getSuperClass()) { 
-           // FIXME: this equality check is totally lame; isKindOf should be enough
-           if (p.getMethods() == type.getMethods()) {
+           if (p.isSame(type)) {
                return true;
            }
        }
        
        return false;
+   }
+   
+   public boolean isSame(RubyModule module) {
+       // FIXME: lame equality check; need something better
+       return module.getMethods() == getMethods(); 
    }
 
     /** rb_mod_initialize
