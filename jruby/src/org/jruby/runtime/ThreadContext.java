@@ -442,7 +442,7 @@ public class ThreadContext {
         		throw je;
         	}
         } finally {
-            postYieldCurrentBlock(currentBlock);
+            postBoundEvalOrYield();
         }
     }
 
@@ -470,7 +470,7 @@ public class ThreadContext {
                 throw je;
             }
         } finally {
-            postYieldSpecificBlock();
+            postBoundEvalOrYield();
             postProcBlockCall();
         }
     }
@@ -1013,17 +1013,9 @@ public class ThreadContext {
 
         return currentBlock;
     }
-
-    private void postYieldCurrentBlock(Block currentBlock) {
-        flushBlockState();
-    }
     
     private void preYieldSpecificBlock(Block specificBlock, RubyModule klass) {
         restoreBlockState(specificBlock, klass);
-    }
-    
-    private void postYieldSpecificBlock() {
-        flushBlockState();
     }
 
     public void preEvalWithBinding(RubyBinding binding) {
@@ -1032,7 +1024,7 @@ public class ThreadContext {
         restoreBlockState(bindingBlock, null);
     }
 
-    public void postEvalWithBinding() {
+    public void postBoundEvalOrYield() {
         flushBlockState();
     }
 }
