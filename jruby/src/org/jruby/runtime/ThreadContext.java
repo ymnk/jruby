@@ -958,10 +958,6 @@ public class ThreadContext {
     public void preBlockPassEval(Block block) {
         pushBlock(block);
         setBlockAvailable();
-        
-        if (getCurrentFrame().getIter() == Iter.ITER_NOT) {
-            getCurrentFrame().setIter(Iter.ITER_PRE);
-        }
     }
     
     public void postBlockPassEval() {
