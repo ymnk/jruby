@@ -192,7 +192,7 @@ public class RubyString extends RubyObject {
 	/** rb_str_new2
 	 *
 	 */
-	public static RubyString newString(IRuby runtime, String str) {
+	public static RubyString newString(IRuby runtime, CharSequence str) {
 		return new RubyString(runtime, str);
 	}
 

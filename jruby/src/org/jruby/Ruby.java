@@ -61,6 +61,7 @@ import org.jruby.libraries.JRubyLibrary;
 import org.jruby.libraries.RbConfigLibrary;
 import org.jruby.libraries.SocketLibrary;
 import org.jruby.libraries.StringIOLibrary;
+import org.jruby.libraries.StringScannerLibrary;
 import org.jruby.libraries.ZlibLibrary;
 import org.jruby.parser.Parser;
 import org.jruby.runtime.Block;
@@ -97,7 +98,7 @@ import org.jruby.util.collections.SinglyLinkedList;
  * The jruby runtime.
  */
 public final class Ruby implements IRuby {
-	private static String[] BUILTIN_LIBRARIES = {"fcntl", "yaml", "etc", "nkf", "strscan"};
+	private static String[] BUILTIN_LIBRARIES = {"fcntl", "yaml", "etc", "nkf" };
     
 	private CacheMap cacheMap = new CacheMap();
     private ThreadService threadService = new ThreadService(this);
@@ -429,6 +430,7 @@ public final class Ruby implements IRuby {
         
         loadService.registerBuiltin("jruby.rb", new JRubyLibrary());
         loadService.registerBuiltin("stringio.rb", new StringIOLibrary());
+        loadService.registerBuiltin("strscan.rb", new StringScannerLibrary());
         loadService.registerBuiltin("zlib.rb", new ZlibLibrary());
     }
 
