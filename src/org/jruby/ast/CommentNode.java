@@ -11,7 +11,7 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
- * Copyright (C) 2005 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2006 Thomas Corbat <tcorbat@hsr.ch>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -25,49 +25,72 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
+
 package org.jruby.ast;
 
-import java.io.IOException;
 import java.util.List;
 
-import org.jruby.ast.types.INameNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.lexer.yacc.SourcePosition;
 
 /**
- * Simple Node that allows editor projects to keep position info in AST
- * (evaluation does not need this).
+ * Represents a comment in the ruby code.
+ * 
+ * @author tcorbat
  */
-public class ArgumentNode extends Node implements INameNode {
-    private static final long serialVersionUID = -6375678995811376530L;
-    private String identifier;
-    
-    public ArgumentNode(ISourcePosition position, String identifier) {
-        super(position);
-        
-        this.identifier = identifier.intern();
-    }
-    
-    private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
-        in.defaultReadObject();
-        
-        identifier = identifier.intern();
-    }
+public class CommentNode extends Node {
 
-    public Instruction accept(NodeVisitor visitor) {
-        throw new RuntimeException("ArgumentNode should never be evaluated");
-    }
-    
-    public String getName() {
-        return identifier;
-    }
-    
-    public void setName(String name) {
-        this.identifier = name;
-    }
+	private static final long serialVersionUID = -8304070370230933044L;
 
-    public List childNodes() {
-        return EMPTY_LIST;
+	private String commentValue;
+
+	public CommentNode(ISourcePosition position, String commentValue) {
+		super(position);
+
+		this.commentValue = commentValue;
+	}
+
+	public Instruction accept(NodeVisitor visitor) {
+
+		return visitor.visitCommentNode(this);
+	}
+
+	public List childNodes() {
+
+		return EMPTY_LIST;
+	}
+
+	public String getCommentValue() {
+
+		return commentValue;
+	}
+
+	public void add(CommentNode comment) {
+		StringBuffer commentString = new StringBuffer(commentValue);
+		commentString.append("\n");
+		commentString.append(comment.getCommentValue());
+		
+		commentValue = commentString.toString();
+		expandPosition(comment);				
+	}
+
+	private void expandPosition(CommentNode comment) {
+		ISourcePosition currentPos = getPosition();
+		ISourcePosition newCommentPos = comment.getPosition();
+		
+		String filename = currentPos.getFile();
+		int startLine = currentPos.getStartLine();
+		int startOffset = currentPos.getStartOffset();
+		int endLine = newCommentPos.getEndLine();
+		int endOffset = newCommentPos.getEndOffset();
+		
+		ISourcePosition combinedPos =  new SourcePosition(filename, startLine, startOffset, endLine, endOffset);
+		setPosition(combinedPos);
+	}
+
+    public String toString() {
+        return "CommentNode [" + commentValue + "]";
     }
 }

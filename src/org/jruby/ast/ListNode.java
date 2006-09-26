@@ -36,6 +36,7 @@ import java.util.ListIterator;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.lexer.yacc.SourcePosition;
 
 /**
  * All Nodes which have a list representation inherit this.  This is also used
@@ -57,6 +58,7 @@ public class ListNode extends Node {
             list = new ArrayList();
         }
         list.add(node);
+        setPosition(SourcePosition.combinePosition(getPosition(), node.getPosition()));
         return this;
     }
 

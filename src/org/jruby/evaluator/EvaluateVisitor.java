@@ -73,6 +73,8 @@ import org.jruby.ast.ClassVarDeclNode;
 import org.jruby.ast.ClassVarNode;
 import org.jruby.ast.Colon2Node;
 import org.jruby.ast.Colon3Node;
+
+import org.jruby.ast.CommentNode;
 import org.jruby.ast.ConstDeclNode;
 import org.jruby.ast.ConstNode;
 import org.jruby.ast.DAsgnNode;
@@ -152,6 +154,7 @@ import org.jruby.ast.util.ArgsUtil;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.exceptions.JumpException;
 import org.jruby.internal.runtime.methods.DefaultMethod;
+import org.jruby.internal.runtime.methods.EvaluateCallable;
 import org.jruby.internal.runtime.methods.WrapperCallable;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.Block;
@@ -2157,6 +2160,24 @@ public final class EvaluateVisitor implements NodeVisitor {
     }
     private static final SymbolNodeVisitor symbolNodeVisitor = new SymbolNodeVisitor();
 
+    
+//  Nothing to do, other than side effects
+    private static class CommentNodeVisitor implements Instruction {
+    	public void execute(EvaluationState state, InstructionContext ctx) {
+    		CommentNode iVisited = (CommentNode)ctx;
+            state.setResult(state.runtime.newSymbol(iVisited.getCommentValue().toString()));
+    	}
+    }
+    private static final CommentNodeVisitor commentNodeVisitor = new CommentNodeVisitor();  
+    
+//  Nothing to do, other than side effects
+    private static class NullNodeVisitor implements Instruction {
+    	public void execute(EvaluationState state, InstructionContext ctx) {
+    		
+    	}
+    }
+    private static final NullNodeVisitor nullNodeVisitor = new NullNodeVisitor();
+
     /**
      * @see NodeVisitor#visitAliasNode(AliasNode)
      */
@@ -2924,4 +2945,10 @@ public final class EvaluateVisitor implements NodeVisitor {
 
         return enclosingModule;
     }
+
+    //tcorbat: This method does nothing execpt matching the interface NodeVisitor
+	public Instruction visitCommentNode(CommentNode node) {
+		// TODO Might has to get some functionality.
+		return commentNodeVisitor;
+	}
 }

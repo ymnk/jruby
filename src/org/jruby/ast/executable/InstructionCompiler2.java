@@ -50,6 +50,7 @@ import org.jruby.ast.ClassVarDeclNode;
 import org.jruby.ast.ClassVarNode;
 import org.jruby.ast.Colon2Node;
 import org.jruby.ast.Colon3Node;
+import org.jruby.ast.CommentNode;
 import org.jruby.ast.ConstDeclNode;
 import org.jruby.ast.ConstNode;
 import org.jruby.ast.DAsgnNode;
@@ -1081,4 +1082,9 @@ public class InstructionCompiler2 implements NodeVisitor {
         mv.visitVarInsn(Opcodes.ASTORE, 50);
         runtimeLoaded = true;
     }
+
+	public Instruction visitCommentNode(CommentNode node) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

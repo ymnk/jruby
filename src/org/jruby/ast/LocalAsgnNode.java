@@ -77,6 +77,13 @@ public class LocalAsgnNode extends AssignableNode implements INameNode {
     public String getName() {
         return name;
     }
+    
+    /**
+     * Name of the local assignment.
+     **/
+    public void setName(String name) {
+        this.name = name;
+    }
 
     /**
      * Gets the count.

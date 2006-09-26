@@ -98,6 +98,13 @@ public class ScopeNode extends Node {
     public String[] getLocalNames() {
         return localNames;
     }
+
+    /**
+     * Sets the localNames.
+     */
+    public void setLocalNames(String[] localNames) {
+        this.localNames = localNames;
+    }
     
     public List childNodes() {
         return createList(bodyNode);

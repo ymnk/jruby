@@ -16,6 +16,7 @@
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2006 Thomas Corbat <tcorbat@hsr.ch>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -33,6 +34,8 @@ package org.jruby.ast;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
 import org.jruby.ast.visitor.NodeVisitor;
@@ -41,6 +44,7 @@ import org.jruby.evaluator.InstructionBundle;
 import org.jruby.evaluator.InstructionContext;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.lexer.yacc.ISourcePositionHolder;
+import org.jruby.lexer.yacc.SourcePosition;
 
 /**
  *
@@ -53,10 +57,13 @@ public abstract class Node implements ISourcePositionHolder, InstructionContext,
     public InstructionBundle instruction;
 
     private ISourcePosition position;
+    
+    private ArrayList comments;
 
     public Node(ISourcePosition position) {
         this.position = position;
     }
+    
 
     /**
      * Location of this node within the source
@@ -105,4 +112,62 @@ public abstract class Node implements ISourcePositionHolder, InstructionContext,
         String nodeType = name.substring(i + 1);
         return nodeType;
     }
+    
+    public void addComment(CommentNode comment){
+    		if(comments == null){
+    			comments = new ArrayList();
+    		}
+    		comments.add(comment);
+    	
+    }
+    
+    public void addComments(Collection comments){
+		if(this.comments == null){
+			this.comments = new ArrayList();
+		}
+    		this.comments.addAll(comments);
+    	
+    }
+    
+    public Collection getComments(){
+    		if(comments == null){
+    			return EMPTY_LIST;
+    		}
+    		return comments;
+    	
+    }
+    
+    public boolean hasComments(){
+    		if(comments == null){
+    			return false;
+    		}
+    		return !comments.isEmpty();
+    }
+    
+    public ISourcePosition getPositionIncludingComments(){
+    	if(position == null){
+    		return null;
+    	}
+    	else if (comments == null){
+    		return position;
+    	}
+    	
+		String fileName = position.getFile();
+		int startOffset = position.getStartOffset();
+		int endOffset = position.getEndOffset();
+		int startLine = position.getStartLine();
+		int endLine = position.getEndLine();
+		
+		ISourcePosition commentIncludingPos = new SourcePosition(fileName,startLine,endLine, startOffset, endOffset);
+		
+		Iterator commentItr = comments.iterator();
+		while(commentItr.hasNext())
+		{
+			ISourcePosition currentPos = ((CommentNode)commentItr.next()).getPosition();
+			commentIncludingPos = SourcePosition.combinePosition(commentIncludingPos, currentPos);
+		}		
+		
+		return commentIncludingPos;
+    }
+
 }

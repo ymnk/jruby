@@ -15,6 +15,7 @@
  * Copyright (C) 2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 Zach Dennis <zdennis@mktec.com>
+ * Copyright (C) 2006 Thomas Corbat <tcorbat@hsr.ch>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -30,8 +31,11 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.lexer.yacc;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 
 /**
@@ -44,10 +48,20 @@ import java.util.ArrayList;
  * 
  * @author enebo
  */
-public class LexerSource {
+public class LexerSource implements Cloneable{
+	private int MARK_SIZE = 10000;
+	private StringBuffer bufCache = new StringBuffer();
+    private int lineCache = 0; 
+    private int columnCache = 0;
+    private int offsetCache = 0;
+    private ArrayList lineWidthsCache;
+    private boolean nextCharIsOnANewLineCache;
+    private ISourcePosition lastPositionCache;
+
+
 	// Where we get new positions from.
 	private ISourcePositionFactory positionFactory;
-	
+
 	// Where we get our newest char's
     private final Reader reader;
     
@@ -75,7 +89,7 @@ public class LexerSource {
     // Flag to let us now in next read after a newline that we should reset 
     // column
     private boolean nextCharIsOnANewLine = true;
-	
+    
     /**
      * Create our food-source for the lexer
      * 
@@ -83,14 +97,19 @@ public class LexerSource {
      * @param reader is what represents the contents of file sourceName
      */
     public LexerSource(String sourceName, Reader reader) {
-        this.sourceName = sourceName;
-        this.reader = reader;
+    	this(sourceName, reader, null);
+    	//passing the factory to the other constructor isn't possible because of 'this'
         this.positionFactory = new SourcePositionFactory(this);
     }
     
     public LexerSource(String sourceName, Reader reader, ISourcePositionFactory factory) {
         this.sourceName = sourceName;
-        this.reader = reader;
+        if(reader.markSupported()) {
+            this.reader = reader;	
+        } else {
+    			this.reader = new BufferedReader(reader);
+        }
+        
         this.positionFactory = factory;
     }
 
@@ -106,6 +125,10 @@ public class LexerSource {
     	if (length > 0) {
     		c = buf.charAt(length - 1);
     		buf.deleteCharAt(length - 1);
+    		if(c == '\r') {
+    			c = buf.charAt(length - 1);
+        		buf.deleteCharAt(length - 1);
+    		}
     	} else {
     		c = wrappedRead();
             
@@ -135,7 +158,7 @@ public class LexerSource {
     		
     		nextCharIsOnANewLine = true;
         } 
-            
+
     	return c; 
     }
 
@@ -243,6 +266,7 @@ public class LexerSource {
                 if ((c = reader.read()) != '\n') {
                     unread((char)c);
                     c = '\n';
+                    return (char) c;
                 } else {
                     // Position within source must reflect the actual offset and column.  Since
                 	// we ate an extra character here (this accounting is normally done in read
@@ -251,8 +275,7 @@ public class LexerSource {
                     column++;
                 }
             }
-        	
-            return c != -1 ? (char) c : '\0';
+            return  c != -1 ? (char) c : '\0'; 
         } catch (IOException e) {
             return 0;
         }
@@ -274,6 +297,7 @@ public class LexerSource {
         for (char c = read(); c != '\n' && c != '\0'; c = read()) {
             sb.append(c);
         }
+
         return sb.toString();
     }
 
@@ -359,6 +383,7 @@ public class LexerSource {
                 } else if (c == '\0') {
                     throw new SyntaxException(getPosition(null, false), "Invalid escape character syntax");
                 } 
+
                 return (char) ((c & 0xff) | 0x80);
             case 'C' :
                 if ((c = read()) != '-') {
@@ -376,6 +401,7 @@ public class LexerSource {
             case '\0' :
                 throw new SyntaxException(getPosition(null, false), "Invalid escape character syntax");
             default :
+
                 return c;
         }
     }
@@ -456,4 +482,29 @@ public class LexerSource {
         buffer.append(" ...");
         return buffer.toString();
     }
+    
+
+	public void markSource() throws IOException {
+		bufCache = new StringBuffer(buf.toString());
+		lineCache = line;
+		columnCache = column;
+		offsetCache = offset;
+		lineWidthsCache = new ArrayList(lineWidths);
+		nextCharIsOnANewLineCache = nextCharIsOnANewLine;
+		lastPositionCache = positionFactory.getLastPosition();
+		reader.mark(MARK_SIZE);
+		
+	}
+	
+	public void resetSource() throws IOException {
+		buf = new StringBuffer(bufCache.toString());
+		positionFactory.setLastPosition(lastPositionCache);
+		nextCharIsOnANewLine = nextCharIsOnANewLineCache;
+		lineWidths = new ArrayList(lineWidthsCache);
+		offset = offsetCache;
+		column = columnCache;
+		line = lineCache;
+		reader.reset();
+	}
+
 }

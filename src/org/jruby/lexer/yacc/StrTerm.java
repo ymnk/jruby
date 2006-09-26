@@ -27,6 +27,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.lexer.yacc;
 
-public abstract class StrTerm {
+public abstract class StrTerm implements Cloneable{
     public abstract int parseString(RubyYaccLexer lexer, LexerSource src);
+    public abstract Object clone();
 }

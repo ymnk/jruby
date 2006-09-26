@@ -87,6 +87,7 @@ nil,   #['NewlineNode', 0, 12, 0, 142],
 ['Colon2Node', 0, 0, 6, 6],
 ['ScopeNode', 1, 10, 14, 137],
 ['BlockNode', 1, 10, 14, 137],
+nil,
 ['DefnNode', 1, 4, 14, 73],
 ['ArgumentNode', 1, 1, 18, 21],
 nil,   #['ArgsNode', 1, 1, 27, 35],
@@ -95,9 +96,10 @@ nil,   #['ArgsNode', 1, 1, 27, 35],
 ['ArgumentNode', 1, 1, 29, 32],
 nil,   #['ScopeNode', 2, 3, 44, 68],
 nil,   #['BlockNode', 2, 3, 44, 68],
+nil,
 nil,   #['FCallNode', 2, 3, 44, 60],
 nil,   #['ArrayNode', 2, 2, 48, 54],
-['CallNode', 2, 2, 45, 47],
+['CallNode', 2, 2, 45, 52],
 ['LocalVarNode', 2, 2, 45, 47],
 ['LocalVarNode', 2, 2, 55, 58],
 nil,   #['NewlineNode', 2, 4, 44, 69],
@@ -149,7 +151,7 @@ nil,   #['ScopeNode', 2, 3, 43, 59],
 nil,   #['NewlineNode', 2, 3, 39, 58],
 nil,   #['FCallNode', 2, 3, 43, 59],
 nil,   #['ArrayNode', 2, 2, 47, 53],
-['CallNode', 2, 2, 44, 46],
+['CallNode', 2, 2, 44, 51],
 ['LocalVarNode', 2, 2, 44, 46],
 ['LocalVarNode', 2, 2, 54, 57]
 ]
@@ -168,6 +170,7 @@ nil,
 ['Colon2Node', 0, 0, 6, 9],
 nil, #['ScopeNode', 1, 5, 20, 77],
 nil, #['BlockNode', 1, 5, 20, 77],
+nil,
 ['ClassVarDeclNode', 1, 1, 13, 24],
 ['FixnumNode', 1, 1, 24, 24],
 nil,
@@ -176,6 +179,7 @@ nil,
 ['ArgsNode', 2, 3, 35, 36],
 nil, #['ScopeNode', 3, 4, 45, 70],
 nil, #['BlockNode', 3, 4, 45, 70],
+nil,
 ['InstAsgnNode', 3, 3, 40, 54],
 ['StrNode', 3, 3, 49, 54],
 nil,
@@ -192,3 +196,90 @@ class Test
   end
 end
 END
+
+#test calls:
+list = [
+nil,
+['CallNode', 0, 0, 0, 9],
+nil
+]
+test_tree(list, <<END)
+String.new
+END
+
+list = [
+nil,
+['CallNode', 0, 0, 0, 9],
+nil
+]
+test_tree(list, <<END)
+String.new()
+END
+
+list = [
+nil,
+['CallNode', 0, 0, 0, 15],
+nil
+]
+test_tree(list, <<END)
+String.new("aaa")
+END
+
+list = [
+nil,
+['CallNode', 0, 0, 0, 15],
+nil
+]
+test_tree(list, <<END)
+String.new "aaa" + "bbb"
+END
+
+list = [
+nil,
+['CallNode', 0, 0, 0, 16],
+nil
+]
+test_tree(list, <<END)
+String.new 5.to_s
+END
+
+#test arrays
+
+list = [
+nil,
+['CallNode', 0, 0, 0, 29],
+['ConstNode', 0, 0, 0, 4],
+['ArrayNode', 0, 0, 10, 29]
+]
+test_tree(list, <<END)
+Array.new "aa", 11000, 20, 340
+END
+
+list = [
+nil,
+nil,
+nil,
+['ArrayNode', 0, 0, 10, 24],
+]
+test_tree(list, <<END)
+Array.new String.new(1234)
+END
+
+list = [
+nil,
+['ArrayNode', 0, 0, 1, 10],
+]
+test_tree(list, <<END)
+[55, "test"]
+END
+
+list = [
+nil,
+nil,
+nil,
+['ArrayNode', 0, 0, 10, 12],
+]
+test_tree(list, <<END)
+Array.new("a")
+END
+

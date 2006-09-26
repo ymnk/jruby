@@ -35,4 +35,6 @@ public interface ISourcePositionFactory {
     public ISourcePosition getDummyPosition();
     public ISourcePosition getPosition(ISourcePosition startPosition, boolean inclusive);
     public ISourcePosition getUnion(ISourcePosition first, ISourcePosition second);
+    public ISourcePosition getLastPosition();
+	public void setLastPosition(ISourcePosition lastPosition);
 }

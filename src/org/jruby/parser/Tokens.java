@@ -13,6 +13,8 @@
  *
  * Copyright (C) 2001-2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2004-2005 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2006 Thomas Corbat <tcorbat@hsr.ch>
+ * 
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -148,6 +150,11 @@ public interface Tokens {
     int tBANG       = DefaultRubyParser.tBANG;
     int tLCURLY       = DefaultRubyParser.tLCURLY;
     int tPIPE       = DefaultRubyParser.tPIPE;
+    int tEOF_COMMENT = DefaultRubyParser.tEOF_COMMENT;
+    
+//  tcorbat: Token for comments in ruby
+    int tTAILCOMMENT                = DefaultRubyParser.tTAILCOMMENT;
+    int tSOLOCOMMENT        = DefaultRubyParser.tSOLOCOMMENT;
 
     String[] operators = {"+@", "-@", "**", "<=>", "==", "===", "!=", ">=", "<=", "&&",
                           "||", "=~", "!~", "..", "...", "[]", "[]=", "<<", ">>", "::"};

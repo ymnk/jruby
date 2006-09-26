@@ -40,6 +40,7 @@ import org.jruby.TestRegexpTranslator;
 import org.jruby.javasupport.TestJavaClass;
 import org.jruby.javasupport.test.JavaSupportTestSuite;
 import org.jruby.runtime.callback.TestReflectionCallback;
+import org.jruby.ast.visitor.TestReWriteVisitor;
 
 /**
  *
@@ -71,6 +72,7 @@ public class MainTestSuite extends TestSuite {
         suite.addTest(new TestSuite(TestRegexpTranslator.class));
         suite.addTest(new TestSuite(TestAdoptedThreading.class));
         suite.addTest(new TestSuite(TestRubyArray.class));
+	suite.addTest(TestReWriteVisitor.suite());
         return suite;
     }
 }

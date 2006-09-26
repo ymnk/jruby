@@ -66,4 +66,15 @@ public class StackState implements Cloneable {
     public boolean isInState() {
         return (stack & 1) != 0;
     }
+    public StackState getClone()
+    {
+    		try {
+				return (StackState) this.clone();
+			} catch (CloneNotSupportedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				return null;
+			}
+    }
+    
 }

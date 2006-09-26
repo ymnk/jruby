@@ -11,7 +11,7 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
- * Copyright (C) 2005 Thomas E. Enebo <enebo@acm.org>
+ * Copyright (C) 2006 Mirko Stocker <me@misto.ch>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -25,58 +25,28 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.lexer.yacc;
 
-import java.util.ArrayList;
+package org.jruby.ast.visitor.rewriteutils;
 
 import org.jruby.ast.CommentNode;
+import org.jruby.ast.Node;
+import org.jruby.ast.visitor.ReWriteVisitor;
+import org.jruby.evaluator.Instruction;
 
-
-public class Token implements ISourcePositionHolder, ICommentable {
-	private ISourcePosition position = null;
-	private Object value;
-	private ArrayList comments = new ArrayList();
+public class IgnoreCommentsReWriteVisitor extends ReWriteVisitor{
 	
-	public Token(Object value, ISourcePosition position) {
-		this.value = value;
-		this.position = position;
+	public IgnoreCommentsReWriteVisitor(ReWriterContext config){
+		super(config);
 	}
 	
-	public void setValue(Object value) {
-		this.value = value;
+	protected boolean printCommentsAfter(Node iVisited) {
+		return false;
 	}
 	
-	public Object getValue() {
-		return value;
+	protected void printCommentsAtEnd(Node n) {
 	}
 	
-	public ISourcePosition getPosition() {
-		return position;
+	public Instruction visitCommentNode(CommentNode iVisited) {
+		return null;
 	}
-	
-	public void setPosition(ISourcePosition position) {
-		this.position = position;
-	}
-    
-    public String toString() {
-        return "Token { Value=" + value + ", Position=" + position + "}";
-    }
-
-	public boolean hasComments() {
-		return !comments.isEmpty();
-	}
-
-	public ArrayList getComments() {
-		
-		return comments;
-	}
-
-	public void addComment(CommentNode comment) {
-		comments.add(comment);
-	}
-	
-	public void addComments(ArrayList comments)
-	{
-		this.comments.addAll(comments);
-	}
-}
+}	

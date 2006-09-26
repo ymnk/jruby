@@ -103,7 +103,7 @@ public class HeredocTerm extends StrTerm {
                     throw new SyntaxException(src.getPosition(), "can't find string \"" + eos + "\" anywhere before EOF");
                 }
                 if (c != '\n') {
-                    lexer.yaccValue = new Token(buffer.toString(), lexer.getPosition(null, false));
+                    lexer.setYaccValue(new Token(buffer.toString(), lexer.getPosition(null, false)));
                     return Tokens.tSTRING_CONTENT;
                 }
                 buffer.append(src.read());
@@ -119,7 +119,11 @@ public class HeredocTerm extends StrTerm {
 
         src.unreadMany(lastLine);
         lexer.setStrTerm(new StringTerm(-1, '\0', '\0'));
-        lexer.yaccValue = new Token(str.toString(), lexer.getPosition(null, false));
+        lexer.setYaccValue(new Token(str.toString(), lexer.getPosition(null, false)));
         return Tokens.tSTRING_CONTENT;
     }
+
+	public final Object clone() {
+		return new HeredocTerm(eos, func, lastLine);
+	}
 }

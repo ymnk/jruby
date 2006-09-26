@@ -48,6 +48,11 @@ public class StringTerm extends StrTerm {
         this.paren = paren;
         this.nest = 0;
     }
+    
+    public StringTerm(int func, char term, char paren, int nest) {
+    	this(func, term, paren);
+    	this.nest = nest;
+    }
 
     public int parseString(final RubyYaccLexer lexer, LexerSource src) {
         char c;
@@ -72,8 +77,8 @@ public class StringTerm extends StrTerm {
                 return ' ';
             }
             if ((func & RubyYaccLexer.STR_FUNC_REGEXP) != 0) {
-                lexer.yaccValue = new RegexpNode(src.getPosition(),
-                        buffer.toString(), parseRegexpFlags(src));
+           	
+            		lexer.setYaccValue(new Token(new RegexpNode(src.getPosition(),buffer.toString(), parseRegexpFlags(src)),src.getPosition()));
                 return Tokens.tREGEXP_END;
             }
             return Tokens.tSTRING_END;
@@ -99,7 +104,7 @@ public class StringTerm extends StrTerm {
             throw new SyntaxException(src.getPosition(), "unterminated string meets end of file");
         }
 
-        lexer.yaccValue = new Token(buffer.toString(), lexer.getPosition(null, false));
+        lexer.setYaccValue( new Token(buffer.toString(), lexer.getPosition(null, false)));
         return Tokens.tSTRING_CONTENT;
     }
 
@@ -312,5 +317,9 @@ public class StringTerm extends StrTerm {
             }
             buffer.append(c);
         }
+    }
+
+    public final Object clone() {
+    	return new StringTerm(func, term, paren, nest);
     }
 }

@@ -18,6 +18,7 @@
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Mirko Stocker <me@misto.ch>
+ * Copyright (C) 2006 Thomas Corbat <tcorbat@hsr.ch>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -34,8 +35,10 @@
 package org.jruby.parser;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Stack;
 
 import org.jruby.ast.AndNode;
@@ -92,8 +95,10 @@ import org.jruby.ast.visitor.BreakStatementVisitor;
 import org.jruby.ast.visitor.ExpressionVisitor;
 import org.jruby.ast.visitor.UselessStatementVisitor;
 import org.jruby.common.IRubyWarnings;
+import org.jruby.lexer.yacc.ICommentable;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.lexer.yacc.ISourcePositionFactory;
+import org.jruby.lexer.yacc.SourcePosition;
 import org.jruby.lexer.yacc.SyntaxException;
 import org.jruby.lexer.yacc.Token;
 import org.jruby.util.IdUtil;
@@ -115,6 +120,20 @@ public class ParserSupport {
 
     private RubyParserConfiguration configuration;
     private RubyParserResult result;
+
+	public ParserSupport getClone()
+	{
+		ParserSupport clone;
+		try {
+			clone = (ParserSupport) this.clone();
+			return clone;
+		} catch (CloneNotSupportedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null;
+		}
+		
+	}
 
     public void reset() {
         localNamesStack = new Stack();
@@ -281,8 +300,59 @@ public class ParserSupport {
         if (node == null) {
             return null;
         }
-        
+
         return node instanceof NewlineNode ? node : new NewlineNode(position, node); 
+	}
+
+	
+	public Node introduceComment(Node node, Object[] yaccValues){
+		
+        if (node == null) {
+            return null;
+        }
+        
+		ArrayList yaccValueList = new ArrayList(Arrays.asList(yaccValues));
+		Iterator valueItr = yaccValueList.iterator();
+		
+		while(valueItr.hasNext()){
+			
+			Object currentValue = valueItr.next();
+			if((currentValue instanceof ICommentable) && ((ICommentable)currentValue).hasComments()){
+				continue;
+			}else{
+				valueItr.remove();
+			}
+		}
+		
+		if(yaccValueList.isEmpty()){
+			return node;
+		}else{
+			Iterator commentItr = yaccValueList.iterator();
+			
+			while(commentItr.hasNext()){
+				ICommentable currentCommentable = (ICommentable)commentItr.next();
+				if(currentCommentable.hasComments()){
+					node.addComments(currentCommentable.getComments());
+				}			
+			}
+			return node;
+		}
+	}
+
+
+	public ISourcePosition union(ISourcePosition first, ISourcePosition second) {
+
+		assert first.getFile().equals(second.getFile());
+
+		if (first.getStartOffset() < second.getStartOffset()) {
+			return new SourcePosition(first.getFile(), first.getStartLine(),
+					second.getEndLine(), first.getStartOffset(), second
+							.getEndOffset());
+		} else {
+			return new SourcePosition(first.getFile(), second.getStartLine(),
+					first.getEndLine(), second.getStartOffset(), first
+							.getEndOffset());
+		}
     }
     
     public ISourcePosition union(Node first, Node second) {
@@ -324,9 +394,10 @@ public class ParserSupport {
             return tail;
         }
         
-        while (head instanceof NewlineNode) {
-            head = ((NewlineNode) head).getNextNode();
-        }
+        //Mirko asks: This was added, and it breaks a lof of my code, is it really needed?
+//        while (head instanceof NewlineNode) {
+//            head = ((NewlineNode) head).getNextNode();
+//        }
 
         if (!(head instanceof BlockNode)) {
             head = new BlockNode(union(head, tail)).add(head);
@@ -341,6 +412,7 @@ public class ParserSupport {
         } else {
             ((ListNode) head).add(tail);
         }
+		head.setPosition(union(head, tail));
 
         return head;
     }
@@ -533,14 +605,14 @@ public class ParserSupport {
         return node;
     }
 
-    public AndNode newAndNode(Node left, Node right) {
+	public AndNode newAndNode(ISourcePosition pos, Node left, Node right) {
         checkExpression(left);
-        return new AndNode(left.getPosition(), left, right);
+		return new AndNode(pos, left, right);
     }
 
-    public OrNode newOrNode(Node left, Node right) {
+	public OrNode newOrNode(ISourcePosition pos, Node left, Node right) {
         checkExpression(left);
-        return new OrNode(left.getPosition(), left, right);
+		return new OrNode(pos, left, right);
     }
 
     public Node getReturnArgsNode(Node node) {
@@ -552,7 +624,7 @@ public class ParserSupport {
         return node;
     }
 
-    public Node new_call(Node receiverNode, String name, Node args) {
+	public Node new_call(Node receiverNode, Token name, Node args) {
     	/*
         Node node = ((BlockPassNode) args).getArgsNode();
         IListNode argsNode = null;
@@ -569,17 +641,25 @@ public class ParserSupport {
         if (args != null && args instanceof BlockPassNode) {
             Node argsNode = ((BlockPassNode) args).getArgsNode();
             
-            ((BlockPassNode) args).setIterNode(new CallNode(receiverNode.getPosition(), receiverNode, name, argsNode));
+			((BlockPassNode) args).setIterNode(new CallNode(union(receiverNode,
+					name), receiverNode, (String) name.getValue(), argsNode));
             return args;
         }
+		if (args == null) {
+			return new CallNode(union(receiverNode, name), receiverNode,
+					(String) name.getValue(), args);
+		}
 
-        return new CallNode(receiverNode.getPosition(), receiverNode, name, args);
+		return new CallNode(union(receiverNode, args), receiverNode,
+				(String) name.getValue(), args);
     }
 
     public Node new_fcall(String name, Node args, Token operation) {
         if (args != null && args instanceof BlockPassNode) {
             ((BlockPassNode) args).setIterNode(new FCallNode(union(operation, args), name, ((BlockPassNode) args).getArgsNode()));
             return args;
+		} else if (args != null) {
+			return new FCallNode(union(operation, args), name, args);
         }
         return new FCallNode(operation.getPosition(), name, args);
     }
@@ -714,8 +794,8 @@ public class ParserSupport {
     public Node literal_concat(ISourcePosition position, Node head, Node tail) { 
 
         if (head == null) {
-        	assert tail == null || tail instanceof Node;
-        	return (Node) tail;
+        	assert tail == null;
+        	return tail;
         }
         
         if (tail == null) {
@@ -723,15 +803,16 @@ public class ParserSupport {
         }
         
         if (head instanceof EvStrNode) {
-            head = new DStrNode(position).add(head);
+			head = new DStrNode(union(head.getPosition(), position)).add(head);
         } 
 
         if (tail instanceof StrNode) {
         	if (head instanceof StrNode) {
-        	    head = new StrNode(union(head, (Node) tail), 
+        	    head = new StrNode(union(head, tail), 
                        ((StrNode) head).getValue() + ((StrNode) tail).getValue());
         	} else {
-        		((ListNode) head).add((Node) tail);
+        		((ListNode) head).add(tail);
+				head.setPosition(union(head.getPosition(), tail.getPosition()));
         	}
         } else if (tail instanceof DStrNode) {
             if(head instanceof StrNode){
@@ -746,6 +827,7 @@ public class ParserSupport {
         		
         	}
         	((DStrNode) head).add(tail);
+			head.setPosition(union(head.getPosition(), tail.getPosition()));
         }
         
         return head;
@@ -807,4 +889,25 @@ public class ParserSupport {
         
         return first;
     }
+
+	public ListNode commentLastElement(ListNode node, Object[] yaccValues) {
+		
+		ListIterator revItr = node.reverseIterator();
+		Node commentedNode = null;
+		
+		if(revItr.hasPrevious())
+		{
+			commentedNode = (Node)revItr.previous();
+			revItr.remove();
+		}
+		else{
+			return node;
+		}
+		
+		commentedNode = introduceComment(commentedNode, yaccValues);
+		
+		node.add(commentedNode);
+		
+		return node;
+	}
 }

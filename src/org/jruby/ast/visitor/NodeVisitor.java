@@ -51,6 +51,7 @@ import org.jruby.ast.ClassVarDeclNode;
 import org.jruby.ast.ClassVarNode;
 import org.jruby.ast.Colon2Node;
 import org.jruby.ast.Colon3Node;
+import org.jruby.ast.CommentNode;
 import org.jruby.ast.ConstDeclNode;
 import org.jruby.ast.ConstNode;
 import org.jruby.ast.DAsgnNode;
@@ -226,4 +227,7 @@ public interface NodeVisitor {
     public Instruction visitYieldNode(YieldNode iVisited);
     public Instruction visitZArrayNode(ZArrayNode iVisited);
     public Instruction visitZSuperNode(ZSuperNode iVisited);
+    
+    //tcorbat: Method for visiting a CommentNode
+	public Instruction visitCommentNode(CommentNode node);
 }
