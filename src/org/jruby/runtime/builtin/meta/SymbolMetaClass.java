@@ -34,6 +34,7 @@ import org.jruby.RubyClass;
 import org.jruby.RubySymbol;
 import org.jruby.RubySymbol.SymbolMethod;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.collections.SinglyLinkedList;
@@ -48,7 +49,7 @@ public class SymbolMetaClass extends ObjectMetaClass {
 	}
 
     public SymbolMethod equal = new SymbolMethod(this, Arity.singleArgument(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubySymbol self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubySymbol self, IRubyObject[] args) {
             IRubyObject other = args[0];
             
             // Symbol table ensures only one instance for every name,

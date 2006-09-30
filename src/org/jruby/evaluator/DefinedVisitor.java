@@ -116,7 +116,7 @@ public class DefinedVisitor extends AbstractVisitor {
      */
     protected Instruction visitNode(Node iVisited) {
         try {
-            new EvaluationState(state.runtime, state.getSelf()).begin(iVisited);
+            new EvaluationState(state.runtime, state.getSelf()).begin(state.getThreadContext(), iVisited);
             definition = "expression";
         } catch (JumpException jumpExcptn) {
         }
@@ -157,7 +157,7 @@ public class DefinedVisitor extends AbstractVisitor {
 	public Instruction visitCallNode(CallNode iVisited) {
 		if (getDefinition(iVisited.getReceiverNode()) != null) {
 			try {
-                IRubyObject receiver = new EvaluationState(state.runtime, state.getSelf()).begin(iVisited.getReceiverNode());
+                IRubyObject receiver = new EvaluationState(state.runtime, state.getSelf()).begin(state.getThreadContext(), iVisited.getReceiverNode());
 				RubyClass metaClass = receiver.getMetaClass();
 				ICallable method = metaClass.searchMethod(iVisited.getName());
 				Visibility visibility = method.getVisibility();
@@ -411,7 +411,7 @@ public class DefinedVisitor extends AbstractVisitor {
 	 */
 	public Instruction visitColon2Node(Colon2Node iVisited) {
 		try {
-            IRubyObject left = new EvaluationState(state.runtime, state.getSelf()).begin(iVisited.getLeftNode());
+            IRubyObject left = new EvaluationState(state.runtime, state.getSelf()).begin(state.getThreadContext(), iVisited.getLeftNode());
 			if (left instanceof RubyModule) {
 				if (((RubyModule) left).getConstantAt(iVisited.getName()) != null) {
 					definition = "constant";

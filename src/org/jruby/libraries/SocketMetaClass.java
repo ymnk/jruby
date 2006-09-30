@@ -11,6 +11,7 @@ import org.jruby.RubyFixnum;
 import org.jruby.RubyString;
 import org.jruby.libraries.RubySocket.SocketMethod;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.builtin.meta.BasicSocketMetaClass;
@@ -22,7 +23,7 @@ public class SocketMetaClass extends BasicSocketMetaClass {
 	}
 	
     public SocketMethod gethostname = new SocketMethod(this, Arity.singleArgument(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubySocket self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubySocket self, IRubyObject[] args) {
         	return self.getRuntime().getNil();
         }
     };

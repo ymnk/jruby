@@ -59,7 +59,7 @@ public class RaiseException extends JumpException {
         if (msg == null) {
             msg = "No message available";
         }
-        setException((RubyException) excptnClass.callMethod("new", excptnClass.getRuntime().newString(msg)), nativeException);
+        setException((RubyException) excptnClass.callMethod(runtime.getCurrentContext(), "new", excptnClass.getRuntime().newString(msg)), nativeException);
     }
     
     public static RaiseException createNativeRaiseException(IRuby runtime, Throwable cause) {
@@ -119,9 +119,9 @@ public class RaiseException extends JumpException {
 
         runtime.setStackTraces(runtime.getStackTraces() + 1);
 
-        if (newException.callMethod("backtrace").isNil() && tc.getSourceFile() != null) {
+        if (newException.callMethod(tc, "backtrace").isNil() && tc.getSourceFile() != null) {
             IRubyObject backtrace = tc.createBacktrace(0, nativeException);
-            newException.callMethod("set_backtrace", backtrace);
+            newException.callMethod(tc, "set_backtrace", backtrace);
         }
 
         runtime.setStackTraces(runtime.getStackTraces() - 1);

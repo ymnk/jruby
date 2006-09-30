@@ -65,13 +65,13 @@ public class RubyString extends RubyObject {
             super(implementationClass, arity, visibility);
         }
         
-        public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+        public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
             RubyString s = (RubyString)receiver;
             
-            return invoke(s, args);
+            return invoke(context, s, args);
         }
         
-        public abstract IRubyObject invoke(RubyString target, IRubyObject[] args);
+        public abstract IRubyObject invoke(ThreadContext context, RubyString target, IRubyObject[] args);
         
     };
     
@@ -157,7 +157,7 @@ public class RubyString extends RubyObject {
 	 */
 	public static RubyString objAsString(IRubyObject obj) {
 		return (RubyString) (obj instanceof RubyString ? obj : 
-			obj.callMethod("to_s"));
+			obj.callMethod(obj.getRuntime().getCurrentContext(), "to_s"));
 	}
 
 	/** rb_str_cmp
@@ -269,7 +269,7 @@ public class RubyString extends RubyObject {
 		RubyString thisLCString = getRuntime().newString(toString().toLowerCase());
 		RubyString lcString = getRuntime().newString(stringValue(other).toString().toLowerCase());
 
-		return ((StringMetaClass)thisLCString.getMetaClass()).op_cmp.call(getRuntime(), thisLCString, thisLCString.getMetaClass(), "<=>", new IRubyObject[] {lcString}, false);
+		return ((StringMetaClass)thisLCString.getMetaClass()).op_cmp.call(getRuntime().getCurrentContext(), thisLCString, thisLCString.getMetaClass(), "<=>", new IRubyObject[] {lcString}, false);
 	}
     
 	/** rb_str_match
@@ -281,7 +281,7 @@ public class RubyString extends RubyObject {
 		} else if (other instanceof RubyString) {
 			return RubyRegexp.newRegexp((RubyString) other, 0, null).match(this);
 		}
-		return other.callMethod("=~", this);
+		return other.callMethod(getRuntime().getCurrentContext(), "=~", this);
 	}
 
 	/** rb_str_match2

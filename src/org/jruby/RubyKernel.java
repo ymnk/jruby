@@ -218,9 +218,9 @@ public class RubyKernel {
         }
 
         String name = args[0].asSymbol();
-        String description = recv.callMethod("inspect").toString();
-        boolean noClass = description.length() > 0 && description.charAt(0) == '#';
         ThreadContext tc = runtime.getCurrentContext();
+        String description = recv.callMethod(tc, "inspect").toString();
+        boolean noClass = description.length() > 0 && description.charAt(0) == '#';
         Visibility lastVis = tc.getLastVisibility();
         CallType lastCallType = tc.getLastCallType();
         String format = lastVis.errorMessageFormat(lastCallType, name);
@@ -283,7 +283,7 @@ public class RubyKernel {
             }
             
             // Strange that Ruby has custom code here and not convertToTypeWithCheck equivalent.
-            value = object.callMethod("to_a");
+            value = object.callMethod(recv.getRuntime().getCurrentContext(), "to_a");
             if (value.getMetaClass() != recv.getRuntime().getClass("Array")) {
                 throw recv.getRuntime().newTypeError("`to_a' did not return Array");
                
@@ -294,15 +294,15 @@ public class RubyKernel {
     }
     
     public static IRubyObject new_float(IRubyObject recv, IRubyObject object) {
-        return object.callMethod("to_f");
+        return object.callMethod(recv.getRuntime().getCurrentContext(), "to_f");
     }
     
     public static IRubyObject new_integer(IRubyObject recv, IRubyObject object) {
-        return object.callMethod("to_i");
+        return object.callMethod(recv.getRuntime().getCurrentContext(), "to_i");
     }
     
     public static IRubyObject new_string(IRubyObject recv, IRubyObject object) {
-        return object.callMethod("to_s");
+        return object.callMethod(recv.getRuntime().getCurrentContext(), "to_s");
     }
     
     
@@ -311,8 +311,9 @@ public class RubyKernel {
 
         for (int i = 0; i < args.length; i++) {
             if (args[i] != null) {
-                defout.callMethod("write", args[i].callMethod("inspect"));
-                defout.callMethod("write", recv.getRuntime().newString("\n"));
+                ThreadContext context = recv.getRuntime().getCurrentContext();
+                defout.callMethod(context, "write", args[i].callMethod(context, "inspect"));
+                defout.callMethod(context, "write", recv.getRuntime().newString("\n"));
             }
         }
         return recv.getRuntime().getNil();
@@ -321,7 +322,7 @@ public class RubyKernel {
     public static IRubyObject puts(IRubyObject recv, IRubyObject[] args) {
         IRubyObject defout = recv.getRuntime().getGlobalVariables().get("$>");
         
-        defout.callMethod("puts", args);
+        defout.callMethod(recv.getRuntime().getCurrentContext(), "puts", args);
 
         return recv.getRuntime().getNil();
     }
@@ -329,7 +330,7 @@ public class RubyKernel {
     public static IRubyObject print(IRubyObject recv, IRubyObject[] args) {
         IRubyObject defout = recv.getRuntime().getGlobalVariables().get("$>");
 
-        defout.callMethod("print", args);
+        defout.callMethod(recv.getRuntime().getCurrentContext(), "print", args);
 
         return recv.getRuntime().getNil();
     }
@@ -343,7 +344,7 @@ public class RubyKernel {
             	args = ArgsUtil.popArray(args);
             }
 
-            defout.callMethod("write", RubyKernel.sprintf(recv, args));
+            defout.callMethod(recv.getRuntime().getCurrentContext(), "write", RubyKernel.sprintf(recv, args));
         }
 
         return recv.getRuntime().getNil();
@@ -559,7 +560,7 @@ public class RubyKernel {
         RubyArray newArgs = recv.getRuntime().newArray(args);
         newArgs.shift();
 
-        return ((StringMetaClass)str.getMetaClass()).format.call(recv.getRuntime(), str, str.getMetaClass(), "%", new IRubyObject[] {newArgs}, false);
+        return ((StringMetaClass)str.getMetaClass()).format.call(recv.getRuntime().getCurrentContext(), str, str.getMetaClass(), "%", new IRubyObject[] {newArgs}, false);
     }
 
     public static IRubyObject raise(IRubyObject recv, IRubyObject[] args) {
@@ -583,13 +584,13 @@ public class RubyKernel {
             if (!args[0].respondsTo("exception")) {
                 throw runtime.newTypeError("exception class/object expected");
             }
-            exception = args[0].callMethod("exception");
+            exception = args[0].callMethod(recv.getRuntime().getCurrentContext(), "exception");
         } else {
             if (!args[0].respondsTo("exception")) {
                 throw runtime.newTypeError("exception class/object expected");
             }
             
-            exception = args[0].callMethod("exception", args[1]);
+            exception = args[0].callMethod(recv.getRuntime().getCurrentContext(), "exception", args[1]);
         }
         
         if (!exception.isKindOf(runtime.getClass("Exception"))) {

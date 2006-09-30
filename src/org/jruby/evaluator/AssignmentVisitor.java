@@ -80,14 +80,15 @@ public class AssignmentVisitor extends AbstractVisitor {
 	 * @see AbstractVisitor#visitCallNode(CallNode)
 	 */
 	public Instruction visitCallNode(CallNode iVisited) {
-        IRubyObject receiver = state.begin(iVisited.getReceiverNode());
+        ThreadContext context = state.getThreadContext();
+        IRubyObject receiver = state.begin(context, iVisited.getReceiverNode());
 
         if (iVisited.getArgsNode() == null) { // attribute set.
-            receiver.callMethod(iVisited.getName(), new IRubyObject[] {value}, CallType.NORMAL);
+            receiver.callMethod(context, iVisited.getName(), new IRubyObject[] {value}, CallType.NORMAL);
         } else { // element set
-            RubyArray args = (RubyArray)state.begin(iVisited.getArgsNode());
+            RubyArray args = (RubyArray)state.begin(context, iVisited.getArgsNode());
             args.append(value);
-            receiver.callMethod(iVisited.getName(), args.toJavaArray(), CallType.NORMAL);
+            receiver.callMethod(context, iVisited.getName(), args.toJavaArray(), CallType.NORMAL);
         }
 		return null;
 	}
@@ -118,10 +119,11 @@ public class AssignmentVisitor extends AbstractVisitor {
 	 * @see AbstractVisitor#visitConstDeclNode(ConstDeclNode)
 	 */
 	public Instruction visitConstDeclNode(ConstDeclNode iVisited) {
+        ThreadContext context = state.getThreadContext();
 		if (iVisited.getPathNode() == null) {
-			state.getThreadContext().getRubyClass().defineConstant(iVisited.getName(), value);
+			context.getRubyClass().defineConstant(iVisited.getName(), value);
 		} else {
-			((RubyModule) state.begin(iVisited.getPathNode())).defineConstant(iVisited.getName(), value);
+			((RubyModule) state.begin(context, iVisited.getPathNode())).defineConstant(iVisited.getName(), value);
 		}
 		return null;
 	}

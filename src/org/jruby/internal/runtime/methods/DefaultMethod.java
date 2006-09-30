@@ -72,25 +72,21 @@ public final class DefaultMethod extends AbstractMethod {
 		assert argsNode != null;
     }
     
-    public void preMethod(IRuby runtime, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
-        ThreadContext context = runtime.getCurrentContext();
-        
+    public void preMethod(ThreadContext context, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
         context.preDefMethodInternalCall(lastClass, recv, name, args, noSuper, cref);
     }
     
-    public void postMethod(IRuby runtime) {
-        ThreadContext context = runtime.getCurrentContext();
-        
+    public void postMethod(ThreadContext context) {
         context.postDefMethodInternalCall();
     }
 
     /**
      * @see AbstractCallable#call(IRuby, IRubyObject, String, IRubyObject[], boolean)
      */
-    public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+    public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
     	assert args != null;
 
-        ThreadContext context = runtime.getCurrentContext();
+        IRuby runtime = context.getRuntime();
         
         Scope scope = context.getFrameScope();
         if (body.getLocalNames() != null) {
@@ -102,7 +98,7 @@ public final class DefaultMethod extends AbstractMethod {
         }
 
         try {
-            prepareArguments(runtime, scope, receiver, args);
+            prepareArguments(context, scope, receiver, args);
             
             getArity().checkArity(runtime, args);
 
@@ -121,9 +117,9 @@ public final class DefaultMethod extends AbstractMethod {
         }
     }
 
-    private void prepareArguments(IRuby runtime, Scope scope, IRubyObject receiver, IRubyObject[] args) {
+    private void prepareArguments(ThreadContext context, Scope scope, IRubyObject receiver, IRubyObject[] args) {
         int expectedArgsCount = argsNode.getArgsCount();
-        ThreadContext tc = runtime.getCurrentContext();
+        IRuby runtime = context.getRuntime();
 
         if (expectedArgsCount > args.length) {
             throw runtime.newArgumentError("Wrong # of arguments(" + args.length + " for " + expectedArgsCount + ")");
@@ -165,7 +161,7 @@ public final class DefaultMethod extends AbstractMethod {
                 for (int i = expectedArgsCount; i < args.length && iter.hasNext(); i++) {
                     //new AssignmentVisitor(new EvaluationState(runtime, receiver)).assign((Node)iter.next(), args[i], true);
 //                  in-frame EvalState should already have receiver set as self, continue to use it
-                    new AssignmentVisitor(tc.getFrameEvalState()).assign((Node)iter.next(), args[i], true);
+                    new AssignmentVisitor(context.getFrameEvalState()).assign((Node)iter.next(), args[i], true);
                     expectedArgsCount++;
                 }
 
@@ -174,7 +170,7 @@ public final class DefaultMethod extends AbstractMethod {
                     //new EvaluationState(runtime, receiver).begin((Node)iter.next());
                     //EvaluateVisitor.getInstance().eval(receiver.getRuntime(), receiver, (Node)iter.next());
                     // in-frame EvalState should already have receiver set as self, continue to use it
-                    allArgs.add(tc.getFrameEvalState().begin((Node)iter.next()));
+                    allArgs.add(context.getFrameEvalState().begin(context, (Node)iter.next()));
                 }
             }
         }
@@ -199,7 +195,7 @@ public final class DefaultMethod extends AbstractMethod {
             }
         }
         
-        tc.setFrameArgs((IRubyObject[])allArgs.toArray(new IRubyObject[allArgs.size()]));
+        context.setFrameArgs((IRubyObject[])allArgs.toArray(new IRubyObject[allArgs.size()]));
     }
 
     private void traceReturn(IRuby runtime, IRubyObject receiver, String name) {

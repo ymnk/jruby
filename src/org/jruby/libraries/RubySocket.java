@@ -6,6 +6,7 @@ import org.jruby.RubyModule;
 import org.jruby.RubyObject;
 import org.jruby.internal.runtime.methods.DirectInvocationMethod;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -15,13 +16,13 @@ public class RubySocket extends RubyObject {
             super(implementationClass, arity, visibility);
         }
         
-        public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+        public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
             RubySocket s = (RubySocket)receiver;
             
-            return invoke(s, args);
+            return invoke(context, s, args);
         }
         
-        public abstract IRubyObject invoke(RubySocket target, IRubyObject[] args);
+        public abstract IRubyObject invoke(ThreadContext context, RubySocket target, IRubyObject[] args);
     };
 
 	public RubySocket(IRuby runtime, RubyClass metaClass) {

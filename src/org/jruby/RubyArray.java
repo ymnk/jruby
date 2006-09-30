@@ -107,7 +107,7 @@ public class RubyArray extends RubyObject implements List {
 
     public boolean includes(IRubyObject item) {
         for (int i = 0, n = getLength(); i < n; i++) {
-            if (item.callMethod("==", entry(i)).isTrue()) {
+            if (item.callMethod(getRuntime().getCurrentContext(), "==", entry(i)).isTrue()) {
                 return true;
             }
         }
@@ -631,7 +631,7 @@ public class RubyArray extends RubyObject implements List {
             if (i > 0) {
                 result.append(separator);
             }
-            result.append(entry(i).callMethod("inspect"));
+            result.append(entry(i).callMethod(getRuntime().getCurrentContext(), "inspect"));
         }
         result.cat("]");
         return result;
@@ -819,7 +819,7 @@ public class RubyArray extends RubyObject implements List {
         }
 
         for (long i = 0; i < length; i++) {
-            if (!entry(i).callMethod("==", ary.entry(i)).isTrue()) {
+            if (!entry(i).callMethod(getRuntime().getCurrentContext(), "==", ary.entry(i)).isTrue()) {
                 return getRuntime().getFalse();
             }
         }
@@ -842,7 +842,7 @@ public class RubyArray extends RubyObject implements List {
         }
 
         for (long i = 0; i < length; i++) {
-            if (!entry(i).callMethod("eql?", ary.entry(i)).isTrue()) {
+            if (!entry(i).callMethod(getRuntime().getCurrentContext(), "eql?", ary.entry(i)).isTrue()) {
                 return getRuntime().getFalse();
             }
         }
@@ -952,7 +952,7 @@ public class RubyArray extends RubyObject implements List {
      */
     public IRubyObject index(IRubyObject obj) {
         for (int i = 0, len = getLength(); i < len; i++) {
-            if (obj.callMethod("==", entry(i)).isTrue()) {
+            if (obj.callMethod(getRuntime().getCurrentContext(), "==", entry(i)).isTrue()) {
                 return getRuntime().newFixnum(i);
             }
         }
@@ -964,7 +964,7 @@ public class RubyArray extends RubyObject implements List {
      */
     public IRubyObject rindex(IRubyObject obj) {
         for (int i = getLength() - 1; i >= 0; i--) {
-            if (obj.callMethod("==", entry(i)).isTrue()) {
+            if (obj.callMethod(getRuntime().getCurrentContext(), "==", entry(i)).isTrue()) {
                 return getRuntime().newFixnum(i);
             }
         }
@@ -1043,15 +1043,15 @@ public class RubyArray extends RubyObject implements List {
      */
     public IRubyObject delete(IRubyObject obj) {
         modify();
-        ThreadContext tc = getRuntime().getCurrentContext();
+        ThreadContext context = getRuntime().getCurrentContext();
         IRubyObject result = getRuntime().getNil();
         for (int i = getLength() - 1; i >= 0; i--) {
-            if (obj.callMethod("==", entry(i)).isTrue()) {
+            if (obj.callMethod(context, "==", entry(i)).isTrue()) {
                 result = (IRubyObject) list.remove(i);
             }
         }
-        if (result.isNil() && tc.isBlockGiven()) {
-            result = tc.yield(entry(0));
+        if (result.isNil() && context.isBlockGiven()) {
+            result = context.yield(entry(0));
         }
         return result;
     }
@@ -1114,7 +1114,7 @@ public class RubyArray extends RubyObject implements List {
         }
 
         for (int i = 0; i < len; i++) {
-        	IRubyObject result = entry(i).callMethod("<=>", ary.entry(i));
+        	IRubyObject result = entry(i).callMethod(getRuntime().getCurrentContext(), "<=>", ary.entry(i));
         	
         	if (result.isNil() || ((RubyFixnum)result).getLongValue() != 0) {
                 return result;
@@ -1152,7 +1152,7 @@ public class RubyArray extends RubyObject implements List {
                 continue;
             }
             RubyArray ary = (RubyArray) entry(i);
-            if (arg.callMethod("==", ary.entry(0)).isTrue()) {
+            if (arg.callMethod(getRuntime().getCurrentContext(), "==", ary.entry(0)).isTrue()) {
                 return ary;
             }
         }
@@ -1168,7 +1168,7 @@ public class RubyArray extends RubyObject implements List {
                 continue;
             }
             RubyArray ary = (RubyArray) entry(i);
-            if (arg.callMethod("==", ary.entry(1)).isTrue()) {
+            if (arg.callMethod(getRuntime().getCurrentContext(), "==", ary.entry(1)).isTrue()) {
                 return ary;
             }
         }
@@ -1278,7 +1278,7 @@ public class RubyArray extends RubyObject implements List {
         for (int i = ary1.size() - 1; i >= 0; i--) {
             IRubyObject obj = (IRubyObject) ary1.get(i);
             for (int j = 0; j < len2; j++) {
-                if (obj.callMethod("==", (IRubyObject) ary2.get(j)).isTrue()) {
+                if (obj.callMethod(getRuntime().getCurrentContext(), "==", (IRubyObject) ary2.get(j)).isTrue()) {
                     ary1.remove(i);
                     break;
                 }
@@ -1305,7 +1305,7 @@ public class RubyArray extends RubyObject implements List {
         for (int i = 0; i < len1; i++) {
             IRubyObject obj = (IRubyObject) ary1.get(i);
             for (int j = 0; j < len2; j++) {
-                if (obj.callMethod("eql?", (IRubyObject) ary2.get(j)).isTrue()) {
+                if (obj.callMethod(getRuntime().getCurrentContext(), "eql?", (IRubyObject) ary2.get(j)).isTrue()) {
                     ary3.add(obj);
                     break;
                 }
@@ -1400,10 +1400,10 @@ public class RubyArray extends RubyObject implements List {
             if (o1 instanceof RubyString && o2 instanceof RubyString) {
                 StringMetaClass stringMC = (StringMetaClass)((RubyObject)o1).getMetaClass();
                 return RubyNumeric.fix2int(
-                        stringMC.op_cmp.call(stringMC.getRuntime(), (RubyString)o1, stringMC, "<=>", new IRubyObject[] {(RubyString)o2}, false));
+                        stringMC.op_cmp.call(stringMC.getRuntime().getCurrentContext(), (RubyString)o1, stringMC, "<=>", new IRubyObject[] {(RubyString)o2}, false));
             }
 
-            return RubyNumeric.fix2int(obj1.callMethod("<=>", obj2));
+            return RubyNumeric.fix2int(obj1.callMethod(obj1.getRuntime().getCurrentContext(), "<=>", obj2));
         }
     }
 

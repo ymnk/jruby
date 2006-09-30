@@ -73,7 +73,10 @@ public class RubyEnumerable {
 
     private static class RubyFirstArrayComparator implements Comparator {
         public int compare(Object o1, Object o2) {
-            return RubyFixnum.fix2int((((IRubyObject[])o1)[0].callMethod("<=>",((IRubyObject[])o2)[0])));
+            IRubyObject[] o1arr = (IRubyObject[])o1;
+            IRubyObject[] o2arr = (IRubyObject[])o2;
+            
+            return RubyFixnum.fix2int(o1arr[0].callMethod(o1arr[0].getRuntime().getCurrentContext(), "<=>", o2arr[0]));
         }
     }
     private static class RubyYieldComparator implements Comparator {
@@ -88,12 +91,12 @@ public class RubyEnumerable {
         }
     }
 
-    public static IRubyObject callEach(ThreadContext tc, IRubyObject self, RubyModule module, BlockCallback bc) {
-        Iter bef = tc.getFrameIter();
-        tc.preBlockPassEval(new CallBlock(self,module,Arity.noArguments(),bc,tc));
-        IRubyObject ret = self.callMethod("each");
-        tc.postBlockPassEval();
-        tc.setFrameIter(bef);
+    public static IRubyObject callEach(ThreadContext context, IRubyObject self, RubyModule module, BlockCallback bc) {
+        Iter bef = context.getFrameIter();
+        context.preBlockPassEval(new CallBlock(self,module,Arity.noArguments(),bc,context));
+        IRubyObject ret = self.callMethod(context, "each");
+        context.postBlockPassEval();
+        context.setFrameIter(bef);
         return ret;
     }
 
@@ -143,8 +146,8 @@ public class RubyEnumerable {
         public IRubyObject method1(final ThreadContext tc, IRubyObject self, IRubyObject[] args) {
             //SORT
             if(!tc.isBlockGiven()) {
-                IRubyObject res = self.callMethod("to_a");
-                return res.callMethod("sort");
+                IRubyObject res = self.callMethod(tc, "to_a");
+                return res.callMethod(tc, "sort");
             } else {
                 final List arr = eachToList(tc,self,module);
                 Collections.sort(arr, new RubyYieldComparator(tc));
@@ -176,14 +179,14 @@ public class RubyEnumerable {
             if(!tc.isBlockGiven()) {
                 for(Iterator iter = arr.iterator();iter.hasNext();) {
                     IRubyObject item = (IRubyObject)iter.next();
-                    if(pattern.callMethod("===",item).isTrue()) {
+                    if(pattern.callMethod(tc, "===",item).isTrue()) {
                         result.add(item);
                     }
                 }                
             } else {
                 for(Iterator iter = arr.iterator();iter.hasNext();) {
                     IRubyObject item = (IRubyObject)iter.next();
-                    if(pattern.callMethod("===",item).isTrue()) {
+                    if(pattern.callMethod(tc, "===",item).isTrue()) {
                         result.add(tc.yield(item));
                     }
                 }                
@@ -323,7 +326,7 @@ public class RubyEnumerable {
             //INCLUDE?
             List arr = eachToList(tc,self,module);
             for(Iterator iter = arr.iterator();iter.hasNext();) {
-                if(args[0].callMethod("==",(IRubyObject)iter.next()).isTrue()) {
+                if(args[0].callMethod(tc, "==",(IRubyObject)iter.next()).isTrue()) {
                     return tc.getRuntime().getTrue();
                 }
             }
@@ -337,14 +340,14 @@ public class RubyEnumerable {
             if(tc.isBlockGiven()) {
                 for(Iterator iter = arr.iterator();iter.hasNext();) {
                     IRubyObject item = (IRubyObject)iter.next();
-                    if(result == null || (tc.yield(tc.getRuntime().newArray(item,result)).callMethod(">", RubyFixnum.zero(tc.getRuntime()))).isTrue()) {
+                    if(result == null || (tc.yield(tc.getRuntime().newArray(item,result)).callMethod(tc, ">", RubyFixnum.zero(tc.getRuntime()))).isTrue()) {
                         result = item;
                     }
                 }
             } else {
                 for(Iterator iter = arr.iterator();iter.hasNext();) {
                     IRubyObject item = (IRubyObject)iter.next();
-                    if(result == null || item.callMethod("<=>",result).callMethod(">", RubyFixnum.zero(tc.getRuntime())).isTrue()) {
+                    if(result == null || item.callMethod(tc, "<=>",result).callMethod(tc, ">", RubyFixnum.zero(tc.getRuntime())).isTrue()) {
                         result = item;
                     }
                 }
@@ -362,14 +365,14 @@ public class RubyEnumerable {
             if(tc.isBlockGiven()) {
                 for(Iterator iter = arr.iterator();iter.hasNext();) {
                     IRubyObject item = (IRubyObject)iter.next();
-                    if(result == null || (tc.yield(tc.getRuntime().newArray(item,result)).callMethod("<", RubyFixnum.zero(tc.getRuntime()))).isTrue()) {
+                    if(result == null || (tc.yield(tc.getRuntime().newArray(item,result)).callMethod(tc, "<", RubyFixnum.zero(tc.getRuntime()))).isTrue()) {
                         result = item;
                     }
                 }
             } else {
                 for(Iterator iter = arr.iterator();iter.hasNext();) {
                     IRubyObject item = (IRubyObject)iter.next();
-                    if(result == null || item.callMethod("<=>",result).callMethod("<", RubyFixnum.zero(tc.getRuntime())).isTrue()) {
+                    if(result == null || item.callMethod(tc, "<=>",result).callMethod(tc, "<", RubyFixnum.zero(tc.getRuntime())).isTrue()) {
                         result = item;
                     }
                 }
@@ -435,7 +438,7 @@ public class RubyEnumerable {
                     List array = new ArrayList(aLen);
                     array.add(elem);
                     for(int i=0,j=args.length;i<j;i++) {
-                        array.add(args[i].callMethod("[]",tc.getRuntime().newFixnum(ix)));
+                        array.add(args[i].callMethod(tc, "[]",tc.getRuntime().newFixnum(ix)));
                     }
                     tc.yield(tc.getRuntime().newArray(array));
                     ix++;
@@ -447,7 +450,7 @@ public class RubyEnumerable {
                     List array = new ArrayList(aLen);
                     array.add(elem);
                     for(int i=0,j=args.length;i<j;i++) {
-                        array.add(args[i].callMethod("[]",tc.getRuntime().newFixnum(ix)));
+                        array.add(args[i].callMethod(tc, "[]",tc.getRuntime().newFixnum(ix)));
                     }
                     zip.add(tc.getRuntime().newArray(array));
                     ix++;
@@ -467,7 +470,7 @@ public class RubyEnumerable {
                     curr = tc.getRuntime().newArray();
                     results.put(key,curr);
                 }
-                curr.callMethod("<<",item);
+                curr.callMethod(tc, "<<",item);
             }
             return new RubyHash(tc.getRuntime(),results,tc.getRuntime().getNil());
         }

@@ -45,6 +45,7 @@ import org.jruby.RubyModule;
 import org.jruby.RubyString;
 import org.jruby.ast.Node;
 import org.jruby.runtime.CallType;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.callback.Callback;
 import org.jruby.runtime.marshal.MarshalStream;
 
@@ -73,16 +74,16 @@ public interface IRubyObject {
     
     Map getInstanceVariables();
 
-    IRubyObject callMethod(RubyModule context, String name, IRubyObject[] args, CallType callType);
+    IRubyObject callMethod(ThreadContext context, RubyModule type, String name, IRubyObject[] args, CallType callType);
     
-    IRubyObject callMethod(String name, IRubyObject[] args, CallType callType);
+    IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, CallType callType);
     
     /**
      * RubyMethod funcall.
      * @param string
      * @return RubyObject
      */
-    IRubyObject callMethod(String string);
+    IRubyObject callMethod(ThreadContext context, String string);
 
     /**
      * RubyMethod isNil.
@@ -110,7 +111,7 @@ public interface IRubyObject {
      * @param arg
      * @return RubyObject
      */
-    IRubyObject callMethod(String string, IRubyObject arg);
+    IRubyObject callMethod(ThreadContext context, String string, IRubyObject arg);
 
     /**
      * RubyMethod getRubyClass.
@@ -162,7 +163,7 @@ public interface IRubyObject {
      * @param rubyArgs
      * @return IRubyObject
      */
-    IRubyObject callMethod(String method, IRubyObject[] rubyArgs);
+    IRubyObject callMethod(ThreadContext context, String method, IRubyObject[] rubyArgs);
 
     /**
      * RubyMethod eval.

@@ -203,7 +203,8 @@ public final class Ruby implements IRuby {
 
     public IRubyObject eval(Node node) {
         try {
-            return getCurrentContext().getFrameEvalState().begin(node);
+            ThreadContext context = getCurrentContext();
+            return context.getFrameEvalState().begin(context, node);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
 	            return (IRubyObject)je.getSecondaryData();
@@ -713,12 +714,13 @@ public final class Ruby implements IRuby {
 		if (excp == null || excp.isNil()) {
             return;
         }
+        
+        ThreadContext tc = getCurrentContext();
 
-        RubyArray backtrace = (RubyArray) excp.callMethod("backtrace");
+        RubyArray backtrace = (RubyArray) excp.callMethod(tc, "backtrace");
 
         PrintStream errorStream = getErrorStream();
 		if (backtrace.isNil()) {
-            ThreadContext tc = getCurrentContext();
             
             if (tc.getSourceFile() != null) {
                 errorStream.print(tc.getPosition());

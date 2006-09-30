@@ -52,6 +52,7 @@ import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
 import org.jruby.RubyHash;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -181,6 +182,7 @@ public class JRubyConstructor extends ConstructorImpl {
 
     public static Object constructRubyMap(final Constructor ctor, final String tag, final Node node) {
         final IRuby runtime = ((JRubyConstructor)ctor).runtime;
+        ThreadContext context = runtime.getCurrentContext();
         RubyModule objClass = runtime.getModule("Object");
         if(tag != null) {
             final String[] nms = tag.split("::");
@@ -193,7 +195,7 @@ public class JRubyConstructor extends ConstructorImpl {
         final Map vars = (Map)(ctor.constructMapping(node));
         for(final Iterator iter = vars.keySet().iterator();iter.hasNext();) {
             final IRubyObject key = (IRubyObject)iter.next();
-            oo.callMethod("[]=",new IRubyObject[]{key,(IRubyObject)vars.get(key)});
+            oo.callMethod(context, "[]=",new IRubyObject[]{key,(IRubyObject)vars.get(key)});
         }
         return oo;
     }

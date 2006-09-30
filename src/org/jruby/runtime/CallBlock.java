@@ -72,17 +72,15 @@ public class CallBlock extends Block {
             super(implementationClass, visibility);
             this.callback = callback;
         }
-        public void preMethod(IRuby runtime, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
-            ThreadContext context = runtime.getCurrentContext();
+        public void preMethod(ThreadContext context, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
             context.preMethodCall(implementationClass, lastClass, recv, name, args, noSuper);
         }
     
-        public void postMethod(IRuby runtime) {
-            ThreadContext context = runtime.getCurrentContext();
+        public void postMethod(ThreadContext context) {
             context.postMethodCall();
         }
 
-        public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+        public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
             return callback.call(args,receiver);
         }
 

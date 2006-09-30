@@ -43,6 +43,8 @@ public class EvaluationState {
     
     private JumpException currentException;
     
+    private ThreadContext currentContext;
+    
     public EvaluationState(IRuby runtime, IRubyObject self) {
         this.runtime = runtime;
         this.evaluator = EvaluateVisitor.getInstance();
@@ -284,7 +286,7 @@ public class EvaluationState {
                 handleReturn(je);
                 break;
             case JumpType.RAISE:
-                handleRaise(je);
+                handleRaise(currentContext, je);
                 break;
             case JumpType.REDO:
                 handleRedo(je);
@@ -300,7 +302,7 @@ public class EvaluationState {
     }
     
     // works like old recursive evaluation, for Assignment and Defined visitors.
-    public IRubyObject begin(Node node) {
+    public IRubyObject begin(ThreadContext context, Node node) {
         if (node == null) {
             clearResult(); // must clear result in case we are still in use
             
@@ -310,6 +312,8 @@ public class EvaluationState {
         // TODO: This is a minor hack that depends on us being called in recursion; safe for now
         InstructionBundle previousStack = currentStack;
         currentStack = null;
+        ThreadContext oldContext = currentContext;
+        currentContext = context;
         
         begin2(node);
         
@@ -324,6 +328,7 @@ public class EvaluationState {
                 throw runtime.newSystemStackError("stack level too deep");
         } finally {
             currentStack = previousStack;
+            currentContext = oldContext;
             end();
         }
         
@@ -435,7 +440,7 @@ public class EvaluationState {
         }
     }
     
-    private void handleRaise(JumpException je) {
+    private void handleRaise(ThreadContext context, JumpException je) {
         RaiseException re = (RaiseException)je;
         RubyException raisedException = re.getException();
         
@@ -479,7 +484,7 @@ public class EvaluationState {
             
             // need to make these iterative
             if (exceptionNodes instanceof SplatNode) {                    
-                exceptionNodesList = (ListNode) begin(exceptionNodes);
+                exceptionNodesList = (ListNode) begin(context, exceptionNodes);
             } else {
                 exceptionNodesList = (ListNode) exceptionNodes;
             }
@@ -589,7 +594,7 @@ public class EvaluationState {
             if (! args[i].isKindOf(runtime.getClass("Module"))) {
                 throw runtime.newTypeError("class or module required for rescue clause");
             }
-            if (args[i].callMethod("===", currentException).isTrue())
+            if (args[i].callMethod(tc, "===", currentException).isTrue())
                 return true;
         }
         return false;
@@ -607,9 +612,9 @@ public class EvaluationState {
             for (Iterator iter=((ArrayNode)node).iterator(); iter.hasNext();){
                 final Node next = (Node) iter.next();
                 if (next instanceof SplatNode) {
-                    list.addAll(((RubyArray) begin(next)).getList());
+                    list.addAll(((RubyArray) begin(context, next)).getList());
                 } else {
-                    list.add(begin(next));
+                    list.add(begin(context, next));
                 }
             }
 
@@ -618,7 +623,7 @@ public class EvaluationState {
             return (IRubyObject[]) list.toArray(new IRubyObject[list.size()]);
         }
 
-        return ArgsUtil.arrayify(begin(node));
+        return ArgsUtil.arrayify(begin(context, node));
     }
 
     public boolean hasNext() {

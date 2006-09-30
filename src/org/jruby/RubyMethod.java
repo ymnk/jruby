@@ -115,7 +115,7 @@ public class RubyMethod extends RubyObject {
         tc.setIfBlockAvailable();
         try {
             // FIXME: should lastClass be implementation module for a Method?
-            return method.call(getRuntime(), receiver, implementationModule, methodName, args, false);
+            return method.call(tc, receiver, implementationModule, methodName, args, false);
         } finally {
             tc.clearIfBlockAvailable();
         }

@@ -36,6 +36,7 @@ import org.jruby.ast.types.IArityNode;
 import org.jruby.evaluator.EvaluationState;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.ICallable;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -57,14 +58,14 @@ public class EvaluateCallable extends AbstractCallable {
     	this(node, null, procArityOf(vars));
     }
     
-    public void preMethod(IRuby runtime, RubyModule implementationClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
+    public void preMethod(ThreadContext context, RubyModule implementationClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
     }
     
-    public void postMethod(IRuby runtime) {
+    public void postMethod(ThreadContext context) {
     }
 
-    public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
-        return new EvaluationState(runtime, receiver).begin(node);
+    public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+        return new EvaluationState(context.getRuntime(), receiver).begin(context, node);
         // REVIST: we will execute under a different self, so save it (should be a stack?)
         // This almost works, but causes rubicon TestThread to run forever
 //        EvaluationState evalState = runtime.getCurrentContext().getCurrentFrame().getEvalState();

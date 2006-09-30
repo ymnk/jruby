@@ -40,6 +40,7 @@ import org.jruby.RubyString;
 import org.jruby.RubyString.StringMethod;
 import org.jruby.javasupport.JavaUtil;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.PrintfFormat;
@@ -55,30 +56,30 @@ public class StringMetaClass extends ObjectMetaClass {
     }
 
     public StringMethod hash = new StringMethod(this, Arity.noArguments(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubyString self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubyString self, IRubyObject[] args) {
             return self.getRuntime().newFixnum(self.toString().hashCode());
         }
     };
     
     public StringMethod to_s = new StringMethod(this, Arity.noArguments(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubyString self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubyString self, IRubyObject[] args) {
             return self;
         }
     };
     
     /* rb_str_cmp_m */
     public StringMethod op_cmp = new StringMethod(this, Arity.singleArgument(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubyString self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubyString self, IRubyObject[] args) {
             if (args[0] instanceof RubyString) {
                 return getRuntime().newFixnum(self.cmp((RubyString) args[0]));
             }
                 
             if (args[0].respondsTo("to_str") && args[0].respondsTo("<=>")) {
-                IRubyObject tmp = args[0].callMethod("<=>", self);
+                IRubyObject tmp = args[0].callMethod(context, "<=>", self);
 
                 if (!tmp.isNil()) {
-                    return tmp instanceof RubyFixnum ? tmp.callMethod("-") :
-                        getRuntime().newFixnum(0).callMethod("-", tmp);
+                    return tmp instanceof RubyFixnum ? tmp.callMethod(context, "-") :
+                        getRuntime().newFixnum(0).callMethod(context, "-", tmp);
                 }
             }
             
@@ -87,7 +88,7 @@ public class StringMetaClass extends ObjectMetaClass {
     };
 
     public StringMethod equal = new StringMethod(this, Arity.singleArgument(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubyString self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubyString self, IRubyObject[] args) {
             IRubyObject other = args[0];
             
             if (other == self) {
@@ -103,16 +104,16 @@ public class StringMetaClass extends ObjectMetaClass {
     };
     
     public StringMethod veryEqual = new StringMethod(this, Arity.singleArgument(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubyString self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubyString self, IRubyObject[] args) {
             IRubyObject other = args[0];
-            IRubyObject truth = self.callMethod("==", other);
+            IRubyObject truth = self.callMethod(context, "==", other);
             
             return truth == self.getRuntime().getNil() ? self.getRuntime().getFalse() : truth;
         }
     };
 
     public StringMethod op_plus = new StringMethod(this, Arity.singleArgument(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubyString self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubyString self, IRubyObject[] args) {
             IRubyObject other = args[0];
             RubyString str = RubyString.stringValue(other);
             
@@ -121,7 +122,7 @@ public class StringMetaClass extends ObjectMetaClass {
     };
 
     public StringMethod op_mul = new StringMethod(this, Arity.singleArgument(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubyString self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubyString self, IRubyObject[] args) {
             IRubyObject other = args[0];
             
             RubyInteger otherInteger =
@@ -148,7 +149,7 @@ public class StringMetaClass extends ObjectMetaClass {
     };
 
     public StringMethod format = new StringMethod(this, Arity.singleArgument(), Visibility.PUBLIC) {
-        public IRubyObject invoke(RubyString self, IRubyObject[] args) {
+        public IRubyObject invoke(ThreadContext context, RubyString self, IRubyObject[] args) {
             IRubyObject arg = args[0];
             
             if (arg instanceof RubyArray) {

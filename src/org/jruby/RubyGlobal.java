@@ -44,6 +44,7 @@ import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.runtime.Constants;
 import org.jruby.runtime.GlobalVariable;
 import org.jruby.runtime.ReadonlyGlobalVariable;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /** This class initializes global variables and constants.
@@ -67,7 +68,7 @@ public class RubyGlobal {
                 throw getRuntime().newTypeError("can't convert " + key.getMetaClass() + " into String");
             }
 
-            return super.aref(key.callMethod("to_str"));
+            return super.aref(key.callMethod(getRuntime().getCurrentContext(), "to_str"));
         }
 
         public IRubyObject aset(IRubyObject key, IRubyObject value) {
@@ -78,8 +79,9 @@ public class RubyGlobal {
                 throw getRuntime().newTypeError("can't convert " + value.getMetaClass() + " into String");
             }
 
-            return super.aset(key.callMethod("to_str"),
-                    value.isNil() ? getRuntime().getNil() : value.callMethod("to_str"));
+            ThreadContext context = getRuntime().getCurrentContext();
+            return super.aset(key.callMethod(context, "to_str"),
+                    value.isNil() ? getRuntime().getNil() : value.callMethod(context, "to_str"));
         }
     }
     
@@ -242,14 +244,14 @@ public class RubyGlobal {
 
         public IRubyObject get() {
             IRubyObject errorInfo = runtime.getGlobalVariables().get("$!");
-            return errorInfo.isNil() ? runtime.getNil() : errorInfo.callMethod("backtrace");
+            return errorInfo.isNil() ? runtime.getNil() : errorInfo.callMethod(runtime.getCurrentContext(), "backtrace");
         }
 
         public IRubyObject set(IRubyObject value) {
             if (runtime.getGlobalVariables().get("$!").isNil()) {
                 throw runtime.newArgumentError("$! not set.");
             }
-            runtime.getGlobalVariables().get("$!").callMethod("set_backtrace", value);
+            runtime.getGlobalVariables().get("$!").callMethod(runtime.getCurrentContext(), "set_backtrace", value);
             return value;
         }
     }

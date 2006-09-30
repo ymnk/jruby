@@ -37,6 +37,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 import org.jruby.util.IOInputStream;
@@ -217,8 +218,9 @@ public class RubyZlib {
         }
 
         public static IRubyObject open(IRubyObject recv, RubyString filename) throws IOException {
-            RubyObject proc = (recv.getRuntime().getCurrentContext().isBlockGiven()) ? (RubyObject)recv.getRuntime().newProc() : (RubyObject)recv.getRuntime().getNil();
-            RubyGzipReader io = newInstance(recv,new IRubyObject[]{recv.getRuntime().getClass("File").callMethod("open",new IRubyObject[]{filename,recv.getRuntime().newString("rb")})});
+            ThreadContext context = recv.getRuntime().getCurrentContext();
+            RubyObject proc = (context.isBlockGiven()) ? (RubyObject)recv.getRuntime().newProc() : (RubyObject)recv.getRuntime().getNil();
+            RubyGzipReader io = newInstance(recv,new IRubyObject[]{recv.getRuntime().getClass("File").callMethod(context, "open",new IRubyObject[]{filename,recv.getRuntime().newString("rb")})});
             
             return RubyGzipFile.wrap(recv, io, proc);
         }
@@ -435,8 +437,9 @@ public class RubyZlib {
                 }
             }
 
-            RubyObject proc = (recv.getRuntime().getCurrentContext().isBlockGiven()) ? (RubyObject)recv.getRuntime().newProc() : (RubyObject)recv.getRuntime().getNil();
-            RubyGzipWriter io = newInstance(recv,new IRubyObject[]{recv.getRuntime().getClass("File").callMethod("open",new IRubyObject[]{args[0],recv.getRuntime().newString("wb")}),level,strategy});
+            ThreadContext context = recv.getRuntime().getCurrentContext();
+            RubyObject proc = (context.isBlockGiven()) ? (RubyObject)recv.getRuntime().newProc() : (RubyObject)recv.getRuntime().getNil();
+            RubyGzipWriter io = newInstance(recv,new IRubyObject[]{recv.getRuntime().getClass("File").callMethod(context, "open",new IRubyObject[]{args[0],recv.getRuntime().newString("wb")}),level,strategy});
             return RubyGzipFile.wrap(recv, io, proc);
         }
 

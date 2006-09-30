@@ -350,7 +350,7 @@ public class RubyModule extends RubyObject {
         // cnutter: removed iterative inclusion of module's superclasses, because it included them in reverse order
         // see RubyModule.newIncludeClass for replacement
         
-        module.callMethod("included", this);
+        module.callMethod(getRuntime().getCurrentContext(), "included", this);
     }
 
     public void defineMethod(String name, Callback method) {
@@ -569,7 +569,7 @@ public class RubyModule extends RubyObject {
             break;
         }
         
-        return callMethod("const_missing", RubySymbol.newSymbol(getRuntime(), name));
+        return callMethod(getRuntime().getCurrentContext(), "const_missing", RubySymbol.newSymbol(getRuntime(), name));
     }
     
     /**
@@ -710,10 +710,10 @@ public class RubyModule extends RubyObject {
     }
 
     private void addAccessor(String name, boolean readable, boolean writeable) {
-        ThreadContext tc = getRuntime().getCurrentContext();
+        ThreadContext context = getRuntime().getCurrentContext();
         
         // Check the visibility of the previous frame, which will be the frame in which the class is being eval'ed
-        Visibility attributeScope = tc.getCurrentVisibility();
+        Visibility attributeScope = context.getCurrentVisibility();
         if (attributeScope.isPrivate()) {
             //FIXME warning
         } else if (attributeScope.isModuleFunction()) {
@@ -736,13 +736,13 @@ public class RubyModule extends RubyObject {
                     return Arity.noArguments();
                 }
             });
-            callMethod("method_added", RubySymbol.newSymbol(getRuntime(), name));
+            callMethod(context, "method_added", RubySymbol.newSymbol(getRuntime(), name));
         }
         if (writeable) {
             name = name + "=";
             defineMethod(name, new Callback() {
                 public IRubyObject execute(IRubyObject self, IRubyObject[] args) {
-					IRubyObject[] fargs = runtime.getCurrentContext().getFrameArgs();
+					IRubyObject[] fargs = self.getRuntime().getCurrentContext().getFrameArgs();
 					
 			        if (fargs.length != 1) {
 			            throw runtime.newArgumentError("wrong # of arguments(" + fargs.length + "for 1)");
@@ -755,7 +755,7 @@ public class RubyModule extends RubyObject {
                     return Arity.singleArgument();
                 }
             });
-            callMethod("method_added", RubySymbol.newSymbol(getRuntime(), name));
+            callMethod(context, "method_added", RubySymbol.newSymbol(getRuntime(), name));
         }
     }
 
@@ -844,8 +844,8 @@ public class RubyModule extends RubyObject {
         IRubyObject body;
         String name = args[0].asSymbol();
         ICallable newMethod = null;
-        ThreadContext tc = getRuntime().getCurrentContext();
-        Visibility visibility = tc.getCurrentVisibility();
+        ThreadContext context = getRuntime().getCurrentContext();
+        Visibility visibility = context.getCurrentVisibility();
 
         if (visibility.isModuleFunction()) {
             visibility = Visibility.PRIVATE;
@@ -874,12 +874,12 @@ public class RubyModule extends RubyObject {
         addMethod(name, newMethod);
 
         RubySymbol symbol = RubySymbol.newSymbol(getRuntime(), name);
-        if (tc.getPreviousVisibility().isModuleFunction()) {
+        if (context.getPreviousVisibility().isModuleFunction()) {
             getSingletonClass().addMethod(name, new WrapperCallable(getSingletonClass(), newMethod, Visibility.PUBLIC));
-            callMethod("singleton_method_added", symbol);
+            callMethod(context, "singleton_method_added", symbol);
         }
 
-        callMethod("method_added", symbol);
+        callMethod(context, "method_added", symbol);
 
         return body;
     }
@@ -1369,7 +1369,7 @@ public class RubyModule extends RubyObject {
      */
     public RubyModule include(IRubyObject[] modules) {
         for (int i = modules.length - 1; i >= 0; i--) {
-            modules[i].callMethod("append_features", this);
+            modules[i].callMethod(getRuntime().getCurrentContext(), "append_features", this);
         }
 
         return this;
@@ -1426,9 +1426,11 @@ public class RubyModule extends RubyObject {
         if (getRuntime().getSafeLevel() >= 4 && !isTaint()) {
             throw getRuntime().newSecurityError("Insecure: can't change method visibility");
         }
+        
+        ThreadContext context = getRuntime().getCurrentContext(); 
 
         if (args.length == 0) {
-            getRuntime().getCurrentContext().setCurrentVisibility(Visibility.MODULE_FUNCTION);
+            context.setCurrentVisibility(Visibility.MODULE_FUNCTION);
         } else {
             setMethodVisibility(args, Visibility.PRIVATE);
 
@@ -1437,7 +1439,7 @@ public class RubyModule extends RubyObject {
                 ICallable method = searchMethod(name);
                 assert !method.isUndefined() : "undefined method '" + name + "'";
                 getSingletonClass().addMethod(name, new WrapperCallable(getSingletonClass(), method, Visibility.PUBLIC));
-                callMethod("singleton_method_added", RubySymbol.newSymbol(getRuntime(), name));
+                callMethod(context, "singleton_method_added", RubySymbol.newSymbol(getRuntime(), name));
             }
         }
         return this;
