@@ -37,6 +37,7 @@ package org.jruby;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import org.jruby.internal.runtime.methods.AliasMethod;
@@ -997,17 +998,23 @@ public class RubyModule extends RubyObject {
      *
      */
     public RubyArray ancestors() {
-        RubyArray ary = getRuntime().newArray();
-
-        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
-            if (p.isIncluded()) {
-                ary.append(((IncludedModuleWrapper) p).getNonIncludedClass());
-            } else {
-                ary.append(p);
-            }
-        }
+        RubyArray ary = getRuntime().newArray(getAncestorList());
 
         return ary;
+    }
+    
+    public List getAncestorList() {
+        ArrayList list = new ArrayList();
+        
+        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
+            if (p.isIncluded()) {
+                list.add(((IncludedModuleWrapper) p).getNonIncludedClass());
+            } else {
+                list.add(p);
+            }
+        }
+        
+        return list;
     }
 
     /** rb_mod_to_s
