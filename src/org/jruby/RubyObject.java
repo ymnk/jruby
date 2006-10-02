@@ -252,7 +252,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     }
 
     public boolean isKindOf(RubyModule type) {
-        return getMetaClass().getAncestorList().contains(type);
+        return getMetaClass().hasClassInHierarchy(type);
     }
 
     /** rb_singleton_class

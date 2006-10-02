@@ -1016,6 +1016,22 @@ public class RubyModule extends RubyObject {
         
         return list;
     }
+    
+    public boolean hasClassInHierarchy(RubyModule type) {
+        // XXX: This check previously used callMethod("==") to check for equality between classes
+        // when scanning the hierarchy. However the == check may be safe; we should only ever have
+        // one instance bound to a given type/constant. If it's found to be unsafe, examine ways
+        // to avoid the == call.
+        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
+            if (p.isIncluded()) {
+                if (((IncludedModuleWrapper)p).getNonIncludedClass() == type) return true;
+            } else {
+                if (p == type) return true;
+            }
+        }
+        
+        return false;
+    }
 
     /** rb_mod_to_s
      *
