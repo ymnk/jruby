@@ -33,7 +33,6 @@ package org.jruby.runtime;
 
 import org.jruby.IRuby;
 import org.jruby.RubyModule;
-import org.jruby.ast.Node;
 import org.jruby.evaluator.EvaluationState;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.builtin.IRubyObject;
