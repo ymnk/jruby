@@ -75,16 +75,6 @@ public class Frame {
         this.runtime = runtime;
         this.blockArg = blockArg;
     }
-    
-    public void begin(Node node) {
-        evalState.begin2(node);
-    }
-    
-    public void step() {
-        if (evalState.hasNext()) {
-            evalState.executeNext();
-        }
-    }
 
     /** Getter for property args.
      * @return Value of property args.
