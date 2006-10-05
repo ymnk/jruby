@@ -130,6 +130,7 @@ import org.jruby.lexer.yacc.ISourcePositionHolder;
 import org.jruby.lexer.yacc.LexState;
 import org.jruby.lexer.yacc.LexerSource;
 import org.jruby.lexer.yacc.RubyYaccLexer;
+import org.jruby.lexer.yacc.RubyYaccLexerForComments;
 import org.jruby.lexer.yacc.StrTerm;
 import org.jruby.lexer.yacc.SyntaxException;
 import org.jruby.lexer.yacc.Token;
@@ -142,9 +143,17 @@ public class DefaultRubyParser {
     private IRubyWarnings warnings;
 
     public DefaultRubyParser() {
-        support = new ParserSupport();
-        lexer = new RubyYaccLexer();
+    	this(new ParserSupport(), new RubyYaccLexer());
+    }
+    
+    public DefaultRubyParser(ParserSupport support, RubyYaccLexer lexer) {
+        this.support = support;
+        this.lexer = lexer;
         lexer.setParserSupport(support);
+    }
+    
+    public static DefaultRubyParser createDefaultRubyParserWithComments() {
+    	return new DefaultRubyParser(new ParserSupportForComments(), new RubyYaccLexerForComments());
     }
 
     public void setWarnings(IRubyWarnings warnings) {

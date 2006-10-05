@@ -32,70 +32,70 @@ import org.jruby.parser.ParserSupport;
 
 public class LexerContext implements Cloneable{
 
-	private boolean inString;
-	private boolean inRegExp;
+	public boolean inString;
+	public boolean inRegExp;
 	
     // Last token read via yylex().
-    private int token;
+	public int token;
     
     // Value of last token which had a value associated with it.
-    private Token yaccValue;
+	public Token yaccValue;
 
     // Stream of data that yylex() examines.
-    private LexerSource src;
+	public LexerSource src;
     
     // Used for tiny smidgen of grammar in lexer (see setParserSupport())
-    private ParserSupport parserSupport = null;
+	public ParserSupport parserSupport = null;
 
     // The current location of the lexer immediately after a call to yylex()
-    private ISourcePosition currentPos;
+	public ISourcePosition currentPos;
 
     // What handles warnings
-    private IRubyWarnings warnings;
+	public IRubyWarnings warnings;
 
     // Additional context surrounding tokens that both the lexer and
     // grammar use.
-    private LexState lex_state;
+	public LexState lex_state;
     
     // Tempory buffer to build up a potential token.  Consumer takes responsibility to reset 
     // this before use.
-    private StringBuffer tokenBuffer = new StringBuffer(60);
+	public StringBuffer tokenBuffer = new StringBuffer(60);
 
-    private StackState conditionState = new StackState();
-    private StackState cmdArgumentState = new StackState();
-    private StrTerm lex_strterm;
-    private boolean commandStart;
+	public StackState conditionState = new StackState();
+	public StackState cmdArgumentState = new StackState();
+	public StrTerm lex_strterm;
+	public boolean commandStart;
 
-    private boolean lastWasNewLine = false;
-	private boolean currentIsNewLine = true;
+	public boolean lastWasNewLine = false;
+	public boolean currentIsNewLine = true;
 	
 	
 	public final Object clone()
 	{
 		LexerContext clone = new LexerContext();
 		
-		clone.setToken(token);
-		clone.setYaccValue(yaccValue);
-		clone.setSrc(src);
-		clone.setParserSupportEncap(parserSupport);
-		clone.setCurrentPos(currentPos);
-		clone.setWarningsEncap(warnings);
-		clone.setLex_state(lex_state);
-		clone.setTokenBuffer(new StringBuffer(tokenBuffer.toString()));
-		clone.setConditionStateEncap(conditionState.getClone());
-		clone.setCmdArgumentStateEncap(cmdArgumentState.getClone());
+		clone.token = token;
+		clone.yaccValue = yaccValue;
+		clone.src = src;
+		clone.parserSupport = parserSupport;
+		clone.currentPos = currentPos;
+		clone.warnings = warnings;
+		clone.lex_state = lex_state;
+		clone.tokenBuffer = new StringBuffer(tokenBuffer.toString());
+		clone.conditionState = conditionState.getClone();
+		clone.cmdArgumentState = cmdArgumentState.getClone();
 		if(lex_strterm != null) {
-			clone.setLex_strterm((StrTerm)lex_strterm.clone());
+			clone.lex_strterm = ((StrTerm)lex_strterm.clone());
 		}
-		clone.setCommandStart(commandStart);
-		clone.setLastWasNewLine(lastWasNewLine);
-		clone.setCurrentIsNewLine(currentIsNewLine);
-		clone.setInString(inString);
-		clone.setInRegExp(inRegExp);
+		clone.commandStart = commandStart;
+		clone.lastWasNewLine = lastWasNewLine;
+		clone.currentIsNewLine = currentIsNewLine;
+		clone.inString = inString;
+		clone.inRegExp = inRegExp;
 		
 		return clone;
 	}
-	
+
 	
 	public int setToken(int token) {
 		return this.token = token;

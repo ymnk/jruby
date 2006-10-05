@@ -112,7 +112,7 @@ public class TestReWriteVisitor extends TestSuite {
 	public static String generateSource(String original) {
 		if(original.equals(""))
 			return original;
-		DefaultRubyParser parser = RubyParserPool.getInstance().borrowParser();
+		DefaultRubyParser parser = DefaultRubyParser.createDefaultRubyParserWithComments();
 		parser.setWarnings(new NullWarnings());
 		parser.init(new RubyParserConfiguration());
 		

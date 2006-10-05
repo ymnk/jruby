@@ -190,7 +190,7 @@ public class ReWriteVisitor implements NodeVisitor {
 			return;
 		}
 
-		DefaultRubyParser parser = RubyParserPool.getInstance().borrowParser();
+		DefaultRubyParser parser = DefaultRubyParser.createDefaultRubyParserWithComments();
 		parser.setWarnings(new NullWarnings());
 		parser.init(new RubyParserConfiguration());
 

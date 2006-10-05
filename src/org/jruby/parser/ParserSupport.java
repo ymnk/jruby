@@ -306,37 +306,7 @@ public class ParserSupport {
 
 	
 	public Node introduceComment(Node node, Object[] yaccValues){
-		
-        if (node == null) {
-            return null;
-        }
-        
-		ArrayList yaccValueList = new ArrayList(Arrays.asList(yaccValues));
-		Iterator valueItr = yaccValueList.iterator();
-		
-		while(valueItr.hasNext()){
-			
-			Object currentValue = valueItr.next();
-			if((currentValue instanceof ICommentable) && ((ICommentable)currentValue).hasComments()){
-				continue;
-			}else{
-				valueItr.remove();
-			}
-		}
-		
-		if(yaccValueList.isEmpty()){
-			return node;
-		}else{
-			Iterator commentItr = yaccValueList.iterator();
-			
-			while(commentItr.hasNext()){
-				ICommentable currentCommentable = (ICommentable)commentItr.next();
-				if(currentCommentable.hasComments()){
-					node.addComments(currentCommentable.getComments());
-				}			
-			}
-			return node;
-		}
+		return node;
 	}
 
 
@@ -794,7 +764,7 @@ public class ParserSupport {
     public Node literal_concat(ISourcePosition position, Node head, Node tail) { 
 
         if (head == null) {
-        	assert tail == null;
+        	assert tail == null || tail instanceof Node;
         	return tail;
         }
         
@@ -891,22 +861,6 @@ public class ParserSupport {
     }
 
 	public ListNode commentLastElement(ListNode node, Object[] yaccValues) {
-		
-		ListIterator revItr = node.reverseIterator();
-		Node commentedNode = null;
-		
-		if(revItr.hasPrevious())
-		{
-			commentedNode = (Node)revItr.previous();
-			revItr.remove();
-		}
-		else{
-			return node;
-		}
-		
-		commentedNode = introduceComment(commentedNode, yaccValues);
-		
-		node.add(commentedNode);
 		
 		return node;
 	}
