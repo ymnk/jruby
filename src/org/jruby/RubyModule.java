@@ -19,6 +19,7 @@
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004-2005 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -321,37 +322,75 @@ public class RubyModule extends RubyObject {
      * @param arg The module to include
      */
     public synchronized void includeModule(IRubyObject arg) {
+        assert arg != null;
+        
         testFrozen("module");
         if (!isTaint()) {
             getRuntime().secure(4);
         }
 
         if (!(arg instanceof RubyModule)) {
-            throw getRuntime().newTypeError("Wrong argument type " + arg.getMetaClass().getName() + " (expected Module).");
+            throw getRuntime().newTypeError("Wrong argument type " + arg.getMetaClass().getName() +
+                    " (expected Module).");
         }
-
+        
         RubyModule module = (RubyModule) arg;
-        Map moduleMethods = module.getMethods();
 
         // Make sure the module we include does not already exist
         if (isSame(module)) {
     		return;
     	}
         
-        // Invalidate cache for all methods in the new included module in case a base class method
-        // of the same name has already been cached.
-        for (Iterator iter = moduleMethods.keySet().iterator(); iter.hasNext();) {
-        	String methodName = (String) iter.next();
-            getRuntime().getCacheMap().remove(methodName, searchMethod(methodName));
+        infectBy(module);
+        
+        RubyModule p, c;
+        boolean changed = false;
+        boolean skip = false;
+        
+        c = this;
+        while (module != null) {
+            if (getNonIncludedClass() == module.getNonIncludedClass()) {
+                throw getRuntime().newArgumentError("cyclic include detected");
+            }
+            
+            boolean superclassSeen = false;            
+            for (p = getSuperClass(); p != null; p = p.getSuperClass()) {
+                if (p instanceof IncludedModuleWrapper) {
+                    if (p.getNonIncludedClass() == module.getNonIncludedClass()) {
+                        if (!superclassSeen) {
+                            c = p;
+                        }
+                        skip = true;
+                        break;
+                    }
+                } else {
+                    superclassSeen = true;
+                }
+            }
+            if (!skip) {
+                // In the current logic, if we get here we know that module is not an 
+                // IncludedModuleWrapper, so there's no need to fish out the delegate. But just 
+                // in case the logic should change later, let's do it anyway:
+                c.setSuperClass(new IncludedModuleWrapper(getRuntime(), c.getSuperClass(), 
+                        module.getNonIncludedClass()));
+                c = c.getSuperClass();
+                changed = true;
+            }
+
+            module = module.getSuperClass();
+            skip = false;
         }
-        
-        // Include new module
-        setSuperClass(module.newIncludeClass(getSuperClass()));
-        
-        // cnutter: removed iterative inclusion of module's superclasses, because it included them in reverse order
-        // see RubyModule.newIncludeClass for replacement
-        
-        module.callMethod("included", this);
+
+        if (changed) {
+            // MRI seems to blow away its cache completely after an include; is
+            // what we're doing here really safe?
+            for (Iterator iter = ((RubyModule) arg).getMethods().keySet().iterator(); 
+                 iter.hasNext();) {
+                String methodName = (String) iter.next();
+                getRuntime().getCacheMap().remove(methodName, searchMethod(methodName));
+            }
+        }
+ 
     }
 
     public void defineMethod(String name, Callback method) {
@@ -943,7 +982,7 @@ public class RubyModule extends RubyObject {
     }
     
     protected IRubyObject cloneMethods(RubyModule clone) {
-    	RubyModule realType = isIncluded() ? ((IncludedModuleWrapper) this).getNonIncludedClass() : this;
+    	RubyModule realType = this.getNonIncludedClass();
         for (Iterator iter = getMethods().entrySet().iterator(); iter.hasNext(); ) {
             Map.Entry entry = (Map.Entry) iter.next();
             ICallable method = (ICallable) entry.getValue();
@@ -987,7 +1026,7 @@ public class RubyModule extends RubyObject {
 
         for (RubyModule p = getSuperClass(); p != null; p = p.getSuperClass()) {
             if (p.isIncluded()) {
-                ary.append(((IncludedModuleWrapper) p).getNonIncludedClass());
+                ary.append(p.getNonIncludedClass());
             }
         }
 
@@ -1007,27 +1046,19 @@ public class RubyModule extends RubyObject {
         ArrayList list = new ArrayList();
         
         for (RubyModule p = this; p != null; p = p.getSuperClass()) {
-            if (p.isIncluded()) {
-                list.add(((IncludedModuleWrapper) p).getNonIncludedClass());
-            } else {
-                list.add(p);
-            }
+            list.add(p.getNonIncludedClass());
         }
         
         return list;
     }
     
-    public boolean hasClassInHierarchy(RubyModule type) {
+    public boolean hasModuleInHierarchy(RubyModule type) {
         // XXX: This check previously used callMethod("==") to check for equality between classes
         // when scanning the hierarchy. However the == check may be safe; we should only ever have
         // one instance bound to a given type/constant. If it's found to be unsafe, examine ways
         // to avoid the == call.
         for (RubyModule p = this; p != null; p = p.getSuperClass()) {
-            if (p.isIncluded()) {
-                if (((IncludedModuleWrapper)p).getNonIncludedClass() == type) return true;
-            } else {
-                if (p == type) return true;
-            }
+            if (p.getNonIncludedClass() == type) return true;
         }
         
         return false;
@@ -1124,8 +1155,7 @@ public class RubyModule extends RubyObject {
    }
    
    public boolean isSame(RubyModule module) {
-       // FIXME: lame equality check; need something better
-       return module.getMethods() == getMethods(); 
+       return this == module;
    }
 
     /** rb_mod_initialize
@@ -1225,7 +1255,7 @@ public class RubyModule extends RubyObject {
         HashMap undefinedMethods = new HashMap();
 
         for (RubyModule type = this; type != null; type = type.getSuperClass()) {
-        	RubyModule realType = type.isIncluded() ? ((IncludedModuleWrapper) type).getNonIncludedClass() : type;
+        	RubyModule realType = type.getNonIncludedClass();
             for (Iterator iter = type.getMethods().entrySet().iterator(); iter.hasNext();) {
                 Map.Entry entry = (Map.Entry) iter.next();
                 ICallable method = (ICallable) entry.getValue();
@@ -1393,6 +1423,7 @@ public class RubyModule extends RubyObject {
     public RubyModule include(IRubyObject[] modules) {
         for (int i = modules.length - 1; i >= 0; i--) {
             modules[i].callMethod("append_features", this);
+            modules[i].callMethod("included", this);
         }
 
         return this;

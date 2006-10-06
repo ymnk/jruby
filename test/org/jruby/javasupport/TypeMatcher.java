@@ -11,7 +11,7 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
- * Copyright (C) 2005 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2006 Ola Bini <ola@ologix.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -25,37 +25,21 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby;
-
-import org.jruby.javasupport.Java;
-import org.jruby.javasupport.JavaObject;
-import org.jruby.runtime.CallbackFactory;
-import org.jruby.runtime.builtin.IRubyObject;
+/**
+ * $Id: jde-ola.el,v 1.2 2006/08/03 16:45:33 olagus Exp $
+ */
+package org.jruby.javasupport;
 
 /**
- * Module which defines JRuby-specific methods for use. 
+ * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
+ * @version $Revision: 1.2 $
  */
-public class RubyJRuby {
-    public static RubyModule createJRuby(IRuby runtime) {
-        runtime.getModule("Kernel").callMethod("require",runtime.newString("java"));
-        RubyModule comparableModule = runtime.defineModule("JRuby");
-        CallbackFactory callbackFactory = runtime.callbackFactory(RubyJRuby.class);
-        comparableModule.defineModuleFunction("parse", 
-                callbackFactory.getSingletonMethod("parse", IRubyObject.class, IRubyObject.class));
-        comparableModule.defineModuleFunction("runtime", 
-                callbackFactory.getSingletonMethod("runtime"));
+public class TypeMatcher {
+    public String number(float val) {
+        return "float";
+    }
 
-        return comparableModule;
+    public String number(int val) {
+        return "int";
     }
-    
-    public static IRubyObject runtime(IRubyObject recv) {
-        return Java.java_to_ruby(recv, JavaObject.wrap(recv.getRuntime(), recv.getRuntime()));
-    }
-    
-    public static IRubyObject parse(IRubyObject recv, IRubyObject arg1, IRubyObject arg2) {
-        RubyString content = arg1.convertToString();
-        RubyString filename = arg2.convertToString();
-        return Java.java_to_ruby(recv, JavaObject.wrap(recv.getRuntime(), 
-            recv.getRuntime().parse(content.toString(), filename.toString())));
-    }
-}
+}// TypeMatcher

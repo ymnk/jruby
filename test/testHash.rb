@@ -42,8 +42,10 @@ h = Hash.new {|h,k| h[k] = k.to_i*10 }
 
 test_ok(!nil, h.default_proc)
 test_equal(100, h[10])
-test_equal(0, h.default)
 test_equal(20, h.default(2))
+
+#behavior change in 1.8.5 led to this:
+test_equal(nil, h.default)
 
 h.default = 5
 test_equal(nil, h.default_proc)
@@ -63,3 +65,16 @@ end
 test_equal(HashExt, HashExt.new.class)
 test_equal(HashExt, HashExt[:foo => :bar].class)
 
+# make sure hash yields look as expected (copied from MRI iterator test)
+
+class H
+  def each
+    yield [:key, :value]
+  end
+end
+
+[{:key=>:value}, H.new].each {|h|
+  h.each{|a| test_equal([:key, :value], a)}
+  h.each{|*a| test_equal([[:key, :value]], a)}
+  h.each{|k,v| test_equal([:key, :value], [k,v])}
+}
