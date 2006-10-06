@@ -1,5 +1,4 @@
-%{
-/***** BEGIN LICENSE BLOCK *****
+%{/***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -40,7 +39,6 @@ package org.jruby.parser;
 
 import java.io.IOException;
 import java.math.BigInteger;
-
 import org.jruby.ast.AliasNode;
 import org.jruby.ast.ArgsNode;
 import org.jruby.ast.ArgumentNode;
@@ -128,6 +126,7 @@ import org.jruby.lexer.yacc.ISourcePositionHolder;
 import org.jruby.lexer.yacc.LexState;
 import org.jruby.lexer.yacc.LexerSource;
 import org.jruby.lexer.yacc.RubyYaccLexer;
+import org.jruby.lexer.yacc.RubyYaccLexerForComments;
 import org.jruby.lexer.yacc.StrTerm;
 import org.jruby.lexer.yacc.SyntaxException;
 import org.jruby.lexer.yacc.Token;
@@ -140,9 +139,17 @@ public class DefaultRubyParser {
     private IRubyWarnings warnings;
 
     public DefaultRubyParser() {
-        support = new ParserSupport();
-        lexer = new RubyYaccLexer();
+        this(new ParserSupport(), new RubyYaccLexer());
+    }
+     
+    public DefaultRubyParser(ParserSupport support, RubyYaccLexer lexer) {
+        this.support = support;
+        this.lexer = lexer;
         lexer.setParserSupport(support);
+    }
+
+    public static DefaultRubyParser createDefaultRubyParserWithComments() {
+        return new DefaultRubyParser(new ParserSupportForComments(), new RubyYaccLexerForComments());
     }
 
     public void setWarnings(IRubyWarnings warnings) {
@@ -704,9 +711,8 @@ mlhs_head     : mlhs_item ',' {
                 }
 
 mlhs_node     : variable {
-                    Node node = support.assignable($<ISourcePositionHolder>1.getPosition(), $1, null);
+                    Node node = support.assignable(getPosition($<ISourcePositionHolder>1), $1, null);
                     $$ = support.introduceComment(node, new Object[]{$1});
-                
                 }
               | primary_value '[' aref_args ']' {
                     Node node = support.getElementAssignmentNode($1, $3);
@@ -749,7 +755,7 @@ mlhs_node     : variable {
                 }
 
 lhs           : variable {
-                    Node node = support.assignable($<ISourcePositionHolder>1.getPosition(), $1, null);
+                    Node node = support.assignable(getPosition($<ISourcePositionHolder>1, true), $1, null);
                     $$ = support.introduceComment(node, new Object[]{$1});
                 }
               | primary_value '[' aref_args ']' {
