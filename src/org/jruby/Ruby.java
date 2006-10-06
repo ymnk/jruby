@@ -207,7 +207,8 @@ public final class Ruby implements IRuby {
 
     public IRubyObject eval(Node node) {
         try {
-            return getCurrentContext().getFrameEvalState().begin(node);
+            ThreadContext tc = getCurrentContext();
+            return tc.getFrameEvalState().eval(node, tc.getFrameSelf());
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
 	            return (IRubyObject)je.getSecondaryData();

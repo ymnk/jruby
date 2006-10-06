@@ -477,16 +477,12 @@ public class ThreadContext {
     
     private IRubyObject yieldInternal(Block yieldBlock, IRubyObject value, IRubyObject self, RubyModule klass, boolean aValue) {
         // block is executed under its own self, so save the old one (use a stack?)
-        IRubyObject oldSelf = getCurrentFrame().getEvalState().getSelf();
-        
         try {
             setCRef(yieldBlock.getCRef());
             
             if (klass == null) {
                 self = yieldBlock.getSelf();               
             }
-    
-            getCurrentFrame().getEvalState().setSelf(getCurrentFrame().getSelf()); 
             
             // FIXME: during refactoring, it was determined that all calls to yield are passing false for yieldProc; is this still needed?
             IRubyObject[] args = getBlockArgs(value, self, false, aValue, yieldBlock);
@@ -505,7 +501,6 @@ public class ThreadContext {
                 }
             }
         } finally {
-            getCurrentFrame().getEvalState().setSelf(oldSelf);
             unsetCRef();
         }
     }
@@ -543,7 +538,7 @@ public class ThreadContext {
                     //throw runtime.newArgumentError("wrong # of arguments(0 for 1)");
                 }
 
-                new AssignmentVisitor(getCurrentFrame().getEvalState()).assign(blockVar, value, yieldProc); 
+                new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign(blockVar, value, yieldProc); 
             }
         }
 
@@ -559,7 +554,7 @@ public class ThreadContext {
         Iterator iter = node.getHeadNode() != null ? node.getHeadNode().iterator() : Collections.EMPTY_LIST.iterator();
         for (int i = 0; i < valueLen && iter.hasNext(); i++) {
             Node lNode = (Node) iter.next();
-            new AssignmentVisitor(getCurrentFrame().getEvalState()).assign(lNode, value.entry(i), pcall);
+            new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign(lNode, value.entry(i), pcall);
         }
 
         if (pcall && iter.hasNext()) {
@@ -571,16 +566,16 @@ public class ThreadContext {
                 // no check for '*'
             } else if (varLen < valueLen) {
                 ArrayList newList = new ArrayList(value.getList().subList(varLen, valueLen));
-                new AssignmentVisitor(getCurrentFrame().getEvalState()).assign(node.getArgsNode(), runtime.newArray(newList), pcall);
+                new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign(node.getArgsNode(), runtime.newArray(newList), pcall);
             } else {
-                new AssignmentVisitor(getCurrentFrame().getEvalState()).assign(node.getArgsNode(), runtime.newArray(0), pcall);
+                new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign(node.getArgsNode(), runtime.newArray(0), pcall);
             }
         } else if (pcall && valueLen < varLen) {
             throw runtime.newArgumentError("Wrong # of arguments (" + valueLen + " for " + varLen + ")");
         }
 
         while (iter.hasNext()) {
-            new AssignmentVisitor(getCurrentFrame().getEvalState()).assign((Node)iter.next(), runtime.getNil(), pcall);
+            new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign((Node)iter.next(), runtime.getNil(), pcall);
         }
         
         return value;
@@ -788,7 +783,6 @@ public class ThreadContext {
         pushRubyClass(runtime.getObject());
         pushCRef(runtime.getObject());
         getCurrentFrame().setSelf(runtime.getTopSelf());
-        getCurrentFrame().getEvalState().setSelf(runtime.getTopSelf());
     }
 
     public void preClassEval(String[] localNames, RubyModule type) {
@@ -883,7 +877,6 @@ public class ThreadContext {
         
         Frame frame = getCurrentFrame();
         frame.setSelf(topSelf);
-        frame.getEvalState().setSelf(topSelf);
     }
     
     public void preNodeEval(RubyModule newWrapper, RubyModule rubyClass, IRubyObject self) {

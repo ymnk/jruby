@@ -174,7 +174,7 @@ public final class DefaultMethod extends AbstractMethod {
                 for (int i = expectedArgsCount; i < args.length && iter.hasNext(); i++) {
                     //new AssignmentVisitor(new EvaluationState(runtime, receiver)).assign((Node)iter.next(), args[i], true);
    //                  in-frame EvalState should already have receiver set as self, continue to use it
-                    new AssignmentVisitor(context.getFrameEvalState()).assign((Node)iter.next(), args[i], true);
+                    new AssignmentVisitor(context.getFrameEvalState(), context.getFrameSelf()).assign((Node)iter.next(), args[i], true);
                     expectedArgsCount++;
                 }
    

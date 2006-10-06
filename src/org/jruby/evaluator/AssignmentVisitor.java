@@ -54,9 +54,12 @@ public class AssignmentVisitor extends AbstractVisitor {
     private EvaluationState state;
     private IRubyObject value;
     private boolean check;
+    private IRubyObject result;
+    private IRubyObject self;
 
-    public AssignmentVisitor(EvaluationState state) {
+    public AssignmentVisitor(EvaluationState state, IRubyObject self) {
         this.state = state;
+        this.self = self;
     }
 
     public IRubyObject assign(Node node, IRubyObject aValue, boolean aCheck) {
@@ -65,7 +68,7 @@ public class AssignmentVisitor extends AbstractVisitor {
 
         acceptNode(node);
 
-        return state.getResult();
+        return result;
     }
 
 	/**
@@ -146,7 +149,7 @@ public class AssignmentVisitor extends AbstractVisitor {
 	 * @see AbstractVisitor#visitInstAsgnNode(InstAsgnNode)
 	 */
 	public Instruction visitInstAsgnNode(InstAsgnNode iVisited) {
-		state.getSelf().setInstanceVariable(iVisited.getName(), value);
+		self.setInstanceVariable(iVisited.getName(), value);
 		return null;
 	}
 
@@ -165,8 +168,8 @@ public class AssignmentVisitor extends AbstractVisitor {
 		if (!(value instanceof RubyArray)) {
 			value = RubyArray.newArray(state.runtime, value);
 		}
-        state.setResult(state.getThreadContext()
-				.mAssign(state.getSelf(), iVisited, (RubyArray) value, check));
+        result = state.getThreadContext()
+				.mAssign(self, iVisited, (RubyArray) value, check);
 		return null;
 	}
 }
