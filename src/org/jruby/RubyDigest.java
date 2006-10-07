@@ -38,12 +38,13 @@ import org.jruby.runtime.builtin.IRubyObject;
  */
 public class RubyDigest {
     public static void createDigest(IRuby runtime) {
+        RubyOpenSSL.checkBouncyCastle();
         RubyModule mDigest = runtime.defineModule("Digest");
         RubyClass cDigestBase = mDigest.defineClassUnder("Base",runtime.getObject());
 
         CallbackFactory basecb = runtime.callbackFactory(Base.class);
         
-        cDigestBase.defineSingletonMethod("new",basecb.getSingletonMethod("newInstance"));
+        cDigestBase.defineSingletonMethod("new",basecb.getOptSingletonMethod("newInstance"));
         cDigestBase.defineSingletonMethod("digest",basecb.getSingletonMethod("s_digest",RubyString.class));
         cDigestBase.defineSingletonMethod("hexdigest",basecb.getSingletonMethod("s_hexdigest",RubyString.class));
 
@@ -66,8 +67,41 @@ public class RubyDigest {
         cDigest_MD5.setClassVar("metadata",runtime.newString("MD5"));
     }
 
+    public static void createDigestRMD160(IRuby runtime) {
+        runtime.getModule("Kernel").callMethod("require",runtime.newString("digest.so"));
+        RubyModule mDigest = runtime.getModule("Digest");
+        RubyClass cDigestBase = mDigest.getClass("Base");
+        RubyClass cDigest_RMD160 = mDigest.defineClassUnder("RMD160",cDigestBase);
+        cDigest_RMD160.setClassVar("metadata",runtime.newString("RIPEMD160"));
+    }
+
+    public static void createDigestSHA1(IRuby runtime) {
+        runtime.getModule("Kernel").callMethod("require",runtime.newString("digest.so"));
+        RubyModule mDigest = runtime.getModule("Digest");
+        RubyClass cDigestBase = mDigest.getClass("Base");
+        RubyClass cDigest_SHA1 = mDigest.defineClassUnder("SHA1",cDigestBase);
+        cDigest_SHA1.setClassVar("metadata",runtime.newString("SHA1"));
+    }
+
+    public static void createDigestSHA2(IRuby runtime) {
+        try {
+            MessageDigest.getInstance("SHA-256");
+        } catch(NoSuchAlgorithmException e) {
+            throw runtime.newLoadError("SHA2 not supported");
+        }
+        runtime.getModule("Kernel").callMethod("require",runtime.newString("digest.so"));
+        RubyModule mDigest = runtime.getModule("Digest");
+        RubyClass cDigestBase = mDigest.getClass("Base");
+        RubyClass cDigest_SHA2_256 = mDigest.defineClassUnder("SHA256",cDigestBase);
+        cDigest_SHA2_256.setClassVar("metadata",runtime.newString("SHA-256"));
+        RubyClass cDigest_SHA2_384 = mDigest.defineClassUnder("SHA384",cDigestBase);
+        cDigest_SHA2_384.setClassVar("metadata",runtime.newString("SHA-384"));
+        RubyClass cDigest_SHA2_512 = mDigest.defineClassUnder("SHA512",cDigestBase);
+        cDigest_SHA2_512.setClassVar("metadata",runtime.newString("SHA-512"));
+    }
+
     public static class Base extends RubyObject {
-        public static IRubyObject newInstance(IRubyObject recv) {
+        public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args) {
             if(recv == recv.getRuntime().getModule("Digest").getClass("Base")) {
                 throw recv.getRuntime().newNotImplementedError("Digest::Base is an abstract class");
             }
@@ -77,20 +111,35 @@ public class RubyDigest {
             }
 
             Base result = new Base(recv.getRuntime(), (RubyClass)recv);
-            result.callInit(new IRubyObject[0]);
             try {
                 result.setAlgorithm(((RubyClass)recv).getClassVar("metadata"));
             } catch(NoSuchAlgorithmException e) {
                 throw recv.getRuntime().newNotImplementedError("the " + recv + "() function is unimplemented on this machine");
             }
-
+            result.callInit(args);
             return result;
         }
         public static IRubyObject s_digest(IRubyObject recv, RubyString str) {
-            return recv.getRuntime().getNil();
+            String name = ((RubyClass)recv).getClassVar("metadata").toString();
+            try {
+                MessageDigest md = MessageDigest.getInstance(name);
+                return recv.getRuntime().newString(new String(md.digest(str.toString().getBytes("PLAIN")),"ISO8859_1"));
+            } catch(NoSuchAlgorithmException e) {
+                throw recv.getRuntime().newNotImplementedError("Unsupported digest algorithm (" + name + ")");
+            } catch(java.io.UnsupportedEncodingException e) {
+                throw recv.getRuntime().newNotImplementedError("Unsupported digest algorithm (" + name + ")");
+            }
         }
         public static IRubyObject s_hexdigest(IRubyObject recv, RubyString str) {
-            return recv.getRuntime().getNil();
+            String name = ((RubyClass)recv).getClassVar("metadata").toString();
+            try {
+                MessageDigest md = MessageDigest.getInstance(name);
+                return recv.getRuntime().newString(toHex(md.digest(str.toString().getBytes("PLAIN"))));
+            } catch(NoSuchAlgorithmException e) {
+                throw recv.getRuntime().newNotImplementedError("Unsupported digest algorithm (" + name + ")");
+            } catch(java.io.UnsupportedEncodingException e) {
+                throw recv.getRuntime().newNotImplementedError("Unsupported digest algorithm (" + name + ")");
+            }
         }
 
         private MessageDigest algo;
@@ -102,6 +151,9 @@ public class RubyDigest {
         }
         
         public IRubyObject initialize(IRubyObject[] args) {
+            if(args.length > 0 && !args[0].isNil()) {
+                update(args[0]);
+            }
             return this;
         }
 
@@ -132,7 +184,7 @@ public class RubyDigest {
         public IRubyObject digest() {
             try {
                 algo.reset();
-                return getRuntime().newString(new String(algo.digest(data.toString().getBytes("PLAIN")),"PLAIN"));
+                return getRuntime().newString(new String(algo.digest(data.toString().getBytes("PLAIN")),"ISO8859_1"));
             } catch(java.io.UnsupportedEncodingException e) {
                 return getRuntime().getNil();
             }

@@ -37,14 +37,17 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
 public class RubyOpenSSL {
-    public static void createOpenSSL(IRuby runtime) {
+    public static void checkBouncyCastle() {
         try {
             Class v = Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider");
             java.security.Security.addProvider((java.security.Provider)(v.newInstance()));
         } catch(Exception e) {
             // No BouncyCastle available...
         }
+    }
 
+    public static void createOpenSSL(IRuby runtime) {
+        checkBouncyCastle();
         RubyModule ossl = runtime.defineModule("OpenSSL");
         RubyClass eOSSLError = ossl.defineClassUnder("OpenSSLError",runtime.getClass("StandardError"));
 

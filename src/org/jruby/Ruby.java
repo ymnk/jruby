@@ -448,7 +448,11 @@ public final class Ruby implements IRuby {
         loadService.registerBuiltin("zlib.rb", new ZlibLibrary());
         loadService.registerBuiltin("openssl.so", new OpenSSLLibrary());
         loadService.registerBuiltin("digest.so", new DigestLibrary());
+        loadService.registerBuiltin("digest.rb", new DigestLibrary());
         loadService.registerBuiltin("digest/md5.rb", new DigestLibrary.MD5());
+        loadService.registerBuiltin("digest/rmd160.rb", new DigestLibrary.RMD160());
+        loadService.registerBuiltin("digest/sha1.rb", new DigestLibrary.SHA1());
+        loadService.registerBuiltin("digest/sha2.rb", new DigestLibrary.SHA2());
     }
 
     private void initCoreClasses() {
