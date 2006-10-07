@@ -438,8 +438,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public IRubyObject eval(Node n) {
         //return new EvaluationState(getRuntime(), this).begin(n);
         // need to continue evaluation with a new self, so save the old one (should be a stack?)
-        EvaluationState state = getRuntime().getCurrentContext().getFrameEvalState();
-        return state.eval(n, this);
+        return EvaluationState.eval(getRuntime().getCurrentContext(), n, this);
     }
 
     public void callInit(IRubyObject[] args) {
@@ -663,7 +662,6 @@ public class RubyObject implements Cloneable, IRubyObject {
         ThreadContext threadContext = getRuntime().getCurrentContext();
         
         ISourcePosition savedPosition = threadContext.getPosition();
-        EvaluationState state = null;
         IRubyObject result = getRuntime().getNil();
         
         IRubyObject newSelf = null;
@@ -682,8 +680,7 @@ public class RubyObject implements Cloneable, IRubyObject {
             threadContext.preEvalWithBinding((RubyBinding)scope);            
             newSelf = threadContext.getFrameSelf();
 
-            state = threadContext.getFrameEvalState();
-            result = state.eval(getRuntime().parse(src.toString(), file), newSelf);
+            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file), newSelf);
         } finally {
             threadContext.postBoundEvalOrYield();
             
@@ -705,7 +702,6 @@ public class RubyObject implements Cloneable, IRubyObject {
         ISourcePosition savedPosition = threadContext.getPosition();
         // no binding, just eval in "current" frame (caller's frame)
         Iter iter = threadContext.getFrameIter();
-        EvaluationState state = threadContext.getFrameEvalState();
         IRubyObject result = getRuntime().getNil();
         
         try {
@@ -715,7 +711,7 @@ public class RubyObject implements Cloneable, IRubyObject {
             }
             
             
-            result = state.eval(getRuntime().parse(src.toString(), file), this);
+            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file), this);
         } finally {
             
             // FIXME: this is broken for Proc, see above

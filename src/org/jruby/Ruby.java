@@ -50,6 +50,7 @@ import java.util.Stack;
 
 import org.jruby.ast.Node;
 import org.jruby.common.RubyWarnings;
+import org.jruby.evaluator.EvaluationState;
 import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.GlobalVariables;
@@ -208,7 +209,7 @@ public final class Ruby implements IRuby {
     public IRubyObject eval(Node node) {
         try {
             ThreadContext tc = getCurrentContext();
-            return tc.getFrameEvalState().eval(node, tc.getFrameSelf());
+            return EvaluationState.eval(tc, node, tc.getFrameSelf());
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
 	            return (IRubyObject)je.getSecondaryData();

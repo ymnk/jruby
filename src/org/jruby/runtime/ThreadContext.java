@@ -47,7 +47,6 @@ import org.jruby.ast.StarNode;
 import org.jruby.ast.ZeroArgNode;
 import org.jruby.ast.util.ArgsUtil;
 import org.jruby.evaluator.AssignmentVisitor;
-import org.jruby.evaluator.EvaluationState;
 import org.jruby.exceptions.JumpException;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.lexer.yacc.SourcePositionFactory;
@@ -242,10 +241,6 @@ public class ThreadContext {
     
     public int getFrameCount() {
         return frameStack.size();
-    }
-    
-    public EvaluationState getFrameEvalState() {
-        return getCurrentFrame().getEvalState();
     }
     
     public String getFrameLastFunc() {
@@ -538,7 +533,7 @@ public class ThreadContext {
                     //throw runtime.newArgumentError("wrong # of arguments(0 for 1)");
                 }
 
-                new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign(blockVar, value, yieldProc); 
+                new AssignmentVisitor(getFrameSelf()).assign(blockVar, value, yieldProc); 
             }
         }
 
@@ -554,7 +549,7 @@ public class ThreadContext {
         Iterator iter = node.getHeadNode() != null ? node.getHeadNode().iterator() : Collections.EMPTY_LIST.iterator();
         for (int i = 0; i < valueLen && iter.hasNext(); i++) {
             Node lNode = (Node) iter.next();
-            new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign(lNode, value.entry(i), pcall);
+            new AssignmentVisitor(getFrameSelf()).assign(lNode, value.entry(i), pcall);
         }
 
         if (pcall && iter.hasNext()) {
@@ -566,16 +561,16 @@ public class ThreadContext {
                 // no check for '*'
             } else if (varLen < valueLen) {
                 ArrayList newList = new ArrayList(value.getList().subList(varLen, valueLen));
-                new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign(node.getArgsNode(), runtime.newArray(newList), pcall);
+                new AssignmentVisitor(getFrameSelf()).assign(node.getArgsNode(), runtime.newArray(newList), pcall);
             } else {
-                new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign(node.getArgsNode(), runtime.newArray(0), pcall);
+                new AssignmentVisitor(getFrameSelf()).assign(node.getArgsNode(), runtime.newArray(0), pcall);
             }
         } else if (pcall && valueLen < varLen) {
             throw runtime.newArgumentError("Wrong # of arguments (" + valueLen + " for " + varLen + ")");
         }
 
         while (iter.hasNext()) {
-            new AssignmentVisitor(getCurrentFrame().getEvalState(), getFrameSelf()).assign((Node)iter.next(), runtime.getNil(), pcall);
+            new AssignmentVisitor(getFrameSelf()).assign((Node)iter.next(), runtime.getNil(), pcall);
         }
         
         return value;
