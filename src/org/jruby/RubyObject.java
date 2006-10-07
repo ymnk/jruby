@@ -663,7 +663,6 @@ public class RubyObject implements Cloneable, IRubyObject {
         ThreadContext threadContext = getRuntime().getCurrentContext();
         
         ISourcePosition savedPosition = threadContext.getPosition();
-        IRubyObject oldSelf = null;
         EvaluationState state = null;
         IRubyObject result = getRuntime().getNil();
         
