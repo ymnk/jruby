@@ -1916,6 +1916,13 @@ public final class EvaluateVisitor implements NodeVisitor {
             } finally {
             	tc.endCallArgs();
             }
+            
+            if(!tc.getFramePreviousSelf().getClass().equals(org.jruby.RubyObject.class)) {
+                if(tc.getFramePreviousSelf().getMetaClass().getMethods().containsKey(tc.getFrameLastFunc())) {
+                    tc.setSelfToPrevious();
+                }
+            }
+            
             state.setResult(tc.callSuper(args));
     	}
     }

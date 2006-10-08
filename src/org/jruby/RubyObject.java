@@ -358,7 +358,7 @@ public class RubyObject implements Cloneable, IRubyObject {
             // classes are directly in the hierarchy, so no special logic is necessary for implementer
             implementer = method.getImplementationClass();
         }
-        
+
         String originalName = method.getOriginalName();
         if (originalName != null) {
             name = originalName;

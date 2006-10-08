@@ -275,7 +275,15 @@ public class ThreadContext {
     public IRubyObject getFrameSelf() {
         return getCurrentFrame().getSelf();
     }
-    
+
+    public IRubyObject getFramePreviousSelf() {
+        return getPreviousFrame().getSelf();
+    }
+
+    public void setSelfToPrevious() {
+        getCurrentFrame().setSelf(getPreviousFrame().getSelf());
+    }
+
     public RubyModule getFrameLastClass() {
         return getCurrentFrame().getLastClass();
     }

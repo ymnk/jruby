@@ -114,6 +114,10 @@ public class RubyModule extends RubyObject {
         this.superClass = superClass;
     }
     
+    public void setParent(RubyModule p) {
+        cref = new SinglyLinkedList(this,p.cref);
+    }
+
     public RubyModule getParent() {
         if (cref.getNext() == null) {
             return null;
@@ -285,6 +289,9 @@ public class RubyModule extends RubyObject {
             if (module.getBaseName() == null) {
                 module.setBaseName(name);
             }
+            /*
+            module.setParent(this);
+            */
         }
         return result;
     }
