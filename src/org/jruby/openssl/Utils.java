@@ -25,45 +25,22 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby;
-
-import org.jruby.runtime.CallbackFactory;
-
-import org.jruby.openssl.Cipher;
-import org.jruby.openssl.Digest;
-import org.jruby.openssl.Random;
+package org.jruby.openssl;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
-public class RubyOpenSSL {
-    public static void checkBouncyCastle() {
-        try {
-            Class v = Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider");
-            java.security.Security.addProvider((java.security.Provider)(v.newInstance()));
-        } catch(Exception e) {
-            // No BouncyCastle available...
+public class Utils {
+    private Utils() {}
+    public static String toHex(byte[] val) {
+        StringBuffer out = new StringBuffer();
+        for(int i=0,j=val.length;i<j;i++) {
+            String ve = Integer.toString((((int)((char)val[i])) & 0xFF),16);
+            if(ve.length() == 1) {
+                ve = "0" + ve;
+            }
+            out.append(ve);
         }
+        return out.toString();
     }
-
-    public static void createOpenSSL(IRuby runtime) {
-        checkBouncyCastle();
-
-        RubyModule ossl = runtime.defineModule("OpenSSL");
-        RubyClass eOSSLError = ossl.defineClassUnder("OpenSSLError",runtime.getClass("StandardError"));
-
-        Digest.createDigest(runtime, ossl);
-        Cipher.createCipher(runtime, ossl);
-        Random.createRandom(runtime, ossl);
-
-        ossl.setConstant("VERSION",runtime.newString("1.0.0"));
-        ossl.setConstant("OPENSSL_VERSION",runtime.newString("OpenSSL 0.9.8b 04 May 2006 (Java fake)"));
-        
-        try {
-            java.security.MessageDigest.getInstance("SHA224");
-            ossl.setConstant("OPENSSL_VERSION_NUMBER",runtime.newFixnum(9469999));
-        } catch(java.security.NoSuchAlgorithmException e) {
-            ossl.setConstant("OPENSSL_VERSION_NUMBER",runtime.newFixnum(9469952));
-        }
-    }
-}// RubyOpenSSL
+}// Utils
