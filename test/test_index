@@ -69,6 +69,7 @@ testSocket.rb
 testUnboundMethod.rb
 testComparable.rb
 testInspect.rb
+testYAML.rb
 
 # MRI Ruby tests (from sample/test.rb in Matz's Ruby Interpreter):
 

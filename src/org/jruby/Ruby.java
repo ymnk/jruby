@@ -65,6 +65,7 @@ import org.jruby.libraries.SocketLibrary;
 import org.jruby.libraries.StringIOLibrary;
 import org.jruby.libraries.StringScannerLibrary;
 import org.jruby.libraries.ZlibLibrary;
+import org.jruby.libraries.YamlLibrary;
 import org.jruby.parser.Parser;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CacheMap;
@@ -446,6 +447,7 @@ public final class Ruby implements IRuby {
         loadService.registerBuiltin("stringio.rb", new StringIOLibrary());
         loadService.registerBuiltin("strscan.rb", new StringScannerLibrary());
         loadService.registerBuiltin("zlib.rb", new ZlibLibrary());
+        loadService.registerBuiltin("yaml_internal.rb", new YamlLibrary());
     }
 
     private void initCoreClasses() {
