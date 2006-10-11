@@ -61,6 +61,22 @@ public class OpenSSLImpl {
         }
     }
 
+    private static Class pemHandlerImpl;
+    public static PEMHandler getPEMHandler() {
+        if(null == pemHandlerImpl) {
+            try {
+                Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider");
+                pemHandlerImpl = Class.forName("org.jruby.openssl.BouncyCastlePEMHandler");
+            } catch(Exception e) {
+                pemHandlerImpl = DefaultPEMHandler.class;
+            }
+        }
+        try {
+            return (PEMHandler)pemHandlerImpl.newInstance();
+        } catch(Exception e) {}
+        return null;
+    }
+
     public static KeyAndIv EVP_BytesToKey(int key_len, int iv_len, MessageDigest md, byte[] salt, byte[] data, int count) {
         byte[] key = new byte[key_len];
         byte[]  iv = new byte[iv_len];

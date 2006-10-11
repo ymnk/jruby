@@ -480,5 +480,9 @@ public class Cipher extends RubyObject {
         clone.setFrozen(isFrozen());
         return clone;
     }
+
+    String getAlgorithm() {
+        return this.ciph.getAlgorithm();
+    }
 }
 
