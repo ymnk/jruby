@@ -31,6 +31,7 @@ import org.jruby.runtime.CallbackFactory;
 
 import org.jruby.openssl.Cipher;
 import org.jruby.openssl.Digest;
+import org.jruby.openssl.HMAC;
 import org.jruby.openssl.PKey;
 import org.jruby.openssl.Random;
 
@@ -57,6 +58,7 @@ public class RubyOpenSSL {
         Cipher.createCipher(runtime, ossl);
         Random.createRandom(runtime, ossl);
         PKey.createPKey(runtime,ossl);
+        HMAC.createHMAC(runtime,ossl);
 
         ossl.setConstant("VERSION",runtime.newString("1.0.0"));
         ossl.setConstant("OPENSSL_VERSION",runtime.newString("OpenSSL 0.9.8b 04 May 2006 (Java fake)"));
