@@ -34,6 +34,7 @@ import org.jruby.openssl.Digest;
 import org.jruby.openssl.HMAC;
 import org.jruby.openssl.PKey;
 import org.jruby.openssl.Random;
+import org.jruby.openssl.X509;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -59,6 +60,7 @@ public class RubyOpenSSL {
         Random.createRandom(runtime, ossl);
         PKey.createPKey(runtime,ossl);
         HMAC.createHMAC(runtime,ossl);
+        X509.createX509(runtime,ossl);
 
         ossl.setConstant("VERSION",runtime.newString("1.0.0"));
         ossl.setConstant("OPENSSL_VERSION",runtime.newString("OpenSSL 0.9.8b 04 May 2006 (Java fake)"));
