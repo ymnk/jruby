@@ -34,6 +34,8 @@ import java.math.BigInteger;
 
 import java.security.KeyPair;
 import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPublicKey;
 import java.security.interfaces.RSAPrivateCrtKey;
@@ -98,6 +100,18 @@ public class PKeyRSA extends PKey {
     private RSAPrivateCrtKey privKey;
     private RSAPublicKey pubKey;
 
+    PublicKey getPublicKey() {
+        return pubKey;
+    }
+
+    PrivateKey getPrivateKey() {
+        return privKey;
+    }
+
+    String getAlgorithm() {
+        return "RSA";
+    }
+
     public IRubyObject initialize(IRubyObject[] args) {
         Object rsa;
         IRubyObject arg;
@@ -156,7 +170,7 @@ public class PKeyRSA extends PKey {
                 if(null == val) {
                     try {
                         val = OpenSSLImpl.getPEMHandler().readPEM(new StringReader(input),passwd);
-                    } catch(Exception e3) {
+                    } catch(Exception e) {
                         val = null;
                     }
                 }
@@ -180,7 +194,6 @@ public class PKeyRSA extends PKey {
                 } else {
                     throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("PKey"))).getConstant("RSAError")), "Neither PUB key nor PRIV key:", true);
                 }
-
             }
         }
 

@@ -42,6 +42,8 @@ public class X509 {
         RubyModule mX509 = ossl.defineModuleUnder("X509");
 
         X509Name.createX509Name(runtime,mX509);
+        X509Cert.createX509Cert(runtime,mX509);
+        X509Extensions.createX509Ext(runtime,mX509);
 
         mX509.setConstant("V_OK",runtime.newFixnum(0));
         mX509.setConstant("V_ERR_UNABLE_TO_GET_ISSUER_CERT",runtime.newFixnum(2));

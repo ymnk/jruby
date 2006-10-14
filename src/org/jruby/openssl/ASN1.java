@@ -27,16 +27,31 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.openssl;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+ 
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Enumeration;
 
 import org.bouncycastle.asn1.DERObjectIdentifier;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.DERString;
+import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERUTF8String;
+import org.bouncycastle.asn1.DERTaggedObject;
+import org.bouncycastle.asn1.DERNull;
+import org.bouncycastle.asn1.DERSet;
+import org.bouncycastle.asn1.DERUTCTime;
+import org.bouncycastle.asn1.DERInteger;
+import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.DERBoolean;
+import org.bouncycastle.asn1.DERBitString;
 
 import org.jruby.IRuby;
 import org.jruby.RubyObject;
@@ -64,6 +79,13 @@ public class ASN1 {
             ((Map)val).put("organizationname",org.bouncycastle.asn1.x509.X509Name.DefaultLookUp.get("o"));
             ((Map)val).put("commonname",org.bouncycastle.asn1.x509.X509Name.DefaultLookUp.get("cn"));
             ((Map)val).put("countryname",org.bouncycastle.asn1.x509.X509Name.DefaultLookUp.get("c"));
+            ((Map)val).put("basicconstraints",new DERObjectIdentifier("2.5.29.19"));
+            ((Map)val).put("keyusage",new DERObjectIdentifier("2.5.29.15"));
+            ((Map)val).put("subjectkeyidentifier",new DERObjectIdentifier("2.5.29.14"));
+            ((Map)val).put("authoritykeyidentifier",new DERObjectIdentifier("2.5.29.35"));
+            ((Map)val).put("extendedkeyusage",new DERObjectIdentifier("2.5.29.37"));
+            ((Map)val).put("subjectaltname",new DERObjectIdentifier("2.5.29.17"));
+            ((Map)val).put("rsa-sha1",new DERObjectIdentifier("1.2.840.113549.1.1.5"));
             SYM_TO_OID.put(runtime,val);
         }
         return (Map)val;
@@ -74,6 +96,13 @@ public class ASN1 {
         if(null == val) {
             val = new HashMap(org.bouncycastle.asn1.x509.X509Name.DefaultSymbols);
             ((Map)val).put(org.bouncycastle.asn1.x509.X509Name.DefaultLookUp.get("street"),"streetAddress");
+            ((Map)val).put(new DERObjectIdentifier("2.5.29.19"),"basicConstraints");
+            ((Map)val).put(new DERObjectIdentifier("2.5.29.15"),"keyUsage");
+            ((Map)val).put(new DERObjectIdentifier("2.5.29.14"),"subjectKeyIdentifier");
+            ((Map)val).put(new DERObjectIdentifier("2.5.29.35"),"authorityKeyIdentifier");
+            ((Map)val).put(new DERObjectIdentifier("2.5.29.37"),"extendedKeyUsage");
+            ((Map)val).put(new DERObjectIdentifier("2.5.29.17"),"subjectAltName");
+            ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.1.5"),"RSA-SHA1");
             OID_TO_SYM.put(runtime,val);
         }
         return (Map)val;
@@ -86,7 +115,7 @@ public class ASN1 {
         {"BIT_STRING",  org.bouncycastle.asn1.DERBitString.class, "BitString" },
         {"OCTET_STRING",  org.bouncycastle.asn1.DEROctetString.class, "OctetString" },
         {"NULL",  org.bouncycastle.asn1.DERNull.class, "Null" },
-        {"OBJECT",  org.bouncycastle.asn1.DERObject.class, "ObjectId" },
+        {"OBJECT",  org.bouncycastle.asn1.DERObjectIdentifier.class, "ObjectId" },
         {"OBJECT_DESCRIPTOR",  null, null },
         {"EXTERNAL",  null, null },
         {"REAL",  null, null },
@@ -329,32 +358,86 @@ public class ASN1 {
     }
 
     public static IRubyObject traverse(IRubyObject recv, IRubyObject a) {
+        System.err.println("WARNING: unimplemented method called: traverse");
         return null;
     }
 
-    public static IRubyObject decode(IRubyObject recv, IRubyObject obj) throws Exception {
-        Object v = new ASN1InputStream(obj.toString().getBytes("PLAIN")).readObject();
-        String v_name = (String)(ASN1_INFO[idForClass(v.getClass())][2]);
+    private final static DateFormat dateF = new SimpleDateFormat("yyMMddHHmmssz");
+    private static IRubyObject decodeObj(RubyModule asnM,Object v) throws Exception {
+        int ix = idForClass(v.getClass());
+        String v_name = ix == -1 ? null : (String)(ASN1_INFO[ix][2]);
         if(null != v_name) {
-            RubyClass c = ((RubyModule)recv).getClass(v_name);
-            if(v instanceof DERString) {
+            RubyClass c = asnM.getClass(v_name);
+            if(v instanceof DERBitString) {
+                String va = new String(((DERBitString)v).getBytes(),"ISO8859_1");
+                return c.callMethod("new",asnM.getRuntime().newString(va));
+            } else if(v instanceof DERString) {
                 String val = ((DERString)v).getString();
                 if(v instanceof DERUTF8String) {
                     val = new String(val.getBytes("UTF-8"),"ISO8859-1");
                 }
-                IRubyObject back = c.callMethod("new",recv.getRuntime().newString(val));
-                return back;
+                return c.callMethod("new",asnM.getRuntime().newString(val));
+            } else if(v instanceof DERSequence) {
+                List l = new ArrayList();
+                for(Enumeration enm = ((DERSequence)v).getObjects(); enm.hasMoreElements(); ) {
+                    l.add(decodeObj(asnM,enm.nextElement()));
+                }
+                return c.callMethod("new",asnM.getRuntime().newArray(l));
+            } else if(v instanceof DERSet) {
+                List l = new ArrayList();
+                for(Enumeration enm = ((DERSet)v).getObjects(); enm.hasMoreElements(); ) {
+                    l.add(decodeObj(asnM,enm.nextElement()));
+                }
+                return c.callMethod("new",asnM.getRuntime().newArray(l));
+            } else if(v instanceof DERNull) {
+                return c.callMethod("new",asnM.getRuntime().getNil());
+            } else if(v instanceof DERInteger) {
+                return c.callMethod("new",RubyNumeric.str2inum(asnM.getRuntime(),asnM.getRuntime().newString(((DERInteger)v).getValue().toString()),10));
+            } else if(v instanceof DERUTCTime) {
+                Date d = dateF.parse(((DERUTCTime)v).getTime());
+                Calendar cal = Calendar.getInstance();
+                cal.setTime(d);
+                IRubyObject[] argv = new IRubyObject[6];
+                argv[0] = asnM.getRuntime().newFixnum(cal.get(Calendar.YEAR));
+                argv[1] = asnM.getRuntime().newFixnum(cal.get(Calendar.MONTH));
+                argv[2] = asnM.getRuntime().newFixnum(cal.get(Calendar.DAY_OF_MONTH));
+                argv[3] = asnM.getRuntime().newFixnum(cal.get(Calendar.HOUR));
+                argv[4] = asnM.getRuntime().newFixnum(cal.get(Calendar.MINUTE));
+                argv[5] = asnM.getRuntime().newFixnum(cal.get(Calendar.SECOND));
+                return c.callMethod("new",asnM.getRuntime().getClass("Time").callMethod("utc",argv));
+            } else if(v instanceof DERObjectIdentifier) {
+                String av = ((DERObjectIdentifier)v).getId();
+                return c.callMethod("new",asnM.getRuntime().newString(av));
+            } else if(v instanceof DEROctetString) {
+                String va = new String(((DEROctetString)v).getOctets(),"ISO8859_1");
+                return c.callMethod("new",asnM.getRuntime().newString(va));
+            } else if(v instanceof DERBoolean) {
+                return c.callMethod("new",((DERBoolean)v).isTrue() ? asnM.getRuntime().getTrue() : asnM.getRuntime().getFalse());
             } else {
-                System.err.println("Should handle: " + v.getClass().getName());
+                System.out.println("Should handle: " + v.getClass().getName());
             }
+        } else if(v instanceof DERTaggedObject) {
+            RubyClass c = asnM.getClass("ASN1Data");
+            IRubyObject val = decodeObj(asnM, ((DERTaggedObject)v).getObject());
+            IRubyObject tag = asnM.getRuntime().newFixnum(((DERTaggedObject)v).getTagNo());
+            IRubyObject tag_class = asnM.getRuntime().newSymbol("CONTEXT_SPECIFIC");
+            return c.callMethod("new",new IRubyObject[]{val,tag,tag_class});
         }
-
 
         System.err.println("v: " + v + "[" + v.getClass().getName() + "]");
         return null;
     }
 
+    public static IRubyObject decode(IRubyObject recv, IRubyObject obj) throws Exception {
+        obj = OpenSSLImpl.to_der_if_possible(obj);
+        RubyModule asnM = (RubyModule)recv;
+        ASN1InputStream asis = new ASN1InputStream(obj.toString().getBytes("PLAIN"));
+        IRubyObject ret = decodeObj(asnM, asis.readObject());
+        return ret;
+    }
+
     public static IRubyObject decode_all(IRubyObject recv, IRubyObject a) {
+        System.err.println("WARNING: unimplemented method called: decode_all");
         return null;
     }
 
@@ -397,6 +480,7 @@ public class ASN1 {
         }
 
         public IRubyObject to_der() {
+            System.err.println("WARNING: unimplemented method called: asn1data#to_der");
             return this;
         }
 
@@ -458,6 +542,13 @@ public class ASN1 {
                 tagging = getRuntime().getNil();
                 tag_class = getRuntime().newSymbol("UNIVERSAL");
             }
+            if("ObjectId".equals(getMetaClass().getRealClass().getBaseName())) {
+                String v = (String)(getSymLookup(getRuntime()).get(new DERObjectIdentifier(value.toString())));
+                if(v != null) {
+                    value = getRuntime().newString(v);
+                }
+            }
+
             this.callMethod("tag=",tag);
             this.callMethod("value=",value);
             this.callMethod("tagging=",tagging);
@@ -467,6 +558,7 @@ public class ASN1 {
         }
 
         public IRubyObject to_der() {
+            System.err.println("WARNING: unimplemented method called: asn1prim#to_der");
             return this;
         }
     }
@@ -528,10 +620,12 @@ public class ASN1 {
         }
 
         public IRubyObject to_der() {
+            System.err.println("WARNING: unimplemented method called: asn1cons#to_der");
             return this;
         }
 
         public IRubyObject each() {
+            System.err.println("WARNING: unimplemented method called: asn1cons#each");
             return getRuntime().getNil();
         }
     }

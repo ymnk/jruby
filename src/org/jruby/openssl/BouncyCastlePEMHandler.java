@@ -43,11 +43,15 @@ public class BouncyCastlePEMHandler implements PEMHandler {
     }
 
     public void writePEM(Writer writ, Object obj, String algorithm, char[] password) throws Exception {
-        new PEMWriter(writ).writeObject(obj,algorithm,password,null);
+        PEMWriter p = new PEMWriter(writ);
+        p.writeObject(obj,algorithm,password,null);
+        p.flush();
     }
 
     public void writePEM(Writer writ, Object obj) throws Exception {
-        new PEMWriter(writ).writeObject(obj);
+        PEMWriter p = new PEMWriter(writ);
+        p.writeObject(obj);
+        p.flush();
     }
 
     private static class BasicPasswordFinder implements PasswordFinder {

@@ -27,6 +27,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.openssl;
 
+import java.security.PublicKey;
+import java.security.PrivateKey;
+
 import org.jruby.IRuby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
@@ -66,6 +69,18 @@ public class PKey extends RubyObject {
 
     public IRubyObject initialize() {
         return this;
+    }
+
+    PublicKey getPublicKey() {
+        return null;
+    }
+
+    PrivateKey getPrivateKey() {
+        return null;
+    }
+
+    String getAlgorithm() {
+        return "NONE";
     }
 
     public IRubyObject sign(IRubyObject digest, IRubyObject data) {

@@ -28,7 +28,10 @@
 package org.jruby.openssl;
 
 import java.io.StringReader;
+import java.io.StringWriter;
 
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.KeyPair;
 import java.security.KeyFactory;
 import java.security.interfaces.DSAPublicKey;
@@ -54,10 +57,21 @@ public class PKeyDSA extends PKey {
         RubyClass cDSA = mPKey.defineClassUnder("DSA",mPKey.getClass("PKey"));
         mPKey.defineClassUnder("DSAError",mPKey.getClass("PKeyError"));
         
-        CallbackFactory rsacb = runtime.callbackFactory(PKeyDSA.class);
+        CallbackFactory dsacb = runtime.callbackFactory(PKeyDSA.class);
 
-        cDSA.defineSingletonMethod("new",rsacb.getOptSingletonMethod("newInstance"));
-        cDSA.defineMethod("initialize",rsacb.getOptMethod("initialize"));
+        cDSA.defineSingletonMethod("new",dsacb.getOptSingletonMethod("newInstance"));
+        cDSA.defineMethod("initialize",dsacb.getOptMethod("initialize"));
+
+        cDSA.defineMethod("public?",dsacb.getMethod("public_p"));
+        cDSA.defineMethod("private?",dsacb.getMethod("private_p"));
+        cDSA.defineMethod("to_der",dsacb.getMethod("to_der"));
+        cDSA.defineMethod("to_text",dsacb.getMethod("to_text"));
+        cDSA.defineMethod("public_key",dsacb.getMethod("public_key"));
+        cDSA.defineMethod("export",dsacb.getOptMethod("export"));
+        cDSA.defineMethod("to_pem",dsacb.getOptMethod("export"));
+        cDSA.defineMethod("to_s",dsacb.getOptMethod("export"));
+        cDSA.defineMethod("syssign",dsacb.getMethod("syssign",IRubyObject.class));
+        cDSA.defineMethod("sysverify",dsacb.getMethod("sysverify",IRubyObject.class,IRubyObject.class));
     }
 
     public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args) {
@@ -72,6 +86,18 @@ public class PKeyDSA extends PKey {
 
     private DSAPrivateKey privKey;
     private DSAPublicKey pubKey;
+
+    PublicKey getPublicKey() {
+        return pubKey;
+    }
+
+    PrivateKey getPrivateKey() {
+        return privKey;
+    }
+
+    String getAlgorithm() {
+        return "DSA";
+    }
 
     public IRubyObject initialize(IRubyObject[] args) {
         Object rsa;
@@ -142,5 +168,72 @@ public class PKeyDSA extends PKey {
         }
 
         return this;
+    }
+
+    public IRubyObject public_p() {
+        return pubKey != null ? getRuntime().getTrue() : getRuntime().getFalse();
+    }
+
+    public IRubyObject private_p() {
+        return privKey != null ? getRuntime().getTrue() : getRuntime().getFalse();
+    }
+
+    public IRubyObject to_der() throws Exception {
+        return getRuntime().newString( new String(privKey == null ? pubKey.getEncoded() : privKey.getEncoded(),"ISO8859_1"));
+    }
+
+    public IRubyObject to_text() throws Exception {
+        return getRuntime().getNil();
+    }
+
+    public IRubyObject public_key() {
+        PKeyDSA val = new PKeyDSA(getRuntime(),getMetaClass().getRealClass());
+        val.privKey = null;
+        val.pubKey = this.pubKey;
+        return val;
+    }
+
+    public IRubyObject export(IRubyObject[] args) throws Exception {
+        StringWriter w = new StringWriter();
+        Object exp = pubKey;
+        if(privKey != null) {
+            exp = privKey;
+        }
+        if(args.length == 0) {
+            OpenSSLImpl.getPEMHandler().writePEM(w,exp);
+        } else {
+            String algo = ((Cipher)args[0]).getAlgorithm();
+            char[] passwd = null;
+            if(args.length > 1 && !args[1].isNil()) {
+                passwd = args[1].toString().toCharArray();
+            }
+            OpenSSLImpl.getPEMHandler().writePEM(w,exp,algo,passwd);
+        }
+        w.close();
+        return getRuntime().newString(w.toString());
+    }
+
+    private String getPadding(int padding) {
+        if(padding < 1 || padding > 4) {
+            throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("PKey"))).getConstant("DSAError")), null, true);
+        }
+
+        String p = "/NONE/PKCS1Padding";
+        if(padding == 3) {
+            p = "/NONE/NoPadding";
+        } else if(padding == 4) {
+            p = "/NONE/OAEPWithMD5AndMGF1Padding";
+        } else if(padding == 2) {
+            p = "/NONE/ISO9796-1Padding";
+        }
+        return p;
+    }        
+
+    public IRubyObject syssign(IRubyObject arg) {
+        return getRuntime().getNil();
+    }
+
+    public IRubyObject sysverify(IRubyObject arg, IRubyObject arg2) {
+        return getRuntime().getNil();
     }
 }// PKeyDSA

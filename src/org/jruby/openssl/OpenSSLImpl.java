@@ -29,6 +29,8 @@ package org.jruby.openssl;
 
 import java.security.MessageDigest;
 
+import org.jruby.runtime.builtin.IRubyObject;
+
 /**
  * Static class that holds various OpenSSL methods that aren't
  * really easy to do any other way.
@@ -40,6 +42,18 @@ public class OpenSSLImpl {
      * No instantiating this class...
      */
     private OpenSSLImpl() {}
+
+    public static IRubyObject to_der(IRubyObject obj) {
+        return obj.callMethod("to_der");
+    }
+
+    public static IRubyObject to_der_if_possible(IRubyObject obj) {
+        if(obj.respondsTo("to_der")) {
+            return to_der(obj);
+        } else {
+            return obj;
+        }
+    }
 
     public static interface KeyAndIv {
         byte[] getKey();

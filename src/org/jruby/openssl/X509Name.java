@@ -232,7 +232,6 @@ public class X509Name extends RubyObject {
         try {
             oid_v = getObjectIdentifier(oid);
         } catch(IllegalArgumentException e) {
-            System.err.println("we have a slight problem with: " + oid);
             throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("NameError")), "invalid field name", true);
         }
         if(null == oid_v) {
@@ -326,6 +325,10 @@ else
         }
 
         return RubyFixnum.one(getRuntime());
+    }
+
+    org.bouncycastle.asn1.x509.X509Name getRealName() {
+        return new org.bouncycastle.asn1.x509.X509Name(new Vector(oids),new Vector(values));
     }
 
     public IRubyObject eql_p(IRubyObject other) {

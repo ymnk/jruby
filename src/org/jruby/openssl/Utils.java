@@ -43,4 +43,18 @@ public class Utils {
         }
         return out.toString();
     }
+
+    public static String toHex(byte[] val, char sep) {
+        StringBuffer out = new StringBuffer();
+        String sap = "";
+        for(int i=0,j=val.length;i<j;i++) {
+            String ve = Integer.toString((((int)((char)val[i])) & 0xFF),16);
+            if(ve.length() == 1) {
+                ve = "0" + ve;
+            }
+            out.append(sap).append(ve);
+            sap = ""+(char)sep;
+        }
+        return out.toString().toUpperCase();
+    }
 }// Utils

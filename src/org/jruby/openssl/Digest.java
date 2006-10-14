@@ -68,12 +68,21 @@ public class Digest extends RubyObject {
         cDigest.defineMethod("size",digestcb.getMethod("size"));
     }
 
+    private static String transformDigest(String inp) {
+        if("DSS".equalsIgnoreCase(inp)) {
+            return "SHA";
+        } else if("DSS1".equalsIgnoreCase(inp)) {
+            return "SHA1";
+        }
+        return inp;
+    }
+
     public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args) {
         Digest result = new Digest(recv.getRuntime(), (RubyClass)recv);
         if(!(recv.toString().equals("OpenSSL::Digest::Digest"))) {
             try {
                 result.name = recv.toString();
-                result.md = MessageDigest.getInstance(recv.toString());
+                result.md = MessageDigest.getInstance(transformDigest(recv.toString()));
             } catch(NoSuchAlgorithmException e) {
                 throw recv.getRuntime().newNotImplementedError("Unsupported digest algorithm (" + recv.toString() + ")");
             }
@@ -85,7 +94,7 @@ public class Digest extends RubyObject {
     public static IRubyObject s_digest(IRubyObject recv, IRubyObject str, IRubyObject data) {
         String name = str.toString();
         try {
-            MessageDigest md = MessageDigest.getInstance(name);
+            MessageDigest md = MessageDigest.getInstance(transformDigest(name));
             return recv.getRuntime().newString(new String(md.digest(data.toString().getBytes("PLAIN")),"ISO8859_1"));
         } catch(NoSuchAlgorithmException e) {
             throw recv.getRuntime().newNotImplementedError("Unsupported digest algorithm (" + name + ")");
@@ -97,7 +106,7 @@ public class Digest extends RubyObject {
     public static IRubyObject s_hexdigest(IRubyObject recv, IRubyObject str, IRubyObject data) {
         String name = str.toString();
         try {
-            MessageDigest md = MessageDigest.getInstance(name);
+            MessageDigest md = MessageDigest.getInstance(transformDigest(name));
             return recv.getRuntime().newString(Utils.toHex(md.digest(data.toString().getBytes("PLAIN"))));
         } catch(NoSuchAlgorithmException e) {
             throw recv.getRuntime().newNotImplementedError("Unsupported digest algorithm (" + name + ")");
@@ -125,7 +134,7 @@ public class Digest extends RubyObject {
 
         name = type.toString();
         try {
-            md = MessageDigest.getInstance(name);
+            md = MessageDigest.getInstance(transformDigest(name));
         } catch(NoSuchAlgorithmException e) {
             throw getRuntime().newNotImplementedError("Unsupported digest algorithm (" + name + ")");
         }
@@ -143,7 +152,7 @@ public class Digest extends RubyObject {
         data = new StringBuffer(((Digest)obj).data.toString());
         name = ((Digest)obj).md.getAlgorithm();
         try {
-            md = MessageDigest.getInstance(name);
+            md = MessageDigest.getInstance(transformDigest(name));
         } catch(NoSuchAlgorithmException e) {
             throw getRuntime().newNotImplementedError("Unsupported digest algorithm (" + name + ")");
         }
