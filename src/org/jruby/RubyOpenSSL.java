@@ -29,6 +29,7 @@ package org.jruby;
 
 import org.jruby.runtime.CallbackFactory;
 
+import org.jruby.openssl.ASN1;
 import org.jruby.openssl.Cipher;
 import org.jruby.openssl.Digest;
 import org.jruby.openssl.HMAC;
@@ -55,6 +56,7 @@ public class RubyOpenSSL {
         RubyModule ossl = runtime.defineModule("OpenSSL");
         RubyClass eOSSLError = ossl.defineClassUnder("OpenSSLError",runtime.getClass("StandardError"));
 
+        ASN1.createASN1(runtime, ossl);
         Digest.createDigest(runtime, ossl);
         Cipher.createCipher(runtime, ossl);
         Random.createRandom(runtime, ossl);
