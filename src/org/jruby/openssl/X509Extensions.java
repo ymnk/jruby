@@ -29,7 +29,13 @@ package org.jruby.openssl;
 
 import java.security.MessageDigest;
 
+import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.DERObjectIdentifier;
+import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.asn1.DERInteger;
+import org.bouncycastle.asn1.DERBoolean;
+import org.bouncycastle.asn1.DERBitString;
+import org.bouncycastle.asn1.DEROctetString;
 
 import org.jruby.IRuby;
 import org.jruby.Ruby;
@@ -165,17 +171,16 @@ public class X509Extensions {
 
             Extension ext = (Extension)(((RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("Extension"))).callMethod("new"));
 
-            if(r_oid.equals(new DERObjectIdentifier("2.5.29.14"))) {
+            if(r_oid.equals(new DERObjectIdentifier("2.5.29.14"))) { //subjectKeyIdentifier
                 if("hash".equalsIgnoreCase(value)) {
                     IRubyObject val = getInstanceVariable("@subject_certificate").callMethod("public_key").callMethod("to_der");
                     IRubyObject seq = ASN1.decode(((RubyModule)(getRuntime().getModule("OpenSSL"))).getConstant("ASN1"),val);
                     val = seq.callMethod("value").callMethod("[]",getRuntime().newFixnum(1)).callMethod("value");
                     MessageDigest dig = MessageDigest.getInstance("SHA-1");
                     byte[] b = dig.digest(val.toString().getBytes("PLAIN"));
-                    value = Utils.toHex(b,':');
+                    value = new String(new DEROctetString(b).getDEREncoded(),"ISO8859_1");
                 } else {
                     StringBuffer nstr = new StringBuffer();
-                    String sep = "";
                     for(int i = 0; i < value.length(); i+=2) {
                         if(i+1 >= value.length()) {
                             throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("ExtensionError")), oid + " = " + value + ": odd number of digits", true);
@@ -184,18 +189,99 @@ public class X509Extensions {
                         char c1 = value.charAt(i);
                         char c2 = value.charAt(i+1);
                         if(isHexDigit(c1) && isHexDigit(c2)) {
-                            nstr.append(sep).append(Character.toUpperCase(c1)).append(Character.toUpperCase(c2));
+                            nstr.append(Character.toUpperCase(c1)).append(Character.toUpperCase(c2));
                         } else {
                             throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("ExtensionError")), oid + " = " + value + ": illegal hex digit", true);
                         }
-                        sep = ":";
                         while((i+2) < value.length() && value.charAt(i+2) == ':') {
                             i++;
                         }
                     }
-                    value = nstr.toString();
+                    String v = nstr.toString();
+                    byte[] arr = new byte[v.length()/2];
+                    String cur = null;
+                    for(int i=0;i<v.length();i+=2) {
+                        arr[i/2] = (byte)Integer.parseInt(v.substring(i,i+2),16);
+                    }
+                    value = new String(new DEROctetString(arr).getDEREncoded(),"ISO8859_1");
                 }
+            } else if(r_oid.equals(new DERObjectIdentifier("2.5.29.19"))) { //basicConstraints
+                String[] spl = value.split(",");
+                ASN1EncodableVector asnv = new ASN1EncodableVector();
+                for(int i=0;i<spl.length;i++) {
+                    if(spl[i].length() > 3 && spl[i].substring(0,3).equalsIgnoreCase("CA:")) {
+                        asnv.add(new DERBoolean("TRUE".equalsIgnoreCase(spl[i].substring(3))));
+                    }
+                }
+                for(int i=0;i<spl.length;i++) {
+                    if(spl[i].length() > 8 && spl[i].substring(0,8).equalsIgnoreCase("pathlen:")) {
+                        asnv.add(new DERInteger(Integer.parseInt(spl[i].substring(8))));
+                    }
+                }
+                value = new String(new DERSequence(asnv).getDEREncoded(),"ISO8859_1");
+            } else if(r_oid.equals(new DERObjectIdentifier("2.5.29.15"))) { //keyUsage
+                byte v1 = 0;
+                byte v2 = 0;
+                String[] spl = value.split(",");
+                for(int i=0;i<spl.length;i++) {
+                    if("decipherOnly".equals(spl[i].trim()) || "Decipher Only".equals(spl[i].trim())) {
+                        v2 |= (byte)128;
+                    } else if("digitalSignature".equals(spl[i].trim()) || "Digital Signature".equals(spl[i].trim())) {
+                        v1 |= (byte)128;
+                    } else if("nonRepudiation".equals(spl[i].trim()) || "Non Repudiation".equals(spl[i].trim())) {
+                        v1 |= (byte)64;
+                    } else if("keyEncipherment".equals(spl[i].trim()) || "Key Encipherment".equals(spl[i].trim())) {
+                        v1 |= (byte)32;
+                    } else if("dataEncipherment".equals(spl[i].trim()) || "Data Encipherment".equals(spl[i].trim())) {
+                        v1 |= (byte)16;
+                    } else if("keyAgreement".equals(spl[i].trim()) || "Key Agreement".equals(spl[i].trim())) {
+                        v1 |= (byte)8;
+                    } else if("keyCertSign".equals(spl[i].trim()) || "Key Cert Sign".equals(spl[i].trim())) {
+                        v1 |= (byte)4;
+                    } else if("cRLSign".equals(spl[i].trim())) {
+                        v1 |= (byte)2;
+                    } else if("encipherOnly".equals(spl[i].trim()) || "Encipher Only".equals(spl[i].trim())) {
+                        v1 |= (byte)1;
+                    } else {
+                        throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("ExtensionError")), oid + " = " + value + ": unknown bit string argument", true);
+                    }
+                }
+                byte[] inp;
+                if(v2 != 0) {
+                    inp = new byte[]{v1,v2};
+                } else {
+                    inp = new byte[]{v1};
+                }
+                int unused = 0;
+                for(int i = (inp.length-1); i>-1; i--) {
+                    if(inp[i] == 0) {
+                        unused += 8;
+                    } else {
+                        byte a2 = inp[i];
+                        int x = 8;
+                        while(a2 != 0) {
+                            a2 <<= 1;
+                            x--;
+                        }
+                        unused += x;
+                        break;
+                    }
+                }
+                
+                value = new String(new DERBitString(inp,unused).getDEREncoded(),"ISO8859_1");
             }
+
+            /*
+     digitalSignature        (0),128
+     nonRepudiation          (1),64
+     keyEncipherment         (2),32
+     dataEncipherment        (3),16
+     keyAgreement            (4), 8
+     keyCertSign             (5), 4
+     cRLSign                 (6), 2
+     encipherOnly            (7), 1
+     decipherOnly            (8)  0 128
+*/
 
             ext.setRealOid(r_oid);
             ext.setRealValue(value);
@@ -264,8 +350,8 @@ public class X509Extensions {
             return getRuntime().newString((String)(ASN1.getSymLookup(getRuntime()).get(oid)));
         }
 
-        public IRubyObject value() {
-            return getRuntime().newString(value);
+        public IRubyObject value() throws Exception {
+            return getRuntime().newString(Utils.toHex(value.substring(2).getBytes("PLAIN"),':'));
         }
 
         public IRubyObject critical_p() {

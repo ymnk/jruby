@@ -158,7 +158,7 @@ public class X509Name extends RubyObject {
             }
         } else {
             try {
-                ASN1Sequence seq = (ASN1Sequence)new ASN1InputStream(arg.toString().getBytes("PLAIN")).readObject();
+                ASN1Sequence seq = (ASN1Sequence)new ASN1InputStream(OpenSSLImpl.to_der_if_possible(arg).toString().getBytes("PLAIN")).readObject();
                 oids = new ArrayList();
                 values = new ArrayList();
                 types = new ArrayList();
@@ -173,6 +173,7 @@ public class X509Name extends RubyObject {
                     types.add(getRuntime().newFixnum(ASN1.idForClass(value.getObjectAt(1).getClass())));
                 }
             } catch(Exception e) {
+                System.err.println("exception in init for X509Name: " + e);
             }
         }
         return this;

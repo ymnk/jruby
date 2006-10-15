@@ -27,6 +27,8 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.openssl;
 
+import java.math.BigInteger;
+
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
  
@@ -38,9 +40,12 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Enumeration;
+import java.util.Iterator;
 
-import org.bouncycastle.asn1.DERObjectIdentifier;
+import org.bouncycastle.asn1.ASN1EncodableVector;
+import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.DERObjectIdentifier;
 import org.bouncycastle.asn1.DERString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERUTF8String;
@@ -52,13 +57,18 @@ import org.bouncycastle.asn1.DERInteger;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERBoolean;
 import org.bouncycastle.asn1.DERBitString;
+import org.bouncycastle.asn1.DEREncodableVector;
 
 import org.jruby.IRuby;
+import org.jruby.RubyArray;
+import org.jruby.RubyBignum;
 import org.jruby.RubyObject;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
 import org.jruby.RubySymbol;
+import org.jruby.RubyString;
+import org.jruby.RubyTime;
 
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.CallbackFactory;
@@ -85,6 +95,7 @@ public class ASN1 {
             ((Map)val).put("authoritykeyidentifier",new DERObjectIdentifier("2.5.29.35"));
             ((Map)val).put("extendedkeyusage",new DERObjectIdentifier("2.5.29.37"));
             ((Map)val).put("subjectaltname",new DERObjectIdentifier("2.5.29.17"));
+            ((Map)val).put("rsaencryption",new DERObjectIdentifier("1.2.840.113549.1.1.1"));
             ((Map)val).put("rsa-sha1",new DERObjectIdentifier("1.2.840.113549.1.1.5"));
             SYM_TO_OID.put(runtime,val);
         }
@@ -102,6 +113,7 @@ public class ASN1 {
             ((Map)val).put(new DERObjectIdentifier("2.5.29.35"),"authorityKeyIdentifier");
             ((Map)val).put(new DERObjectIdentifier("2.5.29.37"),"extendedKeyUsage");
             ((Map)val).put(new DERObjectIdentifier("2.5.29.17"),"subjectAltName");
+            ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.1.1"),"rsaEncryption");
             ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.1.5"),"RSA-SHA1");
             OID_TO_SYM.put(runtime,val);
         }
@@ -259,6 +271,13 @@ public class ASN1 {
         mASN1.defineClassUnder("Set",cASN1Constructive);
 
         cASN1ObjectId.defineSingletonMethod("register",asncb.getOptSingletonMethod("objectid_register"));
+        cASN1ObjectId.defineMethod("sn",asncb.getSingletonMethod("objectid_sn"));
+        cASN1ObjectId.defineMethod("ln",asncb.getSingletonMethod("objectid_ln"));
+        cASN1ObjectId.defineMethod("short_name",asncb.getSingletonMethod("objectid_sn"));
+        cASN1ObjectId.defineMethod("long_name",asncb.getSingletonMethod("objectid_ln"));
+        cASN1ObjectId.defineMethod("oid",asncb.getSingletonMethod("objectid_oid"));
+
+        cASN1BitString.attr_accessor(new IRubyObject[]{runtime.newSymbol("unused_bits")});
     }
 
     public static IRubyObject objectid_register(IRubyObject recv, IRubyObject[] args) {
@@ -267,6 +286,57 @@ public class ASN1 {
         getOIDLookup(recv.getRuntime()).put(args[2].toString().toLowerCase(),deroi);
         getSymLookup(recv.getRuntime()).put(deroi,args[1].toString());
         return recv.getRuntime().getTrue();
+    }
+
+    public static IRubyObject objectid_sn(IRubyObject self) {
+        return self.getRuntime().newString(getShortNameFor(self.getRuntime(),self.callMethod("value").toString()));
+    }
+
+    public static IRubyObject objectid_ln(IRubyObject self) {
+        return self.getRuntime().newString(getLongNameFor(self.getRuntime(),self.callMethod("value").toString()));
+    }
+
+    public static IRubyObject objectid_oid(IRubyObject self) {
+        return self.getRuntime().newString(getObjectIdentifier(self.getRuntime(),self.callMethod("value").toString()).getId());
+    }
+
+    private static String getShortNameFor(IRuby runtime, String nameOrOid) {
+        DERObjectIdentifier oid = getObjectIdentifier(runtime,nameOrOid);
+        Map em = getOIDLookup(runtime);
+        String name = null;
+        for(Iterator iter = em.keySet().iterator();iter.hasNext();) {
+            Object key = iter.next();
+            if(oid.equals(em.get(key))) {
+                if(name == null || ((String)key).length() < name.length()) {
+                    name = (String)key;
+                }
+            }
+        }
+        return name;
+    }
+
+    private static String getLongNameFor(IRuby runtime, String nameOrOid) {
+        DERObjectIdentifier oid = getObjectIdentifier(runtime,nameOrOid);
+        Map em = getOIDLookup(runtime);
+        String name = null;
+        for(Iterator iter = em.keySet().iterator();iter.hasNext();) {
+            Object key = iter.next();
+            if(oid.equals(em.get(key))) {
+                if(name == null || ((String)key).length() > name.length()) {
+                    name = (String)key;
+                }
+            }
+        }
+        return name;
+    }
+
+    private static DERObjectIdentifier getObjectIdentifier(IRuby runtime, String nameOrOid) {
+        Object val1 = ASN1.getOIDLookup(runtime).get(nameOrOid.toLowerCase());
+        if(null != val1) {
+            return (DERObjectIdentifier)val1;
+        }
+        DERObjectIdentifier val2 = new DERObjectIdentifier(nameOrOid);
+        return val2;
     }
     
     public static IRubyObject fact_Boolean(IRubyObject recv, IRubyObject[] args) {
@@ -362,7 +432,7 @@ public class ASN1 {
         return null;
     }
 
-    private final static DateFormat dateF = new SimpleDateFormat("yyMMddHHmmssz");
+    private final static DateFormat dateF = new SimpleDateFormat("yyyyMMddHHmmssz");
     private static IRubyObject decodeObj(RubyModule asnM,Object v) throws Exception {
         int ix = idForClass(v.getClass());
         String v_name = ix == -1 ? null : (String)(ASN1_INFO[ix][2]);
@@ -370,7 +440,9 @@ public class ASN1 {
             RubyClass c = asnM.getClass(v_name);
             if(v instanceof DERBitString) {
                 String va = new String(((DERBitString)v).getBytes(),"ISO8859_1");
-                return c.callMethod("new",asnM.getRuntime().newString(va));
+                IRubyObject bString = c.callMethod("new",asnM.getRuntime().newString(va));
+                bString.callMethod("unused_bits=",asnM.getRuntime().newFixnum(((DERBitString)v).getPadBits()));
+                return bString;
             } else if(v instanceof DERString) {
                 String val = ((DERString)v).getString();
                 if(v instanceof DERUTF8String) {
@@ -394,17 +466,17 @@ public class ASN1 {
             } else if(v instanceof DERInteger) {
                 return c.callMethod("new",RubyNumeric.str2inum(asnM.getRuntime(),asnM.getRuntime().newString(((DERInteger)v).getValue().toString()),10));
             } else if(v instanceof DERUTCTime) {
-                Date d = dateF.parse(((DERUTCTime)v).getTime());
+                Date d = dateF.parse(((DERUTCTime)v).getAdjustedTime());
                 Calendar cal = Calendar.getInstance();
                 cal.setTime(d);
                 IRubyObject[] argv = new IRubyObject[6];
                 argv[0] = asnM.getRuntime().newFixnum(cal.get(Calendar.YEAR));
-                argv[1] = asnM.getRuntime().newFixnum(cal.get(Calendar.MONTH));
+                argv[1] = asnM.getRuntime().newFixnum(cal.get(Calendar.MONTH)+1);
                 argv[2] = asnM.getRuntime().newFixnum(cal.get(Calendar.DAY_OF_MONTH));
-                argv[3] = asnM.getRuntime().newFixnum(cal.get(Calendar.HOUR));
+                argv[3] = asnM.getRuntime().newFixnum(cal.get(Calendar.HOUR_OF_DAY));
                 argv[4] = asnM.getRuntime().newFixnum(cal.get(Calendar.MINUTE));
                 argv[5] = asnM.getRuntime().newFixnum(cal.get(Calendar.SECOND));
-                return c.callMethod("new",asnM.getRuntime().getClass("Time").callMethod("utc",argv));
+                return c.callMethod("new",asnM.getRuntime().getClass("Time").callMethod("local",argv));
             } else if(v instanceof DERObjectIdentifier) {
                 String av = ((DERObjectIdentifier)v).getId();
                 return c.callMethod("new",asnM.getRuntime().newString(av));
@@ -421,7 +493,7 @@ public class ASN1 {
             IRubyObject val = decodeObj(asnM, ((DERTaggedObject)v).getObject());
             IRubyObject tag = asnM.getRuntime().newFixnum(((DERTaggedObject)v).getTagNo());
             IRubyObject tag_class = asnM.getRuntime().newSymbol("CONTEXT_SPECIFIC");
-            return c.callMethod("new",new IRubyObject[]{val,tag,tag_class});
+            return c.callMethod("new",new IRubyObject[]{asnM.getRuntime().newArray(val),tag,tag_class});
         }
 
         System.err.println("v: " + v + "[" + v.getClass().getName() + "]");
@@ -479,9 +551,28 @@ public class ASN1 {
             return this;
         }
 
-        public IRubyObject to_der() {
-            System.err.println("WARNING: unimplemented method called: asn1data#to_der");
-            return this;
+        ASN1Encodable toASN1() throws Exception {
+            //            System.err.println(getMetaClass().getRealClass().getBaseName()+"#toASN1");
+            int tag = RubyNumeric.fix2int(callMethod("tag"));
+            IRubyObject val = callMethod("value");
+            if(val instanceof RubyArray) {
+                RubyArray arr = (RubyArray)callMethod("value");
+                if(arr.getList().size() > 1) {
+                    ASN1EncodableVector vec = new ASN1EncodableVector();
+                    for(Iterator iter = arr.getList().iterator();iter.hasNext();) {
+                        vec.add(((ASN1Data)iter.next()).toASN1());
+                    }
+                    return new DERTaggedObject(tag, new DERSequence(vec));
+                } else {
+                    return new DERTaggedObject(tag,((ASN1Data)(arr.getList().get(0))).toASN1());
+                }
+            } else {
+                return new DERTaggedObject(tag, ((ASN1Data)val).toASN1());
+            }
+        }
+
+        public IRubyObject to_der() throws Exception {
+            return getRuntime().newString(new String(toASN1().getDEREncoded(),"ISO8859_1"));
         }
 
         protected IRubyObject defaultTag() {
@@ -490,6 +581,30 @@ public class ASN1 {
                 return getRuntime().newFixnum(i);
             } else {
                 return getRuntime().getNil();
+            }
+        }
+
+        protected void print() {
+            print(0);
+        }
+
+        protected void printIndent(int indent) {
+            for(int i=0;i<indent;i++) {
+                System.out.print(" ");
+            }
+        }
+
+        protected void print(int indent) {
+            printIndent(indent);
+            System.out.println("ASN1Data: ");
+            IRubyObject val = callMethod("value");
+            if(val instanceof RubyArray) {
+                RubyArray arr = (RubyArray)val;
+                for(Iterator iter = arr.getList().iterator();iter.hasNext();) {
+                    ((ASN1Data)iter.next()).print(indent+1);
+                }
+            } else {
+                ((ASN1Data)val).print(indent+1);
             }
         }
     }
@@ -543,7 +658,7 @@ public class ASN1 {
                 tag_class = getRuntime().newSymbol("UNIVERSAL");
             }
             if("ObjectId".equals(getMetaClass().getRealClass().getBaseName())) {
-                String v = (String)(getSymLookup(getRuntime()).get(new DERObjectIdentifier(value.toString())));
+                String v = (String)(getSymLookup(getRuntime()).get(getObjectIdentifier(value.toString())));
                 if(v != null) {
                     value = getRuntime().newString(v);
                 }
@@ -557,9 +672,63 @@ public class ASN1 {
             return this;
         }
 
-        public IRubyObject to_der() {
-            System.err.println("WARNING: unimplemented method called: asn1prim#to_der");
-            return this;
+        private DERObjectIdentifier getObjectIdentifier(String nameOrOid) {
+            Object val1 = ASN1.getOIDLookup(getRuntime()).get(nameOrOid.toLowerCase());
+            if(null != val1) {
+                return (DERObjectIdentifier)val1;
+            }
+            DERObjectIdentifier val2 = new DERObjectIdentifier(nameOrOid);
+            return val2;
+        }
+
+        ASN1Encodable toASN1() throws Exception {
+            //            System.err.println(getMetaClass().getRealClass().getBaseName()+"#toASN1");
+            int tag = idForRubyName(getMetaClass().getRealClass().getBaseName());
+            Class imp = (Class)ASN1_INFO[tag][1];
+            IRubyObject val = callMethod("value");
+            if(imp == DERObjectIdentifier.class) {
+                return getObjectIdentifier(val.toString());
+            } else if(imp == DERNull.class) {
+                return new DERNull();
+            } else if(imp == DERBoolean.class) {
+                return new DERBoolean(val.isTrue());
+            } else if(imp == DERUTCTime.class) {
+                return new DERUTCTime(((RubyTime)val).getJavaDate());
+            } else if(imp == DERInteger.class && val instanceof RubyBignum) {
+                return new DERInteger(((RubyBignum)val).getValue());
+            } else if(imp == DERInteger.class) {
+                return new DERInteger(new BigInteger(val.toString()));
+            } else if(imp == DEROctetString.class) {
+                return new DEROctetString(val.toString().getBytes("PLAIN"));
+            } else if(imp == DERBitString.class) {
+                byte[] bs = val.toString().getBytes("PLAIN");
+                int unused = 0;
+                for(int i = (bs.length-1); i>-1; i--) {
+                    if(bs[i] == 0) {
+                        unused += 8;
+                    } else {
+                        byte v2 = bs[i];
+                        int x = 8;
+                        while(v2 != 0) {
+                            v2 <<= 1;
+                            x--;
+                        }
+                        unused += x;
+                        break;
+                    }
+                }
+                return new DERBitString(bs,unused);
+            } else if(val instanceof RubyString) {
+                return (ASN1Encodable)imp.getConstructor(new Class[]{String.class}).newInstance(new Object[]{val.toString()});
+            }
+            System.err.println("object with tag: " + tag + " and value: " + val + " and val.class: " + val.getClass().getName() + " and impl: " + imp.getName());
+            System.err.println("WARNING: unimplemented method called: asn1data#toASN1");
+            return null;
+        }
+
+        protected void print(int indent) {
+            printIndent(indent);
+            System.out.println(getMetaClass().getRealClass().getBaseName() + ": " + callMethod("value").callMethod("inspect").toString());
         }
     }
 
@@ -619,14 +788,32 @@ public class ASN1 {
             return this;
         }
 
-        public IRubyObject to_der() {
-            System.err.println("WARNING: unimplemented method called: asn1cons#to_der");
-            return this;
+        ASN1Encodable toASN1() throws Exception {
+            //            System.err.println(getMetaClass().getRealClass().getBaseName()+"#toASN1");
+            int id = idForRubyName(getMetaClass().getRealClass().getBaseName());
+            if(id != -1) {
+                ASN1EncodableVector vec = new ASN1EncodableVector();
+                RubyArray arr = (RubyArray)callMethod("value");
+                for(Iterator iter = arr.getList().iterator();iter.hasNext();) {
+                    vec.add(((ASN1Data)iter.next()).toASN1());
+                }
+                return (ASN1Encodable)(((Class)(ASN1_INFO[id][1])).getConstructor(new Class[]{DEREncodableVector.class}).newInstance(new Object[]{vec}));
+            }
+            return null;
         }
 
         public IRubyObject each() {
             System.err.println("WARNING: unimplemented method called: asn1cons#each");
             return getRuntime().getNil();
+        }
+
+        protected void print(int indent) {
+            printIndent(indent);
+            System.out.println(getMetaClass().getRealClass().getBaseName() + ": ");
+            RubyArray arr = (RubyArray)callMethod("value");
+            for(Iterator iter = arr.getList().iterator();iter.hasNext();) {
+                ((ASN1Data)iter.next()).print(indent+1);
+            }
         }
     }
 }// ASN1

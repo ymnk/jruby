@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Collections;
 
 import org.jruby.ast.Node;
 import org.jruby.evaluator.EvaluationState;
@@ -150,12 +151,22 @@ public class RubyObject implements Cloneable, IRubyObject {
         return (IRubyObject) getInstanceVariables().remove(name);
     }
 
+    /**
+     * Returns an unmodifiable snapshot of the current state of instance variables.
+     * This method synchronizes access to avoid deadlocks.
+     */
+    public Map getInstanceVariablesSnapshot() {
+        synchronized(getInstanceVariables()) {
+            return Collections.unmodifiableMap(new HashMap(getInstanceVariables()));
+        }
+    }
+
     public Map getInstanceVariables() {
     	// TODO: double checking may or may not be safe enough here
     	if (instanceVariables == null) {
 	    	synchronized (this) {
 	    		if (instanceVariables == null) {
-	    			instanceVariables = new HashMap();
+                            instanceVariables = Collections.synchronizedMap(new HashMap());
 	    		}
 	    	}
     	}
@@ -163,7 +174,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     }
 
     public void setInstanceVariables(Map instanceVariables) {
-        this.instanceVariables = instanceVariables;
+        this.instanceVariables = Collections.synchronizedMap(instanceVariables);
     }
 
     /**
@@ -912,37 +923,36 @@ public class RubyObject implements Cloneable, IRubyObject {
         return getRuntime().newBoolean(isFrozen());
     }
 
-    /** rb_obj_inspect
-     *
-     */
+    
     public IRubyObject inspect() {
-//        if(getInstanceVariables().size() > 0) {
-//            StringBuffer part = new StringBuffer();
-//            String cname = getMetaClass().getRealClass().getName();
-//            part.append("#<").append(cname).append(":0x");
-//            part.append(Integer.toHexString(System.identityHashCode(this)));
-//            part.append(" ");
-//            if(!getRuntime().registerInspecting(this)) {
-//                /* 6:tags 16:addr 1:eos */
-//                part.append("...>");
-//                return getRuntime().newString(part.toString());
-//            }
-//            try {
-//                String sep = "";
-//                for (Iterator iter = instanceVariableNames(); iter.hasNext();) {
-//                    String name = (String) iter.next();
-//                    part.append(sep);
-//                    part.append(name);
-//                    part.append("=");
-//                    part.append(getInstanceVariable(name).callMethod("inspect"));
-//                    sep = ", ";
-//                }
-//                part.append(">");
-//                return getRuntime().newString(part.toString());
-//            } finally {
-//                getRuntime().unregisterInspecting(this);
-//            }
-//        }
+        if(getInstanceVariables().size() > 0) {
+            StringBuffer part = new StringBuffer();
+            String cname = getMetaClass().getRealClass().getName();
+            part.append("#<").append(cname).append(":0x");
+            part.append(Integer.toHexString(System.identityHashCode(this)));
+            part.append(" ");
+            if(!getRuntime().registerInspecting(this)) {
+                /* 6:tags 16:addr 1:eos */
+                part.append("...>");
+                return getRuntime().newString(part.toString());
+            }
+            try {
+                String sep = "";
+                Map iVars = getInstanceVariablesSnapshot();
+                for (Iterator iter = iVars.keySet().iterator(); iter.hasNext();) {
+                    String name = (String) iter.next();
+                    part.append(sep);
+                    part.append(name);
+                    part.append("=");
+                    part.append(((IRubyObject)(iVars.get(name))).callMethod("inspect"));
+                    sep = ", ";
+                }
+                part.append(">");
+                return getRuntime().newString(part.toString());
+            } finally {
+                getRuntime().unregisterInspecting(this);
+            }
+        }
         return callMethod("to_s");
     }
 

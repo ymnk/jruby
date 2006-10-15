@@ -147,7 +147,7 @@ public class X509Cert extends RubyObject {
                 String critOid = (String)iter.next();
                 byte[] value = cert.getExtensionValue(critOid);
                 IRubyObject rValue = ASN1.decode(((RubyModule)(getRuntime().getModule("OpenSSL"))).getConstant("ASN1"),getRuntime().newString(new String(value,"PLAIN"))).callMethod("value");
-                add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(critOid),rValue,getRuntime().getTrue()}));
+                add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(critOid),getRuntime().newString(Utils.toHex(rValue.toString().substring(2).getBytes("PLAIN"),':')),getRuntime().getTrue()}));
             }
         }
 
@@ -157,7 +157,7 @@ public class X509Cert extends RubyObject {
                 String ncritOid = (String)iter.next();
                 byte[] value = cert.getExtensionValue(ncritOid);
                 IRubyObject rValue = ASN1.decode(((RubyModule)(getRuntime().getModule("OpenSSL"))).getConstant("ASN1"),getRuntime().newString(new String(value,"PLAIN"))).callMethod("value");
-                add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(ncritOid),rValue,getRuntime().getFalse()}));
+                add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(ncritOid),getRuntime().newString(Utils.toHex(rValue.toString().substring(2).getBytes("PLAIN"),':')),getRuntime().getFalse()}));
             }
         }
         changed = false;

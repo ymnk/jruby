@@ -29,6 +29,7 @@ package org.jruby.openssl;
 
 import java.security.PublicKey;
 import java.security.PrivateKey;
+import java.security.Signature;
 
 import org.jruby.IRuby;
 import org.jruby.RubyClass;
@@ -83,11 +84,16 @@ public class PKey extends RubyObject {
         return "NONE";
     }
 
-    public IRubyObject sign(IRubyObject digest, IRubyObject data) {
+    public IRubyObject sign(IRubyObject digest, IRubyObject data) throws Exception {
         if(!this.callMethod("private?").isTrue()) {
             throw getRuntime().newArgumentError("Private key is needed.");
         }
-
+        Signature sig = Signature.getInstance(((Digest)digest).getAlgorithm() + "WITH" + getAlgorithm(),"BC");
+        sig.initSign(getPrivateKey());
+        byte[] inp = data.toString().getBytes("PLAIN");
+        sig.update(inp);
+        byte[] sigge = sig.sign();
+        return getRuntime().newString(new String(sigge,"ISO8859_1"));
         /*
     GetPKey(self, pkey);
     EVP_SignInit(&ctx, GetDigestPtr(digest));
@@ -102,10 +108,10 @@ public class PKey extends RubyObject {
 
     return str;
          */
-        return getRuntime().getNil();
     }
 
     public IRubyObject verify(IRubyObject digest, IRubyObject sig, IRubyObject data) {
+        System.err.println("WARNING: unimplemented method PKey#verify called");
         /*
     GetPKey(self, pkey);
     EVP_VerifyInit(&ctx, GetDigestPtr(digest));
