@@ -34,6 +34,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.KeyPair;
 import java.security.KeyFactory;
+import java.security.interfaces.DSAParams;
 import java.security.interfaces.DSAPublicKey;
 import java.security.interfaces.DSAPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -48,6 +49,10 @@ import org.jruby.RubyObject;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.builtin.IRubyObject;
+
+import org.bouncycastle.asn1.ASN1EncodableVector;
+import org.bouncycastle.asn1.DERInteger;
+import org.bouncycastle.asn1.DERSequence;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -112,8 +117,6 @@ public class PKeyDSA extends PKey {
                 pass = args[1];
             }
             if(arg instanceof RubyFixnum) {
-                //	rsa = rsa_generate(FIX2INT(arg), NIL_P(pass) ? DSA_F4 : NUM2INT(pass));
-                //	if (!rsa) ossl_raise(eDSAError, NULL);
             } else {
                 if(pass != null && !pass.isNil()) {
                     passwd = pass.toString();
@@ -179,7 +182,21 @@ public class PKeyDSA extends PKey {
     }
 
     public IRubyObject to_der() throws Exception {
-        return getRuntime().newString( new String(privKey == null ? pubKey.getEncoded() : privKey.getEncoded(),"ISO8859_1"));
+        if(pubKey != null && privKey == null) {
+            return getRuntime().newString( new String(pubKey.getEncoded(),"ISO8859_1"));
+        } else if(privKey != null && pubKey != null) {
+            DSAParams params = privKey.getParams();
+            ASN1EncodableVector v1 = new ASN1EncodableVector();
+            v1.add(new DERInteger(0));
+            v1.add(new DERInteger(params.getP()));
+            v1.add(new DERInteger(params.getQ()));
+            v1.add(new DERInteger(params.getG()));
+            v1.add(new DERInteger(pubKey.getY()));
+            v1.add(new DERInteger(privKey.getX()));
+            return getRuntime().newString( new String(new DERSequence(v1).getEncoded(),"ISO8859_1"));
+        } else {
+            return getRuntime().newString( new String(privKey.getEncoded(),"ISO8859_1"));
+        }
     }
 
     public IRubyObject to_text() throws Exception {

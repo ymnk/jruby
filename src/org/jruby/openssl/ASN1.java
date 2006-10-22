@@ -97,6 +97,8 @@ public class ASN1 {
             ((Map)val).put("subjectaltname",new DERObjectIdentifier("2.5.29.17"));
             ((Map)val).put("rsaencryption",new DERObjectIdentifier("1.2.840.113549.1.1.1"));
             ((Map)val).put("rsa-sha1",new DERObjectIdentifier("1.2.840.113549.1.1.5"));
+            ((Map)val).put("dsa-sha1",new DERObjectIdentifier("1.2.840.10040.4.3"));
+            ((Map)val).put("dsa",new DERObjectIdentifier("1.2.840.10040.4.1"));
             SYM_TO_OID.put(runtime,val);
         }
         return (Map)val;
@@ -115,6 +117,8 @@ public class ASN1 {
             ((Map)val).put(new DERObjectIdentifier("2.5.29.17"),"subjectAltName");
             ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.1.1"),"rsaEncryption");
             ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.1.5"),"RSA-SHA1");
+            ((Map)val).put(new DERObjectIdentifier("1.2.840.10040.4.3"),"DSA-SHA1");
+            ((Map)val).put(new DERObjectIdentifier("1.2.840.10040.4.1"),"DSA");
             OID_TO_SYM.put(runtime,val);
         }
         return (Map)val;
@@ -803,7 +807,10 @@ public class ASN1 {
         }
 
         public IRubyObject each() {
-            System.err.println("WARNING: unimplemented method called: asn1cons#each");
+            RubyArray arr = (RubyArray)callMethod("value");
+            for(Iterator iter = arr.getList().iterator();iter.hasNext();) {
+                getRuntime().getCurrentContext().yield((IRubyObject)iter.next());
+            }
             return getRuntime().getNil();
         }
 

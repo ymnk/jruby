@@ -180,11 +180,14 @@ public class X509Extensions {
 
             if(r_oid.equals(new DERObjectIdentifier("2.5.29.14"))) { //subjectKeyIdentifier
                 if("hash".equalsIgnoreCase(value)) {
-                    IRubyObject val = getInstanceVariable("@subject_certificate").callMethod("public_key").callMethod("to_der");
-                    IRubyObject seq = ASN1.decode(((RubyModule)(getRuntime().getModule("OpenSSL"))).getConstant("ASN1"),val);
-                    val = seq.callMethod("value").callMethod("[]",getRuntime().newFixnum(1)).callMethod("value");
-                    MessageDigest dig = MessageDigest.getInstance("SHA-1");
-                    byte[] b = dig.digest(val.toString().getBytes("PLAIN"));
+                    IRubyObject pkey = getInstanceVariable("@subject_certificate").callMethod("public_key");
+                    IRubyObject val = null;
+                    if(pkey instanceof PKeyRSA) {
+                        val = pkey.callMethod("to_der");
+                    } else {
+                        val = ASN1.decode(getRuntime().getModule("OpenSSL").getConstant("ASN1"),pkey.callMethod("to_der")).callMethod("value").callMethod("[]",getRuntime().newFixnum(1)).callMethod("value");
+                    }
+                    byte[] b = MessageDigest.getInstance("SHA-1").digest(val.toString().getBytes("PLAIN"));
                     value = new String(new DEROctetString(b).getDEREncoded(),"ISO8859_1");
                 } else {
                     StringBuffer nstr = new StringBuffer();
@@ -374,9 +377,15 @@ public class X509Extensions {
         public IRubyObject value() throws Exception {
             if(getRealOid().equals(new DERObjectIdentifier("2.5.29.19"))) { //basicConstraints
                 ASN1Sequence seq2 = (ASN1Sequence)(new ASN1InputStream(value.getBytes("PLAIN")).readObject());
-                String val = "CA:" + (((DERBoolean)(seq2.getObjectAt(0))).isTrue() ? "TRUE" : "FALSE") +
-                    ", pathlen:" + seq2.getObjectAt(1).toString();
-                return getRuntime().newString(val);
+                String c = "";
+                String path = "";
+                if(seq2.size()>0) {
+                    c = "CA:" + (((DERBoolean)(seq2.getObjectAt(0))).isTrue() ? "TRUE" : "FALSE");
+                }
+                if(seq2.size()>1) {
+                    path = ", pathlen:" + seq2.getObjectAt(1).toString();
+                }
+                return getRuntime().newString(c+path);
             } else {
                 return getRuntime().newString(Utils.toHex(value.substring(2).getBytes("PLAIN"),':'));
             }

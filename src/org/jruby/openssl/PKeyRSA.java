@@ -43,6 +43,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.security.spec.RSAKeyGenParameterSpec;
+import java.security.spec.RSAPrivateCrtKeySpec;
 
 import javax.crypto.Cipher;
 
@@ -56,6 +57,11 @@ import org.jruby.RubyNumeric;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.builtin.IRubyObject;
+
+import org.bouncycastle.asn1.ASN1EncodableVector;
+import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.asn1.DERInteger;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -155,6 +161,47 @@ public class PKeyRSA extends PKey {
 
                 if(null == val) {
                     try {
+                        val = OpenSSLImpl.getPEMHandler().readPEM(new StringReader(input),passwd);
+                    } catch(Exception e) {
+                        val = null;
+                    }
+                }
+                if(null == val) {
+                    try {
+                        DERSequence seq = (DERSequence)(new ASN1InputStream(input.getBytes("PLAIN")).readObject());
+                        if(seq.size() == 2) {
+                            BigInteger mod = ((DERInteger)seq.getObjectAt(0)).getValue();
+                            BigInteger pubexp = ((DERInteger)seq.getObjectAt(1)).getValue();
+                            val = fact.generatePublic(new RSAPublicKeySpec(mod,pubexp));
+                        } else {
+                            val = null;
+                        }
+                    } catch(Exception ex) {
+                        val = null;
+                    }
+                }
+                if(null == val) {
+                    try {
+                        DERSequence seq = (DERSequence)(new ASN1InputStream(input.getBytes("PLAIN")).readObject());
+                        if(seq.size() == 9) {
+                            BigInteger mod = ((DERInteger)seq.getObjectAt(1)).getValue();
+                            BigInteger pubexp = ((DERInteger)seq.getObjectAt(2)).getValue();
+                            BigInteger privexp = ((DERInteger)seq.getObjectAt(3)).getValue();
+                            BigInteger primep = ((DERInteger)seq.getObjectAt(4)).getValue();
+                            BigInteger primeq = ((DERInteger)seq.getObjectAt(5)).getValue();
+                            BigInteger primeep = ((DERInteger)seq.getObjectAt(6)).getValue();
+                            BigInteger primeeq = ((DERInteger)seq.getObjectAt(7)).getValue();
+                            BigInteger crtcoeff = ((DERInteger)seq.getObjectAt(8)).getValue();
+                            val = fact.generatePrivate(new RSAPrivateCrtKeySpec(mod,pubexp,privexp,primep,primeq,primeep,primeeq,crtcoeff));
+                        } else {
+                            val = null;
+                        }
+                    } catch(Exception ex) {
+                        val = null;
+                    }
+                }
+                if(null == val) {
+                    try {
                         val = fact.generatePublic(new X509EncodedKeySpec(input.getBytes("PLAIN")));
                     } catch(Exception e) {
                         val = null;
@@ -163,13 +210,6 @@ public class PKeyRSA extends PKey {
                 if(null == val) {
                     try {
                         val = fact.generatePrivate(new PKCS8EncodedKeySpec(input.getBytes("PLAIN")));
-                    } catch(Exception e) {
-                        val = null;
-                    }
-                }
-                if(null == val) {
-                    try {
-                        val = OpenSSLImpl.getPEMHandler().readPEM(new StringReader(input),passwd);
                     } catch(Exception e) {
                         val = null;
                     }
@@ -209,7 +249,24 @@ public class PKeyRSA extends PKey {
     }
 
     public IRubyObject to_der() throws Exception {
-        return getRuntime().newString( new String(privKey == null ? pubKey.getEncoded() : privKey.getEncoded(),"ISO8859_1"));
+        if(pubKey != null && privKey == null) {
+            ASN1EncodableVector v1 = new ASN1EncodableVector();
+            v1.add(new DERInteger(pubKey.getModulus()));
+            v1.add(new DERInteger(pubKey.getPublicExponent()));
+            return getRuntime().newString( new String(new DERSequence(v1).getEncoded(),"ISO8859_1"));
+        } else {
+            ASN1EncodableVector v1 = new ASN1EncodableVector();
+            v1.add(new DERInteger(0));
+            v1.add(new DERInteger(privKey.getModulus()));
+            v1.add(new DERInteger(privKey.getPublicExponent()));
+            v1.add(new DERInteger(privKey.getPrivateExponent()));
+            v1.add(new DERInteger(privKey.getPrimeP()));
+            v1.add(new DERInteger(privKey.getPrimeQ()));
+            v1.add(new DERInteger(privKey.getPrimeExponentP()));
+            v1.add(new DERInteger(privKey.getPrimeExponentQ()));
+            v1.add(new DERInteger(privKey.getCrtCoefficient()));
+            return getRuntime().newString( new String(new DERSequence(v1).getEncoded(),"ISO8859_1"));
+        }
     }
 
     public IRubyObject public_key() {

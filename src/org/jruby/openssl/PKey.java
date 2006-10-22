@@ -42,7 +42,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
-public class PKey extends RubyObject {
+public abstract class PKey extends RubyObject {
     public static void createPKey(IRuby runtime, RubyModule ossl) {
         RubyModule mPKey = ossl.defineModuleUnder("PKey");
         RubyClass cPKey = mPKey.defineClassUnder("PKey",runtime.getObject());
@@ -83,6 +83,8 @@ public class PKey extends RubyObject {
     String getAlgorithm() {
         return "NONE";
     }
+
+    public abstract IRubyObject to_der() throws Exception;
 
     public IRubyObject sign(IRubyObject digest, IRubyObject data) throws Exception {
         if(!this.callMethod("private?").isTrue()) {
