@@ -125,6 +125,12 @@ public class X509Name extends RubyObject {
     private List values;
     private List types;
 
+    void addEntry(Object oid, Object value, Object type) {
+        oids.add(oid);
+        values.add(value);
+        types.add(type);
+    }
+
     public IRubyObject initialize(IRubyObject[] args) {
         if(checkArgumentCount(args,0,2) == 0) {
             return this;
