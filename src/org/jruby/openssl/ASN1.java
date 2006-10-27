@@ -99,6 +99,8 @@ public class ASN1 {
             ((Map)val).put("rsa-sha1",new DERObjectIdentifier("1.2.840.113549.1.1.5"));
             ((Map)val).put("dsa-sha1",new DERObjectIdentifier("1.2.840.10040.4.3"));
             ((Map)val).put("dsa",new DERObjectIdentifier("1.2.840.10040.4.1"));
+            ((Map)val).put("msextreq",new DERObjectIdentifier("1.3.6.1.4.1.311.2.1.14"));
+            ((Map)val).put("extreq",new DERObjectIdentifier("1.2.840.113549.1.9.14"));
             SYM_TO_OID.put(runtime,val);
         }
         return (Map)val;
@@ -119,6 +121,8 @@ public class ASN1 {
             ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.1.5"),"RSA-SHA1");
             ((Map)val).put(new DERObjectIdentifier("1.2.840.10040.4.3"),"DSA-SHA1");
             ((Map)val).put(new DERObjectIdentifier("1.2.840.10040.4.1"),"DSA");
+            ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.9.14"),"extReq");
+            ((Map)val).put(new DERObjectIdentifier("1.3.6.1.4.1.311.2.1.14"),"msExtReq");
             OID_TO_SYM.put(runtime,val);
         }
         return (Map)val;
@@ -799,7 +803,12 @@ public class ASN1 {
                 ASN1EncodableVector vec = new ASN1EncodableVector();
                 RubyArray arr = (RubyArray)callMethod("value");
                 for(Iterator iter = arr.getList().iterator();iter.hasNext();) {
-                    vec.add(((ASN1Data)iter.next()).toASN1());
+                    IRubyObject v = (IRubyObject)iter.next();
+                    if(v instanceof ASN1Data) {
+                        vec.add(((ASN1Data)v).toASN1());
+                    } else {
+                        vec.add(((ASN1Data)ASN1.decode(getRuntime().getModule("OpenSSL").getConstant("ASN1"),OpenSSLImpl.to_der_if_possible(v))).toASN1());
+                    }
                 }
                 return (ASN1Encodable)(((Class)(ASN1_INFO[id][1])).getConstructor(new Class[]{DEREncodableVector.class}).newInstance(new Object[]{vec}));
             }

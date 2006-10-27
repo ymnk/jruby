@@ -35,6 +35,12 @@ import org.jruby.RubyObject;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.builtin.IRubyObject;
 
+import org.bouncycastle.asn1.ASN1EncodableVector;
+import org.bouncycastle.asn1.DERObject;
+import org.bouncycastle.asn1.DERObjectIdentifier;
+import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.asn1.DERSet;
+
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
@@ -47,7 +53,7 @@ public class Attribute extends RubyObject {
         CallbackFactory attrcb = runtime.callbackFactory(Attribute.class);
 
         cAttribute.defineSingletonMethod("new",attrcb.getOptSingletonMethod("newInstance"));
-        cAttribute.defineMethod("initialize",attrcb.getOptMethod("initialize"));
+        cAttribute.defineMethod("initialize",attrcb.getOptMethod("_initialize"));
         cAttribute.defineMethod("to_der",attrcb.getMethod("to_der"));
         cAttribute.defineMethod("oid",attrcb.getMethod("oid"));
         cAttribute.defineMethod("oid=",attrcb.getMethod("set_oid",IRubyObject.class));
@@ -65,8 +71,39 @@ public class Attribute extends RubyObject {
         super(runtime,type);
     }
 
-    public IRubyObject initialize(IRubyObject[] str) {
-        System.err.println("WARNING: unimplemented method called: attr#init");
+    private IRubyObject oid;
+    private IRubyObject value;
+
+    private DERObjectIdentifier getObjectIdentifier(String nameOrOid) {
+        Object val1 = ASN1.getOIDLookup(getRuntime()).get(nameOrOid.toLowerCase());
+        if(null != val1) {
+            return (DERObjectIdentifier)val1;
+        }
+        DERObjectIdentifier val2 = new DERObjectIdentifier(nameOrOid);
+        return val2;
+    }
+
+    DERObject toASN1() throws Exception {
+        ASN1EncodableVector v1 = new ASN1EncodableVector();
+        v1.add(getObjectIdentifier(oid.toString()));
+        if(value instanceof ASN1.ASN1Constructive) {
+            v1.add(((ASN1.ASN1Constructive)value).toASN1());
+        } else {
+            ASN1EncodableVector v2 = new ASN1EncodableVector();
+            v2.add(((ASN1.ASN1Data)value).toASN1());
+            v1.add(new DERSet(v2));
+        }
+        return new DERSequence(v1);
+    }
+
+    public IRubyObject _initialize(IRubyObject[] str) throws Exception {
+        if(checkArgumentCount(str,1,2) == 1) {
+            IRubyObject _oid = OpenSSLImpl.to_der_if_possible(str[0]);
+            set_oid(_oid);
+            return this;
+        }
+        set_oid(str[0]);
+        set_value(str[1]);
         return this;
     }
 
@@ -76,22 +113,21 @@ public class Attribute extends RubyObject {
     }
 
     public IRubyObject oid() {
-        System.err.println("WARNING: unimplemented method called: attr#oid");
-        return getRuntime().getNil();
+        return oid;
     }
 
     public IRubyObject set_oid(IRubyObject val) {
-        System.err.println("WARNING: unimplemented method called: attr#oid=");
-        return getRuntime().getNil();
+        this.oid = val;
+        return val;
     }
 
     public IRubyObject value() {
-        System.err.println("WARNING: unimplemented method called: attr#value");
-        return getRuntime().getNil();
+        return value;
     }
 
-    public IRubyObject set_value(IRubyObject val) {
-        System.err.println("WARNING: unimplemented method called: attr#value=");
-        return getRuntime().getNil();
+    public IRubyObject set_value(IRubyObject val) throws Exception {
+        IRubyObject tmp = OpenSSLImpl.to_der_if_possible(val);
+        this.value = ASN1.decode(getRuntime().getModule("OpenSSL").getConstant("ASN1"),tmp);
+        return val;
     }
 }// Attribute

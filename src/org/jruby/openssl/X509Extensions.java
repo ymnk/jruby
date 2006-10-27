@@ -337,7 +337,7 @@ public class X509Extensions {
         public IRubyObject _initialize(IRubyObject[] args) throws Exception {
             byte[] octets = null;
             if(args.length == 1) {
-                ASN1InputStream is = new ASN1InputStream(args[0].toString().getBytes("PLAIN"));
+                ASN1InputStream is = new ASN1InputStream(OpenSSLImpl.to_der_if_possible(args[0]).toString().getBytes("PLAIN"));
                 Object obj = is.readObject();
                 ASN1Sequence seq = (ASN1Sequence)obj;
                 setRealOid((DERObjectIdentifier)(seq.getObjectAt(0)));
@@ -386,6 +386,53 @@ public class X509Extensions {
                     path = ", pathlen:" + seq2.getObjectAt(1).toString();
                 }
                 return getRuntime().newString(c+path);
+            } else if(getRealOid().equals(new DERObjectIdentifier("2.5.29.15"))) { //keyUsage
+                byte[] bs = value.substring(2).getBytes("PLAIN");
+                byte b1 = 0;
+                byte b2 = bs[0];
+                if(bs.length>1) {
+                    b1 = bs[1];
+                }
+                StringBuffer sbe = new StringBuffer();
+                String sep = "";
+                if((b2 & (byte)128) != 0) {
+                    sbe.append(sep).append("Decipher Only");
+                    sep = ", ";
+                }
+                if((b1 & (byte)128) != 0) {
+                    sbe.append(sep).append("Digital Signature");
+                    sep = ", ";
+                }
+                if((b1 & (byte)64) != 0) {
+                    sbe.append(sep).append("Non Repudiation");
+                    sep = ", ";
+                }
+                if((b1 & (byte)32) != 0) {
+                    sbe.append(sep).append("Key Encipherment");
+                    sep = ", ";
+                }
+                if((b1 & (byte)16) != 0) {
+                    sbe.append(sep).append("Data Encipherment");
+                    sep = ", ";
+                }
+                if((b1 & (byte)8) != 0) {
+                    sbe.append(sep).append("Key Agreement");
+                    sep = ", ";
+                }
+                if((b1 & (byte)4) != 0) {
+                    sbe.append(sep).append("Key Cert Sign");
+                    sep = ", ";
+                }
+                if((b1 & (byte)2) != 0) {
+                    sbe.append(sep).append("cRLSign");
+                    sep = ", ";
+                }
+                if((b1 & (byte)1) != 0) {
+                    sbe.append(sep).append("Encipher Only");
+                }
+                return getRuntime().newString(sbe.toString());
+            } else if(getRealOid().equals(new DERObjectIdentifier("2.5.29.17"))) { //subjectAltName
+                return getRuntime().newString(value);
             } else {
                 return getRuntime().newString(Utils.toHex(value.substring(2).getBytes("PLAIN"),':'));
             }

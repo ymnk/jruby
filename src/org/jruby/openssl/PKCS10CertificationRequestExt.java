@@ -50,7 +50,9 @@ import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.DERInteger;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.ASN1Set;
+import org.bouncycastle.asn1.DERSet;
 import org.bouncycastle.asn1.DEROutputStream;
+import org.bouncycastle.asn1.DERTaggedObject;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -112,6 +114,16 @@ public class PKCS10CertificationRequestExt extends PKCS10CertificationRequest {
                 InvalidKeyException, SignatureException
     {
         super(signatureAlgorithm,subject,key,attributes,signingKey,provider);
+    }
+
+    public void setAttributes(DERSet attrs) {
+        ASN1Sequence seq = (ASN1Sequence)this.reqInfo.toASN1Object();
+        ASN1EncodableVector v1 = new ASN1EncodableVector();
+        for(int i=0;i<(seq.size()-1);i++) {
+            v1.add(seq.getObjectAt(i));
+        }
+        v1.add(new DERTaggedObject(0,attrs));
+        this.reqInfo = new CertificationRequestInfo(new DERSequence(v1));
     }
 
     public void setVersion(int v) {

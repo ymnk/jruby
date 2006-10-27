@@ -30,7 +30,13 @@ package org.jruby.openssl;
 import java.security.PublicKey;
 import java.security.Signature;
 
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Enumeration;
+
 import org.jruby.IRuby;
+import org.jruby.RubyArray;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
@@ -40,9 +46,13 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.builtin.IRubyObject;
 
+import org.bouncycastle.asn1.ASN1Set;
+import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.DERSet;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERString;
+import org.bouncycastle.asn1.DERObjectIdentifier;
+import org.bouncycastle.asn1.DERObject;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -88,10 +98,13 @@ public class Request extends RubyObject {
     private IRubyObject public_key;
     private boolean valid = false;
 
+    private List attrs;
+
     private PKCS10CertificationRequestExt req;
 
     public Request(IRuby runtime, RubyClass type) {
         super(runtime,type);
+        attrs = new ArrayList();
     }
 
     public IRubyObject _initialize(IRubyObject[] args) throws Exception {
@@ -121,6 +134,18 @@ public class Request extends RubyObject {
             }
             Object t = getRuntime().newFixnum(ASN1.idForClass(internal.getObjectAt(1).getClass()));
             ((X509Name)subject).addEntry(oid,v,t);
+        }
+        ASN1Set in_attrs = req.getCertificationRequestInfo().getAttributes();
+        for(Enumeration enm = in_attrs.getObjects();enm.hasMoreElements();) {
+            DERSet obj = (DERSet)enm.nextElement();
+            for(Enumeration enm2 = obj.getObjects();enm2.hasMoreElements();) {
+                DERSequence val = (DERSequence)enm2.nextElement();
+                DERObjectIdentifier v0 = (DERObjectIdentifier)val.getObjectAt(0);
+                DERObject v1 = (DERObject)val.getObjectAt(1);
+                IRubyObject a1 = getRuntime().newString(((String)(ASN1.getSymLookup(getRuntime()).get(v0))));
+                IRubyObject a2 = ASN1.decode(getRuntime().getModule("OpenSSL").getConstant("ASN1"),getRuntime().newString(new String(v1.getDEREncoded(),"ISO8859_1")));
+                add_attribute(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("Attribute").callMethod("new",new IRubyObject[]{a1,a2}));
+            }
         }
         this.valid = true;
         return this;
@@ -206,7 +231,11 @@ public class Request extends RubyObject {
             throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("RequestError")), null, true);
         }
 
-        req = new PKCS10CertificationRequestExt(digAlg + "WITH" + keyAlg,((X509Name)this.subject).getRealName(),((PKey)public_key).getPublicKey(),new DERSet(),((PKey)key).getPrivateKey());
+        ASN1EncodableVector v1 = new ASN1EncodableVector();
+        for(Iterator iter = attrs.iterator();iter.hasNext();) {
+            v1.add(((Attribute)iter.next()).toASN1());
+        }
+        req = new PKCS10CertificationRequestExt(digAlg + "WITH" + keyAlg,((X509Name)this.subject).getRealName(),((PKey)public_key).getPublicKey(),new DERSet(v1),((PKey)key).getPrivateKey());
         req.setVersion(RubyNumeric.fix2int(version));
         valid = true;
         return this;
@@ -221,18 +250,33 @@ public class Request extends RubyObject {
     }
 
     public IRubyObject attributes() {
-        System.err.println("WARNING: unimplemented method called: attributes");
-        return getRuntime().newArray();
+        return getRuntime().newArray(attrs);
     }
 
-    public IRubyObject set_attributes(IRubyObject val) {
+    public IRubyObject set_attributes(IRubyObject val) throws Exception {
         valid = false;
-        System.err.println("WARNING: unimplemented method called: attributes=");
+        attrs.clear();
+        attrs.addAll(((RubyArray)val).getList());
+        if(req != null) {
+            ASN1EncodableVector v1 = new ASN1EncodableVector();
+            for(Iterator iter = attrs.iterator();iter.hasNext();) {
+                v1.add(((Attribute)iter.next()).toASN1());
+            }
+            req.setAttributes(new DERSet(v1));
+        }
         return val;
     }
 
-    public IRubyObject add_attribute(IRubyObject val) {
-        System.err.println("WARNING: unimplemented method called: add_attribute");
+    public IRubyObject add_attribute(IRubyObject val) throws Exception {
+        valid = false;
+        attrs.add(val);
+        if(req != null) {
+            ASN1EncodableVector v1 = new ASN1EncodableVector();
+            for(Iterator iter = attrs.iterator();iter.hasNext();) {
+                v1.add(((Attribute)iter.next()).toASN1());
+            }
+            req.setAttributes(new DERSet(v1));
+        }
         return getRuntime().getNil();
     }
 
