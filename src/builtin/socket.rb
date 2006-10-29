@@ -251,7 +251,7 @@ class TCPServer < TCPSocket
   end
   
   def close
-    TCPSocket.new(@javaServerSocketChannel.accept, nil)
+    @javaServerSocketChannel.close
   end
   
   def listen(backlog)
