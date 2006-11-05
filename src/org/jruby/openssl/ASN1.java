@@ -80,28 +80,79 @@ import org.jruby.runtime.builtin.IRubyObject;
 public class ASN1 {
     private static Map SYM_TO_OID = new IdentityHashMap();
     private static Map OID_TO_SYM = new IdentityHashMap();
+    private static Map OID_TO_NID = new IdentityHashMap();
+    private static Map NID_TO_OID = new IdentityHashMap();
+    private static Map NID_TO_SN = new IdentityHashMap();
+    private static Map NID_TO_LN = new IdentityHashMap();
 
+
+    static void addObject(IRuby runtime, int nid, String sn, String ln, String oid) {
+        Map s2o = (Map)SYM_TO_OID.get(runtime);
+        Map o2s = (Map)OID_TO_SYM.get(runtime);
+        Map o2n = (Map)OID_TO_NID.get(runtime);
+        Map n2o = (Map)NID_TO_OID.get(runtime);
+        Map n2s = (Map)NID_TO_SN.get(runtime);
+        Map n2l = (Map)NID_TO_LN.get(runtime);
+        if(null != oid && (null != sn || null != ln)) {
+            DERObjectIdentifier ident = new DERObjectIdentifier(oid);
+            Integer i_nid = new Integer(nid);
+            if(sn != null) {
+                s2o.put(sn.toLowerCase(),ident);
+            }
+            if(ln != null) {
+                s2o.put(ln.toLowerCase(),ident);
+            }
+            o2s.put(ident,sn == null ? ln : sn);
+            o2n.put(ident,i_nid);
+            n2o.put(i_nid,ident);
+            n2s.put(i_nid,sn);
+            n2l.put(i_nid,ln);
+        }        
+    }
+
+    private synchronized static void initMaps(IRuby runtime) {
+        Object val = new HashMap(org.bouncycastle.asn1.x509.X509Name.DefaultLookUp);
+        Object val2 = new HashMap(org.bouncycastle.asn1.x509.X509Name.DefaultSymbols);
+        SYM_TO_OID.put(runtime,val);
+        OID_TO_SYM.put(runtime,val2);
+        OID_TO_NID.put(runtime,new HashMap());
+        NID_TO_OID.put(runtime,new HashMap());
+        NID_TO_SN.put(runtime,new HashMap());
+        NID_TO_LN.put(runtime,new HashMap());
+        OpenSSLImpl.defaultObjects(runtime);
+    }
+
+    synchronized static Integer obj2nid(IRuby runtime, String oid) {
+        return obj2nid(runtime, new DERObjectIdentifier(oid));
+    }
+
+    synchronized static Integer obj2nid(IRuby runtime, DERObjectIdentifier oid) {
+        Map o2n = (Map)OID_TO_NID.get(runtime);
+        if(null == o2n) {
+            initMaps(runtime);
+            o2n = (Map)OID_TO_NID.get(runtime);
+        }
+        return (Integer)o2n.get(oid);
+    }
+
+    synchronized static String nid2ln(IRuby runtime, int nid) {
+        return nid2ln(runtime, new Integer(nid));
+    }
+
+    synchronized static String nid2ln(IRuby runtime, Integer nid) {
+        Map n2l = (Map)NID_TO_LN.get(runtime);
+        if(null == n2l) {
+            initMaps(runtime);
+            n2l = (Map)NID_TO_LN.get(runtime);
+        }
+        return (String)n2l.get(nid);
+    }
+    
     synchronized static Map getOIDLookup(IRuby runtime) {
         Object val = SYM_TO_OID.get(runtime);
         if(null == val) {
-            val = new HashMap(org.bouncycastle.asn1.x509.X509Name.DefaultLookUp);
-            ((Map)val).put("streetaddress",org.bouncycastle.asn1.x509.X509Name.DefaultLookUp.get("street"));
-            ((Map)val).put("organizationname",org.bouncycastle.asn1.x509.X509Name.DefaultLookUp.get("o"));
-            ((Map)val).put("commonname",org.bouncycastle.asn1.x509.X509Name.DefaultLookUp.get("cn"));
-            ((Map)val).put("countryname",org.bouncycastle.asn1.x509.X509Name.DefaultLookUp.get("c"));
-            ((Map)val).put("basicconstraints",new DERObjectIdentifier("2.5.29.19"));
-            ((Map)val).put("keyusage",new DERObjectIdentifier("2.5.29.15"));
-            ((Map)val).put("subjectkeyidentifier",new DERObjectIdentifier("2.5.29.14"));
-            ((Map)val).put("authoritykeyidentifier",new DERObjectIdentifier("2.5.29.35"));
-            ((Map)val).put("extendedkeyusage",new DERObjectIdentifier("2.5.29.37"));
-            ((Map)val).put("subjectaltname",new DERObjectIdentifier("2.5.29.17"));
-            ((Map)val).put("rsaencryption",new DERObjectIdentifier("1.2.840.113549.1.1.1"));
-            ((Map)val).put("rsa-sha1",new DERObjectIdentifier("1.2.840.113549.1.1.5"));
-            ((Map)val).put("dsa-sha1",new DERObjectIdentifier("1.2.840.10040.4.3"));
-            ((Map)val).put("dsa",new DERObjectIdentifier("1.2.840.10040.4.1"));
-            ((Map)val).put("msextreq",new DERObjectIdentifier("1.3.6.1.4.1.311.2.1.14"));
-            ((Map)val).put("extreq",new DERObjectIdentifier("1.2.840.113549.1.9.14"));
-            SYM_TO_OID.put(runtime,val);
+            initMaps(runtime);
+            val = SYM_TO_OID.get(runtime);
         }
         return (Map)val;
     }
@@ -109,21 +160,8 @@ public class ASN1 {
     synchronized static Map getSymLookup(IRuby runtime) {
         Object val = OID_TO_SYM.get(runtime);
         if(null == val) {
-            val = new HashMap(org.bouncycastle.asn1.x509.X509Name.DefaultSymbols);
-            ((Map)val).put(org.bouncycastle.asn1.x509.X509Name.DefaultLookUp.get("street"),"streetAddress");
-            ((Map)val).put(new DERObjectIdentifier("2.5.29.19"),"basicConstraints");
-            ((Map)val).put(new DERObjectIdentifier("2.5.29.15"),"keyUsage");
-            ((Map)val).put(new DERObjectIdentifier("2.5.29.14"),"subjectKeyIdentifier");
-            ((Map)val).put(new DERObjectIdentifier("2.5.29.35"),"authorityKeyIdentifier");
-            ((Map)val).put(new DERObjectIdentifier("2.5.29.37"),"extendedKeyUsage");
-            ((Map)val).put(new DERObjectIdentifier("2.5.29.17"),"subjectAltName");
-            ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.1.1"),"rsaEncryption");
-            ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.1.5"),"RSA-SHA1");
-            ((Map)val).put(new DERObjectIdentifier("1.2.840.10040.4.3"),"DSA-SHA1");
-            ((Map)val).put(new DERObjectIdentifier("1.2.840.10040.4.1"),"DSA");
-            ((Map)val).put(new DERObjectIdentifier("1.2.840.113549.1.9.14"),"extReq");
-            ((Map)val).put(new DERObjectIdentifier("1.3.6.1.4.1.311.2.1.14"),"msExtReq");
-            OID_TO_SYM.put(runtime,val);
+            initMaps(runtime);
+            val = OID_TO_SYM.get(runtime);
         }
         return (Map)val;
     }

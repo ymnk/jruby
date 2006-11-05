@@ -334,6 +334,15 @@ public class X509Extensions {
             return critical;
         }
 
+        private DERObjectIdentifier getObjectIdentifier(String nameOrOid) {
+            Object val1 = ASN1.getOIDLookup(getRuntime()).get(nameOrOid.toLowerCase());
+            if(null != val1) {
+                return (DERObjectIdentifier)val1;
+            }
+            DERObjectIdentifier val2 = new DERObjectIdentifier(nameOrOid);
+            return val2;
+        }
+
         public IRubyObject _initialize(IRubyObject[] args) throws Exception {
             byte[] octets = null;
             if(args.length == 1) {
@@ -343,9 +352,11 @@ public class X509Extensions {
                 setRealOid((DERObjectIdentifier)(seq.getObjectAt(0)));
                 setRealCritical(((DERBoolean)(seq.getObjectAt(1))).isTrue());
                 octets = ((DEROctetString)(seq.getObjectAt(2))).getOctets();
-            } else if(args.length == 3) {
-                setRealOid(new DERObjectIdentifier(args[0].toString()));
+            } else if(args.length > 1) {
+                setRealOid(getObjectIdentifier(args[0].toString()));
                 octets = args[1].toString().getBytes("PLAIN");
+            }
+            if(args.length > 2) {
                 setRealCritical(args[2].isTrue());
             }
             if(args.length > 0) {
