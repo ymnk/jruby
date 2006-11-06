@@ -134,7 +134,7 @@ class OpenSSL::TestX509CRL < Test::Unit::TestCase
       ["authorityKeyIdentifier", "keyid:always", false], 
       ["issuerAltName", "issuer:copy", false],
     ]
-
+    
     cert = issue_cert(@ca, @rsa2048, 1, Time.now, Time.now+3600, cert_exts,
                       nil, nil, OpenSSL::Digest::SHA1.new)
     crl = issue_crl([], 1, Time.now, Time.now+1600, crl_exts,
@@ -177,7 +177,6 @@ class OpenSSL::TestX509CRL < Test::Unit::TestCase
     crl = issue_crl([], 1, Time.now, Time.now+1600, [],
                     cert, @rsa2048, OpenSSL::Digest::SHA1.new)
     assert_match(1.to_s, crl.extensions[0].value)
-puts crl.to_text
     assert_match(/X509v3 CRL Number:\s+#{1}/m, crl.to_text)
 
     crl = issue_crl([], 2**32, Time.now, Time.now+1600, [],

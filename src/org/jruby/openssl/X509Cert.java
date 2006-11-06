@@ -334,7 +334,7 @@ public class X509Cert extends RubyObject {
 
     public IRubyObject add_extension(IRubyObject arg) throws Exception {
         extensions.add(arg);
-        generator.addExtension(((X509Extensions.Extension)arg).getRealOid(),((X509Extensions.Extension)arg).getRealCritical(),((X509Extensions.Extension)arg).getRealValue().getBytes("PLAIN"));
+        generator.addExtension(((X509Extensions.Extension)arg).getRealOid(),((X509Extensions.Extension)arg).getRealCritical(),((X509Extensions.Extension)arg).getRealValueBytes());
         return arg;
     }
 

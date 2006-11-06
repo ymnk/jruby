@@ -209,19 +209,16 @@ public class SSLSocket extends RubyObject {
         while (true) {
             SSLEngineResult res;
             waitSelect(asel);
-            switch (hsStatus) {
-            case FINISHED:
+            if(hsStatus == SSLEngineResult.HandshakeStatus.FINISHED) {
                 if (initialHandshake) {
                     finishInitialHandshake();
                 }
                 return;
-            case NEED_TASK:
+            } else if(hsStatus == SSLEngineResult.HandshakeStatus.NEED_TASK) {
                 doTasks();
-                break;
-            case NEED_UNWRAP:
+            } else if(hsStatus == SSLEngineResult.HandshakeStatus.NEED_UNWRAP) {
                 readAndUnwrap();
-                break;
-            case NEED_WRAP:
+            } else if(hsStatus == SSLEngineResult.HandshakeStatus.NEED_WRAP) {
                 if (netData.hasRemaining()) {
                     while(flushData());
                 }
@@ -230,9 +227,8 @@ public class SSLSocket extends RubyObject {
                 hsStatus = res.getHandshakeStatus();
                 netData.flip();
                 flushData();
-                break;
-            case NOT_HANDSHAKING:
-            assert false : "doHandshake() should never reach the NOT_HANDSHAKING state";
+            } else {
+                assert false : "doHandshake() should never reach the NOT_HANDSHAKING state";
                 return;
             }
         }

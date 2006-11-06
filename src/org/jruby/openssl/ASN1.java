@@ -135,6 +135,17 @@ public class ASN1 {
         return (Integer)o2n.get(oid);
     }
 
+    synchronized static String o2a(IRuby runtime, DERObjectIdentifier obj) {
+        Integer nid = obj2nid(runtime,obj);
+        Map n2l = (Map)NID_TO_LN.get(runtime);
+        Map n2s = (Map)NID_TO_SN.get(runtime);
+        String one = (String)n2l.get(nid);
+        if(one == null) {
+            one = (String)n2s.get(nid);
+        }
+        return one;
+    }
+
     synchronized static String nid2ln(IRuby runtime, int nid) {
         return nid2ln(runtime, new Integer(nid));
     }
@@ -664,6 +675,10 @@ public class ASN1 {
 
         public ASN1Primitive(IRuby runtime, RubyClass type) {
             super(runtime,type);
+        }
+
+        public String toString() {
+            return this.callMethod("value").toString();
         }
 
         public IRubyObject initialize(IRubyObject[] args) {

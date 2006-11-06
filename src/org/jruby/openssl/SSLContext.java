@@ -92,7 +92,7 @@ public class SSLContext extends RubyObject {
     }
 
     String[] getCipherSuites(SSLEngine engine) {
-        List<String> ciphs = new ArrayList<String>();
+        List ciphs = new ArrayList();
         if(this.ciphers instanceof RubyArray) {
             for(Iterator iter = ((RubyArray)this.ciphers).getList().iterator();iter.hasNext();) {
                 addCipher(ciphs, iter.next().toString(),engine);
@@ -100,10 +100,10 @@ public class SSLContext extends RubyObject {
         } else {
             addCipher(ciphs,this.ciphers.toString(),engine);
         }
-        return ciphs.toArray(new String[ciphs.size()]);
+        return (String[])ciphs.toArray(new String[ciphs.size()]);
     }
 
-    private void addCipher(List<String> lst, String cipher, SSLEngine engine) {
+    private void addCipher(List lst, String cipher, SSLEngine engine) {
         String[] supported = engine.getSupportedCipherSuites();
         if("ADH".equals(cipher)) {
             for(int i=0;i<supported.length;i++) {
