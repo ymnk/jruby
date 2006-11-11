@@ -85,7 +85,7 @@ public class X509_STORE {
         verify_cb = func;
     }
 
-    public void free() {
+    public void free() throws Exception {
         for(Iterator iter = get_cert_methods.iterator();iter.hasNext();) {
             X509_LOOKUP lu = (X509_LOOKUP)iter.next();
             lu.shutdown();
@@ -117,7 +117,7 @@ public class X509_STORE {
 	return param.set1(param);
     }
 
-    public X509_LOOKUP add_lookup(X509_LOOKUP_METHOD m) { 
+    public X509_LOOKUP add_lookup(X509_LOOKUP_METHOD m) throws Exception { 
         X509_LOOKUP lu;
 
         for(Iterator iter = get_cert_methods.iterator();iter.hasNext();) {
@@ -175,7 +175,7 @@ public class X509_STORE {
 	return ret;
     } 
 
-    public int load_locations(String file, String path) { 
+    public int load_locations(String file, String path) throws Exception { 
 	X509_LOOKUP lookup;
 
 	if(file != null) {
@@ -204,7 +204,7 @@ public class X509_STORE {
 	return 1;
     } 
 
-    public int set_default_paths() { 
+    public int set_default_paths() throws Exception { 
 	X509_LOOKUP lookup;
 
 	lookup = add_lookup(X509_LOOKUP.file());

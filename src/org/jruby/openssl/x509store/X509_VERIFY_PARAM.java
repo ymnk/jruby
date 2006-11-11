@@ -29,6 +29,7 @@ package org.jruby.openssl.x509store;
 
 import java.util.Date;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -44,25 +45,102 @@ public class X509_VERIFY_PARAM {
     public int depth;
     public List policies;
 
-    public X509_VERIFY_PARAM() {
+    public X509_VERIFY_PARAM() { 
+        zero();
     }
 
-    public void free() {}
-    public int inherit(X509_VERIFY_PARAM from) { return -1; }
-    public int set1(X509_VERIFY_PARAM from) { return -1; }
-    public int set1_name(String name) { return -1; }
-    public int set_flags(long flags) { return -1; }
-    public int clear_flags(long flags) { return -1; }
-    public long get_flags() { return -1; }
-    public int set_purpose(int purpose) { return -1; }
-    public int set_trust(int trust) { return -1; }
-    public void set_depth(int depth) {}
-    public void set_time(Date t) {}
-    public int add0_policy(Object policy) { return -1; }
-    public int set1_policies(List policies) { return -1; }
-    public int get_depth() { return -1; }
-    public int add0_table() { return -1; }
+    private void zero() {
+        name = null;
+        purpose = 0;
+        trust = 0;
+        inh_flags = X509.X509_VP_FLAG_DEFAULT;
+        flags = 0;
+        depth = -1;
+        policies = null;
+    }
 
-    public static X509_VERIFY_PARAM lookup(String name) { return null; }
-    public static void table_cleanup() {}
+    public void free() {
+        zero();
+    }
+    
+    public int inherit(X509_VERIFY_PARAM from) { 
+        return -1; 
+    } //TODO: implement
+    
+    public int set1(X509_VERIFY_PARAM from) { 
+	inh_flags |= X509.X509_VP_FLAG_DEFAULT;
+	return inherit(from);
+    } 
+    
+    public int set1_name(String name) { 
+        this.name = name;
+        return 1;
+    }
+    
+    public int set_flags(long flags) { 
+	this.flags |= flags;
+	if((flags & X509.V_FLAG_POLICY_MASK) == X509.V_FLAG_POLICY_MASK) {
+            this.flags |= X509.V_FLAG_POLICY_CHECK;
+        }
+        return 1;
+    } 
+    
+    public int clear_flags(long flags) { 
+	this.flags &= ~flags;
+	return 1;
+    } 
+    
+    public long get_flags() { 
+	return flags;
+    } 
+    
+    public int set_purpose(int purpose) { 
+        int[] arg = new int[]{this.purpose};
+        int v = X509_PURPOSE.set(arg,purpose);
+        this.purpose = arg[0];
+        return v;
+    } 
+    
+    public int set_trust(int trust) { 
+        int[] arg = new int[]{this.trust};
+        int v = X509_TRUST.set(arg,trust);
+        this.trust = arg[0];
+        return v;
+    }
+    
+    public void set_depth(int depth) {
+	this.depth = depth;
+    }
+    
+    public void set_time(Date t) {
+	this.check_time = t;
+	this.flags |= X509.V_FLAG_USE_CHECK_TIME;
+    } 
+    
+    public int add0_policy(Object policy) { 
+        if(policies == null) {
+            policies = new ArrayList();
+        }
+        policies.add(policy);
+        return 1;
+    }
+    
+    public int set1_policies(List policies) { 
+        return -1; 
+    } //TODO: implement
+    
+    public int get_depth() { 
+	return depth;
+    }
+    
+    public int add0_table() { 
+        return -1; 
+    } //TODO: implement
+
+    public static X509_VERIFY_PARAM lookup(String name) { 
+        return null; 
+    } //TODO: implement
+    
+    public static void table_cleanup() {
+    } //TODO: implement
 }// X509_VERIFY_PARAM

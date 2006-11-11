@@ -34,4 +34,8 @@ import java.security.PrivateKey;
  */
 public class X509_OBJECT_PKEY extends X509_OBJECT {
     public PrivateKey pkey;
+
+    public int type() {
+        return X509.X509_LU_PKEY;
+    }
 }// X509_OBJECT_PKEY

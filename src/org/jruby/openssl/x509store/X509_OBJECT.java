@@ -32,10 +32,20 @@ import java.util.List;
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
-public abstract class X509_OBJECT {
-    public static int idx_by_subject(List h, int type, X509_NAME name) {return -1;}
-    public static X509_OBJECT retrieve_by_subject(List h,int type,X509_NAME name) {return null;}
-    public static X509_OBJECT retrieve_match(List h, X509_OBJECT x) {return null;}
-    public void up_ref_count() {}
-    public void free_contents() {}
+public abstract class X509_OBJECT implements Comparable {
+    public static int idx_by_subject(List h, int type, X509_NAME name) {return -1;} //TODO: implement
+    public static X509_OBJECT retrieve_by_subject(List h,int type,X509_NAME name) {return null;} //TODO: implement
+    public static X509_OBJECT retrieve_match(List h, X509_OBJECT x) {return null;} //TODO: implement
+    public void up_ref_count() {} //TODO: implement
+    public void free_contents() {} //TODO: implement
+
+    public boolean isName(X509_NAME nm) {
+        return false;
+    }
+
+    public abstract int type();
+
+    public int compareTo(Object other) {
+        return type() - ((X509_OBJECT)other).type();
+    }
 }// X509_OBJECT

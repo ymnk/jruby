@@ -41,5 +41,5 @@ public class X509_LOOKUP_METHOD {
     public Function4 get_by_subject;
     public Function5 get_by_issuer_serial;
     public Function4 get_by_fingerprint;
-    public Function5 get_by_alias;
+    public Function4 get_by_alias;
 }// X509_LOOKUP_METHOD

@@ -28,10 +28,27 @@
 package org.jruby.openssl.x509store;
 
 import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
 public class X509_OBJECT_CERT extends X509_OBJECT {
     public Certificate x509;
+
+    public int type() {
+        return X509.X509_LU_X509;
+    }
+
+    public boolean isName(X509_NAME nm) {
+        return ((X509Certificate)x509).getSubjectX500Principal().toString().equals(nm.toString());
+    }
+
+    public int compareTo(Object oth) {
+        int ret1 = super.compareTo(oth);
+        if(ret1 == 0) {
+            ret1 = x509.equals(((X509_OBJECT_CERT)oth).x509) ? 0 : -1;
+        }
+        return ret1;
+    }
 }// X509_OBJECT_CERT

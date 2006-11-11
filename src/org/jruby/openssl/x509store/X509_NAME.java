@@ -31,4 +31,13 @@ package org.jruby.openssl.x509store;
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
 public class X509_NAME {
+    //TODO: implement this
+
+    public long hash() { //TODO: implement
+        return 0;
+    }
+
+    public String toString() { //TODO: implement this
+        return null;
+    }
 }// X509_NAME
