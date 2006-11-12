@@ -44,6 +44,10 @@ public class X509_OBJECT_CERT extends X509_OBJECT {
         return nm.isEqual(((X509Certificate)x509).getSubjectX500Principal());
     }
 
+    public boolean matches(X509_OBJECT o) {
+        return o instanceof X509_OBJECT_CERT && ((X509Certificate)x509).getSubjectX500Principal().equals(((X509Certificate)((X509_OBJECT_CERT)o).x509).getSubjectX500Principal());
+    }
+
     public int compareTo(Object oth) {
         int ret1 = super.compareTo(oth);
         if(ret1 == 0) {

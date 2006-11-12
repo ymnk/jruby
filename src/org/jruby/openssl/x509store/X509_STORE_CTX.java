@@ -31,6 +31,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CRL;
 
 import java.util.Date;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -75,7 +76,8 @@ public class X509_STORE_CTX {
 
     public List ex_data;
 
-    public void set_depth(int depth) { //TODO: implement
+    public void set_depth(int depth) { 
+        param.set_depth(depth);
     }
 
     public void set_app_data(Object data) {
@@ -86,38 +88,93 @@ public class X509_STORE_CTX {
         return get_ex_data(0);
     }
 
-    public X509_STORE_CTX() { //TODO: implement
-    }
-
     public int get1_issuer(Certificate[] issuer, Certificate x) { return -1; } //TODO: implement
 
-    public void free() {} //TODO: implement
     public int init(X509_STORE store, Certificate x509, List chain) { return -1; } //TODO: implement
-    public void trusted_stack(List sk) {} //TODO: implement
-    public void cleanup() {} //TODO: implement
-    public int set_ex_data(int idx,Object data) { return -1; } //TODO: implement
-    public Object get_ex_data(int idx) { return null; } //TODO: implement
-    public int get_error() { return -1; } //TODO: implement
-    public void set_error(int s) {} //TODO: implement
-    public int get_error_depth() { return -1; } //TODO: implement
-    public Certificate get_current_cert() { return null; } //TODO: implement
-    public List get_chain() { return null; } //TODO: implement
-    public List get1_chain() { return null; } //TODO: implement
-    public void set_cert(Certificate x) {} //TODO: implement
-    public void set_chain(List sk) {} //TODO: implement
-    public void set0_crls(List sk) {} //TODO: implement
-    public int set_purpose(int purpose) { return -1; } //TODO: implement
-    public int set_trust(int trust) { return -1; } //TODO: implement
-    public int purpose_inherit(int def_purpose,int purpose, int trust) { return -1; } //TODO: implement
-    public void set_flags(long flags) {} //TODO: implement
-    public void set_time(long flags,Date t) {} //TODO: implement
-    public void set_verify_cb(Function2 verify_cb) {} //TODO: implement
-    //X509_POLICY_TREE get0_policy_tree(); //TODO: implement
-    public int get_explicit_policy() { return -1; } //TODO: implement
 
-    public X509_VERIFY_PARAM get0_param() { return null; } //TODO: implement
-    public void set0_param(X509_VERIFY_PARAM param) {} //TODO: implement
+    public void trusted_stack(List sk) {
+        other_ctx = sk;
+        get_issuer = get_issuer_sk;
+    }
+
+    public void cleanup() throws Exception {
+        if(cleanup != null && cleanup != Function1.iZ) {
+            cleanup.call(this);
+        }
+        param = null;
+        //        tree = null;
+        chain = null;
+        ex_data = null;
+    } 
+
+    public int set_ex_data(int idx,Object data) { 
+        ex_data.set(idx,data);
+        return 1; 
+    } 
+    public Object get_ex_data(int idx) { 
+        return ex_data.get(idx); 
+    }
+    public int get_error() { 
+        return error;
+    }
+    public void set_error(int s) {
+        this.error = s;
+    } 
+    public int get_error_depth() { 
+        return error_depth; 
+    } 
+    public Certificate get_current_cert() { 
+        return current_cert; 
+    }
+    public List get_chain() { 
+        return chain; 
+    } 
+    public List get1_chain() { 
+        return new ArrayList(chain); 
+    } 
+    public void set_cert(Certificate x) {
+        this.cert = x;
+    } 
+    public void set_chain(List sk) {
+        this.untrusted = sk;
+    } 
+    public void set0_crls(List sk) {
+        this.crls = sk;
+    } 
+    public int set_purpose(int purpose) { 
+        return purpose_inherit(0,purpose,0);
+    }
+    public int set_trust(int trust) { 
+        return purpose_inherit(0,0,trust);
+    }
+    public int purpose_inherit(int def_purpose,int purpose, int trust) { return -1; } //TODO: implement
+    public void set_flags(long flags) {
+        param.set_flags(flags);
+    } 
+    public void set_time(long flags,Date t) {
+        param.set_time(t);
+    } 
+    public void set_verify_cb(Function2 verify_cb) {
+        this.verify_cb = verify_cb;
+    } 
+    //X509_POLICY_TREE get0_policy_tree(); //TODO: implement
+    public int get_explicit_policy() { 
+        return explicit_policy;
+    } 
+    public X509_VERIFY_PARAM get0_param() { 
+        return param; 
+    } 
+    public void set0_param(X509_VERIFY_PARAM param) {
+        this.param = param;
+    } 
     public int set_default(String name) { return -1; } //TODO: implement
 
     public int get_by_subject(int type,X509_NAME name,X509_OBJECT ret) { return -1; } //TODO: implement
+
+    public final static Function3 get_issuer_sk = new Function3() { //TODO: implement
+            public int call(Object a1, Object a2, Object a3) {
+                return -1;
+            }
+        };
+
 }// X509_STORE_CTX

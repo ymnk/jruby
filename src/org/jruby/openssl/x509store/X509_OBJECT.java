@@ -28,18 +28,47 @@
 package org.jruby.openssl.x509store;
 
 import java.util.List;
+import java.util.Iterator;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
 public abstract class X509_OBJECT implements Comparable {
-    public static int idx_by_subject(List h, int type, X509_NAME name) {return -1;} //TODO: implement
-    public static X509_OBJECT retrieve_by_subject(List h,int type,X509_NAME name) {return null;} //TODO: implement
-    public static X509_OBJECT retrieve_match(List h, X509_OBJECT x) {return null;} //TODO: implement
-    public void up_ref_count() {} //TODO: implement
-    public void free_contents() {} //TODO: implement
+    public static int idx_by_subject(List h, int type, X509_NAME name) {
+        int ix = 0;
+        for(Iterator iter = h.iterator();iter.hasNext();ix++) {
+            if(((X509_OBJECT)iter.next()).isName(name)) {
+                return ix;
+            }
+        }
+        return -1;
+    }
+
+    public static X509_OBJECT retrieve_by_subject(List h,int type,X509_NAME name) {
+        for(Iterator iter = h.iterator();iter.hasNext();) {
+            X509_OBJECT o = (X509_OBJECT)iter.next();
+            if(o.isName(name)) {
+                return o;
+            }
+        }
+        return null;
+    }
+
+    public static X509_OBJECT retrieve_match(List h, X509_OBJECT x) {
+        for(Iterator iter = h.iterator();iter.hasNext();) {
+            X509_OBJECT o = (X509_OBJECT)iter.next();
+            if(o.matches(x)) {
+                return o;
+            }
+        }
+        return null;
+    }
 
     public boolean isName(X509_NAME nm) {
+        return false;
+    }
+
+    public boolean matches(X509_OBJECT o) {
         return false;
     }
 

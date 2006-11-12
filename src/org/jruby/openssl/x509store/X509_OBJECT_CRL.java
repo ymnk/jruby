@@ -44,6 +44,10 @@ public class X509_OBJECT_CRL extends X509_OBJECT {
         return nm.isEqual(((X509CRL)crl).getIssuerX500Principal());
     }
 
+    public boolean matches(X509_OBJECT o) {
+        return o instanceof X509_OBJECT_CRL && ((X509CRL)crl).getIssuerX500Principal().equals(((X509CRL)((X509_OBJECT_CRL)o).crl).getIssuerX500Principal());
+    }
+
     public int compareTo(Object oth) {
         int ret1 = super.compareTo(oth);
         if(ret1 == 0) {
