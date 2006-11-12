@@ -54,6 +54,8 @@ import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.DERInteger;
 import org.bouncycastle.asn1.DERSequence;
 
+import org.jruby.openssl.x509store.PEM;
+
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
@@ -108,7 +110,7 @@ public class PKeyDSA extends PKey {
         Object rsa;
         IRubyObject arg;
         IRubyObject pass = null;
-        String passwd = null;
+        char[] passwd = null;
         if(checkArgumentCount(args,0,2) == 0) {
             rsa = null; //DSA.new
         } else {
@@ -119,7 +121,7 @@ public class PKeyDSA extends PKey {
             if(arg instanceof RubyFixnum) {
             } else {
                 if(pass != null && !pass.isNil()) {
-                    passwd = pass.toString();
+                    passwd = pass.toString().toCharArray();
                 }
                 String input = arg.toString();
 
@@ -130,11 +132,24 @@ public class PKeyDSA extends PKey {
                 } catch(Exception e) {
                     throw getRuntime().newLoadError("unsupported key algorithm (DSA)");
                 }
-
                 if(null == val) {
                     try {
-                        val = fact.generatePublic(new X509EncodedKeySpec(input.getBytes("PLAIN")));
-                    } catch(Exception e) {
+                        val = PEM.read_DSAPrivateKey(new StringReader(input),passwd);
+                    } catch(Exception e3) {
+                        val = null;
+                    }
+                }
+                if(null == val) {
+                    try {
+                        val = PEM.read_DSAPublicKey(new StringReader(input),passwd);
+                    } catch(Exception e3) {
+                        val = null;
+                    }
+                }
+                if(null == val) {
+                    try {
+                        val = PEM.read_DSA_PUBKEY(new StringReader(input),passwd);
+                    } catch(Exception e3) {
                         val = null;
                     }
                 }
@@ -147,8 +162,8 @@ public class PKeyDSA extends PKey {
                 }
                 if(null == val) {
                     try {
-                        val = OpenSSLImpl.getPEMHandler().readPEM(new StringReader(input),passwd);
-                    } catch(Exception e3) {
+                        val = fact.generatePublic(new X509EncodedKeySpec(input.getBytes("PLAIN")));
+                    } catch(Exception e) {
                         val = null;
                     }
                 }
@@ -212,19 +227,19 @@ public class PKeyDSA extends PKey {
 
     public IRubyObject export(IRubyObject[] args) throws Exception {
         StringWriter w = new StringWriter();
-        Object exp = pubKey;
-        if(privKey != null) {
-            exp = privKey;
-        }
-        if(args.length == 0) {
-            OpenSSLImpl.getPEMHandler().writePEM(w,exp);
-        } else {
-            String algo = ((Cipher)args[0]).getAlgorithm();
-            char[] passwd = null;
+        checkArgumentCount(args,0,2);
+        char[] passwd = null;
+        String algo = null;
+        if(args.length > 0 && !args[0].isNil()) {
+            algo = ((Cipher)args[0]).getAlgorithm();
             if(args.length > 1 && !args[1].isNil()) {
                 passwd = args[1].toString().toCharArray();
             }
-            OpenSSLImpl.getPEMHandler().writePEM(w,exp,algo,passwd);
+        }
+        if(privKey != null) {
+            PEM.write_DSAPrivateKey(w,privKey,algo,passwd);
+        } else {
+            PEM.write_DSAPublicKey(w,pubKey);
         }
         w.close();
         return getRuntime().newString(w.toString());

@@ -41,7 +41,7 @@ public class X509_OBJECT_CRL extends X509_OBJECT {
     }
 
     public boolean isName(X509_NAME nm) {
-        return ((X509CRL)crl).getIssuerX500Principal().toString().equals(nm.toString());
+        return nm.isEqual(((X509CRL)crl).getIssuerX500Principal());
     }
 
     public int compareTo(Object oth) {

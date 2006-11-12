@@ -29,6 +29,7 @@ package org.jruby.openssl.x509store;
 
 import java.io.File;
 import java.io.FileReader;
+import java.io.Reader;
 import java.io.InputStream;
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
@@ -43,8 +44,6 @@ import java.security.cert.CRL;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
-import org.bouncycastle.openssl.PEMReader;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -107,9 +106,9 @@ public class X509_LOOKUP {
         Certificate x = null;
 
         if(type == X509.X509_FILETYPE_PEM) {
-            PEMReader pr = new PEMReader(new InputStreamReader(in));
+            Reader r = new InputStreamReader(in);
             for(;;) {
-                x = (Certificate)pr.readObject();
+                x = PEM.read_X509_AUX(r,null);
                 if(null == x) {
                     break;
                 }
@@ -150,9 +149,9 @@ public class X509_LOOKUP {
         CRL x = null;
 
         if(type == X509.X509_FILETYPE_PEM) {
-            PEMReader pr = new PEMReader(new InputStreamReader(in));
+            Reader r = new InputStreamReader(in);
             for(;;) {
-                x = (CRL)pr.readObject();
+                x = PEM.read_X509_CRL(r,null);;
                 if(null == x) {
                     break;
                 }
@@ -188,9 +187,9 @@ public class X509_LOOKUP {
             return load_cert_file(file,type);
         }
         int count = 0;
-        PEMReader pr = new PEMReader(new FileReader(file));
+        Reader r  = new FileReader(file);
         for(;;) {
-            Object v = pr.readObject();
+            Object v = PEM.read(r,null);
             if(null == v) {
                 break;
             }

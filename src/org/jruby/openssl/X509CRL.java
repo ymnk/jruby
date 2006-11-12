@@ -66,6 +66,8 @@ import org.bouncycastle.asn1.DERInteger;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.x509.X509V2CRLGenerator;
 
+import org.jruby.openssl.x509store.PEM;
+
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
@@ -197,8 +199,7 @@ public class X509CRL extends RubyObject {
 
     public IRubyObject to_pem() throws Exception {
         StringWriter w = new StringWriter();
-        Object exp = crl;
-        OpenSSLImpl.getPEMHandler().writePEM(w,exp);
+        PEM.write_X509_CRL(w,crl);
         w.close();
         return getRuntime().newString(w.toString());
     }

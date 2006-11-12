@@ -63,6 +63,8 @@ import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERInteger;
 
+import org.jruby.openssl.x509store.PEM;
+
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
@@ -122,7 +124,7 @@ public class PKeyRSA extends PKey {
         Object rsa;
         IRubyObject arg;
         IRubyObject pass = null;
-        String passwd = null;
+        char[] passwd = null;
         if(checkArgumentCount(args,0,2) == 0) {
             rsa = null; //RSA.new
         } else {
@@ -147,7 +149,7 @@ public class PKeyRSA extends PKey {
                 }
             } else {
                 if(pass != null && !pass.isNil()) {
-                    passwd = pass.toString();
+                    passwd = pass.toString().toCharArray();
                 }
                 String input = arg.toString();
 
@@ -161,22 +163,22 @@ public class PKeyRSA extends PKey {
 
                 if(null == val) {
                     try {
-                        val = OpenSSLImpl.getPEMHandler().readPEM(new StringReader(input),passwd);
+                        val = PEM.read_RSAPrivateKey(new StringReader(input),passwd);
                     } catch(Exception e) {
                         val = null;
                     }
                 }
                 if(null == val) {
                     try {
-                        DERSequence seq = (DERSequence)(new ASN1InputStream(input.getBytes("PLAIN")).readObject());
-                        if(seq.size() == 2) {
-                            BigInteger mod = ((DERInteger)seq.getObjectAt(0)).getValue();
-                            BigInteger pubexp = ((DERInteger)seq.getObjectAt(1)).getValue();
-                            val = fact.generatePublic(new RSAPublicKeySpec(mod,pubexp));
-                        } else {
-                            val = null;
-                        }
-                    } catch(Exception ex) {
+                        val = PEM.read_RSAPublicKey(new StringReader(input),passwd);
+                    } catch(Exception e) {
+                        val = null;
+                    }
+                }
+                if(null == val) {
+                    try {
+                        val = PEM.read_RSA_PUBKEY(new StringReader(input),passwd);
+                    } catch(Exception e) {
                         val = null;
                     }
                 }
@@ -193,6 +195,20 @@ public class PKeyRSA extends PKey {
                             BigInteger primeeq = ((DERInteger)seq.getObjectAt(7)).getValue();
                             BigInteger crtcoeff = ((DERInteger)seq.getObjectAt(8)).getValue();
                             val = fact.generatePrivate(new RSAPrivateCrtKeySpec(mod,pubexp,privexp,primep,primeq,primeep,primeeq,crtcoeff));
+                        } else {
+                            val = null;
+                        }
+                    } catch(Exception ex) {
+                        val = null;
+                    }
+                }
+                if(null == val) {
+                    try {
+                        DERSequence seq = (DERSequence)(new ASN1InputStream(input.getBytes("PLAIN")).readObject());
+                        if(seq.size() == 2) {
+                            BigInteger mod = ((DERInteger)seq.getObjectAt(0)).getValue();
+                            BigInteger pubexp = ((DERInteger)seq.getObjectAt(1)).getValue();
+                            val = fact.generatePublic(new RSAPublicKeySpec(mod,pubexp));
                         } else {
                             val = null;
                         }
@@ -278,19 +294,19 @@ public class PKeyRSA extends PKey {
 
     public IRubyObject export(IRubyObject[] args) throws Exception {
         StringWriter w = new StringWriter();
-        Object exp = pubKey;
-        if(privKey != null) {
-            exp = privKey;
-        }
-        if(args.length == 0) {
-            OpenSSLImpl.getPEMHandler().writePEM(w,exp);
-        } else {
-            String algo = ((Cipher)args[0]).getAlgorithm();
-            char[] passwd = null;
+        checkArgumentCount(args,0,2);
+        char[] passwd = null;
+        String algo = null;
+        if(args.length > 0 && !args[0].isNil()) {
+            algo = ((Cipher)args[0]).getAlgorithm();
             if(args.length > 1 && !args[1].isNil()) {
                 passwd = args[1].toString().toCharArray();
             }
-            OpenSSLImpl.getPEMHandler().writePEM(w,exp,algo,passwd);
+        }
+        if(privKey != null) {
+            PEM.write_RSAPrivateKey(w,privKey,algo,passwd);
+        } else {
+            PEM.write_RSAPublicKey(w,pubKey);
         }
         w.close();
         return getRuntime().newString(w.toString());

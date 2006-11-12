@@ -151,40 +151,70 @@ public class X509_TRUST {
     }
 
     public final static Function3 trust_compat = new Function3() {
-            public int call(Object _trust, Object _x, Object _flags) {
-                //TODO: implement
-                return -1;
-            }
-        };
-    public final static Function3 trust_1oidany = new Function3() {
-            public int call(Object _trust, Object _x, Object _flags) {
+            public int call(Object _trust, Object _x, Object _flags) throws Exception {
                 X509_TRUST trust = (X509_TRUST)_trust;
                 X509Certificate x = (X509Certificate)_x;
                 int flags = ((Integer)_flags).intValue();
-                /*                
-                
-	if(x->aux && (x->aux->trust || x->aux->reject))
-        return obj_trust(trust->arg1, x, flags);*/
-	/* we don't have any trust settings: for compatibility
-	 * we return trusted if it is self signed
-	 */
-                /*	return trust_compat(trust, x, flags);*/
 
-                //TODO: implement
+                X509_PURPOSE.check_purpose(x,-1,0);
+                if(x.getIssuerX500Principal().equals(x.getSubjectX500Principal())) { // self signed
+                    return X509.X509_TRUST_TRUSTED;
+                } else {
+                    return X509.X509_TRUST_UNTRUSTED;
+                }
+            }
+        };
+    public final static Function3 trust_1oidany = new Function3() {
+            public int call(Object _trust, Object _x, Object _flags) throws Exception {
+                X509_TRUST trust = (X509_TRUST)_trust;
+                X509Certificate x = (X509Certificate)_x;
+                int flags = ((Integer)_flags).intValue();
 
-                return -1;
+                if(x instanceof X509AuxCertificate) {
+                    X509_AUX ax = ((X509AuxCertificate)x).getAux();
+                    if(ax != null && (ax.trust.size() > 0 || ax.reject.size() > 0)) {
+                        return obj_trust.call(trust.arg1,x,new Integer(flags));
+                    }
+                }
+                return trust_compat.call(trust,x,new Integer(flags));
             }
         };
     public final static Function3 trust_1oid = new Function3() {
-            public int call(Object _trust, Object _x, Object _flags) {
-                //TODO: implement
-                return -1;
+            public int call(Object _trust, Object _x, Object _flags) throws Exception {
+                X509_TRUST trust = (X509_TRUST)_trust;
+                X509Certificate x = (X509Certificate)_x;
+                int flags = ((Integer)_flags).intValue();
+
+                if((x instanceof X509AuxCertificate) && ((X509AuxCertificate)x).getAux() != null) {
+                    return obj_trust.call(trust.arg1,x,new Integer(flags));
+                }
+                return X509.X509_TRUST_UNTRUSTED;
             }
         };
     public final static Function3 obj_trust = new Function3() {
-            public int call(Object _trust, Object _x, Object _flags) {
-                //TODO: implement
-                return -1;
+            public int call(Object _id, Object _x, Object _flags) {
+                String id = (String)_id;
+                X509Certificate x = (X509Certificate)_x;
+                int flags = ((Integer)_flags).intValue();
+                
+                X509_AUX ax = null;
+                if(x instanceof X509AuxCertificate) {
+                    ax = ((X509AuxCertificate)x).getAux();
+                }
+                if(null == ax) {
+                    return X509.X509_TRUST_UNTRUSTED;
+                }
+                for(Iterator iter = ax.reject.iterator(); iter.hasNext(); ) {
+                    if(((String)iter.next()).equals(id)) {
+                        return X509.X509_TRUST_REJECTED;
+                    }
+                }
+                for(Iterator iter = ax.trust.iterator(); iter.hasNext(); ) {
+                    if(((String)iter.next()).equals(id)) {
+                        return X509.X509_TRUST_TRUSTED;
+                    }
+                }
+                return X509.X509_TRUST_UNTRUSTED;
             }
         };
 

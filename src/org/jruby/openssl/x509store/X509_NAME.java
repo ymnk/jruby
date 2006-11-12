@@ -27,17 +27,35 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.openssl.x509store;
 
+import java.security.MessageDigest;
+
+import javax.security.auth.x500.X500Principal;
+
+import org.bouncycastle.asn1.x509.X509Name;
+
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
 public class X509_NAME {
-    //TODO: implement this
+    public X509Name name;
 
-    public long hash() { //TODO: implement
-        return 0;
+    public long hash() { 
+        try {
+            byte[] bytes = name.getEncoded();
+            byte[] md = null;
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            md = md5.digest(bytes);
+            return md[0] | ((long)md[1] << 8) | ((long)md[2] << 16) | ((long)md[3] << 24);
+        } catch(Exception e) {
+            return 0;
+        }
     }
 
-    public String toString() { //TODO: implement this
-        return null;
+    public boolean isEqual(X500Principal oname) {
+        try {
+            return new X500Principal(name.getEncoded()).equals(oname);
+        } catch(Exception e) {
+            return false;
+        }
     }
 }// X509_NAME

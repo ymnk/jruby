@@ -30,7 +30,10 @@ package org.jruby.openssl.x509store;
 import java.util.Date;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+
+import org.bouncycastle.asn1.DERObject;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -49,6 +52,17 @@ public class X509_VERIFY_PARAM {
         zero();
     }
 
+    public X509_VERIFY_PARAM(String n, long t, long i_f, long f, int p, int trs, int d, List pol) {
+        this.name = n;
+        this.check_time = new Date(t);
+        this.inh_flags = i_f;
+        this.flags = f;
+        this.purpose = p;
+        this.trust = trs;
+        this.depth = d;
+        this.policies = pol;
+    }
+
     private void zero() {
         name = null;
         purpose = 0;
@@ -63,9 +77,51 @@ public class X509_VERIFY_PARAM {
         zero();
     }
     
-    public int inherit(X509_VERIFY_PARAM from) { 
-        return -1; 
-    } //TODO: implement
+    public int inherit(X509_VERIFY_PARAM src) { 
+        long inh_flags;
+        boolean to_d, to_o;
+
+        if(src == null) {
+            return 1;
+        }
+
+
+        inh_flags = src.inh_flags | this.inh_flags;
+        if((inh_flags & X509.X509_VP_FLAG_ONCE) != 0) {
+            this.inh_flags = 0;
+        }
+        if((inh_flags & X509.X509_VP_FLAG_LOCKED) != 0) {
+            return 1;
+        }
+        to_d = ((inh_flags & X509.X509_VP_FLAG_DEFAULT) != 0);
+        to_o = ((inh_flags & X509.X509_VP_FLAG_OVERWRITE) != 0);
+
+        if(to_o || ((src.purpose != 0 && (to_d || this.purpose == 0)))) {
+            this.purpose = src.purpose;
+        }
+        if(to_o || ((src.trust != 0 && (to_d || this.trust == 0)))) {
+            this.trust = src.trust;
+        }
+        if(to_o || ((src.depth != -1 && (to_d || this.depth == -1)))) {
+            this.depth = src.depth;
+        }
+
+        if(to_o || !((this.flags & X509.V_FLAG_USE_CHECK_TIME) != 0)) {
+            this.check_time = src.check_time;
+            this.flags &= ~X509.V_FLAG_USE_CHECK_TIME;
+        }
+
+        if((inh_flags & X509.X509_VP_FLAG_RESET_FLAGS) != 0) {
+            this.flags = 0;
+        }
+
+        this.flags |= src.flags;
+
+        if(to_o || ((src.policies != null && (to_d || this.policies == null)))) {
+            set1_policies(src.policies);
+        }
+	return 1;
+    }
     
     public int set1(X509_VERIFY_PARAM from) { 
 	inh_flags |= X509.X509_VP_FLAG_DEFAULT;
@@ -117,7 +173,7 @@ public class X509_VERIFY_PARAM {
 	this.flags |= X509.V_FLAG_USE_CHECK_TIME;
     } 
     
-    public int add0_policy(Object policy) { 
+    public int add0_policy(DERObject policy) { 
         if(policies == null) {
             policies = new ArrayList();
         }
@@ -126,21 +182,91 @@ public class X509_VERIFY_PARAM {
     }
     
     public int set1_policies(List policies) { 
-        return -1; 
-    } //TODO: implement
+        if(policies == null) {
+            this.policies = null;
+            return 1;
+        }
+        this.policies = new ArrayList();
+        this.policies.addAll(policies);
+        this.flags |= X509.V_FLAG_POLICY_CHECK;
+	return 1;
+    }
     
     public int get_depth() { 
 	return depth;
     }
     
     public int add0_table() { 
-        return -1; 
-    } //TODO: implement
+        for(Iterator iter = param_table.iterator();iter.hasNext();) {
+            X509_VERIFY_PARAM v = (X509_VERIFY_PARAM)iter.next();
+            if(this.name.equals(v.name)) {
+                iter.remove();
+            }
+        }
+        param_table.add(this);
+	return 1;
+    } 
 
     public static X509_VERIFY_PARAM lookup(String name) { 
+        for(Iterator iter = param_table.iterator();iter.hasNext();) {
+            X509_VERIFY_PARAM v = (X509_VERIFY_PARAM)iter.next();
+            if(name.equals(v.name)) {
+                return v;
+            }
+        }
+        for(int i=0;i<default_table.length;i++) {
+            if(name.equals(default_table[i].name)) {
+                return default_table[i];
+            }
+        }
         return null; 
-    } //TODO: implement
+    }
     
     public static void table_cleanup() {
-    } //TODO: implement
+        param_table.clear();
+    } 
+
+    private final static X509_VERIFY_PARAM[] default_table = new X509_VERIFY_PARAM[] {
+        new X509_VERIFY_PARAM(
+	"default",	/* X509 default parameters */
+	0,		/* Check time */
+	0,		/* internal flags */
+	0,		/* flags */
+	0,		/* purpose */
+	0,		/* trust */
+	9,		/* depth */
+	null		/* policies */
+                              ),
+        new X509_VERIFY_PARAM(
+	"pkcs7",			/* SSL/TLS client parameters */
+	0,				/* Check time */
+	0,				/* internal flags */
+	0,				/* flags */
+	X509.X509_PURPOSE_SMIME_SIGN,	/* purpose */
+	X509.X509_TRUST_EMAIL,		/* trust */
+	-1,				/* depth */
+	null				/* policies */
+                              ),
+        new X509_VERIFY_PARAM(
+	"ssl_client",			/* SSL/TLS client parameters */
+	0,				/* Check time */
+	0,				/* internal flags */
+	0,				/* flags */
+	X509.X509_PURPOSE_SSL_CLIENT,	/* purpose */
+	X509.X509_TRUST_SSL_CLIENT,		/* trust */
+	-1,				/* depth */
+	null				/* policies */
+                              ),
+        new X509_VERIFY_PARAM(
+	"ssl_server",			/* SSL/TLS server parameters */
+	0,				/* Check time */
+	0,				/* internal flags */
+	0,				/* flags */
+	X509.X509_PURPOSE_SSL_SERVER,	/* purpose */
+	X509.X509_TRUST_SSL_SERVER,		/* trust */
+	-1,				/* depth */
+	null				/* policies */
+                              )};
+
+    private final static List param_table = new ArrayList();
 }// X509_VERIFY_PARAM
