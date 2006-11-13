@@ -31,9 +31,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import java.security.cert.Certificate;
-import java.security.cert.X509Certificate;
-
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.DERBitString;
 
@@ -58,7 +55,7 @@ public class X509_PURPOSE {
         this.usr_data = u;
     }
 
-    public static int check_purpose(Certificate x, int id, int ca) throws Exception {
+    public static int check_purpose(X509AuxCertificate x, int id, int ca) throws Exception {
         if(id == -1) {
             return 1;
         }
@@ -160,8 +157,7 @@ public class X509_PURPOSE {
         return trust;
     }
  
-    public static int check_ca(Certificate _x) throws Exception {
-        X509Certificate x = (X509Certificate)_x;
+    public static int check_ca(X509AuxCertificate x) throws Exception {
         if(x.getKeyUsage() != null && !x.getKeyUsage()[5]) { // KEY_CERT_SIGN
             return 0;
         }
@@ -186,8 +182,7 @@ public class X509_PURPOSE {
         }
     }
 
-    public static int check_ssl_ca(Certificate _x) throws Exception {
-        X509Certificate x = (X509Certificate)_x;
+    public static int check_ssl_ca(X509AuxCertificate x) throws Exception {
         int ca_ret = check_ca(x);
         if(ca_ret == 0) {
             return 0;
@@ -200,7 +195,7 @@ public class X509_PURPOSE {
         return 0;
     }
 
-    public static int purpose_smime(X509Certificate x, int ca) throws Exception {
+    public static int purpose_smime(X509AuxCertificate x, int ca) throws Exception {
         if(x.getExtendedKeyUsage() != null && !x.getExtendedKeyUsage().contains("1.3.6.1.5.5.7.3.4")) {
             return 0; // must allow email protection
         }
@@ -234,7 +229,7 @@ public class X509_PURPOSE {
     public final static Function3 cp_ssl_client = new Function3() {
             public int call(Object _xp, Object _x, Object _ca) throws Exception {
                 X509_PURPOSE xp = (X509_PURPOSE)_xp;
-                X509Certificate x = (X509Certificate)_x;
+                X509AuxCertificate x = (X509AuxCertificate)_x;
                 int ca = ((Integer)_ca).intValue();
 
                 if(x.getExtendedKeyUsage() != null && !x.getExtendedKeyUsage().contains("1.3.6.1.5.5.7.3.2")) {
@@ -258,7 +253,7 @@ public class X509_PURPOSE {
     public final static Function3 cp_ssl_server =  new Function3() {
             public int call(Object _xp, Object _x, Object _ca) throws Exception {
                 X509_PURPOSE xp = (X509_PURPOSE)_xp;
-                X509Certificate x = (X509Certificate)_x;
+                X509AuxCertificate x = (X509AuxCertificate)_x;
                 int ca = ((Integer)_ca).intValue();
 
                 if(x.getExtendedKeyUsage() != null && (!x.getExtendedKeyUsage().contains("1.3.6.1.5.5.7.3.1") && 
@@ -284,7 +279,7 @@ public class X509_PURPOSE {
     public final static Function3 cp_ns_ssl_server = new Function3() {
             public int call(Object _xp, Object _x, Object _ca) throws Exception {
                 X509_PURPOSE xp = (X509_PURPOSE)_xp;
-                X509Certificate x = (X509Certificate)_x;
+                X509AuxCertificate x = (X509AuxCertificate)_x;
                 int ca = ((Integer)_ca).intValue();
                 int ret = cp_ssl_server.call(xp,x,_ca);
                 if(ret == 0 || ca != 0) {
@@ -300,7 +295,7 @@ public class X509_PURPOSE {
     public final static Function3 cp_smime_sign = new Function3() {
             public int call(Object _xp, Object _x, Object _ca) throws Exception {
                 X509_PURPOSE xp = (X509_PURPOSE)_xp;
-                X509Certificate x = (X509Certificate)_x;
+                X509AuxCertificate x = (X509AuxCertificate)_x;
                 int ca = ((Integer)_ca).intValue();
                 int ret = purpose_smime(x,ca);
                 if(ret == 0 || ca != 0) {
@@ -316,7 +311,7 @@ public class X509_PURPOSE {
     public final static Function3 cp_smime_encrypt = new Function3() {
             public int call(Object _xp, Object _x, Object _ca) throws Exception {
                 X509_PURPOSE xp = (X509_PURPOSE)_xp;
-                X509Certificate x = (X509Certificate)_x;
+                X509AuxCertificate x = (X509AuxCertificate)_x;
                 int ca = ((Integer)_ca).intValue();
                 int ret = purpose_smime(x,ca);
                 if(ret == 0 || ca != 0) {
@@ -332,7 +327,7 @@ public class X509_PURPOSE {
     public final static Function3 cp_crl_sign = new Function3() {
             public int call(Object _xp, Object _x, Object _ca) throws Exception {
                 X509_PURPOSE xp = (X509_PURPOSE)_xp;
-                X509Certificate x = (X509Certificate)_x;
+                X509AuxCertificate x = (X509AuxCertificate)_x;
                 int ca = ((Integer)_ca).intValue();
                 
                 if(ca != 0) {
@@ -357,7 +352,7 @@ public class X509_PURPOSE {
     public final static Function3 cp_ocsp_helper = new Function3() {
             public int call(Object _xp, Object _x, Object _ca) throws Exception {
                 if(((Integer)_ca).intValue() != 0) {
-                    return check_ca((Certificate)_x);
+                    return check_ca((X509AuxCertificate)_x);
                 }
                 return 1;
             }

@@ -55,6 +55,9 @@ import javax.security.auth.x500.X500Principal;
 public class X509AuxCertificate extends X509Certificate {
     private final X509Certificate wrap;
     private final X509_AUX aux;
+
+    private boolean valid = false;
+    private int ex_flags = 0;
     
     public X509AuxCertificate(X509Certificate wrap) {
         this(wrap,null);
@@ -68,6 +71,22 @@ public class X509AuxCertificate extends X509Certificate {
 
     public X509_AUX getAux() {
         return this.aux;
+    }
+
+    public boolean isValid() {
+        return valid;
+    }
+
+    public void setValid(boolean v) {
+        this.valid = v;
+    }
+
+    public int getExFlags() {
+        return ex_flags;
+    }
+
+    public void setExFlags(int ex_flags) {
+        this.ex_flags = ex_flags;
     }
 
     public void checkValidity() throws CertificateExpiredException, CertificateNotYetValidException { wrap.checkValidity(); }

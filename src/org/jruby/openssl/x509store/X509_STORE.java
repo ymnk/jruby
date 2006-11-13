@@ -27,7 +27,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.openssl.x509store;
 
-import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 import java.security.cert.CRL;
 
 import java.util.ArrayList;
@@ -132,19 +132,17 @@ public class X509_STORE {
         return lu;
     } 
 
-    public int add_cert(Certificate x) { 
+    public int add_cert(X509Certificate x) { 
         int ret = 1;
         if(x == null) {
             return 0;
         }
 
         X509_OBJECT_CERT obj = new X509_OBJECT_CERT();
-        obj.x509 = x;
+        obj.x509 = X509_STORE_CTX.transform(x);
 
 	synchronized(X509.CRYPTO_LOCK_X509_STORE) {
-            obj.up_ref_count();
             if(X509_OBJECT.retrieve_match(objs,obj) != null) {
-                obj.free_contents();
                 Err.PUT_err(X509.X509_R_CERT_ALREADY_IN_HASH_TABLE);
 		ret=0;
             } else {
@@ -163,9 +161,7 @@ public class X509_STORE {
         obj.crl = x;
 
 	synchronized(X509.CRYPTO_LOCK_X509_STORE) {
-            obj.up_ref_count();
             if(X509_OBJECT.retrieve_match(objs,obj) != null) {
-                obj.free_contents();
                 Err.PUT_err(X509.X509_R_CERT_ALREADY_IN_HASH_TABLE);
 		ret=0;
             } else {

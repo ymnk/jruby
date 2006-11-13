@@ -31,6 +31,8 @@ import java.security.MessageDigest;
 
 import javax.security.auth.x500.X500Principal;
 
+import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.x509.X509Name;
 
 /**
@@ -38,6 +40,18 @@ import org.bouncycastle.asn1.x509.X509Name;
  */
 public class X509_NAME {
     public X509Name name;
+
+    public X509_NAME(X500Principal nm) {
+        try {
+            this.name = new X509Name((ASN1Sequence)new ASN1InputStream(nm.getEncoded()).readObject());
+        } catch(Exception e) {
+            this.name = null;
+        }
+    }
+
+    public X509_NAME(X509Name nm) {
+        this.name = nm;
+    }
 
     public long hash() { 
         try {

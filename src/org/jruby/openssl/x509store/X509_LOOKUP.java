@@ -37,8 +37,8 @@ import java.io.InputStreamReader;
 
 import java.math.BigInteger;
 
-import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.cert.CRL;
 
 import java.util.ArrayList;
@@ -103,7 +103,7 @@ public class X509_LOOKUP {
         int count = 0;
         int ret = 0;
         InputStream in = new BufferedInputStream(new FileInputStream(file));
-        Certificate x = null;
+        X509AuxCertificate x = null;
 
         if(type == X509.X509_FILETYPE_PEM) {
             Reader r = new InputStreamReader(in);
@@ -122,7 +122,7 @@ public class X509_LOOKUP {
             ret = count;
         } else if(type == X509.X509_FILETYPE_ASN1) {
             CertificateFactory cf = CertificateFactory.getInstance("X.509","BC");
-            x = cf.generateCertificate(in);
+            x = X509_STORE_CTX.transform((X509Certificate)cf.generateCertificate(in));
             if(x == null) {
                 Err.PUT_err(13);
                 return ret;
@@ -193,8 +193,8 @@ public class X509_LOOKUP {
             if(null == v) {
                 break;
             }
-            if(v instanceof Certificate) {
-                store_ctx.add_cert((Certificate)v);
+            if(v instanceof X509Certificate) {
+                store_ctx.add_cert(X509_STORE_CTX.transform((X509Certificate)v));
                 count++;
             } else if(v instanceof CRL) {
                 store_ctx.add_crl((CRL)v);

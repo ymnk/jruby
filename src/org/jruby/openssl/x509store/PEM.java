@@ -202,7 +202,7 @@ public class PEM {
 
     public static DSAPublicKey read_DSA_PUBKEY(Reader in, char[] f) throws IOException {
         //        System.out.println("WARNING: read_DSA_PUBKEY");
-        return null; //TODO: implement this
+        return null;
     }
     public static DSAPublicKey read_DSAPublicKey(Reader in, char[] f) throws IOException {
         BufferedReader _in = into(in);
@@ -288,29 +288,39 @@ public class PEM {
         }
         return null;
     }
-    public static Object read_PKCS7(Reader in, char[] f) throws IOException {
-        System.out.println("WARNING: read_PKCS7");
-        return null; //TODO: implement this
+    public static ContentInfo read_PKCS7(Reader in, char[] f) throws IOException {
+        BufferedReader _in = into(in);
+        String  line;
+        while ((line = _in.readLine()) != null) {
+            if(line.indexOf(BEF_G+PEM_STRING_PKCS7) != -1) {
+                try {
+                    return readPKCS7(_in,f, BEF_E+PEM_STRING_PKCS7);
+                } catch (Exception e) {
+                    throw new IOException("problem creating PKCS7: " + e.toString());
+                }
+            }
+        }
+        return null;
     }
-    public static X509Certificate read_X509(Reader in, char[] f) throws IOException {
+    public static X509AuxCertificate read_X509(Reader in, char[] f) throws IOException {
         BufferedReader _in = into(in);
         String  line;
         while ((line = _in.readLine()) != null) {
             if(line.indexOf(BEF_G+PEM_STRING_X509_OLD) != -1) {
                 try {
-                    return readCertificate(_in,BEF_E+PEM_STRING_X509_OLD);
+                    return new X509AuxCertificate(readCertificate(_in,BEF_E+PEM_STRING_X509_OLD));
                 } catch (Exception e) {
                     throw new IOException("problem creating X509 certificate: " + e.toString());
                 }
             } else if(line.indexOf(BEF_G+PEM_STRING_X509) != -1) {
                 try {
-                    return readCertificate(_in,BEF_E+PEM_STRING_X509);
+                    return new X509AuxCertificate(readCertificate(_in,BEF_E+PEM_STRING_X509));
                 } catch (Exception e) {
                     throw new IOException("problem creating X509 certificate: " + e.toString());
                 }
             } else if(line.indexOf(BEF_G+PEM_STRING_X509_TRUSTED) != -1) {
                 try {
-                    return readCertificate(_in,BEF_E+PEM_STRING_X509_TRUSTED);
+                    return new X509AuxCertificate(readCertificate(_in,BEF_E+PEM_STRING_X509_TRUSTED));
                 } catch (Exception e) {
                     throw new IOException("problem creating X509 certificate: " + e.toString());
                 }
@@ -392,10 +402,14 @@ public class PEM {
         out.write(BEF_E + PEM_STRING_PUBLIC + AFT);
         out.newLine();
     }
-    public static void write_PKCS7(Writer _out, Object obj) throws IOException {
+    public static void write_PKCS7(Writer _out, ContentInfo obj) throws IOException {
         BufferedWriter out = outo(_out);
-        System.out.println("WARNING: write_PKCS7");
-        //TODO: implement this
+        byte[] encoding = obj.getEncoded();
+        out.write(BEF_G + PEM_STRING_PKCS7 + AFT);
+        out.newLine();
+        writeEncoded(out,encoding);
+        out.write(BEF_E + PEM_STRING_PKCS7 + AFT);
+        out.newLine();
     }
     public static void write_X509(Writer _out, X509Certificate obj) throws IOException {
         BufferedWriter out = outo(_out);
@@ -1019,6 +1033,42 @@ public class PEM {
             }
             out.write(buf, 0, index);
             out.newLine();
+        }
+    }
+
+    /**
+     * Reads in a PKCS7 object. This returns a ContentInfo object suitable for use with the CMS
+     * API.
+     *
+     * @return the X509Certificate
+     * @throws IOException if an I/O error occured
+     */
+    private static ContentInfo readPKCS7(BufferedReader in, char[] p, String  endMarker) throws IOException {
+        String                                  line;
+        StringBuffer                        buf = new StringBuffer();
+        ByteArrayOutputStream    bOut = new ByteArrayOutputStream();
+  
+        while ((line = in.readLine()) != null) {
+            if (line.indexOf(endMarker) != -1) {
+                break;
+            }
+            line = line.trim();
+            buf.append(line.trim());
+            Base64.decode(buf.substring(0, (buf.length() / 4) * 4), bOut);
+            buf.delete(0, (buf.length() / 4) * 4);
+        }
+        if (buf.length() != 0) {
+            throw new RuntimeException("base64 data appears to be truncated");
+        }
+        if (line == null) {
+            throw new IOException(endMarker + " not found");
+        }
+        ByteArrayInputStream    bIn = new ByteArrayInputStream(bOut.toByteArray());
+        try {
+            ASN1InputStream aIn = new ASN1InputStream(bIn);
+            return ContentInfo.getInstance(aIn.readObject());
+        } catch (Exception e) {
+            throw new IOException("problem parsing PKCS7 object: " + e.toString());
         }
     }
 }// PEM

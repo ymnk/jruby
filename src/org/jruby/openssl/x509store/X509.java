@@ -27,6 +27,16 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.openssl.x509store;
 
+import java.util.Arrays;
+
+import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.ASN1OctetString;
+import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
+import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.X509Name;
+
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
@@ -50,6 +60,55 @@ public abstract class X509 {
     }
     public static String get_default_cert_file_env() {
         return X509_CERT_FILE_EVP;
+    }
+
+    public static int check_issued(X509AuxCertificate issuer, X509AuxCertificate subject) throws Exception { 
+        if(!issuer.getSubjectX500Principal().equals(subject.getIssuerX500Principal())) {
+            return V_ERR_SUBJECT_ISSUER_MISMATCH;
+        }
+
+        if(subject.getExtensionValue("2.5.29.35") != null) { //authorityKeyID
+            AuthorityKeyIdentifier sakid = new AuthorityKeyIdentifier(((DERSequence)(new ASN1InputStream(subject.getExtensionValue("2.5.29.35")).readObject())));
+
+            if(sakid.getKeyIdentifier() != null) {
+                if(issuer.getExtensionValue("2.5.29.14") != null) {
+                    SubjectKeyIdentifier iskid = new SubjectKeyIdentifier(((ASN1OctetString)(new ASN1InputStream(issuer.getExtensionValue("2.5.29.14")).readObject())));
+                    if(iskid.getKeyIdentifier() != null) {
+                        if(!Arrays.equals(sakid.getKeyIdentifier(),iskid.getKeyIdentifier())) {
+                            return V_ERR_AKID_SKID_MISMATCH;
+                        }
+                    }
+                }
+            }
+            if(sakid.getAuthorityCertSerialNumber() != null && !sakid.getAuthorityCertSerialNumber().equals(issuer.getSerialNumber())) {
+                return V_ERR_AKID_ISSUER_SERIAL_MISMATCH;
+            }
+            if(sakid.getAuthorityCertIssuer() != null) {
+                GeneralName[] gens = sakid.getAuthorityCertIssuer().getNames();
+                X509Name nm = null;
+                for(int i=0;i<gens.length;i++) {
+                    if(gens[i].getTagNo() == GeneralName.directoryName) {
+                        nm = (X509Name)gens[i].getName();
+                        break;
+                    }
+                }
+                if(nm != null) {
+                    if(!(new X509_NAME(nm).isEqual(issuer.getIssuerX500Principal()))) {
+                        return V_ERR_AKID_ISSUER_SERIAL_MISMATCH;
+                    }
+                }
+            }
+        }
+
+        if(subject.getExtensionValue("1.3.6.1.5.5.7.1.14") != null) {
+            if(issuer.getKeyUsage() != null && !issuer.getKeyUsage()[0]) { // KU_DIGITAL_SIGNATURE
+                return V_ERR_KEYUSAGE_NO_DIGITAL_SIGNATURE;
+            }
+        } else if(issuer.getKeyUsage() != null && !issuer.getKeyUsage()[5]) { // KU_KEY_CERT_SIGN
+            return V_ERR_KEYUSAGE_NO_CERTSIGN;
+        }
+
+        return V_OK;
     }
 
     public static final String OPENSSLDIR = "/usr/local/openssl";
@@ -285,4 +344,28 @@ public abstract class X509 {
     public static final int X509V3_R_UNKNOWN_OPTION = 120;
     public static final int X509V3_R_UNSUPPORTED_OPTION = 117;
     public static final int X509V3_R_USER_TOO_LONG = 132;
+
+    public static final int ERR_R_FATAL=64;
+    public static final int ERR_R_MALLOC_FAILURE=(1|ERR_R_FATAL);
+    public static final int ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED=(2|ERR_R_FATAL);
+    public static final int ERR_R_PASSED_NULL_PARAMETER=(3|ERR_R_FATAL);
+    public static final int ERR_R_INTERNAL_ERROR=(4|ERR_R_FATAL);
+    public static final int ERR_R_DISABLED=(5|ERR_R_FATAL);
+
+    public static final int EXFLAG_BCONS=0x1;
+    public static final int EXFLAG_KUSAGE=0x2;
+    public static final int EXFLAG_XKUSAGE=0x4;
+    public static final int EXFLAG_NSCERT=0x8;
+
+    public static final int EXFLAG_CA=0x10;
+    public static final int EXFLAG_SS=0x20;
+    public static final int EXFLAG_V1=0x40;
+    public static final int EXFLAG_INVALID=0x80;
+    public static final int EXFLAG_SET=0x100;
+    public static final int EXFLAG_CRITICAL=0x200;
+    public static final int EXFLAG_PROXY=0x400;
+
+    public static final int EXFLAG_INVALID_POLICY=0x400;
+
+    public static final int POLICY_FLAG_ANY_POLICY = 0x2;
 }// X509
