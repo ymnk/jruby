@@ -278,41 +278,57 @@ public class X509Extensions {
                 }
                 value = new String(new DERSequence(asnv).getDEREncoded(),"ISO8859_1");
             } else if(r_oid.equals(new DERObjectIdentifier("2.5.29.15"))) { //keyUsage
-                byte v1 = 0;
-                byte v2 = 0;
-                String[] spl = valuex.split(",");
-                for(int i=0;i<spl.length;i++) {
-                    spl[i] = spl[i].trim();
+                byte[] inp = null;
+
+                try {
+                    String[] exx = valuex.split(":");
+                    if(exx != null) {
+                        inp = new byte[exx.length];
+                        for(int i=0;i<exx.length;i++) {
+                            inp[i] = (byte)Integer.parseInt(exx[i],16);
+                        }
+                    }
+                } catch(Exception e) {
+                    inp = null;
                 }
-                for(int i=0;i<spl.length;i++) {
-                    if("decipherOnly".equals(spl[i].trim()) || "Decipher Only".equals(spl[i].trim())) {
-                        v2 |= (byte)128;
-                    } else if("digitalSignature".equals(spl[i].trim()) || "Digital Signature".equals(spl[i].trim())) {
-                        v1 |= (byte)128;
-                    } else if("nonRepudiation".equals(spl[i].trim()) || "Non Repudiation".equals(spl[i].trim())) {
-                        v1 |= (byte)64;
-                    } else if("keyEncipherment".equals(spl[i].trim()) || "Key Encipherment".equals(spl[i].trim())) {
-                        v1 |= (byte)32;
-                    } else if("dataEncipherment".equals(spl[i].trim()) || "Data Encipherment".equals(spl[i].trim())) {
-                        v1 |= (byte)16;
-                    } else if("keyAgreement".equals(spl[i].trim()) || "Key Agreement".equals(spl[i].trim())) {
-                        v1 |= (byte)8;
-                    } else if("keyCertSign".equals(spl[i].trim()) || "Key Cert Sign".equals(spl[i].trim())) {
-                        v1 |= (byte)4;
-                    } else if("cRLSign".equals(spl[i].trim())) {
-                        v1 |= (byte)2;
-                    } else if("encipherOnly".equals(spl[i].trim()) || "Encipher Only".equals(spl[i].trim())) {
-                        v1 |= (byte)1;
+
+                if(inp == null) {
+                    byte v1 = 0;
+                    byte v2 = 0;
+                    String[] spl = valuex.split(",");
+                    for(int i=0;i<spl.length;i++) {
+                        spl[i] = spl[i].trim();
+                    }
+                    for(int i=0;i<spl.length;i++) {
+                        if("decipherOnly".equals(spl[i].trim()) || "Decipher Only".equals(spl[i].trim())) {
+                            v2 |= (byte)128;
+                        } else if("digitalSignature".equals(spl[i].trim()) || "Digital Signature".equals(spl[i].trim())) {
+                            v1 |= (byte)128;
+                        } else if("nonRepudiation".equals(spl[i].trim()) || "Non Repudiation".equals(spl[i].trim())) {
+                            v1 |= (byte)64;
+                        } else if("keyEncipherment".equals(spl[i].trim()) || "Key Encipherment".equals(spl[i].trim())) {
+                            v1 |= (byte)32;
+                        } else if("dataEncipherment".equals(spl[i].trim()) || "Data Encipherment".equals(spl[i].trim())) {
+                            v1 |= (byte)16;
+                        } else if("keyAgreement".equals(spl[i].trim()) || "Key Agreement".equals(spl[i].trim())) {
+                            v1 |= (byte)8;
+                        } else if("keyCertSign".equals(spl[i].trim()) || "Key Cert Sign".equals(spl[i].trim())) {
+                            v1 |= (byte)4;
+                        } else if("cRLSign".equals(spl[i].trim())) {
+                            v1 |= (byte)2;
+                        } else if("encipherOnly".equals(spl[i].trim()) || "Encipher Only".equals(spl[i].trim())) {
+                            v1 |= (byte)1;
+                        } else {
+                            throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("ExtensionError")), oid + " = " + valuex + ": unknown bit string argument", true);
+                        }
+                    }
+                    if(v2 != 0) {
+                        inp = new byte[]{v1,v2};
                     } else {
-                        throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("ExtensionError")), oid + " = " + valuex + ": unknown bit string argument", true);
+                        inp = new byte[]{v1};
                     }
                 }
-                byte[] inp;
-                if(v2 != 0) {
-                    inp = new byte[]{v1,v2};
-                } else {
-                    inp = new byte[]{v1};
-                }
+
                 int unused = 0;
                 for(int i = (inp.length-1); i>-1; i--) {
                     if(inp[i] == 0) {

@@ -65,6 +65,8 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.builtin.IRubyObject;
 
+import org.jruby.openssl.x509store.X509AuxCertificate;
+
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
@@ -133,19 +135,33 @@ public class X509Cert extends RubyObject {
     private X509V3CertificateGenerator generator = new X509V3CertificateGenerator();
     private X509Certificate cert;
 
+    X509AuxCertificate getAuxCert() {
+        if(null == cert) {
+            return null;
+        }
+        if(cert instanceof X509AuxCertificate) {
+            return (X509AuxCertificate)cert;
+        }
+        return new X509AuxCertificate(cert);
+    }
+
     public IRubyObject _initialize(IRubyObject[] args) throws Exception {
         extensions = new ArrayList();
         if(checkArgumentCount(args,0,1) == 0) {
             return this;
         }
 
-        ByteArrayInputStream bis = new ByteArrayInputStream(args[0].toString().getBytes("PLAIN"));
+        IRubyObject arg = OpenSSLImpl.to_der_if_possible(args[0]);
+        ByteArrayInputStream bis = new ByteArrayInputStream(arg.toString().getBytes("PLAIN"));
         CertificateFactory cf = CertificateFactory.getInstance("X.509","BC");
         cert = (X509Certificate)cf.generateCertificate(bis);
 
         set_serial(RubyNumeric.str2inum(getRuntime(),getRuntime().newString(cert.getSerialNumber().toString()),10));
         set_not_before(RubyTime.newTime(getRuntime(),cert.getNotBefore().getTime()));
         set_not_after(RubyTime.newTime(getRuntime(),cert.getNotAfter().getTime()));
+        set_subject(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("Name").callMethod("new",getRuntime().newString(new String(cert.getSubjectX500Principal().getEncoded(),"ISO8859_1"))));
+        set_issuer(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("Name").callMethod("new",getRuntime().newString(new String(cert.getIssuerX500Principal().getEncoded(),"ISO8859_1"))));
+
         IRubyObject extFact = ((RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("ExtensionFactory"))).callMethod("new");
         extFact.callMethod("subject_certificate=",this);
 

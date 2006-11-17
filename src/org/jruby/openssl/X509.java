@@ -46,6 +46,7 @@ public class X509 {
         X509Extensions.createX509Ext(runtime,mX509);
         X509CRL.createX509CRL(runtime,mX509);
         X509Revoked.createX509Revoked(runtime,mX509);
+        X509Store.createX509Store(runtime,mX509);
         Request.createRequest(runtime,mX509);
         Attribute.createAttribute(runtime,mX509);
 

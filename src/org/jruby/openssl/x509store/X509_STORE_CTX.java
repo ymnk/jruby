@@ -31,12 +31,19 @@ import java.security.PublicKey;
 import java.security.cert.CRL;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
+import java.security.cert.X509Extension;
 
 import java.util.Calendar;
 import java.util.Date;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Iterator;
+import java.util.Set;
+import java.util.HashSet;
+
+import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.asn1.DERInteger;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -165,7 +172,7 @@ public class X509_STORE_CTX {
 	error_depth=0;
 	current_cert=null;
 	current_issuer=null;
-        //	tree = null;
+        tree = null;
 
 	param = new X509_VERIFY_PARAM();
 
@@ -202,7 +209,7 @@ public class X509_STORE_CTX {
         } else {
             this.get_issuer = new Function3() {
                     public int call(Object arg1, Object arg2, Object arg3) throws Exception {
-                        return ((X509_STORE_CTX)arg1).get1_issuer((X509AuxCertificate[])arg2,(X509AuxCertificate)arg3);
+                        return ((X509_STORE_CTX)arg2).get1_issuer((X509AuxCertificate[])arg1,(X509AuxCertificate)arg3);
                     }
                 };
         }
@@ -261,7 +268,7 @@ public class X509_STORE_CTX {
             cleanup.call(this);
         }
         param = null;
-        //        tree = null;
+        tree = null;
         chain = null;
         ex_data = null;
     } 
@@ -411,6 +418,330 @@ public class X509_STORE_CTX {
 	return 1;
     }
 
+    public int verify_cert() throws Exception {
+        X509AuxCertificate x,xtmp=null,chain_ss = null;
+        X509_NAME xn;
+        int bad_chain = 0;
+        X509_VERIFY_PARAM p = param;
+        int depth,i,ok=0;
+        int num;
+        Function2 cb;
+        List sktmp = null;
+        if(cert == null) {
+            Err.PUT_err(X509.X509_R_NO_CERT_SET_FOR_US_TO_VERIFY);
+            return -1;
+        }
+	cb=verify_cb;
+
+        if(null == chain) {
+            chain = new ArrayList();
+            chain.add(cert);
+            last_untrusted = 1;
+        }
+
+        if(untrusted != null) {
+            sktmp = new ArrayList(untrusted);
+        }
+        num = chain.size();
+        x = (X509AuxCertificate)chain.get(num-1);
+        depth = param.depth;
+
+	for(;;) {
+            if(depth < num) {
+                break;
+            }
+            xn = new X509_NAME(x.getIssuerX500Principal());
+            if(check_issued.call(this,x,x) != 0) {
+                break;
+            }
+            if(untrusted != null) {
+                xtmp = find_issuer(sktmp,x);
+                if(xtmp != null) {
+                    chain.add(xtmp);
+                    sktmp.remove(xtmp);
+                    last_untrusted++;
+                    x = xtmp;
+                    num++;
+                    continue;
+                }
+            }
+            break;
+        }
+
+        i = chain.size();
+        x = (X509AuxCertificate)chain.get(i-1);
+        xn = new X509_NAME(x.getSubjectX500Principal());
+        if(check_issued.call(this,x,x) != 0) {
+            if(chain.size() == 1) {
+                X509AuxCertificate[] p_xtmp = new X509AuxCertificate[]{xtmp};
+                ok = get_issuer.call(p_xtmp,this,x);
+                xtmp = p_xtmp[0];
+                if(ok <= 0 || !x.equals(xtmp)) {
+                    error = X509.V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT;
+                    current_cert = x;
+                    error_depth = i-1;
+                    bad_chain = 1;
+                    ok = cb.call(new Integer(0),this);
+                    if(ok == 0) {
+                        return ok;
+                    }
+                } else {
+                    x = xtmp;
+                    chain.set(i-1,x);
+                    last_untrusted = 0;
+                }
+            } else {
+                chain_ss = (X509AuxCertificate)chain.remove(chain.size()-1);
+                last_untrusted--;
+                num--;
+                x = (X509AuxCertificate)chain.get(num-1);
+            }
+        }
+
+        for(;;) {
+            if(depth<num) {
+                break;
+            }
+            xn = new X509_NAME(x.getIssuerX500Principal());
+            if(check_issued.call(this,x,x) != 0) {
+                break;
+            }
+            X509AuxCertificate[] p_xtmp = new X509AuxCertificate[]{xtmp};
+            ok = get_issuer.call(p_xtmp,this,x);
+            xtmp = p_xtmp[0];
+            if(ok < 0) {
+                return ok;
+            }
+            if(ok == 0) {
+                break;
+            }
+            x = xtmp;
+            chain.add(x);
+            num++;
+        }
+
+        xn = new X509_NAME(x.getIssuerX500Principal());
+
+        if(check_issued.call(this,x,x) == 0) {
+            if(chain_ss == null || check_issued.call(this,x,chain_ss) == 0) {
+                if(last_untrusted >= num) {
+                    error = X509.V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY;
+                } else {
+                    error = X509.V_ERR_UNABLE_TO_GET_ISSUER_CERT;
+                }
+                current_cert = x;
+            } else {
+                chain.add(chain_ss);
+                num++;
+                last_untrusted = num;
+                current_cert = chain_ss;
+                error = X509.V_ERR_SELF_SIGNED_CERT_IN_CHAIN;
+                chain_ss = null;
+            }
+            error_depth = num-1;
+            bad_chain = 1;
+            ok = cb.call(new Integer(0),this);
+            if(ok == 0) {
+                return ok;
+            }
+        }
+
+        ok = check_chain_extensions();
+        if(ok == 0) {
+            return ok;
+        }
+
+        if(param.trust > 0) {
+            ok = check_trust();
+        }
+        if(ok == 0) {
+            return ok;
+        }
+
+        ok = check_revocation.call(this);
+        if(ok == 0) {
+            return ok;
+        }
+
+        if(verify != null && verify != Function1.iZ) {
+            ok = verify.call(this);
+        } else {
+            ok = internal_verify.call(this);
+        }
+        if(ok == 0) {
+            return ok;
+        }
+
+        if(bad_chain == 0 && (param.flags & X509.V_FLAG_POLICY_CHECK) != 0) {
+            ok = check_policy.call(this);
+        }
+        return ok;
+    }
+
+
+    private final static Set SUPPORT_CRIT_EXT = new HashSet();
+    static {
+        SUPPORT_CRIT_EXT.add("2.16.840.1.113730.1.1"); // netscape cert type, NID 71
+        SUPPORT_CRIT_EXT.add("2.5.29.15"); // key usage, NID 83
+        SUPPORT_CRIT_EXT.add("2.5.29.17"); // subject alt name, NID 85
+        SUPPORT_CRIT_EXT.add("2.5.29.19"); // basic constraints, NID 87
+        SUPPORT_CRIT_EXT.add("2.5.29.37"); // ext key usage, NID 126
+        SUPPORT_CRIT_EXT.add("1.3.6.1.5.5.7.1.14"); // proxy cert info, NID 661
+    }
+
+    private static boolean supported_extension(String oid) {
+        return SUPPORT_CRIT_EXT.contains(oid);
+    }
+
+    private static boolean unhandledCritical(X509Extension xx) {
+        if(xx.getCriticalExtensionOIDs() == null || xx.getCriticalExtensionOIDs().size() == 0) {
+            return false;
+        }
+        for(Iterator iter = xx.getCriticalExtensionOIDs().iterator();iter.hasNext();) {
+            String ss = (String)iter.next();
+            if(!supported_extension(ss)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public int check_chain_extensions() throws Exception {
+	int ok=0, must_be_ca;
+	X509AuxCertificate x;
+        Function2 cb;
+	int proxy_path_length = 0;
+	int allow_proxy_certs = (param.flags & X509.V_FLAG_ALLOW_PROXY_CERTS) != 0 ? 1 : 0;
+        cb = verify_cb;
+	must_be_ca = -1;
+
+	if(System.getenv("OPENSSL_ALLOW_PROXY_CERTS") != null && !"false".equalsIgnoreCase((String)System.getenv("OPENSSL_ALLOW_PROXY_CERTS"))) {
+            allow_proxy_certs = 1;
+        }
+
+        for(int i = 0; i<last_untrusted;i++) {
+            int ret;
+            x = (X509AuxCertificate)chain.get(i);
+            if((param.flags & X509.V_FLAG_IGNORE_CRITICAL) == 0 && unhandledCritical(x)) {
+                error = X509.V_ERR_UNHANDLED_CRITICAL_EXTENSION;
+                error_depth = i;
+                current_cert = x;
+                ok = cb.call(new Integer(0),this);
+                if(ok == 0) {
+                    return ok;
+                }
+            }
+            if(allow_proxy_certs == 0 && x.getExtensionValue("1.3.6.1.5.5.7.1.14") != null) {
+                error = X509.V_ERR_PROXY_CERTIFICATES_NOT_ALLOWED;
+                error_depth = i;
+                current_cert = x;
+                ok = cb.call(new Integer(0),this);
+                if(ok == 0) {
+                    return ok;
+                }
+            }
+
+            ret = X509_PURPOSE.check_ca(x);
+            switch(must_be_ca) {
+            case -1:
+                if((param.flags & X509.V_FLAG_X509_STRICT) != 0 && ret != 1 && ret != 0) {
+                    ret = 0;
+                    error = X509.V_ERR_INVALID_CA;
+                } else {
+                    ret = 1;
+                }
+                break;
+            case 0:
+                if(ret != 0) {
+                    ret = 0;
+                    error = X509.V_ERR_INVALID_NON_CA;
+                } else {
+                    ret = 1;
+                }
+                break;
+            default:
+                if(ret == 0 || ((param.flags & X509.V_FLAG_X509_STRICT) != 0 && ret != 1)) {
+                    ret = 0;
+                    error = X509.V_ERR_INVALID_CA;
+                } else {
+                    ret = 1;
+                }
+                break;
+            }
+            if(ret == 0) {
+                error_depth = i;
+                current_cert = x;
+                ok = cb.call(new Integer(0),this);
+                if(ok == 0) {
+                    return ok;
+                }
+            }
+            if(param.purpose > 0) {
+                ret = X509_PURPOSE.check_purpose(x,param.purpose, must_be_ca > 0 ? 1 : 0);
+                if(ret == 0 || ((param.flags & X509.V_FLAG_X509_STRICT) != 0 && ret != 1)) {
+                    error = X509.V_ERR_INVALID_PURPOSE;
+                    error_depth = i;
+                    current_cert = x;
+                    ok = cb.call(new Integer(0),this);
+                    if(ok == 0) {
+                        return ok;
+                    }
+                }
+            }
+
+            if(i > 1 && x.getBasicConstraints() != -1 && (i > (x.getBasicConstraints() + proxy_path_length + 1))) {
+                error = X509.V_ERR_PATH_LENGTH_EXCEEDED;
+                error_depth = i;
+                current_cert = x;
+                ok = cb.call(new Integer(0),this);
+                if(ok == 0) {
+                    return ok;
+                }
+            }
+
+            if(x.getExtensionValue("1.3.6.1.5.5.7.1.14") != null) {
+                DERSequence pci = (DERSequence)new ASN1InputStream(x.getExtensionValue("1.3.6.1.5.5.7.1.14")).readObject();
+                if(pci.size() > 0 && pci.getObjectAt(0) instanceof DERInteger) {
+                    int pcpathlen = ((DERInteger)pci.getObjectAt(0)).getValue().intValue();
+                    if(i > pcpathlen) {
+                        error = X509.V_ERR_PROXY_PATH_LENGTH_EXCEEDED;
+                        error_depth = i;
+                        current_cert = x;
+                        ok = cb.call(new Integer(0),this);
+                        if(ok == 0) {
+                            return ok;
+                        }
+                    }
+                }
+                proxy_path_length++;
+                must_be_ca = 0;
+            } else {
+                must_be_ca = 1;
+            }
+        }
+	return 1;
+    }
+
+    public int check_trust() throws Exception {
+        int i,ok;
+        X509AuxCertificate x;
+        Function2 cb;
+        cb = verify_cb;
+        i = chain.size()-1;
+        x = (X509AuxCertificate)chain.get(i);
+        ok = X509_TRUST.check_trust(x,param.trust,0);
+        if(ok == X509.X509_TRUST_TRUSTED) {
+            return 1;
+        }
+        error_depth = 1;
+        current_cert = x;
+        if(ok == X509.X509_TRUST_REJECTED) {
+            error = X509.V_ERR_CERT_REJECTED;
+        } else {
+            error = X509.V_ERR_CERT_UNTRUSTED;
+        }
+        return cb.call(new Integer(0),this);
+    }
 
     public int check_cert_time(X509AuxCertificate x) throws Exception {
         Date ptime = null;
@@ -420,15 +751,14 @@ public class X509_STORE_CTX {
         } else {
             ptime = Calendar.getInstance().getTime();
         }
-
-        if(x.getNotBefore().before(ptime)) {
+        if(!x.getNotBefore().before(ptime)) {
             error = X509.V_ERR_CERT_NOT_YET_VALID;
             current_cert = x;
             if(verify_cb.call(new Integer(0),this) == 0) {
                 return 0;
             }
         }
-        if(x.getNotAfter().after(ptime)) {
+        if(!x.getNotAfter().after(ptime)) {
             error = X509.V_ERR_CERT_HAS_EXPIRED;
             current_cert = x;
             if(verify_cb.call(new Integer(0),this) == 0) {
@@ -473,13 +803,13 @@ public class X509_STORE_CTX {
             ptime = Calendar.getInstance().getTime();
         }
         
-        if(crl.getThisUpdate().before(ptime)) {
+        if(!crl.getThisUpdate().before(ptime)) {
             error=X509.V_ERR_CRL_NOT_YET_VALID;
             if(notify == 0 || verify_cb.call(new Integer(0),this) == 0) {
                 return 0;
             }
         }
-        if(crl.getNextUpdate() != null && crl.getNextUpdate().after(ptime)) {
+        if(crl.getNextUpdate() != null && !crl.getNextUpdate().after(ptime)) {
             error=X509.V_ERR_CRL_HAS_EXPIRED;
             if(notify == 0 || verify_cb.call(new Integer(0),this) == 0) {
                 return 0;
@@ -578,6 +908,11 @@ public class X509_STORE_CTX {
                         try {
                             xs.verify(xi.getPublicKey());
                         } catch(Exception e) {
+                            System.err.println("n: " + n);
+                            System.err.println("verifying: " + xs);
+                            System.err.println("verifying with issuer?: " + xi);
+                            System.err.println("verifying with issuer.key?: " + xi.getPublicKey());
+                            System.err.println("exception: " + e);
                             ctx.error = X509.V_ERR_CERT_SIGNATURE_FAILURE;
                             ctx.current_cert = xs;
                             ok = cb.call(new Integer(0),ctx);

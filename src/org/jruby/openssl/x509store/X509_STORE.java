@@ -76,6 +76,9 @@ public class X509_STORE {
 
         references = 1;
         ex_data = new ArrayList();
+        this.ex_data.add(null);this.ex_data.add(null);this.ex_data.add(null);
+        this.ex_data.add(null);this.ex_data.add(null);this.ex_data.add(null);
+        this.ex_data.add(null);this.ex_data.add(null);this.ex_data.add(null);
     }
 
     public void set_verify_func(Function1 func) {
@@ -94,6 +97,14 @@ public class X509_STORE {
         if(param != null) {
             param.free();
         }
+    }
+
+    public int set_ex_data(int idx,Object data) { 
+        ex_data.set(idx,data);
+        return 1; 
+    } 
+    public Object get_ex_data(int idx) { 
+        return ex_data.get(idx); 
     }
 
     public int set_depth(int depth) { 

@@ -37,7 +37,8 @@ public abstract class X509_OBJECT implements Comparable {
     public static int idx_by_subject(List h, int type, X509_NAME name) {
         int ix = 0;
         for(Iterator iter = h.iterator();iter.hasNext();ix++) {
-            if(((X509_OBJECT)iter.next()).isName(name)) {
+            X509_OBJECT oo = (X509_OBJECT)iter.next();
+            if(type == oo.type() && oo.isName(name)) {
                 return ix;
             }
         }
@@ -47,7 +48,7 @@ public abstract class X509_OBJECT implements Comparable {
     public static X509_OBJECT retrieve_by_subject(List h,int type,X509_NAME name) {
         for(Iterator iter = h.iterator();iter.hasNext();) {
             X509_OBJECT o = (X509_OBJECT)iter.next();
-            if(o.isName(name)) {
+            if(type == o.type() && o.isName(name)) {
                 return o;
             }
         }

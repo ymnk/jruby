@@ -130,6 +130,10 @@ public class X509CRL extends RubyObject {
 
     private DERObject crl_v;
 
+    java.security.cert.X509CRL getCRL() {
+        return crl;
+    }
+
     public X509CRL(IRuby runtime, RubyClass type) {
         super(runtime,type);
     }
