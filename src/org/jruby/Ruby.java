@@ -64,7 +64,7 @@ import org.jruby.libraries.SocketLibrary;
 import org.jruby.libraries.StringIOLibrary;
 import org.jruby.libraries.StringScannerLibrary;
 import org.jruby.libraries.ZlibLibrary;
-import org.jruby.libraries.OpenSSLLibrary;
+import org.jruby.ext.openssl.RubyOpenSSL;
 import org.jruby.libraries.DigestLibrary;
 import org.jruby.parser.Parser;
 import org.jruby.runtime.Block;
@@ -446,7 +446,7 @@ public final class Ruby implements IRuby {
         loadService.registerBuiltin("stringio.rb", new StringIOLibrary());
         loadService.registerBuiltin("strscan.rb", new StringScannerLibrary());
         loadService.registerBuiltin("zlib.rb", new ZlibLibrary());
-        loadService.registerBuiltin("openssl.so", new OpenSSLLibrary());
+        loadService.registerBuiltin("openssl.so", new RubyOpenSSL.Service());
         loadService.registerBuiltin("digest.so", new DigestLibrary());
         loadService.registerBuiltin("digest.rb", new DigestLibrary());
         loadService.registerBuiltin("digest/md5.rb", new DigestLibrary.MD5());

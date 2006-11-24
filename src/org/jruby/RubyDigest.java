@@ -38,7 +38,6 @@ import org.jruby.runtime.builtin.IRubyObject;
  */
 public class RubyDigest {
     public static void createDigest(IRuby runtime) {
-        RubyOpenSSL.checkBouncyCastle();
         RubyModule mDigest = runtime.defineModule("Digest");
         RubyClass cDigestBase = mDigest.defineClassUnder("Base",runtime.getObject());
 

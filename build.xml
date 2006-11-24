@@ -27,6 +27,10 @@
     <exclude unless="bsf.present" name="org/jruby/javasupport/bsf/**/*.java"/>
     <exclude unless="jdk1.4+" name="**/XmlAstMarshal.java"/>
     <exclude unless="jdk1.4+" name="**/AstPersistenceDelegates.java"/>
+    <exclude unless="jdk1.5+" name="org/jruby/ext/openssl/**/*.java"/>
+    <exclude unless="bc.present" name="org/jruby/ext/openssl/**/*.java"/>
+    <include name="org/jruby/ext/openssl/RubyOpenSSL.java"/>
+    <include name="org/jruby/ext/openssl/OpenSSLFake.java"/>
   </patternset>
 
   <patternset id="ruby.src.pattern">
@@ -66,6 +70,8 @@
     <available property="jdk1.4+" classname="java.lang.CharSequence"/>
     <available property="jdk1.5+" classname="java.lang.StringBuilder"/>
     <available property="bsf.present" classname="org.apache.bsf.BSFManager"
+               classpathref="build.classpath"/>
+    <available property="bc.present" classname="org.bouncycastle.jce.provider.BouncyCastleProvider"
                classpathref="build.classpath"/>
     <available property="junit.present" classname="junit.framework.TestCase"
                classpathref="build.classpath"/>
