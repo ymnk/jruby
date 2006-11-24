@@ -38,6 +38,7 @@ import java.security.Key;
 import java.security.MessageDigest;
 import java.security.spec.KeySpec;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.SecretKeyFactory;
 
@@ -138,7 +139,7 @@ public class Cipher extends RubyObject {
 
     private static boolean tryCipher(String rubyName) {
         try {
-            javax.crypto.Cipher.getInstance(rubyToJavaCipher(rubyName)[3]);
+            javax.crypto.Cipher.getInstance(rubyToJavaCipher(rubyName)[3],"BC");
             return true;
         } catch(Exception e) {
             return false;
@@ -206,8 +207,10 @@ public class Cipher extends RubyObject {
         padding_type = values[4];
 
         try {
-            ciph = javax.crypto.Cipher.getInstance(realName);
+            ciph = javax.crypto.Cipher.getInstance(realName,"BC");
         } catch(NoSuchAlgorithmException e) {
+            throw getRuntime().newLoadError("unsupported cipher algorithm (" + realName + ")");
+        } catch(NoSuchProviderException e) {
             throw getRuntime().newLoadError("unsupported cipher algorithm (" + realName + ")");
         } catch(javax.crypto.NoSuchPaddingException e) {
             throw getRuntime().newLoadError("unsupported cipher padding (" + realName + ")");
@@ -274,8 +277,10 @@ public class Cipher extends RubyObject {
         padding = ((Cipher)obj).padding;
 
         try {
-            ciph = javax.crypto.Cipher.getInstance(realName);
+            ciph = javax.crypto.Cipher.getInstance(realName,"BC");
         } catch(NoSuchAlgorithmException e) {
+            throw getRuntime().newLoadError("unsupported cipher algorithm (" + realName + ")");
+        } catch(NoSuchProviderException e) {
             throw getRuntime().newLoadError("unsupported cipher algorithm (" + realName + ")");
         } catch(javax.crypto.NoSuchPaddingException e) {
             throw getRuntime().newLoadError("unsupported cipher padding (" + realName + ")");
@@ -389,9 +394,9 @@ public class Cipher extends RubyObject {
                 ssalt = salt.getBytes("PLAIN");
             }
             if(vdigest.isNil()) {
-                digest = MessageDigest.getInstance("MD5");
+                digest = MessageDigest.getInstance("MD5","BC");
             } else {
-                digest = MessageDigest.getInstance(((Digest)vdigest).getAlgorithm());
+                digest = MessageDigest.getInstance(((Digest)vdigest).getAlgorithm(),"BC");
             }
 
             OpenSSLImpl.KeyAndIv result = OpenSSLImpl.EVP_BytesToKey(keyLen/8,ivLen/8,digest,ssalt,pass.getBytes("PLAIN"),iter);

@@ -43,21 +43,21 @@ public class RubyProcess {
         
         RubyModule process_status = process.defineClassUnder("Status", runtime.getObject()); 
 
-        //CallbackFactory processCallbackFactory = runtime.callbackFactory(RubyProcess.class);
+        CallbackFactory processCallbackFactory = runtime.callbackFactory(RubyProcess.class);
         CallbackFactory process_statusCallbackFactory = runtime.callbackFactory(RubyProcess.RubyStatus.class);
 
 //        process.defineModuleFunction("fork", processCallbackFactory.getSingletonMethod("fork"));
 //        process.defineModuleFunction("exit!", processCallbackFactory.getOptSingletonMethod("exit_bang"));
 //        process.defineModuleFunction("exit", processCallbackFactory.getOptSingletonMethod("exit"));
 //        process.defineModuleFunction("abort", processCallbackFactory.getOptSingletonMethod("abort"));
-//        process.defineModuleFunction("kill", processCallbackFactory.getOptSingletonMethod("kill"));
+        process.defineModuleFunction("kill", processCallbackFactory.getOptSingletonMethod("kill"));
 //        process.defineModuleFunction("wait", processCallbackFactory.getOptSingletonMethod("wait"));
 //        process.defineModuleFunction("wait2", processCallbackFactory.getOptSingletonMethod("wait2"));
 //        process.defineModuleFunction("waitpid", processCallbackFactory.getOptSingletonMethod("waitpid"));
 //        process.defineModuleFunction("waitpid2", processCallbackFactory.getOptSingletonMethod("waitpid2"));
 //        process.defineModuleFunction("waitall", processCallbackFactory.getSingletonMethod("waitall"));
 //        process.defineModuleFunction("detach", processCallbackFactory.getSingletonMethod("detach", IRubyObject.class));
-//        process.defineModuleFunction("pid", processCallbackFactory.getSingletonMethod("pid"));
+        process.defineModuleFunction("pid", processCallbackFactory.getSingletonMethod("pid"));
 //        process.defineModuleFunction("ppid", processCallbackFactory.getSingletonMethod("ppid"));
 //
 //        process.defineModuleFunction("getpgrp", processCallbackFactory.getSingletonMethod("getprgrp"));
@@ -152,5 +152,18 @@ public class RubyProcess {
         public IRubyObject success_p() {
             return getRuntime().newBoolean(status == EXIT_SUCCESS);
         }
+    }
+
+    public static IRubyObject pid(IRubyObject recv) {
+        String v = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+        return recv.getRuntime().newFixnum(Integer.parseInt(v.substring(0,v.indexOf('@'))));
+    }
+
+    public static IRubyObject kill(IRubyObject recv, IRubyObject[] args) throws Exception {
+        if(args.length == 2 && RubyNumeric.fix2int(args[1]) != 0) {
+            Runtime.getRuntime().exec("kill -9 " + args[1].toString()).waitFor();
+        }
+
+        return recv.getRuntime().getNil();
     }
 }

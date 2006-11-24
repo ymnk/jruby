@@ -36,6 +36,7 @@ import org.jruby.openssl.Digest;
 import org.jruby.openssl.HMAC;
 import org.jruby.openssl.NetscapeSPKI;
 import org.jruby.openssl.PKey;
+import org.jruby.openssl.PKCS7;
 import org.jruby.openssl.Random;
 import org.jruby.openssl.SSL;
 import org.jruby.openssl.X509;
@@ -68,6 +69,7 @@ public class RubyOpenSSL {
         X509.createX509(runtime,ossl);
         Config.createConfig(runtime,ossl);
         NetscapeSPKI.createNetscapeSPKI(runtime,ossl);
+        PKCS7.createPKCS7(runtime,ossl);
         SSL.createSSL(runtime,ossl);
 
         ossl.setConstant("VERSION",runtime.newString("1.0.0"));

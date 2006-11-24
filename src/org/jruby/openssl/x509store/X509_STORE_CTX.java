@@ -34,6 +34,7 @@ import java.security.cert.X509Certificate;
 import java.security.cert.X509Extension;
 
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Date;
 import java.util.ArrayList;
 import java.util.List;
@@ -140,10 +141,18 @@ public class X509_STORE_CTX {
 	return 0;
     }
 
-    public static List transform(List inp) {
+    public static List transform(Collection inp) {
         List o = new ArrayList();
         for(Iterator iter = inp.iterator();iter.hasNext();) {
             o.add(transform((X509Certificate)iter.next()));
+        }
+        return o;
+    }
+
+    public static List transform(X509Certificate[] inp) {
+        List o = new ArrayList();
+        for(int i=0;i<inp.length;i++) {
+            o.add(transform(inp[i]));
         }
         return o;
     }

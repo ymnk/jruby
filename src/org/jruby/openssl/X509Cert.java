@@ -28,6 +28,7 @@
 package org.jruby.openssl;
 
 import java.io.ByteArrayInputStream;
+import java.io.StringWriter;
 
 import java.math.BigInteger;
 
@@ -49,6 +50,8 @@ import org.bouncycastle.asn1.DERObjectIdentifier;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERBitString;
 import org.bouncycastle.asn1.DERTaggedObject;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 
 import org.jruby.IRuby;
@@ -65,6 +68,7 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.builtin.IRubyObject;
 
+import org.jruby.openssl.x509store.PEM;
 import org.jruby.openssl.x509store.X509AuxCertificate;
 
 /**
@@ -145,6 +149,11 @@ public class X509Cert extends RubyObject {
         return new X509AuxCertificate(cert);
     }
 
+    public static IRubyObject wrap(IRuby runtime, Certificate c) throws Exception {
+        RubyClass cr = (RubyClass)(((RubyModule)(runtime.getModule("OpenSSL").getConstant("X509"))).getConstant("Certificate"));
+        return cr.callMethod("new",runtime.newString(new String(c.getEncoded(),"ISO8859_1")));
+    }
+
     public IRubyObject _initialize(IRubyObject[] args) throws Exception {
         extensions = new ArrayList();
         if(checkArgumentCount(args,0,1) == 0) {
@@ -171,7 +180,12 @@ public class X509Cert extends RubyObject {
                 String critOid = (String)iter.next();
                 byte[] value = cert.getExtensionValue(critOid);
                 IRubyObject rValue = ASN1.decode(((RubyModule)(getRuntime().getModule("OpenSSL"))).getConstant("ASN1"),getRuntime().newString(new String(value,"PLAIN"))).callMethod("value");
-                add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(critOid),getRuntime().newString(Utils.toHex(rValue.toString().substring(2).getBytes("PLAIN"),':')),getRuntime().getTrue()}));
+                //                add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(critOid),getRuntime().newString(Utils.toHex(rValue.toString().substring(2).getBytes("PLAIN"),':')),getRuntime().getTrue()}));
+                if(critOid.equals("2.5.29.17")) {
+                    add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(critOid),getRuntime().newString(rValue.toString()),getRuntime().getTrue()}));
+                } else {
+                    add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(critOid),getRuntime().newString(rValue.toString().substring(2)),getRuntime().getTrue()}));
+                }
             }
         }
 
@@ -181,7 +195,13 @@ public class X509Cert extends RubyObject {
                 String ncritOid = (String)iter.next();
                 byte[] value = cert.getExtensionValue(ncritOid);
                 IRubyObject rValue = ASN1.decode(((RubyModule)(getRuntime().getModule("OpenSSL"))).getConstant("ASN1"),getRuntime().newString(new String(value,"PLAIN"))).callMethod("value");
-                add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(ncritOid),getRuntime().newString(Utils.toHex(rValue.toString().substring(2).getBytes("PLAIN"),':')),getRuntime().getFalse()}));
+                //                add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(ncritOid),getRuntime().newString(Utils.toHex(rValue.toString().substring(2).getBytes("PLAIN"),':')),getRuntime().getFalse()}));
+
+                if(ncritOid.equals("2.5.29.17")) {
+                    add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(ncritOid),getRuntime().newString(rValue.toString()),getRuntime().getFalse()}));
+                } else {
+                    add_extension(extFact.callMethod("create_ext", new IRubyObject[]{getRuntime().newString(ncritOid),getRuntime().newString(rValue.toString().substring(2)),getRuntime().getFalse()}));
+                }
             }
         }
         changed = false;
@@ -201,8 +221,11 @@ public class X509Cert extends RubyObject {
         return getRuntime().newString(new String(cert.getEncoded(),"ISO8859_1"));
     }
 
-    public IRubyObject to_pem() {
-        return getRuntime().getNil();
+    public IRubyObject to_pem() throws Exception {
+        StringWriter w = new StringWriter();
+        PEM.write_X509(w,getAuxCert());
+        w.close();
+        return getRuntime().newString(w.toString());
     }
 
     public IRubyObject to_text() {
@@ -316,6 +339,11 @@ public class X509Cert extends RubyObject {
             throw new RaiseException(getRuntime(), (RubyClass)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("CertificateError")), null, true);
         }
 
+        for(Iterator iter = extensions.iterator();iter.hasNext();) {
+            X509Extensions.Extension ag = (X509Extensions.Extension)iter.next();
+            generator.addExtension(ag.getRealOid(),ag.getRealCritical(),ag.getRealValueBytes());
+        }
+
         sig_alg = getRuntime().newString(digAlg);
         generator.setSignatureAlgorithm(digAlg + "WITH" + keyAlg);
         cert = generator.generateX509Certificate(((PKey)key).getPrivateKey());
@@ -349,8 +377,33 @@ public class X509Cert extends RubyObject {
     }
 
     public IRubyObject add_extension(IRubyObject arg) throws Exception {
-        extensions.add(arg);
-        generator.addExtension(((X509Extensions.Extension)arg).getRealOid(),((X509Extensions.Extension)arg).getRealCritical(),((X509Extensions.Extension)arg).getRealValueBytes());
+        changed = true;
+        if(((X509Extensions.Extension)arg).getRealOid().equals(new DERObjectIdentifier("2.5.29.17"))) {
+            boolean one = true;
+            for(Iterator iter = extensions.iterator();iter.hasNext();) {
+                X509Extensions.Extension ag = (X509Extensions.Extension)iter.next();
+                if(ag.getRealOid().equals(new DERObjectIdentifier("2.5.29.17"))) {
+                    GeneralName[] n1 = GeneralNames.getInstance(new ASN1InputStream(ag.getRealValueBytes()).readObject()).getNames();
+                    GeneralName[] n2 = GeneralNames.getInstance(new ASN1InputStream(((X509Extensions.Extension)arg).getRealValueBytes()).readObject()).getNames();
+                    ASN1EncodableVector v1 = new ASN1EncodableVector();
+
+                    for(int i=0;i<n1.length;i++) {
+                        v1.add(n1[i]);
+                    }
+                    for(int i=0;i<n2.length;i++) {
+                        v1.add(n2[i]);
+                    }
+                    ag.setRealValue(new String(new GeneralNames(new DERSequence(v1)).getDEREncoded(),"ISO8859_1"));
+                    one = false;
+                    break;
+                }
+            }
+            if(one) {
+                extensions.add(arg);
+            }
+        } else {
+            extensions.add(arg);
+        }
         return arg;
     }
 

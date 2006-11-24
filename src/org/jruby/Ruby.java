@@ -621,6 +621,7 @@ public final class Ruby implements IRuby {
         createSysErr(IErrno.ESRCH, "ESRCH");       
         createSysErr(IErrno.ECONNREFUSED, "ECONNREFUSED");
         createSysErr(IErrno.ECONNRESET, "ECONNRESET");
+        createSysErr(IErrno.EADDRINUSE, "EADDRINUSE");
     }
 
     /**

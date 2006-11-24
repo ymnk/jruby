@@ -34,10 +34,12 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import javax.net.ssl.X509TrustManager;
+
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
-public class X509_STORE {
+public class X509_STORE implements X509TrustManager {
     public int cache;
     public List objs; // List<X509_OBJECT>
     public List get_cert_methods; // List<X509_LOOKUP>
@@ -232,4 +234,22 @@ public class X509_STORE {
 
 	return 1;
     } 
+
+
+    public void checkClientTrusted(X509Certificate[] chain, String authType) {
+    }
+
+    public void checkServerTrusted(X509Certificate[] chain, String authType) {
+    }
+
+    public X509Certificate[] getAcceptedIssuers() {
+        List l = new ArrayList();
+        for(Iterator iter = objs.iterator();iter.hasNext();) {
+            Object o = iter.next();
+            if(o instanceof X509_OBJECT_CERT) {
+                l.add(((X509_OBJECT_CERT)o).x509);
+            }
+        }
+        return (X509Certificate[])l.toArray(new X509Certificate[l.size()]);
+    }
 }// X509_STORE

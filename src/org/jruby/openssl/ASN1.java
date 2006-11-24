@@ -44,6 +44,7 @@ import java.util.Iterator;
 
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Encodable;
+import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.DERObjectIdentifier;
 import org.bouncycastle.asn1.DERString;
@@ -225,7 +226,13 @@ public class ASN1 {
     }
 
     public static int idForClass(Class type) {
-        Integer v = (Integer)CLASS_TO_ID.get(type);
+        Integer v = null;
+        while(type != Object.class && v == null) {
+            v = (Integer)CLASS_TO_ID.get(type);
+            if(v == null) {
+                type = type.getSuperclass();
+            }
+        }
         return null == v ? -1 : v.intValue();
     }
 
@@ -506,9 +513,9 @@ public class ASN1 {
                     val = new String(val.getBytes("UTF-8"),"ISO8859-1");
                 }
                 return c.callMethod("new",asnM.getRuntime().newString(val));
-            } else if(v instanceof DERSequence) {
+            } else if(v instanceof ASN1Sequence) {
                 List l = new ArrayList();
-                for(Enumeration enm = ((DERSequence)v).getObjects(); enm.hasMoreElements(); ) {
+                for(Enumeration enm = ((ASN1Sequence)v).getObjects(); enm.hasMoreElements(); ) {
                     l.add(decodeObj(asnM,enm.nextElement()));
                 }
                 return c.callMethod("new",asnM.getRuntime().newArray(l));
@@ -553,7 +560,7 @@ public class ASN1 {
             return c.callMethod("new",new IRubyObject[]{asnM.getRuntime().newArray(val),tag,tag_class});
         }
 
-        System.err.println("v: " + v + "[" + v.getClass().getName() + "]");
+        //        System.err.println("v: " + v + "[" + v.getClass().getName() + "]");
         return null;
     }
 

@@ -38,9 +38,15 @@ import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.DERObjectIdentifier;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERInteger;
+import org.bouncycastle.asn1.DERIA5String;
 import org.bouncycastle.asn1.DERBoolean;
 import org.bouncycastle.asn1.DERBitString;
 import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.DERString;
+import org.bouncycastle.asn1.DERObject;
+import org.bouncycastle.asn1.DERUnknownTag;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
 
 import org.jruby.IRuby;
 import org.jruby.Ruby;
@@ -195,6 +201,8 @@ public class X509Extensions {
                     }
                     byte[] b = MessageDigest.getInstance("SHA-1").digest(val.toString().getBytes("PLAIN"));
                     value = new String(new DEROctetString(b).getDEREncoded(),"ISO8859_1");
+                } else if(valuex.length() == 20) {
+                    value = new String(new DEROctetString(valuex.getBytes("PLAIN")).getDEREncoded(),"ISO8859_1");
                 } else {
                     StringBuffer nstr = new StringBuffer();
                     for(int i = 0; i < valuex.length(); i+=2) {
@@ -279,7 +287,7 @@ public class X509Extensions {
                 value = new String(new DERSequence(asnv).getDEREncoded(),"ISO8859_1");
             } else if(r_oid.equals(new DERObjectIdentifier("2.5.29.15"))) { //keyUsage
                 byte[] inp = null;
-
+                inp = null;
                 try {
                     String[] exx = valuex.split(":");
                     if(exx != null) {
@@ -290,6 +298,10 @@ public class X509Extensions {
                     }
                 } catch(Exception e) {
                     inp = null;
+                }
+
+                if(null == inp && valuex.length()<3) {
+                    inp = valuex.getBytes("PLAIN");
                 }
 
                 if(inp == null) {
@@ -346,6 +358,26 @@ public class X509Extensions {
                 }
                 
                 value = new String(new DERBitString(inp,unused).getDEREncoded(),"ISO8859_1");
+            } else if(r_oid.equals(new DERObjectIdentifier("2.5.29.17"))) { //subjectAltName
+                if(valuex.startsWith("DNS:")) {
+                    value = new String(new GeneralNames(new GeneralName(GeneralName.dNSName,new DERIA5String(valuex.substring(4)))).getDEREncoded(),"ISO8859_1");
+                } else if(valuex.startsWith("IP:")) {
+                    String[] numbers = valuex.substring(3).split("\\.");
+                    byte[] bs = new byte[4];
+                    bs[0] = (byte) (Integer.parseInt(numbers[0]) & 0xff);
+                    bs[1] = (byte) (Integer.parseInt(numbers[1]) & 0xff);
+                    bs[2] = (byte) (Integer.parseInt(numbers[2]) & 0xff);
+                    bs[3] = (byte) (Integer.parseInt(numbers[3]) & 0xff);
+                    value = new String(new GeneralNames(new GeneralName(GeneralName.iPAddress,new DEROctetString(bs))).getDEREncoded(),"ISO8859_1");
+                } else if(valuex.startsWith("IP Address:")) {
+                    String[] numbers = valuex.substring(11).split("\\.");
+                    byte[] bs = new byte[4];
+                    bs[0] = (byte) (Integer.parseInt(numbers[0]) & 0xff);
+                    bs[1] = (byte) (Integer.parseInt(numbers[1]) & 0xff);
+                    bs[2] = (byte) (Integer.parseInt(numbers[2]) & 0xff);
+                    bs[3] = (byte) (Integer.parseInt(numbers[3]) & 0xff);
+                    value = new String(new GeneralNames(new GeneralName(GeneralName.iPAddress,new DEROctetString(bs))).getDEREncoded(),"ISO8859_1");
+                }
             } else {
                 value = new DEROctetString(new DEROctetString(valuex.getBytes("PLAIN")).getDEREncoded());
             }
@@ -553,17 +585,49 @@ public class X509Extensions {
                 default:
                     return getRuntime().newString("Unspecified");
                 }
-            } else {
-                return ASN1.decode(getRuntime().getModule("OpenSSL").getConstant("ASN1"),getRuntime().newString(new String(getRealValueBytes(),"ISO8859_1"))).callMethod("value").callMethod("to_s");
-                //                return getRuntime().newString(value.toString());
-            }
-                /*
             } else if(getRealOid().equals(new DERObjectIdentifier("2.5.29.17"))) { //subjectAltName
-                return getRuntime().newString(value);
+                try {
+                    DERObject seq = new ASN1InputStream(getRealValueBytes()).readObject();
+                    GeneralName[] n1 = null;
+                    if(seq instanceof DERUnknownTag) {
+                        n1 = new GeneralName[]{GeneralName.getInstance(seq)};
+                    } else if(seq instanceof org.bouncycastle.asn1.DERTaggedObject) {
+                        n1 = new GeneralName[]{GeneralName.getInstance(seq)};
+                    } else {
+                        n1 = GeneralNames.getInstance(seq).getNames();
+                    }
+                    StringBuffer sbe = new StringBuffer();
+                    String sep = "";
+                    for(int i=0;i<n1.length;i++) {
+                        sbe.append(sep);
+                        if(n1[i].getTagNo() == GeneralName.dNSName) {
+                            sbe.append("DNS:");
+                            sbe.append(((DERString)n1[i].getName()).getString());
+                        } else if(n1[i].getTagNo() == GeneralName.iPAddress) {
+                            sbe.append("IP Address:");
+                            byte[] bs = ((DEROctetString)n1[i].getName()).getOctets();
+                            String sep2 = "";
+                            for(int j=0;j<bs.length;j++) {
+                                sbe.append(sep2);
+                                sbe.append(((int)bs[j]) & 0xff);
+                                sep2 = ".";
+                            }
+                        } else {
+                            sbe.append(n1[i].toString());
+                        }
+                        sep = ", ";
+                    }
+                    return getRuntime().newString(sbe.toString());
+                } catch(Exception e) {
+                    return getRuntime().newString(getRealValue().toString());
+                }
             } else {
-                return getRuntime().newString(Utils.toHex(value.substring(2).getBytes("PLAIN"),':'));
+                try {
+                    return ASN1.decode(getRuntime().getModule("OpenSSL").getConstant("ASN1"),getRuntime().newString(new String(getRealValueBytes(),"ISO8859_1"))).callMethod("value").callMethod("to_s");
+                } catch(Exception e) {
+                    return getRuntime().newString(getRealValue().toString());
+                }
             }
-                */
         }
 
         public IRubyObject critical_p() {

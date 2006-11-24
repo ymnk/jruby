@@ -179,7 +179,12 @@ public class X509CRL extends RubyObject {
                 }
                 byte[] value = crl.getExtensionValue(oid);
                 IRubyObject mASN1 = ((RubyModule)(getRuntime().getModule("OpenSSL"))).getConstant("ASN1");
-                IRubyObject rValue = ASN1.decode(mASN1,ASN1.decode(mASN1,getRuntime().newString(new String(value,"PLAIN"))).callMethod("value"));
+                IRubyObject rValue = null;
+                try {
+                    rValue = ASN1.decode(mASN1,ASN1.decode(mASN1,getRuntime().newString(new String(value,"PLAIN"))).callMethod("value"));
+                } catch(Exception e) {
+                    rValue = getRuntime().newString(new String(value,"PLAIN"));
+                }
                 X509Extensions.Extension ext1 = (X509Extensions.Extension)(((RubyModule)(getRuntime().getModule("OpenSSL").getConstant("X509"))).getConstant("Extension").callMethod("new"));
                 ext1.setRealOid(ext1.getObjectIdentifier(oid));
                 ext1.setRealValue(rValue);

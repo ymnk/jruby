@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import java.security.cert.CertificateException;
+
 import javax.net.ssl.SSLEngine;
 
 import org.jruby.IRuby;
@@ -38,9 +40,14 @@ import org.jruby.RubyArray;
 import org.jruby.RubyModule;
 import org.jruby.RubyClass;
 import org.jruby.RubyObject;
+import org.jruby.RubyNumeric;
 
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.builtin.IRubyObject;
+
+import org.jruby.openssl.x509store.X509AuxCertificate;
+import org.jruby.openssl.x509store.X509_STORE;
+import org.jruby.openssl.x509store.X509_STORE_CTX;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -76,6 +83,40 @@ public class SSLContext extends RubyObject {
     }
 
     private IRubyObject ciphers;
+    private PKey t_key = null;
+    private X509Cert t_cert = null;
+    
+    private java.security.cert.X509Certificate peer_cert;
+
+    public void setPeer(java.security.cert.X509Certificate p) {
+        this.peer_cert = p;
+    }
+
+    public java.security.cert.X509Certificate getPeer() {
+        return this.peer_cert;
+    }
+
+    private void initFromCallback(IRubyObject cb) {
+        IRubyObject out = cb.callMethod("call",this);
+        t_cert = (X509Cert)(((RubyArray)out).getList().get(0));
+        t_key = (PKey)(((RubyArray)out).getList().get(1));
+    }
+
+    public PKey getCallbackKey() {
+        IRubyObject cb = callMethod("client_cert_cb");
+        if(t_key == null && !cb.isNil()) {
+            initFromCallback(cb);
+        }
+        return t_key;
+    }
+
+    public X509Cert getCallbackCert() {
+        IRubyObject cb = callMethod("client_cert_cb");
+        if(t_cert == null && !cb.isNil()) {
+            initFromCallback(cb);
+        }
+        return t_cert;
+    }
 
     public IRubyObject initialize(IRubyObject[] args) {
         ciphers = getRuntime().getNil();
@@ -93,7 +134,9 @@ public class SSLContext extends RubyObject {
 
     String[] getCipherSuites(SSLEngine engine) {
         List ciphs = new ArrayList();
-        if(this.ciphers instanceof RubyArray) {
+        if(this.ciphers.isNil()) {
+            return engine.getSupportedCipherSuites();
+        } else if(this.ciphers instanceof RubyArray) {
             for(Iterator iter = ((RubyArray)this.ciphers).getList().iterator();iter.hasNext();) {
                 addCipher(ciphs, iter.next().toString(),engine);
             }
@@ -117,6 +160,147 @@ public class SSLContext extends RubyObject {
                     lst.add(supported[i]);
                 }
             }
+        }
+    }
+
+    public KM getKM() {
+        return new KM(this);
+    }
+
+    public TM getTM() {
+        return new TM(this);
+    }
+
+    private static class KM extends javax.net.ssl.X509ExtendedKeyManager {
+        private SSLContext ctt;
+        public KM(SSLContext ctt) {
+            super();
+            this.ctt = ctt;
+        }
+
+        public String 	chooseEngineClientAlias(String[] keyType, java.security.Principal[] issuers, javax.net.ssl.SSLEngine engine) {
+            PKey k = null;
+            if(!ctt.callMethod("key").isNil()) {
+                k = (PKey)ctt.callMethod("key");
+            } else {
+                k = ctt.getCallbackKey();
+            }
+            if(k == null) {
+                return null;
+            }
+            for(int i=0;i<keyType.length;i++) {
+                if(keyType[i].equalsIgnoreCase(k.getAlgorithm())) {
+                    return keyType[i];
+                }
+            }
+            return null;
+        }
+        public String 	chooseEngineServerAlias(String keyType, java.security.Principal[] issuers, javax.net.ssl.SSLEngine engine) {
+            PKey k = null;
+            if(!ctt.callMethod("key").isNil()) {
+                k = (PKey)ctt.callMethod("key");
+            } else {
+                k = ctt.getCallbackKey();
+            }
+            if(k == null) {
+                return null;
+            }
+            if(keyType.equalsIgnoreCase(k.getAlgorithm())) {
+                return keyType;
+            }
+            return null;
+        }
+        public String 	chooseClientAlias(String[] keyType, java.security.Principal[] issuers, java.net.Socket socket) {
+            return null;
+        }
+        public String 	chooseServerAlias(String keyType, java.security.Principal[] issuers, java.net.Socket socket) {
+            return null;
+        }
+        public java.security.cert.X509Certificate[] 	getCertificateChain(String alias) {
+            X509Cert c = null;
+            if(!ctt.callMethod("cert").isNil()) {
+                c = (X509Cert)ctt.callMethod("cert");
+            } else {
+                c = ctt.getCallbackCert();
+            }
+            if(c == null) {
+                return null;
+            }
+            return new java.security.cert.X509Certificate[]{c.getAuxCert()};
+        }
+        public String[] 	getClientAliases(String keyType, java.security.Principal[] issuers) {
+            return null;
+        }
+        public java.security.PrivateKey 	getPrivateKey(String alias) {
+            PKey k = null;
+            if(!ctt.callMethod("key").isNil()) {
+                k = (PKey)ctt.callMethod("key");
+            } else {
+                k = ctt.getCallbackKey();
+            }
+            if(k == null) {
+                return null;
+            }
+            return k.getPrivateKey();
+        }
+        public String[] 	getServerAliases(String keyType, java.security.Principal[] issuers) {
+            return null;
+        }
+    }
+
+    private static class TM implements javax.net.ssl.X509TrustManager {
+        private SSLContext ctt;
+        public TM(SSLContext ctt) {
+            this.ctt = ctt;
+        }
+
+        public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {
+            if(chain != null && chain.length > 0) {
+                ctt.setPeer(chain[0]);
+            }
+        }
+
+        public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
+            if(ctt.callMethod("verify_mode").isNil()) {
+                if(chain != null && chain.length > 0) {
+                    ctt.setPeer(chain[0]);
+                }
+                return;
+            }
+
+            int verify_mode = RubyNumeric.fix2int(ctt.callMethod("verify_mode"));
+            if(chain != null && chain.length > 0) {
+                ctt.setPeer(chain[0]);
+                if((verify_mode & 0x1) != 0) { // verify_peer
+                    X509AuxCertificate x = X509_STORE_CTX.transform(chain[0]);
+                    X509_STORE_CTX ctx = new X509_STORE_CTX();
+                    IRubyObject str = ctt.callMethod("cert_store");
+                    X509_STORE store = null;
+                    if(!str.isNil()) {
+                        store = ((X509Store)str).getStore();
+                    }
+                    if(ctx.init(store,x,X509_STORE_CTX.transform(chain)) == 0) {
+                        throw new CertificateException("couldn't initialize store");
+                    }
+
+                    ctx.set_default("ssl_client");
+                    try {
+                        if(ctx.verify_cert() == 0) {
+                            throw new CertificateException("certificate verify failed");
+                        }
+                    } catch(Exception e) {
+                        throw new CertificateException("certificate verify failed");
+                    }
+                }
+            } else {
+                if((verify_mode & 0x2) != 0) { // fail if no peer cer
+                    throw new CertificateException("no peer certificate");
+                }
+            }
+        }
+
+        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+            return new java.security.cert.X509Certificate[0];
         }
     }
 }// SSLContext
