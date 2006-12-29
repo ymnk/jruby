@@ -38,6 +38,7 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.exceptions.MainExitException;
 import org.jruby.exceptions.ThreadKill;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.DynamicMethod;
 import org.jruby.runtime.ICallable;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
@@ -149,7 +150,7 @@ public class ReflectedMethod extends AbstractMethod {
         }
 	}
 
-	public ICallable dup() {
+	public DynamicMethod dup() {
 		ReflectedMethod newMethod = 
 		    new ReflectedMethod(getImplementationClass(), type, methodName, arity, getVisibility());
 		

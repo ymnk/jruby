@@ -35,6 +35,7 @@ import org.jruby.exceptions.JumpException;
 import org.jruby.internal.runtime.methods.IterateCallable;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.DynamicMethod;
 import org.jruby.runtime.ICallable;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -54,7 +55,7 @@ public class RubyMethod extends RubyObject {
     protected String methodName;
     protected RubyModule originModule;
     protected String originName;
-    protected ICallable method;
+    protected DynamicMethod method;
     protected IRubyObject receiver;
 
     protected RubyMethod(IRuby runtime, RubyClass rubyClass) {
@@ -88,7 +89,7 @@ public class RubyMethod extends RubyObject {
         String methodName,
         RubyModule originModule,
         String originName,
-        ICallable method,
+        DynamicMethod method,
         IRubyObject receiver) {
         IRuby runtime = implementationModule.getRuntime();
         RubyMethod newMethod = new RubyMethod(runtime, runtime.getClass("Method"));

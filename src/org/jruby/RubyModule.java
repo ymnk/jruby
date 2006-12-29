@@ -47,8 +47,9 @@ import org.jruby.internal.runtime.methods.MethodMethod;
 import org.jruby.internal.runtime.methods.ProcMethod;
 import org.jruby.internal.runtime.methods.UndefinedMethod;
 import org.jruby.internal.runtime.methods.WrapperCallable;
+import org.jruby.internal.runtime.methods.WrapperMethod;
 import org.jruby.runtime.Arity;
-import org.jruby.runtime.ICallable;
+import org.jruby.runtime.DynamicMethod;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -431,7 +432,7 @@ public class RubyModule extends RubyObject {
         if (name.equals("__id__") || name.equals("__send__")) {
             getRuntime().getWarnings().warn("undefining `"+ name +"' may cause serious problem");
         }
-        ICallable method = searchMethod(name);
+        DynamicMethod method = searchMethod(name);
         if (method.isUndefined()) {
             String s0 = " class";
             RubyModule c = this;
@@ -452,7 +453,7 @@ public class RubyModule extends RubyObject {
         addMethod(name, UndefinedMethod.getInstance());
     }
 
-    private void addCachedMethod(String name, ICallable method) {
+    private void addCachedMethod(String name, DynamicMethod method) {
         // Included modules modify the original 'included' modules class.  Since multiple
         // classes can include the same module, we cannot cache in the original included module.
         if (!isIncluded()) {
@@ -462,7 +463,7 @@ public class RubyModule extends RubyObject {
     }
 
     // TODO: Consider a better way of synchronizing 
-    public void addMethod(String name, ICallable method) {
+    public void addMethod(String name, DynamicMethod method) {
         if (this == getRuntime().getObject()) {
             getRuntime().secure(4);
         }
@@ -477,7 +478,7 @@ public class RubyModule extends RubyObject {
         synchronized(getMethods()) {
             // If we add a method which already is cached in this class, then we should update the 
             // cachemap so it stays up to date.
-            ICallable existingMethod = (ICallable) getMethods().remove(name);
+            DynamicMethod existingMethod = (DynamicMethod) getMethods().remove(name);
             if (existingMethod != null) {
                 getRuntime().getCacheMap().remove(name, existingMethod);
             }
@@ -502,7 +503,7 @@ public class RubyModule extends RubyObject {
         // We can safely reference methods here instead of doing getMethods() since if we
         // are adding we are not using a IncludedModuleWrapper.
         synchronized(getMethods()) {
-            ICallable method = (ICallable) getMethods().remove(name);
+            DynamicMethod method = (DynamicMethod) getMethods().remove(name);
             if (method == null) {
                 throw getRuntime().newNameError("method '" + name + "' not defined in " + getName(), name);
             }
@@ -517,12 +518,12 @@ public class RubyModule extends RubyObject {
      * @param name The name of the method to search for
      * @return The method, or UndefinedMethod if not found
      */
-    public ICallable searchMethod(String name) {
+    public DynamicMethod searchMethod(String name) {
         for (RubyModule searchModule = this; searchModule != null; searchModule = searchModule.getSuperClass()) {
             // included modules use delegates methods for we need to synchronize on result of getMethods
             synchronized(searchModule.getMethods()) {
                 // See if current class has method or if it has been cached here already
-                ICallable method = (ICallable) searchModule.getMethods().get(name);
+                DynamicMethod method = (DynamicMethod) searchModule.getMethods().get(name);
                 if (method != null) {
                     if (searchModule != this) {
                         addCachedMethod(name, method);
@@ -542,8 +543,8 @@ public class RubyModule extends RubyObject {
      * @param name The name of the method to search for
      * @return The method, or UndefinedMethod if not found
      */
-    public ICallable retrieveMethod(String name) {
-        return (ICallable)getMethods().get(name);
+    public DynamicMethod retrieveMethod(String name) {
+        return (DynamicMethod)getMethods().get(name);
     }
 
     /**
@@ -562,7 +563,7 @@ public class RubyModule extends RubyObject {
         return null;
     }
 
-    public void addModuleFunction(String name, ICallable method) {
+    public void addModuleFunction(String name, DynamicMethod method) {
         addMethod(name, method);
         addSingletonMethod(name, method);
     }
@@ -649,7 +650,7 @@ public class RubyModule extends RubyObject {
         if (this == getRuntime().getObject()) {
             getRuntime().secure(4);
         }
-        ICallable method = searchMethod(oldName);
+        DynamicMethod method = searchMethod(oldName);
         if (method.isUndefined()) {
             if (isModule()) {
                 method = getRuntime().getObject().searchMethod(oldName);
@@ -831,7 +832,7 @@ public class RubyModule extends RubyObject {
             getRuntime().secure(4);
         }
 
-        ICallable method = searchMethod(name);
+        DynamicMethod method = searchMethod(name);
 
         if (method.isUndefined()) {
             throw getRuntime().newNameError("undefined method '" + name + "' for " +
@@ -861,7 +862,7 @@ public class RubyModule extends RubyObject {
      *
      */
     public boolean isMethodBound(String name, boolean checkVisibility) {
-        ICallable method = searchMethod(name);
+        DynamicMethod method = searchMethod(name);
         if (!method.isUndefined()) {
             return !(checkVisibility && method.getVisibility().isPrivate());
         }
@@ -869,7 +870,7 @@ public class RubyModule extends RubyObject {
     }
 
     public IRubyObject newMethod(IRubyObject receiver, String name, boolean bound) {
-        ICallable method = searchMethod(name);
+        DynamicMethod method = searchMethod(name);
         if (method.isUndefined()) {
             throw getRuntime().newNameError("undefined method `" + name +
                 "' for class `" + this.getName() + "'", name);
@@ -894,7 +895,7 @@ public class RubyModule extends RubyObject {
 
         IRubyObject body;
         String name = args[0].asSymbol();
-        ICallable newMethod = null;
+        DynamicMethod newMethod = null;
         ThreadContext tc = getRuntime().getCurrentContext();
         Visibility visibility = tc.getCurrentVisibility();
 
@@ -928,7 +929,7 @@ public class RubyModule extends RubyObject {
         ThreadContext context = getRuntime().getCurrentContext();
 
         if (tc.getPreviousVisibility().isModuleFunction()) {
-            getSingletonClass().addMethod(name, new WrapperCallable(getSingletonClass(), newMethod, Visibility.PUBLIC));
+            getSingletonClass().addMethod(name, new WrapperMethod(getSingletonClass(), newMethod, Visibility.PUBLIC));
             callMethod(context, "singleton_method_added", symbol);
         }
 
@@ -1003,13 +1004,13 @@ public class RubyModule extends RubyObject {
         RubyModule realType = this.getNonIncludedClass();
         for (Iterator iter = getMethods().entrySet().iterator(); iter.hasNext(); ) {
             Map.Entry entry = (Map.Entry) iter.next();
-            ICallable method = (ICallable) entry.getValue();
+            DynamicMethod method = (DynamicMethod) entry.getValue();
 
             // Do not clone cached methods
             if (method.getImplementationClass() == realType) {
                 // A cloned method now belongs to a new class.  Set it.
-                // TODO: Make ICallable immutable
-                ICallable clonedMethod = method.dup();
+                // TODO: Make DynamicMethod immutable
+                DynamicMethod clonedMethod = (DynamicMethod)method.dup();
                 clonedMethod.setImplementationClass(clone);
                 clone.getMethods().put(entry.getKey(), clonedMethod);
             }
@@ -1282,7 +1283,7 @@ public class RubyModule extends RubyObject {
             RubyModule realType = type.getNonIncludedClass();
             for (Iterator iter = type.getMethods().entrySet().iterator(); iter.hasNext();) {
                 Map.Entry entry = (Map.Entry) iter.next();
-                ICallable method = (ICallable) entry.getValue();
+                DynamicMethod method = (DynamicMethod) entry.getValue();
                 String methodName = (String) entry.getKey();
 
                 if (method.isUndefined()) {
@@ -1520,9 +1521,9 @@ public class RubyModule extends RubyObject {
 
             for (int i = 0; i < args.length; i++) {
                 String name = args[i].asSymbol();
-                ICallable method = searchMethod(name);
+                DynamicMethod method = searchMethod(name);
                 assert !method.isUndefined() : "undefined method '" + name + "'";
-                getSingletonClass().addMethod(name, new WrapperCallable(getSingletonClass(), method, Visibility.PUBLIC));
+                getSingletonClass().addMethod(name, new WrapperMethod(getSingletonClass(), method, Visibility.PUBLIC));
                 callMethod(context, "singleton_method_added", RubySymbol.newSymbol(getRuntime(), name));
             }
         }

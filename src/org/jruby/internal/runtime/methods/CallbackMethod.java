@@ -35,6 +35,7 @@ import org.jruby.IRuby;
 import org.jruby.RubyModule;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.DynamicMethod;
 import org.jruby.runtime.ICallable;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
@@ -84,7 +85,7 @@ public class CallbackMethod extends AbstractMethod {
         return getCallback().getArity();
     }
     
-    public ICallable dup() {
+    public DynamicMethod dup() {
         return new CallbackMethod(getImplementationClass(), callback, getVisibility());
     }
 }
