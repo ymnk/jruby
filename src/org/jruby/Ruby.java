@@ -20,6 +20,7 @@
  * Copyright (C) 2004-2005 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
+ * Copyright (C) 2006 Michael Studman <codehaus@michaelstudman.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -43,12 +44,15 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.Reader;
 import java.io.StringReader;
+import java.security.AccessControlException;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Random;
 import java.util.Stack;
 
 import org.jruby.ast.Node;
+import org.jruby.compiler.InstructionCompiler2;
+import org.jruby.ast.executable.Script;
 import org.jruby.common.RubyWarnings;
 import org.jruby.evaluator.EvaluationState;
 import org.jruby.exceptions.JumpException;
@@ -59,21 +63,29 @@ import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.javasupport.Java;
 import org.jruby.javasupport.JavaSupport;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.libraries.IConvLibrary;
 import org.jruby.libraries.JRubyLibrary;
 import org.jruby.libraries.RbConfigLibrary;
 import org.jruby.libraries.SocketLibrary;
 import org.jruby.libraries.StringIOLibrary;
 import org.jruby.libraries.StringScannerLibrary;
 import org.jruby.libraries.ZlibLibrary;
+import org.jruby.libraries.YamlLibrary;
+import org.jruby.libraries.EnumeratorLibrary;
+import org.jruby.libraries.BigDecimalLibrary;
+import org.jruby.ext.openssl.RubyOpenSSL;
+import org.jruby.libraries.DigestLibrary;
+import org.jruby.ext.Generator;
+import org.jruby.ext.Readline;
 import org.jruby.parser.Parser;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CacheMap;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.GlobalVariable;
 import org.jruby.runtime.IAccessor;
 import org.jruby.runtime.ObjectSpace;
 import org.jruby.runtime.ThreadContext;
-import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.builtin.meta.ArrayMetaClass;
 import org.jruby.runtime.builtin.meta.BignumMetaClass;
@@ -90,8 +102,10 @@ import org.jruby.runtime.builtin.meta.ProcMetaClass;
 import org.jruby.runtime.builtin.meta.StringMetaClass;
 import org.jruby.runtime.builtin.meta.SymbolMetaClass;
 import org.jruby.runtime.builtin.meta.TimeMetaClass;
+import org.jruby.runtime.load.Library;
 import org.jruby.runtime.load.LoadService;
 import org.jruby.util.BuiltinScript;
+import org.jruby.util.JRubyClassLoader;
 import org.jruby.util.JRubyFile;
 import org.jruby.util.collections.SinglyLinkedList;
 
@@ -116,9 +130,15 @@ public final class Ruby implements IRuby {
     private Random random = new Random();
 
     private RubyProc traceFunction;
-    private boolean isWithinTrace = false;
     private boolean globalAbortOnExceptionEnabled = false;
     private boolean doNotReverseLookupEnabled = false;
+    private final boolean objectSpaceEnabled;
+    
+    /**
+     * What encoding should we read source files in as...
+     * @see org.jruby.util.CommandlineParser#processArgument()
+     */
+    private String encoding = "ISO8859_1";
 
     /** safe-level:
     		0 - strings from streams/environment/ARGV are tainted (default)
@@ -140,12 +160,16 @@ public final class Ruby implements IRuby {
     private IRubyObject topSelf;
     
     // former java.lang.System concepts now internalized for MVM
-    private String currentDirectory = JRubyFile.getFileProperty("user.dir");
+    private String currentDirectory;
+    
+    private long startTime = System.currentTimeMillis();
+    
     private InputStream in;
     private PrintStream out;
     private PrintStream err;
     
     private IRubyObject verbose;
+    private IRubyObject debug;
 
     // Java support
     private JavaSupport javaSupport;
@@ -165,14 +189,43 @@ public final class Ruby implements IRuby {
     private RubyClass nilClass;
 
     private FixnumMetaClass fixnumClass;
+    
+    private IRubyObject tmsStruct;
 
     /**
      * Create and initialize a new jruby Runtime.
      */
     private Ruby(InputStream in, PrintStream out, PrintStream err) {
-    	this.in = in;
-    	this.out = out;
-    	this.err = err;
+        this.in = in;
+        this.out = out;
+        this.err = err;
+        
+        objectSpaceEnabled = true;
+        
+        try {
+            currentDirectory = JRubyFile.getFileProperty("user.dir");
+        } catch (AccessControlException accessEx) {
+            // default to "/" as current dir for applets (which can't read from FS anyway)
+            currentDirectory = "/";
+        }
+    }
+
+    /**
+     * Create and initialize a new jruby Runtime.
+     */
+    private Ruby(InputStream in, PrintStream out, PrintStream err, boolean osEnabled) {
+        this.in = in;
+        this.out = out;
+        this.err = err;
+        
+        objectSpaceEnabled = osEnabled;
+        
+        try {
+            currentDirectory = JRubyFile.getFileProperty("user.dir");
+        } catch (AccessControlException accessEx) {
+            // default to "/" as current dir for applets (which can't read from FS anyway)
+            currentDirectory = "/";
+        }
     }
 
     /**
@@ -181,7 +234,25 @@ public final class Ruby implements IRuby {
      * @return the JRuby runtime
      */
     public static IRuby getDefaultInstance() {
-        Ruby ruby = new Ruby(System.in, System.out, System.err);
+        Ruby ruby;
+        if(System.getProperty("jruby.objectspace.enabled") != null) {
+            ruby = new Ruby(System.in, System.out, System.err, Boolean.getBoolean("jruby.objectspace.enabled"));
+        } else {
+            ruby = new Ruby(System.in, System.out, System.err);
+        }
+
+        ruby.init();
+        
+        return ruby;
+    }
+
+    /**
+     * Returns a default instance of the JRuby runtime.
+     *
+     * @return the JRuby runtime
+     */
+    public static IRuby newInstance(InputStream in, PrintStream out, PrintStream err, boolean osEnabled) {
+        Ruby ruby = new Ruby(in, out, err, osEnabled);
         ruby.init();
         
         return ruby;
@@ -193,30 +264,73 @@ public final class Ruby implements IRuby {
      * @return the JRuby runtime
      */
     public static IRuby newInstance(InputStream in, PrintStream out, PrintStream err) {
-        Ruby ruby = new Ruby(in, out, err);
-        ruby.init();
-        
-        return ruby;
+        return newInstance(in, out, err, true);
     }
 
     /**
      * Evaluates a script and returns a RubyObject.
      */
     public IRubyObject evalScript(String script) {
-        return eval(parse(script, "<script>"));
+        return eval(parse(script, "<script>", getCurrentContext().getCurrentScope()));
     }
 
     public IRubyObject eval(Node node) {
         try {
             ThreadContext tc = getCurrentContext();
+            
             return EvaluationState.eval(tc, node, tc.getFrameSelf());
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
 	            return (IRubyObject)je.getSecondaryData();
-        	} else {
-        		throw je;
-        	}
+        	} 
+
+            throw je;
 		}
+    }
+
+    public IRubyObject compileAndRun(Node node) {
+        try {
+            ThreadContext tc = getCurrentContext();
+            ISourcePosition position = node.getPosition();
+            InstructionCompiler2 compiler = new InstructionCompiler2();
+            String classname = null;
+            
+            if (position != null) {
+                classname = node.getPosition().getFile();
+                if (classname.endsWith(".rb")) {
+                    classname = classname.substring(0, classname.length() - 3);
+                }
+                compiler.compile(classname, position.getFile(), node);
+            } else {
+                classname = "EVAL";
+                compiler.compile(classname, "EVAL", node);
+            }
+            
+            JRubyClassLoader loader = new JRubyClassLoader();
+            Class scriptClass = compiler.loadClasses(loader);
+            
+            Script script = (Script)scriptClass.newInstance();
+            
+            return script.run(tc, tc.getFrameSelf());
+        } catch (JumpException je) {
+            if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
+                return (IRubyObject)je.getSecondaryData();
+            } else {
+                throw je;
+            }
+        } catch (ClassNotFoundException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return null;
+        } catch (InstantiationException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return null;
+        } catch (IllegalAccessException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public RubyClass getObject() {
@@ -233,6 +347,10 @@ public final class Ruby implements IRuby {
     
     public RubyClass getFixnum() {
         return fixnumClass;
+    }
+    
+    public IRubyObject getTmsStruct() {
+        return tmsStruct;
     }
 
     /** Returns the "true" instance from the instance pool.
@@ -408,6 +526,7 @@ public final class Ruby implements IRuby {
         falseObject = new RubyBoolean(this, false);
 
         verbose = falseObject;
+        debug = falseObject;
         
         javaSupport = new JavaSupport(this);
         
@@ -417,11 +536,11 @@ public final class Ruby implements IRuby {
 
         initCoreClasses();
 
-        RubyGlobal.createGlobals(this);
-
         topSelf = TopSelfFactory.createTopSelf(this);
 
         tc.preInitBuiltinClasses(objectClass, topSelf);
+
+        RubyGlobal.createGlobals(this);
 
         initBuiltinClasses();
         
@@ -433,7 +552,12 @@ public final class Ruby implements IRuby {
 
     private void initLibraries() {
         loadService = new LoadService(this);
-        loadService.registerBuiltin("java.rb", new BuiltinScript("javasupport"));
+        loadService.registerBuiltin("java.rb", new Library() {
+                public void load(IRuby runtime) throws IOException {
+                    Java.createJavaModule(runtime);
+                    new BuiltinScript("javasupport").load(runtime);
+                }
+            });
         loadService.registerBuiltin("socket.rb", new SocketLibrary());
         loadService.registerBuiltin("rbconfig.rb", new RbConfigLibrary());
 
@@ -443,9 +567,22 @@ public final class Ruby implements IRuby {
         
         
         loadService.registerBuiltin("jruby.rb", new JRubyLibrary());
+        loadService.registerBuiltin("iconv.rb", new IConvLibrary());
         loadService.registerBuiltin("stringio.rb", new StringIOLibrary());
         loadService.registerBuiltin("strscan.rb", new StringScannerLibrary());
         loadService.registerBuiltin("zlib.rb", new ZlibLibrary());
+        loadService.registerBuiltin("yaml_internal.rb", new YamlLibrary());
+        loadService.registerBuiltin("enumerator.rb", new EnumeratorLibrary());
+        loadService.registerBuiltin("generator_internal.rb", new Generator.Service());
+        loadService.registerBuiltin("readline.rb", new Readline.Service());
+        loadService.registerBuiltin("openssl.so", new RubyOpenSSL.Service());
+        loadService.registerBuiltin("digest.so", new DigestLibrary());
+        loadService.registerBuiltin("digest.rb", new DigestLibrary());
+        loadService.registerBuiltin("digest/md5.rb", new DigestLibrary.MD5());
+        loadService.registerBuiltin("digest/rmd160.rb", new DigestLibrary.RMD160());
+        loadService.registerBuiltin("digest/sha1.rb", new DigestLibrary.SHA1());
+        loadService.registerBuiltin("digest/sha2.rb", new DigestLibrary.SHA2());
+        loadService.registerBuiltin("bigdecimal.rb", new BigDecimalLibrary());
     }
 
     private void initCoreClasses() {
@@ -497,8 +634,16 @@ public final class Ruby implements IRuby {
         new IOMetaClass(this).initializeClass();
         new ArrayMetaClass(this).initializeClass();
         
-        Java.createJavaModule(this);
-        RubyStruct.createStructClass(this);
+        RubyClass structClass = RubyStruct.createStructClass(this);
+        
+        tmsStruct = RubyStruct.newInstance(structClass,
+                new IRubyObject[] {
+            newString("Tms"),
+            newSymbol("utime"),
+            newSymbol("stime"),
+            newSymbol("cutime"),
+            newSymbol("cstime")});
+        
         RubyFloat.createFloatClass(this);
         
         new BignumMetaClass(this).initializeClass();
@@ -528,7 +673,7 @@ public final class Ruby implements IRuby {
         RubyClass runtimeError = defineClass("RuntimeError", standardError);
         RubyClass ioError = defineClass("IOError", standardError);
         RubyClass scriptError = defineClass("ScriptError", exceptionClass);
-        RubyClass nameError = defineClass("NameError", standardError);
+        RubyClass nameError = RubyNameError.createNameErrorClass(this, standardError);
         RubyClass rangeError = defineClass("RangeError", standardError);
         defineClass("SystemExit", exceptionClass);
         defineClass("Fatal", exceptionClass);
@@ -554,8 +699,10 @@ public final class Ruby implements IRuby {
         NativeException.createClass(this, runtimeError);
         systemCallError = defineClass("SystemCallError", standardError);
         errnoModule = defineModule("Errno");
-        
+       
         initErrnoErrors();
+
+        defineClass("Data",objectClass);
     }
 
     private void initBuiltinClasses() {
@@ -614,6 +761,7 @@ public final class Ruby implements IRuby {
         createSysErr(IErrno.ESRCH, "ESRCH");       
         createSysErr(IErrno.ECONNREFUSED, "ECONNREFUSED");
         createSysErr(IErrno.ECONNRESET, "ECONNRESET");
+        createSysErr(IErrno.EADDRINUSE, "EADDRINUSE");
     }
 
     /**
@@ -637,6 +785,20 @@ public final class Ruby implements IRuby {
      */
     public void setVerbose(IRubyObject verbose) {
         this.verbose = verbose;
+    }
+
+	/** Getter for property isDebug.
+     * @return Value of property isDebug.
+     */
+    public IRubyObject getDebug() {
+        return debug;
+    }
+
+    /** Setter for property isDebug.
+     * @param debug New value of property isDebug.
+     */
+    public void setDebug(IRubyObject debug) {
+        this.debug = debug;
     }
 
     public JavaSupport getJavaSupport() {
@@ -664,16 +826,12 @@ public final class Ruby implements IRuby {
         globalVariables.defineReadonly(name, new ValueAccessor(value));
     }
 
-    public Node parse(Reader content, String file) {
-        return parser.parse(file, content);
+    public Node parse(Reader content, String file, DynamicScope scope) {
+        return parser.parse(file, content, scope);
     }
 
-    public Node parse(String content, String file) {
-        return parser.parse(file, content);
-    }
-
-    public Parser getParser() {
-        return parser;
+    public Node parse(String content, String file, DynamicScope scope) {
+        return parser.parse(file, content, scope);
     }
 
     public ThreadService getThreadService() {
@@ -697,7 +855,12 @@ public final class Ruby implements IRuby {
     }
 
     public PrintStream getErrorStream() {
-        return new PrintStream(((RubyIO) getGlobalVariables().get("$stderr")).getOutStream());
+        java.io.OutputStream os = ((RubyIO) getGlobalVariables().get("$stderr")).getOutStream();
+        if(null != os) {
+            return new PrintStream(os);
+        } else {
+            return new PrintStream(new org.jruby.util.SwallowingOutputStream());
+        }
     }
 
     public InputStream getInputStream() {
@@ -729,21 +892,20 @@ public final class Ruby implements IRuby {
             return;
         }
 
-        RubyArray backtrace = (RubyArray) excp.callMethod("backtrace");
+        ThreadContext tc = getCurrentContext();
+        IRubyObject backtrace = excp.callMethod(tc, "backtrace");
 
         PrintStream errorStream = getErrorStream();
-		if (backtrace.isNil()) {
-            ThreadContext tc = getCurrentContext();
-            
+        if (backtrace.isNil() || !(backtrace instanceof RubyArray)) {
             if (tc.getSourceFile() != null) {
                 errorStream.print(tc.getPosition());
             } else {
                 errorStream.print(tc.getSourceLine());
             }
-        } else if (backtrace.getLength() == 0) {
+        } else if (((RubyArray) backtrace).getLength() == 0) {
             printErrorPos(errorStream);
         } else {
-            IRubyObject mesg = backtrace.first(IRubyObject.NULL_ARRAY);
+            IRubyObject mesg = ((RubyArray) backtrace).first(IRubyObject.NULL_ARRAY);
 
             if (mesg.isNil()) {
                 printErrorPos(errorStream);
@@ -785,9 +947,7 @@ public final class Ruby implements IRuby {
             }
         }
 
-        if (!backtrace.isNil()) {
-            excp.printBacktrace(errorStream);
-        }
+        excp.printBacktrace(errorStream);
 	}
 
 	private void printErrorPos(PrintStream errorStream) {
@@ -833,10 +993,7 @@ public final class Ruby implements IRuby {
                 self.extendObject(context.getRubyClass());
             }
 
-            /* default visibility is private at loading toplevel */
-            context.setCurrentVisibility(Visibility.PRIVATE);
-
-        	Node node = parse(source, scriptName);
+        	Node node = parse(source, scriptName, null);
             self.eval(node);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
@@ -862,15 +1019,13 @@ public final class Ruby implements IRuby {
                 
                 context.preNodeEval(null, objectClass, self);
             } else {
+
                 /* load in anonymous module as toplevel */
                 context.preNodeEval(RubyModule.newModule(this, null), context.getWrapper(), self);
                 
                 self = getTopSelf().rbClone();
                 self.extendObject(context.getRubyClass());
             }
-            
-            /* default visibility is private at loading toplevel */
-            context.setCurrentVisibility(Visibility.PRIVATE);
             
             self.eval(node);
         } catch (JumpException je) {
@@ -906,40 +1061,31 @@ public final class Ruby implements IRuby {
      * MRI: eval.c - call_trace_func
      *
      */
-    public synchronized void callTraceFunction(
-        String event,
-        ISourcePosition position,
-        IRubyObject self,
-        String name,
-        IRubyObject type) {
-        if (!isWithinTrace && traceFunction != null) {
-            ThreadContext tc = getCurrentContext();
-            isWithinTrace = true;
+    public void callTraceFunction(ThreadContext context, String event, ISourcePosition position, 
+            IRubyObject self, String name, IRubyObject type) {
+        if (traceFunction == null) return;
 
-            ISourcePosition savePosition = tc.getPosition();
+        if (!context.isWithinTrace()) {
+            context.setWithinTrace(true);
+
+            ISourcePosition savePosition = context.getPosition();
             String file = position.getFile();
 
-            if (file == null) {
-                file = "(ruby)";
-            }
-            if (type == null) {
-				type = getFalse();
-			}
-            tc.preTrace();
+            if (file == null) file = "(ruby)";
+            if (type == null) type = getFalse(); 
+
+            context.preTrace();
 
             try {
-                traceFunction
-                    .call(new IRubyObject[] {
-                        newString(event),
-                        newString(file),
+                traceFunction.call(new IRubyObject[] { newString(event), newString(file),
                         newFixnum(position.getEndLine()),
                         name != null ? RubySymbol.newSymbol(this, name) : getNil(),
-                        self != null ? self: getNil(),
+                        self != null ? self : getNil(),
                         type });
             } finally {
-                tc.postTrace();
-                tc.setPosition(savePosition);
-                isWithinTrace = false;
+                context.postTrace();
+                context.setPosition(savePosition);
+                context.setWithinTrace(false);
             }
         }
     }
@@ -1137,12 +1283,12 @@ public final class Ruby implements IRuby {
     	return newRaiseException(getClass("NotImplementedError"), message);
     }
 
-    public RaiseException newNoMethodError(String message) {
-    	return newRaiseException(getClass("NoMethodError"), message);
+    public RaiseException newNoMethodError(String message, String name) {
+        return new RaiseException(new RubyNameError(this, this.getClass("NoMethodError"), message, name), true);
     }
 
-    public RaiseException newNameError(String message) {
-    	return newRaiseException(getClass("NameError"), message);
+    public RaiseException newNameError(String message, String name) {
+        return new RaiseException(new RubyNameError(this, this.getClass("NameError"), message, name), true);
     }
 
     public RaiseException newLocalJumpError(String message) {
@@ -1285,5 +1431,21 @@ public final class Ruby implements IRuby {
     public void unregisterInspecting(Object obj) {
         java.util.Map val = (java.util.Map)inspect.get();
         val.remove(obj);
+    }
+
+    public boolean isObjectSpaceEnabled() {
+        return objectSpaceEnabled;
+    }
+
+    public long getStartTime() {
+        return startTime;
+    }
+
+    public void setEncoding(String encoding) {
+        this.encoding = encoding;
+    }
+    
+    public String getEncoding() {
+        return encoding;
     }
 }

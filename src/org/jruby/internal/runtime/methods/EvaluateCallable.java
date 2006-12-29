@@ -29,13 +29,14 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime.methods;
 
-import org.jruby.IRuby;
 import org.jruby.RubyModule;
 import org.jruby.ast.Node;
+import org.jruby.ast.CallNode;
 import org.jruby.ast.types.IArityNode;
 import org.jruby.evaluator.EvaluationState;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.ICallable;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -57,14 +58,14 @@ public class EvaluateCallable extends AbstractCallable {
     	this(node, null, procArityOf(vars));
     }
     
-    public void preMethod(IRuby runtime, RubyModule implementationClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
+    public void preMethod(ThreadContext context, RubyModule implementationClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
     }
     
-    public void postMethod(IRuby runtime) {
+    public void postMethod(ThreadContext context) {
     }
 
-    public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
-        return EvaluationState.eval(runtime.getCurrentContext(), node, receiver);
+    public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+        return EvaluationState.eval(context, node, receiver);
     }
 
     public Node getNode() {
@@ -80,7 +81,10 @@ public class EvaluateCallable extends AbstractCallable {
             return Arity.optional();
         } else if (node instanceof IArityNode) {
             return ((IArityNode) node).getArity();
-        } 
+        } else if (node instanceof CallNode) {
+            return Arity.singleArgument();
+        }
+
 
         throw new Error("unexpected type " + node.getClass() + " at " + node.getPosition());
     }

@@ -14,7 +14,7 @@
  * Copyright (C) 2002 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
- * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2004-2006 Thomas E Enebo <enebo@acm.org>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -32,22 +32,28 @@ package org.jruby.ast;
 
 import java.util.List;
 
+import org.jruby.ast.types.INameNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
 
 /**
- *
- * @author  jpetersen
+ * Access a local variable 
  */
-public class LocalVarNode extends Node {
+public class LocalVarNode extends Node implements INameNode {
     static final long serialVersionUID = 8562701804939317217L;
 
-    private final int count;
+    // The name of the variable
+    private final String name;
+    
+    // A scoped location of this variable (high 16 bits is how many scopes down and low 16 bits
+    // is what index in the right scope to set the value.
+    private final int location;
 
-    public LocalVarNode(ISourcePosition position, int count) {
+    public LocalVarNode(ISourcePosition position, int location, String name) {
         super(position, NodeTypes.LOCALVARNODE);
-        this.count = count;
+        this.location = location;
+        this.name = name;
     }
 
     /**
@@ -59,11 +65,31 @@ public class LocalVarNode extends Node {
     }
 
     /**
-     * Gets the count.
-     * @return Returns a int
+     * How many scopes should we burrow down to until we need to set the block variable value.
+     * 
+     * @return 0 for current scope, 1 for one down, ...
      */
-    public int getCount() {
-        return count;
+    public int getDepth() {
+        return location >> 16;
+    }
+    
+    /**
+     * Gets the index within the scope construct that actually holds the eval'd value
+     * of this local variable
+     * 
+     * @return Returns an int offset into storage structure
+     */
+    public int getIndex() {
+        return location & 0xffff;
+    }
+
+    /**
+     * What is the name of this variable
+     * 
+     * @return the name of the variable
+     */
+    public String getName() {
+        return name;
     }
     
     public List childNodes() {

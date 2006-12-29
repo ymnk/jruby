@@ -34,40 +34,43 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.jruby.IRuby;
 import org.jruby.RubyThread;
 import org.jruby.runtime.ThreadContext;
+import org.jruby.util.collections.WeakHashSet;
 
 public class ThreadService {
     private IRuby runtime;
     private ThreadContext mainContext;
-    private ThreadContextLocal localContext;
+    private ThreadLocal localContext;
     private ThreadGroup rubyThreadGroup;
-    private List rubyThreadList;
+    private Set rubyThreadList;
     private Thread mainThread;
     private RubyThread criticalThread;
 
     public ThreadService(IRuby runtime) {
         this.runtime = runtime;
         this.mainContext = new ThreadContext(runtime);
-        this.localContext = new ThreadContextLocal(mainContext);
+        this.localContext = new ThreadLocal();
         this.rubyThreadGroup = new ThreadGroup("Ruby Threads#" + runtime.hashCode());
-        this.rubyThreadList = Collections.synchronizedList(new ArrayList());
+        this.rubyThreadList = Collections.synchronizedSet(new WeakHashSet());
         
         // Must be called from main thread (it is currently, but this bothers me)
         mainThread = Thread.currentThread();
+        localContext.set(mainContext);
         rubyThreadList.add(mainThread);
     }
 
     public void disposeCurrentThread() {
-        localContext.dispose();
+        localContext.set(null);
     }
 
     public ThreadContext getCurrentContext() {
         ThreadContext tc = (ThreadContext) localContext.get();
         
-        if (tc == mainContext && Thread.currentThread() != mainThread) {
+        if (tc == null) {
             tc = adoptCurrentThread();
         }
         
@@ -92,22 +95,24 @@ public class ThreadService {
     
     public synchronized RubyThread[] getActiveRubyThreads() {
     	// all threads in ruby thread group plus main thread
+
+        synchronized(rubyThreadList) {
+            List rtList = new ArrayList(rubyThreadList.size());
         
-        List rtList = new ArrayList(rubyThreadList.size());
-        
-        for (Iterator iter = rubyThreadList.iterator(); iter.hasNext();) {
-            Thread t = (Thread)iter.next();
+            for (Iterator iter = rubyThreadList.iterator(); iter.hasNext();) {
+                Thread t = (Thread)iter.next();
             
-            if (!t.isAlive()) continue;
+                if (!t.isAlive()) continue;
             
-            RubyThread rt = getRubyThreadFromThread(t);
-            rtList.add(rt);
-        }
+                RubyThread rt = getRubyThreadFromThread(t);
+                rtList.add(rt);
+            }
         
-        RubyThread[] rubyThreads = new RubyThread[rtList.size()];
-        rtList.toArray(rubyThreads);
+            RubyThread[] rubyThreads = new RubyThread[rtList.size()];
+            rtList.toArray(rubyThreads);
     	
-    	return rubyThreads;
+            return rubyThreads;
+        }
     }
     
     public ThreadGroup getRubyThreadGroup() {
@@ -168,26 +173,6 @@ public class ThreadService {
 
 	public RubyThread getCriticalThread() {
     	return criticalThread;
-    }
-
-    private static class ThreadContextLocal extends ThreadLocal {
-        private ThreadContext mainContext;
-
-        public ThreadContextLocal(ThreadContext mainContext) {
-            this.mainContext = mainContext;
-        }
-
-        /**
-         * @see java.lang.ThreadLocal#initialValue()
-         */
-        protected Object initialValue() {
-            return this.mainContext;
-        }
-
-        public void dispose() {
-            this.mainContext = null;
-            set(null);
-        }
     }
 
 }

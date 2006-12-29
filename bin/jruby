@@ -58,12 +58,12 @@ if [ -z "$JRUBY_OPTS" ] ; then
 fi
 
 if [ -z "$JAVA_HOME" ] ; then
-  echo You must set JAVA_HOME to point at your Java Development Kit installation
-  exit 1
+  JAVA_CMD='java'
 else
   if $cygwin; then
     JAVA_HOME=`cygpath -u "$JAVA_HOME"`
   fi
+  JAVA_CMD="$JAVA_HOME/bin/java"
 fi
 
 JRUBY_SHELL=/bin/sh
@@ -85,9 +85,15 @@ else
    CP_DELIMETER=":"
 fi
 
-for i in "$JRUBY_HOME"/lib/*.jar; do
-  CP=$CP$CP_DELIMETER$i
-done
+# add necessary jars for command-line execution
+CP=$CP$CP_DELIMETER"$JRUBY_HOME"/lib/asm-2.2.2.jar
+CP=$CP$CP_DELIMETER"$JRUBY_HOME"/lib/jline-0.9.91-SNAPSHOT.jar
+CP=$CP$CP_DELIMETER"$JRUBY_HOME"/lib/jruby.jar
+CP=$CP$CP_DELIMETER"$JRUBY_HOME"/lib/jvyaml.jar
+CP=$CP$CP_DELIMETER"$JRUBY_HOME"/lib/plaincharset.jar
+CP=$CP$CP_DELIMETER"$JRUBY_HOME"/lib/jruby-openssl.jar
+CP=$CP$CP_DELIMETER"$JRUBY_HOME"/lib/bcprov-jdk15-134.jar
+CP=$CP$CP_DELIMETER"$JRUBY_HOME"/lib/bcmail-jdk15-134.jar
 
 # ----- Set Up JRUBY_BASE If Necessary -------------------------------------
 
@@ -126,7 +132,12 @@ if [ "$1" = "EN_US" ]; then
   shift
 fi
 
-  "$JAVA_HOME/bin/java" $DEBUG -Xmx256m -ea -classpath "$CP" \
+if [ "$1" = "SERVER" ]; then
+  DEBUG="-server"
+  shift
+fi
+
+  "$JAVA_CMD" $DEBUG -Xmx256m -Xss1024k -ea -classpath "$CP" \
   "-Djruby.base=$JRUBY_BASE" \
   "-Djruby.home=$JRUBY_HOME" \
   "-Djruby.lib=$JRUBY_BASE/lib" \

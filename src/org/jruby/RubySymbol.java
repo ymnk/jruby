@@ -34,14 +34,13 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 import org.jruby.internal.runtime.methods.DirectInvocationMethod;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
@@ -63,7 +62,7 @@ public class RubySymbol extends RubyObject {
             super(implementationClass, arity, visibility);
         }
         
-        public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+        public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
             RubySymbol s = (RubySymbol)receiver;
             
             return invoke(s, args);
@@ -138,7 +137,27 @@ public class RubySymbol extends RubyObject {
     }
 
     public RubyFixnum hash() {
-        return getRuntime().newFixnum(symbol.hashCode());
+        return getRuntime().newFixnum(hashCode());
+    }
+    
+    public int hashCode() {
+        return symbol.hashCode();
+    }
+    
+    public boolean equals(Object other) {
+        if (other == this) {
+            return true;
+        }
+        
+        if (other instanceof RubySymbol) {
+            RubySymbol sym = (RubySymbol)other;
+            
+            if (sym.symbol == symbol) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     public IRubyObject to_sym() {
@@ -294,24 +313,20 @@ public class RubySymbol extends RubyObject {
     }
 
     public static class SymbolTable {
-        /* Using Java's GC to keep the table free from unused symbols. */
-        private ReferenceQueue unusedSymbols = new ReferenceQueue();
+       
         private Map table = new HashMap();
-
-        public RubySymbol lookup(String name) {
-            clean();
-            WeakSymbolEntry ref = (WeakSymbolEntry) table.get(name);
-            if (ref == null) {
-                return null;
-            }
-            return (RubySymbol) ref.get();
+        
+        public IRubyObject[] all_symbols() {
+            int length = table.size();
+            IRubyObject[] array = new IRubyObject[length];
+            System.arraycopy(table.values().toArray(), 0, array, 0, length);
+            return array;
         }
-
+        
         public RubySymbol lookup(long symbolId) {
             Iterator iter = table.values().iterator();
             while (iter.hasNext()) {
-                WeakSymbolEntry entry = (WeakSymbolEntry) iter.next();
-                RubySymbol symbol = (RubySymbol) entry.get();
+                RubySymbol symbol = (RubySymbol) iter.next();
                 if (symbol != null) {
                     if (symbol.id == symbolId) {
                         return symbol;
@@ -320,43 +335,15 @@ public class RubySymbol extends RubyObject {
             }
             return null;
         }
-
-        public void store(RubySymbol symbol) {
-            clean();
-            table.put(symbol.asSymbol(), new WeakSymbolEntry(symbol, unusedSymbols));
-        }
-
         
-        public IRubyObject[] all_symbols() {
-            Object[] tmp = table.values().toArray();
-            IRubyObject[] array = new IRubyObject[tmp.length];
-            
-            for (int i = 0; i < tmp.length; i++) {
-                array[i] = (IRubyObject) ((WeakSymbolEntry) tmp[i]).get();
-            }
-
-            return array;
+        public RubySymbol lookup(String name) {
+            return (RubySymbol) table.get(name);
         }
-
-        private void clean() {
-            WeakSymbolEntry ref;
-            while ((ref = (WeakSymbolEntry) unusedSymbols.poll()) != null) {
-                table.remove(ref.name());
-            }
+        
+        public void store(RubySymbol symbol) {
+            table.put(symbol.asSymbol(), symbol);
         }
-
-        private class WeakSymbolEntry extends WeakReference {
-            private final String name;
-
-            public WeakSymbolEntry(RubySymbol symbol, ReferenceQueue queue) {
-                super(symbol, queue);
-                this.name = symbol.asSymbol();
-            }
-
-            public String name() {
-                return name;
-            }
-        }
+        
     }
     
 }

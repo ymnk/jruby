@@ -48,6 +48,7 @@ import org.jruby.RubyObject;
 import org.jruby.RubyString;
 import org.jruby.RubyStruct;
 import org.jruby.RubySymbol;
+import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -150,7 +151,7 @@ public class UnmarshalStream extends FilterInputStream {
         }
         
         if (proc != null) {
-			proc.callMethod("call", new IRubyObject[] {rubyObj});
+			proc.callMethod(getRuntime().getCurrentContext(), "call", new IRubyObject[] {rubyObj});
 		}
         return rubyObj;
     }
@@ -252,10 +253,21 @@ public class UnmarshalStream extends FilterInputStream {
     private IRubyObject userUnmarshal() throws IOException {
         String className = unmarshalObject().asSymbol();
         String marshaled = unmarshalString();
-        RubyModule classInstance = runtime.getModule(className);
-        IRubyObject result = classInstance.callMethod(
-            "_load",
-            runtime.newString(marshaled));
+        RubyModule classInstance;
+        try {
+            classInstance = runtime.getClassFromPath(className);
+        } catch (RaiseException e) {
+            if (e.getException().isKindOf(runtime.getModule("NameError"))) {
+                throw runtime.newArgumentError("undefined class/module " + className);
+            } 
+                
+            throw e;
+        }
+        if (!classInstance.respondsTo("_load")) {
+            throw runtime.newTypeError("class " + classInstance.getName() + " needs to have method `_load'");
+        }
+        IRubyObject result = classInstance.callMethod(getRuntime().getCurrentContext(),
+            "_load", runtime.newString(marshaled));
         registerLinkTarget(result);
         return result;
     }
@@ -265,7 +277,7 @@ public class UnmarshalStream extends FilterInputStream {
         IRubyObject marshaled = unmarshalObject();
         RubyClass classInstance = runtime.getClass(className);
         IRubyObject result = classInstance.newInstance(new IRubyObject[0]);;
-        result.callMethod("marshal_load",marshaled);
+        result.callMethod(getRuntime().getCurrentContext(),"marshal_load", marshaled);
         registerLinkTarget(result);
         return result;
     }

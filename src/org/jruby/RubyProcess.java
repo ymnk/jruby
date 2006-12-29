@@ -43,7 +43,7 @@ public class RubyProcess {
         
         RubyModule process_status = process.defineClassUnder("Status", runtime.getObject()); 
 
-        //CallbackFactory processCallbackFactory = runtime.callbackFactory(RubyProcess.class);
+        CallbackFactory processCallbackFactory = runtime.callbackFactory(RubyProcess.class);
         CallbackFactory process_statusCallbackFactory = runtime.callbackFactory(RubyProcess.RubyStatus.class);
 
 //        process.defineModuleFunction("fork", processCallbackFactory.getSingletonMethod("fork"));
@@ -89,10 +89,10 @@ public class RubyProcess {
 //        process.defineModuleFunction("groups=", processCallbackFactory.getSingletonMethod("groups_set", IRubyObject.class));
 //        process.defineModuleFunction("maxgroups", processCallbackFactory.getSingletonMethod("maxgroups"));
 //        process.defineModuleFunction("maxgroups=", processCallbackFactory.getSingletonMethod("maxgroups_set", IRubyObject.class));
-//        process.defineModuleFunction("times", processCallbackFactory.getSingletonMethod("groups"));
+        process.defineModuleFunction("times", processCallbackFactory.getSingletonMethod("times"));
         
         // Process::Status methods  
-//        process_status.defineMethod("==", process_statusCallbackFactory.getMethod("op_eq"));
+        process_status.defineMethod("==", process_statusCallbackFactory.getMethod("op_eq", IRubyObject.class));
 //        process_status.defineMethod("&", process_statusCallbackFactory.getMethod("op_and"));
         process_status.defineMethod(">>", process_statusCallbackFactory.getMethod("rightshift_op", IRubyObject.class));
         process_status.defineMethod("to_i", process_statusCallbackFactory.getMethod("to_i"));
@@ -137,6 +137,10 @@ public class RubyProcess {
             return getRuntime().newFixnum(status >> shiftValue);
         }
         
+        public IRubyObject op_eq(IRubyObject other) {
+            return other.callMethod(getRuntime().getCurrentContext(),"==",this.to_i());
+        }
+
         public IRubyObject to_i() {
             return exitstatus();
         }
@@ -152,5 +156,25 @@ public class RubyProcess {
         public IRubyObject success_p() {
             return getRuntime().newBoolean(status == EXIT_SUCCESS);
         }
+    }
+    
+    public static IRubyObject times(IRubyObject recv) {
+        IRuby runtime = recv.getRuntime();
+        double currentTime = System.currentTimeMillis() / 1000.0;
+        double startTime = runtime.getStartTime() / 1000.0;
+        RubyFloat zero = runtime.newFloat(0.0);
+        return RubyStruct.newStruct(runtime.getTmsStruct(), new IRubyObject[] {
+                runtime.newFloat(currentTime - startTime), 
+                zero,
+                zero, 
+                zero });
+    }
+
+    public static IRubyObject pid(IRubyObject recv) {
+        return recv.getRuntime().newFixnum(0);
+    }
+
+    public static IRubyObject kill(IRubyObject recv, IRubyObject[] args) throws Exception {
+        return recv.getRuntime().getNil();
     }
 }

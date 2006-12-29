@@ -57,8 +57,10 @@ import org.jruby.RubyFixnum;
 import org.jruby.RubyInteger;
 import org.jruby.RubyModule;
 import org.jruby.RubyString;
+import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.callback.Callback;
 
@@ -249,7 +251,9 @@ public class JavaClass extends JavaObject {
         Callback method = new Callback() {
             public IRubyObject execute(IRubyObject self, IRubyObject[] args) {
                 IRubyObject[] argsArray = new IRubyObject[args.length + 1];
-                argsArray[0] = self.callMethod("java_object");
+                ThreadContext context = self.getRuntime().getCurrentContext();
+                
+                argsArray[0] = self.callMethod(context, "java_object");
                 RubyArray argsAsArray = getRuntime().newArray();
                 for (int j = 0; j < args.length; j++) {
                     argsArray[j+1] = Java.ruby_to_java(proxy, args[j]);
@@ -257,8 +261,8 @@ public class JavaClass extends JavaObject {
                 }
 
                 IRubyObject[] mmArgs = new IRubyObject[] {methods, argsAsArray};
-                IRubyObject result = javaUtilities.callMethod("matching_method", mmArgs);
-                return Java.java_to_ruby(self, result.callMethod("invoke", argsArray));
+                IRubyObject result = javaUtilities.callMethod(context, "matching_method", mmArgs);
+                return Java.java_to_ruby(self, result.callMethod(context, "invoke", argsArray));
             }
 
             public Arity getArity() {
@@ -448,7 +452,7 @@ public class JavaClass extends JavaObject {
             constructor = javaClass().getConstructor(parameterTypes);
             return new JavaConstructor(getRuntime(), constructor);
         } catch (NoSuchMethodException nsme) {
-            throw getRuntime().newNameError("no matching java constructor");
+            throw getRuntime().newNameError("no matching java constructor", null);
         }
     }
 
@@ -459,7 +463,7 @@ public class JavaClass extends JavaObject {
             constructor = javaClass().getDeclaredConstructor (parameterTypes);
             return new JavaConstructor(getRuntime(), constructor);
         } catch (NoSuchMethodException nsme) {
-            throw getRuntime().newNameError("no matching java constructor");
+            throw getRuntime().newNameError("no matching java constructor", null);
         }
     }
 
@@ -506,7 +510,7 @@ public class JavaClass extends JavaObject {
             Field field = javaClass().getField(stringName);
 			return new JavaField(getRuntime(),field);
         } catch (NoSuchFieldException nsfe) {
-            throw getRuntime().newNameError(undefinedFieldMessage(stringName));
+            throw undefinedFieldError(stringName);
         }
     }
 
@@ -516,15 +520,15 @@ public class JavaClass extends JavaObject {
             Field field = javaClass().getDeclaredField(stringName);
 			return new JavaField(getRuntime(),field);
         } catch (NoSuchFieldException nsfe) {
-            throw getRuntime().newNameError(undefinedFieldMessage(stringName));
+            throw undefinedFieldError(stringName);
         }
     }
 
-	private String undefinedFieldMessage(String stringName) {
-		return "undefined field '" + stringName + "' for class '" + javaClass().getName() + "'";
-	}
+    private RaiseException undefinedFieldError(String name) {
+        return getRuntime().newNameError("undefined field '" + name + "' for class '" + javaClass().getName() + "'", name);
+    }
 
-	public RubyArray interfaces() {
+    public RubyArray interfaces() {
         Class[] interfaces = javaClass().getInterfaces();
         RubyArray result = getRuntime().newArray(interfaces.length);
         for (int i = 0; i < interfaces.length; i++) {

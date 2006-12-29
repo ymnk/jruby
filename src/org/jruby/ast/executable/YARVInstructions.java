@@ -36,7 +36,7 @@ public interface YARVInstructions {
     public static final int SETLOCAL = 2;
     public static final int GETSPECIAL = 3;
     public static final int SETSPECIAL = 4;
-    public static final int GETDYAMIC = 5;
+    public static final int GETDYNAMIC = 5;
     public static final int SETDYNAMIC = 6;
     public static final int GETINSTANCEVARIABLE = 7;
     public static final int SETINSTANCEVARIABLE = 8;
@@ -69,6 +69,7 @@ public interface YARVInstructions {
     public static final int SWAP = 35;
     public static final int REPUT = 36;
     public static final int TOPN = 37;
+    public static final int SETN = 9999;
     public static final int EMPTSTACK = 38;
     public static final int DEFINEMETHOD = 39;
     public static final int ALIAS = 40;
@@ -151,4 +152,7 @@ public interface YARVInstructions {
     public static final int UNIFIED_DUP_SETLOCAL = 117;
     public static final int UNIFIED_GETLOCAL_GETLOCAL = 118;
     public static final int UNIFIED_GETLOCAL_PUTOBJECT = 119;
+    
+    public static final int FCALL_FLAG = 1;
+    public static final int VCALL_FLAG = 2;
 }

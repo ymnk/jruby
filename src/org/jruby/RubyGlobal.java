@@ -19,6 +19,7 @@
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Tim Azzopardi <tim@tigerfive.com>
  * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
+ * Copyright (C) 2006 Michael Studman <codehaus@michaelstudman.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -44,6 +45,7 @@ import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.runtime.Constants;
 import org.jruby.runtime.GlobalVariable;
 import org.jruby.runtime.ReadonlyGlobalVariable;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /** This class initializes global variables and constants.
@@ -67,7 +69,7 @@ public class RubyGlobal {
                 throw getRuntime().newTypeError("can't convert " + key.getMetaClass() + " into String");
             }
 
-            return super.aref(key.callMethod("to_str"));
+            return super.aref(key.callMethod(getRuntime().getCurrentContext(), "to_str"));
         }
 
         public IRubyObject aset(IRubyObject key, IRubyObject value) {
@@ -78,8 +80,10 @@ public class RubyGlobal {
                 throw getRuntime().newTypeError("can't convert " + value.getMetaClass() + " into String");
             }
 
-            return super.aset(key.callMethod("to_str"),
-                    value.isNil() ? getRuntime().getNil() : value.callMethod("to_str"));
+            ThreadContext context = getRuntime().getCurrentContext();
+            
+            return super.aset(key.callMethod(context, "to_str"),
+                    value.isNil() ? getRuntime().getNil() : value.callMethod(context, "to_str"));
         }
     }
     
@@ -129,6 +133,7 @@ public class RubyGlobal {
         runtime.defineGlobalConstant("STDERR", stderr);
 
         runtime.defineVariable(new LoadedFeatures(runtime, "$\""));
+        runtime.defineVariable(new LoadedFeatures(runtime, "$LOADED_FEATURES"));
 
         runtime.defineVariable(new LoadPath(runtime, "$:"));
         runtime.defineVariable(new LoadPath(runtime, "$-I"));
@@ -242,14 +247,19 @@ public class RubyGlobal {
 
         public IRubyObject get() {
             IRubyObject errorInfo = runtime.getGlobalVariables().get("$!");
-            return errorInfo.isNil() ? runtime.getNil() : errorInfo.callMethod("backtrace");
+            IRubyObject backtrace = errorInfo.isNil() ? runtime.getNil() : errorInfo.callMethod(errorInfo.getRuntime().getCurrentContext(), "backtrace");
+            //$@ returns nil if $!.backtrace is not an array
+            if (!(backtrace instanceof RubyArray)) {
+                backtrace = runtime.getNil();
+            }
+            return backtrace;
         }
 
         public IRubyObject set(IRubyObject value) {
             if (runtime.getGlobalVariables().get("$!").isNil()) {
                 throw runtime.newArgumentError("$! not set.");
             }
-            runtime.getGlobalVariables().get("$!").callMethod("set_backtrace", value);
+            runtime.getGlobalVariables().get("$!").callMethod(value.getRuntime().getCurrentContext(), "set_backtrace", value);
             return value;
         }
     }

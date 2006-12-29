@@ -31,6 +31,7 @@
 package org.jruby.yaml;
 
 import java.util.Date;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -132,7 +133,7 @@ public class JRubyConstructor extends ConstructorImpl {
 
     public static Object constructYamlStr(final Constructor ctor, final Node node) {
         final org.jruby.RubyString str = (org.jruby.RubyString)((JRubyConstructor)ctor).constructRubyScalar(node);
-        return str.getValue().length() == 0 ? str.getRuntime().getNil() : str;
+        return (str.getValue().length() == 0 && ((org.jvyaml.nodes.ScalarNode)node).getStyle() == 0) ? str.getRuntime().getNil() : str;
     }
 
     public static Object constructYamlSeq(final Constructor ctor, final Node node) {
@@ -148,7 +149,15 @@ public class JRubyConstructor extends ConstructorImpl {
     }
 
     public static Object constructYamlTimestamp(final Constructor ctor, final Node node) {
-        return ((JRubyConstructor)ctor).runtime.newTime(((Date)SafeConstructorImpl.constructYamlTimestamp(ctor,node)).getTime());
+        return ((JRubyConstructor)ctor).runtime.newTime(((Date)SafeConstructorImpl.constructYamlTimestamp(ctor,node)).getTime()).callMethod(((JRubyConstructor)ctor).runtime.getCurrentContext(),"utc");
+    }
+
+    public static Object constructYamlTimestampYMD(final Constructor ctor, final Node node) {
+        Date d = (Date)SafeConstructorImpl.constructYamlTimestamp(ctor,node);
+        Calendar c = Calendar.getInstance();
+        c.setTime(d);
+        IRuby runtime = ((JRubyConstructor)ctor).runtime;
+        return runtime.getClass("Date").callMethod(runtime.getCurrentContext(),"new",new IRubyObject[]{runtime.newFixnum(c.get(Calendar.YEAR)),runtime.newFixnum(c.get(Calendar.MONTH)+1),runtime.newFixnum(c.get(Calendar.DAY_OF_MONTH)),});
     }
 
     public static Object constructYamlInt(final Constructor ctor, final Node node) {
@@ -159,6 +168,9 @@ public class JRubyConstructor extends ConstructorImpl {
     }
     public static Object constructYamlBinary(final Constructor ctor, final Node node) {
         return ((JRubyConstructor)ctor).runtime.newString(((String)SafeConstructorImpl.constructYamlBinary(ctor,node)));
+    }
+    public static Object constructJava(final Constructor ctor, final String pref, final Node node) {
+        return SafeConstructorImpl.constructJava(ctor,pref,node);
     }
     public static Object constructRuby(final Constructor ctor, final String tag, final Node node) {
         final IRuby runtime = ((JRubyConstructor)ctor).runtime;
@@ -193,7 +205,25 @@ public class JRubyConstructor extends ConstructorImpl {
         final Map vars = (Map)(ctor.constructMapping(node));
         for(final Iterator iter = vars.keySet().iterator();iter.hasNext();) {
             final IRubyObject key = (IRubyObject)iter.next();
-            oo.callMethod("[]=",new IRubyObject[]{key,(IRubyObject)vars.get(key)});
+            oo.callMethod(oo.getRuntime().getCurrentContext(),"[]=", new IRubyObject[]{key,(IRubyObject)vars.get(key)});
+        }
+        return oo;
+    }
+
+    public static Object constructRubySequence(final Constructor ctor, final String tag, final Node node) {
+        final IRuby runtime = ((JRubyConstructor)ctor).runtime;
+        RubyModule objClass = runtime.getModule("Object");
+        if(tag != null) {
+            final String[] nms = tag.split("::");
+            for(int i=0,j=nms.length;i<j;i++) {
+                objClass = (RubyModule)objClass.getConstant(nms[i]);
+            }
+        }
+        final RubyClass theCls = (RubyClass)objClass;
+        final RubyObject oo = (RubyObject)theCls.allocate();
+        final List vars = (List)(ctor.constructSequence(node));
+        for(final Iterator iter = vars.iterator();iter.hasNext();) {
+            oo.callMethod(oo.getRuntime().getCurrentContext(),"<<", new IRubyObject[]{(IRubyObject)iter.next()});;
         }
         return oo;
     }
@@ -239,6 +269,11 @@ public class JRubyConstructor extends ConstructorImpl {
                     return constructYamlTimestamp(self,node);
                 }
             });
+        addConstructor("tag:yaml.org,2002:timestamp#ymd",new YamlConstructor() {
+                public Object call(final Constructor self, final Node node) {
+                    return constructYamlTimestampYMD(self,node);
+                }
+            });
         addConstructor("tag:yaml.org,2002:str",new YamlConstructor() {
                 public Object call(final Constructor self, final Node node) {
                     return constructYamlStr(self,node);
@@ -264,15 +299,24 @@ public class JRubyConstructor extends ConstructorImpl {
                     return self.constructPrivateType(node);
                 }
             });
-
         addMultiConstructor("tag:yaml.org,2002:map:",new YamlMultiConstructor() {
                 public Object call(final Constructor self, final String pref, final Node node) {
                     return constructRubyMap(self,pref,node);
                 }
             });
-        addMultiConstructor("!ruby/object:",new YamlMultiConstructor() {
+        addMultiConstructor("tag:yaml.org,2002:seq:",new YamlMultiConstructor() {
+                public Object call(final Constructor self, final String pref, final Node node) {
+                    return constructRubySequence(self,pref,node);
+                }
+            });
+        addMultiConstructor("tag:yaml.org,2002:ruby/object:",new YamlMultiConstructor() {
                 public Object call(final Constructor self, final String pref, final Node node) {
                     return constructRuby(self,pref,node);
+                }
+            });
+        addMultiConstructor("tag:yaml.org,2002:java/object:",new YamlMultiConstructor() {
+                public Object call(final Constructor self, final String pref, final Node node) {
+                    return constructJava(self,pref,node);
                 }
             });
     }

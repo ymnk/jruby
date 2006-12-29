@@ -35,10 +35,12 @@ package org.jruby;
 import java.util.List;
 
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
 import org.jruby.util.IdUtil;
+import org.jruby.exceptions.RaiseException;
 
 /**
  * @author  jpetersen
@@ -87,7 +89,7 @@ public class RubyStruct extends RubyObject {
         RubyClass structClass = type.getRuntime().getClass("Struct");
 
         while (type != null && type != structClass) {
-        	IRubyObject variable = type.getInstanceVariable(name);
+            IRubyObject variable = type.getInstanceVariable(name);
             if (variable != null) {
                 return variable;
             }
@@ -103,7 +105,7 @@ public class RubyStruct extends RubyObject {
     }
 
     private void modify() {
-    	testFrozen("Struct is frozen");
+        testFrozen("Struct is frozen");
 
         if (!isTaint() && getRuntime().getSafeLevel() >= 4) {
             throw getRuntime().newSecurityError("Insecure: can't modify struct");
@@ -123,7 +125,7 @@ public class RubyStruct extends RubyObject {
             }
         }
 
-        throw getRuntime().newNameError(name + " is not struct member");
+        throw notStructMemberError(name);
     }
 
     private IRubyObject getByName(String name) {
@@ -137,7 +139,7 @@ public class RubyStruct extends RubyObject {
             }
         }
 
-        throw getRuntime().newNameError(name + " is not struct member");
+        throw notStructMemberError(name);
     }
 
     // Struct methods
@@ -166,7 +168,7 @@ public class RubyStruct extends RubyObject {
             newStruct = new RubyClass((RubyClass) recv);
         } else {
             if (!IdUtil.isConstant(name)) {
-                throw recv.getRuntime().newNameError("identifier " + name + " needs to be constant");
+                throw recv.getRuntime().newNameError("identifier " + name + " needs to be constant", name);
             }
             newStruct = ((RubyClass) recv).defineClassUnder(name, (RubyClass) recv);
         }
@@ -175,7 +177,7 @@ public class RubyStruct extends RubyObject {
         newStruct.setInstanceVariable("__member__", member);
 
         CallbackFactory callbackFactory = recv.getRuntime().callbackFactory(RubyStruct.class);
-		newStruct.defineSingletonMethod("new", callbackFactory.getOptSingletonMethod("newStruct"));
+        newStruct.defineSingletonMethod("new", callbackFactory.getOptSingletonMethod("newStruct"));
         newStruct.defineSingletonMethod("[]", callbackFactory.getOptSingletonMethod("newStruct"));
         newStruct.defineSingletonMethod("members", callbackFactory.getSingletonMethod("members"));
 
@@ -184,6 +186,11 @@ public class RubyStruct extends RubyObject {
             String memberName = args[i].asSymbol();
             newStruct.defineMethod(memberName, callbackFactory.getMethod("get"));
             newStruct.defineMethod(memberName + "=", callbackFactory.getMethod("set", IRubyObject.class));
+        }
+        
+        ThreadContext context = recv.getRuntime().getCurrentContext();
+        if (context.isBlockGiven()) {
+            recv.getRuntime().getCurrentContext().yieldCurrentBlock(null, newStruct, newStruct, false);
         }
 
         return newStruct;
@@ -261,7 +268,11 @@ public class RubyStruct extends RubyObject {
             }
         }
 
-        throw getRuntime().newNameError(name + " is not struct member");
+        throw notStructMemberError(name);
+    }
+
+    private RaiseException notStructMemberError(String name) {
+        return getRuntime().newNameError(name + " is not struct member", name);
     }
 
     public IRubyObject get() {
@@ -277,7 +288,7 @@ public class RubyStruct extends RubyObject {
             }
         }
 
-        throw getRuntime().newNameError(name + " is not struct member");
+        throw notStructMemberError(name);
     }
 
     public IRubyObject rbClone() {
@@ -285,10 +296,10 @@ public class RubyStruct extends RubyObject {
 
         clone.values = new IRubyObject[values.length];
         System.arraycopy(values, 0, clone.values, 0, values.length);
-        
+
         clone.setFrozen(this.isFrozen());
         clone.setTaint(this.isTaint());
-        
+
         return clone;
     }
 
@@ -310,7 +321,7 @@ public class RubyStruct extends RubyObject {
     }
 
     public IRubyObject to_s() {
-        return getRuntime().newString("#<" + getMetaClass().getName() + ">");
+        return inspect();
     }
 
     public IRubyObject inspect() {
@@ -320,7 +331,7 @@ public class RubyStruct extends RubyObject {
 
         StringBuffer sb = new StringBuffer(100);
 
-        sb.append("#<").append(getMetaClass().getName()).append(' ');
+        sb.append("#<struct ").append(getMetaClass().getName()).append(' ');
 
         for (int i = 0; i < member.getLength(); i++) {
             if (i > 0) {
@@ -328,7 +339,7 @@ public class RubyStruct extends RubyObject {
             }
 
             sb.append(member.entry(i).asSymbol()).append("=");
-            sb.append(values[i].callMethod("inspect"));
+            sb.append(values[i].callMethod(getRuntime().getCurrentContext(), "inspect"));
         }
 
         sb.append('>');
@@ -345,8 +356,9 @@ public class RubyStruct extends RubyObject {
     }
 
     public IRubyObject each() {
+        ThreadContext context = getRuntime().getCurrentContext();
         for (int i = 0; i < values.length; i++) {
-            getRuntime().getCurrentContext().yield(values[i]);
+            context.yield(values[i]);
         }
 
         return this;
@@ -414,7 +426,7 @@ public class RubyStruct extends RubyObject {
         RubySymbol className = (RubySymbol) input.unmarshalObject();
         RubyClass rbClass = pathToClass(runtime, className.asSymbol());
         if (rbClass == null) {
-            throw runtime.newNameError("uninitialized constant " + className);
+            throw runtime.newNameError("uninitialized constant " + className, className.asSymbol());
         }
 
         int size = input.unmarshalInt();

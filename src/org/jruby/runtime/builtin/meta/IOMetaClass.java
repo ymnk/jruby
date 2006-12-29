@@ -39,6 +39,7 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.Selector;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Channel;
+import java.nio.channels.Pipe;
 
 import org.jruby.IRuby;
 import org.jruby.RubyArray;
@@ -85,6 +86,7 @@ public class IOMetaClass extends ObjectMetaClass {
 	        defineSingletonMethod("readlines", Arity.optional());
 	        defineSingletonMethod("popen", Arity.optional());
             defineSingletonMethod("select", Arity.optional());
+			defineSingletonMethod("pipe", Arity.noArguments());
 	
 	        defineMethod("<<", Arity.singleArgument(), "addString");
 			defineMethod("binmode", Arity.noArguments());
@@ -186,7 +188,7 @@ public class IOMetaClass extends ObjectMetaClass {
             if(!obj.respondsTo("to_io")) {
                 return;
             }
-            ioObj = (RubyIO) obj.callMethod("to_io");
+            ioObj = (RubyIO) obj.callMethod(obj.getRuntime().getCurrentContext(), "to_io");
         } else {
             ioObj = (RubyIO) obj;
         }
@@ -222,7 +224,7 @@ public class IOMetaClass extends ObjectMetaClass {
                 // read
                 for (Iterator i = ((RubyArray) args[0]).getList().iterator(); i.hasNext(); ) {
                     IRubyObject obj = (IRubyObject) i.next();
-                    registerSelect(selector, obj, SelectionKey.OP_READ|SelectionKey.OP_ACCEPT|SelectionKey.OP_CONNECT);
+                    registerSelect(selector, obj, SelectionKey.OP_READ|SelectionKey.OP_ACCEPT);
                 }
             }
             if (args.length > 1 && !args[1].isNil()) {
@@ -274,14 +276,11 @@ public class IOMetaClass extends ObjectMetaClass {
                     w.add(key.attachment());
                 }
             }
-            List ret = new ArrayList();
-            ret.add(RubyArray.newArray(runtime, r));
-            ret.add(RubyArray.newArray(runtime, w));
-            ret.add(RubyArray.newArray(runtime, e));
+            
             // make all sockets blocking as configured again
             for (Iterator i = selector.keys().iterator(); i.hasNext(); ) {
                 SelectionKey key = (SelectionKey) i.next();
- 		SelectableChannel channel = key.channel();
+                SelectableChannel channel = key.channel();
                 synchronized(channel.blockingLock()) {
                     boolean blocking = ((RubyIO) key.attachment()).getBlocking();
                     key.cancel();
@@ -289,6 +288,17 @@ public class IOMetaClass extends ObjectMetaClass {
                 }
             }
             selector.close();
+
+            if (r.size() == 0 && w.size() == 0 && e.size() == 0) {
+                return runtime.getNil();
+            }
+            
+            List ret = new ArrayList();
+            
+            ret.add(RubyArray.newArray(runtime, r));
+            ret.add(RubyArray.newArray(runtime, w));
+            ret.add(RubyArray.newArray(runtime, e));
+
             return RubyArray.newArray(runtime, ret);
         } catch(IOException e) {
             throw runtime.newIOError(e.getMessage());
@@ -341,6 +351,7 @@ public class IOMetaClass extends ObjectMetaClass {
     	String command = cmdObj.toString();
         ThreadContext tc = runtime.getCurrentContext();
 
+        /*
     	// only r works so throw error if anything else specified.
         if (args.length >= 2) {
             String mode = args[1].convertToString().toString();
@@ -348,12 +359,12 @@ public class IOMetaClass extends ObjectMetaClass {
                 throw runtime.newNotImplementedError("only 'r' currently supported");
             }
         }
-    	
+    	*/
     	try {
     		//TODO Unify with runInShell()
 	    	Process process;
 	    	String shell = System.getProperty("jruby.shell");
-	        if (shell != null) {
+                if (shell != null) {
 	            String shellSwitch = "-c";
 	            if (!shell.endsWith("sh")) {
 	                shellSwitch = "/c";
@@ -361,7 +372,7 @@ public class IOMetaClass extends ObjectMetaClass {
 	            process = Runtime.getRuntime().exec(new String[] { shell, shellSwitch, command });
 	        } else {
 	            process = Runtime.getRuntime().exec(command);
-	        }
+                }
 	    	
 	    	RubyIO io = new RubyIO(runtime, process);
 	    	
@@ -381,4 +392,14 @@ public class IOMetaClass extends ObjectMetaClass {
         	throw runtime.newThreadError("unexpected interrupt");
         }
     }
+
+	// NIO based pipe
+	public IRubyObject pipe() throws Exception {
+		IRuby runtime = getRuntime();
+		Pipe pipe = Pipe.open();
+		return runtime.newArray(new IRubyObject[]{
+			new RubyIO(runtime, pipe.source()),
+			new RubyIO(runtime, pipe.sink())
+			});
+	}
 }

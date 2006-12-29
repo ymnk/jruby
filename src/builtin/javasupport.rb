@@ -13,8 +13,9 @@
 #
 # Copyright (C) 2002 Anders Bengtsson <ndrsbngtssn@yahoo.se>
 # Copyright (C) 2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
-# Copyright (C) 2004-2005 Thomas E Enebo <enebo@acm.org>
+# Copyright (C) 2004-2006 Thomas E Enebo <enebo@acm.org>
 # Copyright (C) 2004 David Corbin <dcorbin@users.sourceforge.net>
+# Copyright (C) 2006 Michael Studman <me@michaelstudman.com>
 # 
 # Alternatively, the contents of this file may be used under the terms of
 # either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -117,26 +118,21 @@ class JavaProxy
     
     def setup_constants
       fields = java_class.fields
-      constants = fields.select {|field|
-        field.static? and field.final? and JavaUtilities.valid_constant_name?(field.name)
-      }.each {|constant|
-        const_set(constant.name, Java.java_to_ruby(constant.static_value))
-      }
-      naughty_constants = fields.select {|field|
-        field.static? and field.final? and !JavaUtilities.valid_constant_name?(field.name)
-      }
+      class_methods = java_class.java_class_methods.collect! { |m| m.name } 
 
-      class_methods = java_class.java_class_methods.collect! { |m| m.name }
-
-      naughty_constants.each do |constant|
-        name = constant.name
-        # Do not add any constants that has same-name class method
-        next if class_methods.detect {|m| m == name }
-
-        class_eval do
-          singleton_class.send(:define_method, name) do |*args|
-            Java.java_to_ruby(java_class.field(name).static_value)
+      fields.each do |field|
+        if field.static? and field.final? and JavaUtilities.valid_constant_name?(field.name)
+          const_set(field.name, Java.java_to_ruby(field.static_value))
+        elsif (field.static? and field.final? and !JavaUtilities.valid_constant_name?(field.name)) or
+            (field.public? and field.static? and !field.final? && !JavaUtilities.valid_constant_name?(field.name))
+            
+          next if class_methods.detect {|m| m == field.name } 
+          class_eval do
+            singleton_class.send(:define_method, field.name) do |*args|
+              Java.java_to_ruby(java_class.field(field.name).static_value)
+            end
           end
+
         end
       end
     end
@@ -186,6 +182,10 @@ class JavaProxy
   
   def to_java_object
     java_object
+  end
+
+  def synchronized
+    java_object.synchronized { yield }
   end
 end
 
@@ -457,7 +457,7 @@ module Java
 
    def method_missing(sym, *args)
      if sym.to_s.downcase[0] == sym.to_s[0]
-       Package.create_package sym, sym
+       Package.create_package sym, sym, Java
      else
        JavaUtilities.get_proxy_class "#{sym}"
      end
@@ -469,16 +469,18 @@ module Java
      @name = name
    end
 
+   def singleton; class << self; self; end; end 
+
    def method_missing(sym, *args)
      if sym.to_s.downcase[0] == sym.to_s[0]
-       self.class.create_package sym, "#{@name}.#{sym}"
+       self.class.create_package sym, "#{@name}.#{sym}", singleton
      else
        JavaUtilities.get_proxy_class "#{@name}.#{sym}"
      end
    end
 
    class << self
-     def create_package(sym, package_name, cls=self)
+     def create_package(sym, package_name, cls)
        package = Java::Package.new package_name
        cls.send(:define_method, sym) { package }
        package
@@ -487,10 +489,13 @@ module Java
  end
 end
 
-Java::Package.create_package(:java, :java, Kernel)
-Java::Package.create_package(:javax, :javax, Kernel)
-Java::Package.create_package(:org, :org, Kernel)
-Java::Package.create_package(:com, :com, Kernel)
+# Create convenience methods for top-level java packages so we do not need to prefix
+# with 'Java::'.  We undef these methods within Package in case we run into 'com.foo.com'.
+[:java, :javax, :com, :org].each do |meth|
+ Java::Package.create_package(meth, meth, Kernel)
+ Java::Package.send(:undef_method, meth)
+end
 
 require 'builtin/java/exceptions'
 require 'builtin/java/collections'
+require 'builtin/java/interfaces'

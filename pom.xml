@@ -5,10 +5,10 @@
   <groupId>org.jruby</groupId>
   <artifactId>jruby</artifactId>
   <packaging>jar</packaging>
-  <version>0.9.1-SNAPSHOT</version>
+  <version>0.9.3-SNAPSHOT</version>
   <name>JRuby</name>
   <url>http://www.jruby.org/</url>
-  <description>A 1.8.2 compatible Ruby interpreter written in 100% pure Java</description>
+  <description>A 1.8.5 compatible Ruby interpreter written in 100% pure Java</description>
 
   <issueManagement>
     <system>JIRA</system>
@@ -79,6 +79,7 @@
       <groupId>bsf</groupId>
       <artifactId>bsf</artifactId>
       <version>2.3.0</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>ant</groupId>
@@ -89,7 +90,7 @@
     <dependency>
       <groupId>jvyaml</groupId>
       <artifactId>jvyaml</artifactId>
-      <version>1.0</version>
+      <version>0.2.1</version>
       <scope>system</scope>
       <systemPath>${basedir}/lib/jvyaml.jar</systemPath>
     </dependency>
@@ -97,9 +98,29 @@
       <groupId>asm</groupId>
       <artifactId>asm</artifactId>
       <version>2.2.2</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>bouncycastle</groupId>
+      <artifactId>bcprov-jdk15</artifactId>
+      <version>134</version>
       <scope>system</scope>
-      <systemPath>${basedir}/lib/asm-2.2.2.jar</systemPath>
-    </dependency>                                                                                                                                                          
+      <systemPath>${basedir}/lib/bcprov-jdk15-134.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>bouncycastle</groupId>
+      <artifactId>bcmail-jdk15</artifactId>
+      <version>134</version>
+      <scope>system</scope>
+      <systemPath>${basedir}/lib/bcmail-jdk15-134.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>jline</groupId>
+      <artifactId>jline</artifactId>
+      <version>0.9.91-SNAPSHOT</version>
+      <scope>system</scope>
+      <systemPath>${basedir}/lib/jline-0.9.91-SNAPSHOT.jar</systemPath>
+    </dependency>
   </dependencies>
 
   <build>
@@ -176,7 +197,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <!-- surefire not working yet -->
-          <skip>true</skip>
+          <skip>true</skip> 
           <includes>
             <include>org/jruby/test/MainTestSuite.java</include>
           </includes>
@@ -199,3 +220,4 @@
     </plugins>
   </build>
 </project>
+

@@ -140,7 +140,7 @@ public class FileMetaClass extends IOMetaClass {
             constants.setConstant("LOCK_UN", runtime.newFixnum(RubyFile.LOCK_UN));
 	
 	        // TODO Singleton methods: atime, blockdev?, chardev?, chown, ctime, directory? 
-	        // TODO Singleton methods: executable?, executable_real?, extname,
+	        // TODO Singleton methods: executable?, executable_real?, 
 	        // TODO Singleton methods: ftype, grpowned?, lchmod, lchown, link, mtime, owned?
 	        // TODO Singleton methods: pipe?, readlink, setgid?, setuid?, socket?, 
 	        // TODO Singleton methods: stat, sticky?, symlink, symlink?, umask, utime
@@ -153,6 +153,7 @@ public class FileMetaClass extends IOMetaClass {
 	        defineSingletonMethod("delete", Arity.optional(), "unlink");
 			defineSingletonMethod("dirname", Arity.singleArgument());
 	        defineSingletonMethod("expand_path", Arity.optional());
+			defineSingletonMethod("extname", Arity.singleArgument());
             defineSingletonMethod("fnmatch", Arity.optional());
             defineSingletonMethod("fnmatch?", Arity.optional(), "fnmatch");
 			defineSingletonMethod("join", Arity.optional());
@@ -317,6 +318,17 @@ public class FileMetaClass extends IOMetaClass {
 			return getRuntime().newString("/");
 		}
 		return getRuntime().newString(name.substring(0, index)).infectBy(filename);
+	}
+
+	public IRubyObject extname(IRubyObject arg) {
+		RubyString filename = RubyString.stringValue(arg);
+		String name = filename.toString();
+        int ix = name.lastIndexOf(".");
+        if(ix == -1) {
+            return getRuntime().newString("");
+        } else {
+            return getRuntime().newString(name.substring(ix));
+        }
 	}
     
     public IRubyObject expand_path(IRubyObject[] args) {
@@ -495,17 +507,17 @@ public class FileMetaClass extends IOMetaClass {
 
 	    file.openInternal(path, modes);
 
-	    if (tryToYield && tc.isBlockGiven()) {
+        if (fileMode != null) {
+            chmod(new IRubyObject[] {fileMode, pathString});
+        }
+
+        if (tryToYield && tc.isBlockGiven()) {
             IRubyObject value = getRuntime().getNil();
 	        try {
 	            value = tc.yield(file);
 	        } finally {
 	            file.close();
 	        }
-            
-            if (fileMode != null) {
-                chmod(new IRubyObject[] {fileMode, pathString});
-            }
 	        
 	        return value;
 	    }
@@ -519,9 +531,10 @@ public class FileMetaClass extends IOMetaClass {
         oldNameString.checkSafeString();
         newNameString.checkSafeString();
         JRubyFile oldFile = JRubyFile.create(getRuntime().getCurrentDirectory(),oldNameString.toString());
-        
-        if (!oldFile.exists()) {
-        	throw getRuntime().newErrnoENOENTError("No such file: " + oldNameString);
+        JRubyFile newFile = JRubyFile.create(getRuntime().getCurrentDirectory(),newNameString.toString());
+
+        if (!oldFile.exists() || !newFile.getParentFile().exists()) {
+        	throw getRuntime().newErrnoENOENTError("No such file or directory - " + oldNameString + " or " + newNameString);
         }
         oldFile.renameTo(JRubyFile.create(getRuntime().getCurrentDirectory(),newNameString.toString()));
         
@@ -556,8 +569,28 @@ public class FileMetaClass extends IOMetaClass {
     }
     
     public IRubyObject symlink_p(IRubyObject arg1) {
-    	// FIXME if possible, make this return something real (Java's lack of support for symlinks notwithstanding)
-    	return getRuntime().getFalse();
+    	RubyString filename = RubyString.stringValue(arg1);
+        
+        JRubyFile file = JRubyFile.create(getRuntime().getCurrentDirectory(), filename.toString());
+        
+        try {
+            // Only way to determine symlink is to compare canonical and absolute files
+            // However symlinks in containing path must not produce false positives, so we check that first
+            File absoluteParent = file.getAbsoluteFile().getParentFile();
+            File canonicalParent = file.getAbsoluteFile().getParentFile().getCanonicalFile();
+
+            if (canonicalParent.getAbsolutePath().equals(absoluteParent.getAbsolutePath())) {
+                // parent doesn't change when canonicalized, compare absolute and canonical file directly
+                return file.getAbsolutePath().equals(file.getCanonicalPath()) ? getRuntime().getFalse() : getRuntime().getTrue();
+            }
+
+            // directory itself has symlinks (canonical != absolute), so build new path with canonical parent and compare
+            file = JRubyFile.create(getRuntime().getCurrentDirectory(), canonicalParent.getAbsolutePath() + "/" + file.getName());
+            return file.getAbsolutePath().equals(file.getCanonicalPath()) ? getRuntime().getFalse() : getRuntime().getTrue();
+        } catch (IOException ioe) {
+            // problem canonicalizing the file; nothing we can do but return false
+            return getRuntime().getFalse();
+        }
     }
 
     // Can we produce IOError which bypasses a close?

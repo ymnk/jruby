@@ -37,10 +37,7 @@ package org.jruby.exceptions;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-import org.jruby.IRuby;
-import org.jruby.NativeException;
-import org.jruby.RubyClass;
-import org.jruby.RubyException;
+import org.jruby.*;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -50,8 +47,7 @@ public class RaiseException extends JumpException {
 	private RubyException exception;
 
     public RaiseException(RubyException actException) {
-    	super(JumpType.RaiseJump);
-        setException(actException, false);
+    	this(actException, false);
     }
 
     public RaiseException(IRuby runtime, RubyClass excptnClass, String msg, boolean nativeException) {
@@ -59,9 +55,14 @@ public class RaiseException extends JumpException {
         if (msg == null) {
             msg = "No message available";
         }
-        setException((RubyException) excptnClass.callMethod("new", excptnClass.getRuntime().newString(msg)), nativeException);
+        setException((RubyException) excptnClass.callMethod(runtime.getCurrentContext(), "new", excptnClass.getRuntime().newString(msg)), nativeException);
     }
-    
+
+    public RaiseException(RubyException exception, boolean isNativeException) {
+        super(JumpType.RaiseJump);
+        setException(exception, isNativeException);
+    }
+
     public static RaiseException createNativeRaiseException(IRuby runtime, Throwable cause) {
         NativeException nativeException = new NativeException(runtime, runtime.getClass(NativeException.CLASS_NAME), cause);
         return new RaiseException(cause, nativeException);
@@ -98,17 +99,15 @@ public class RaiseException extends JumpException {
      */
     protected void setException(RubyException newException, boolean nativeException) {
         IRuby runtime = newException.getRuntime();
-        ThreadContext tc = runtime.getCurrentContext();
-        
-        runtime.getGlobalVariables().set("$!", newException);
+        ThreadContext context = runtime.getCurrentContext();
+
+        if (!context.isWithinDefined()) {
+            runtime.getGlobalVariables().set("$!", newException);
+        }
 
         if (runtime.getTraceFunction() != null) {
-            runtime.callTraceFunction(
-                "return",
-                tc.getPosition(),
-                tc.getFrameSelf(),
-                tc.getFrameLastFunc(),
-                tc.getFrameLastClass());
+            runtime.callTraceFunction(context, "return", context.getPosition(),
+                    context.getFrameSelf(), context.getFrameLastFunc(), context.getFrameLastClass());
         }
 
         this.exception = newException;
@@ -119,9 +118,9 @@ public class RaiseException extends JumpException {
 
         runtime.setStackTraces(runtime.getStackTraces() + 1);
 
-        if (newException.callMethod("backtrace").isNil() && tc.getSourceFile() != null) {
-            IRubyObject backtrace = tc.createBacktrace(0, nativeException);
-            newException.callMethod("set_backtrace", backtrace);
+        if (newException.callMethod(context, "backtrace").isNil() && context.getSourceFile() != null) {
+            IRubyObject backtrace = context.createBacktrace(0, nativeException);
+            newException.callMethod(context, "set_backtrace", backtrace);
         }
 
         runtime.setStackTraces(runtime.getStackTraces() - 1);

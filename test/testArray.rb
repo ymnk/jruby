@@ -82,6 +82,20 @@ test_equal([1], Array[1])
 test_equal([], Array[])
 test_equal([1,2], Array[1,2])
 
+##### insert ####
+
+a = [10, 11]
+a.insert(1, 12)
+test_equal([10, 12, 11], a)
+a = []
+a.insert(-1, 10)
+test_equal([10], a)
+a.insert(-2, 11)
+test_equal([11, 10], a)
+a = [10]
+a.insert(-1, 11)
+test_equal([10, 11], a)
+
 ##### == #####
 class AryTest
   def to_ary; [1,2]; end
@@ -94,6 +108,15 @@ end
 test_equal(ArrayExt, ArrayExt.new.class)
 test_equal(ArrayExt, ArrayExt[:foo, :bar].class)
 
+##### flatten #####
+a = [2,[3,[4]]]
+test_equal([1,2,3,4],[1,a].flatten)
+test_equal([2,[3,[4]]],a)
+a = [[1,2,[3,[4],[5]],6,[7,[8]]],9]
+test_equal([1,2,3,4,5,6,7,8,9],a.flatten)
+test_ok(a.flatten!,"We did flatten")
+test_ok(!a.flatten!,"We didn't flatten")
+
 ##### splat test #####
 class ATest
   def to_a; 1; end
@@ -101,3 +124,38 @@ end
 
 proc { |a| test_equal(1, a) }.call(*1)
 test_exception(TypeError) { proc { |a| }.call(*ATest.new) }
+
+#### index test ####
+class AlwaysEqual
+  def ==(arg)
+    true
+  end
+end
+
+array_of_alwaysequal = [AlwaysEqual.new]
+# this should pass because index should call AlwaysEqual#== when searching
+test_equal(0, array_of_alwaysequal.index("foo"))
+test_equal(0, array_of_alwaysequal.rindex("foo"))
+
+#### <=>
+
+test_equal(0, [] <=> [])
+test_equal(0, [1] <=> [1])
+test_equal(-1, [1] <=> [2])
+test_equal(1, [2] <=> [1])
+test_equal(1, [1] <=> [])
+test_equal(-1, [] <=> [1])
+
+test_equal(0, [1, 1] <=> [1, 1])
+test_equal(-1, [1, 1] <=> [1, 2])
+
+test_equal(1, [1,6,1] <=> [1,5,0,1])
+test_equal(-1, [1,5,0,1] <=> [1,6,1])
+
+class BadComparator
+  def <=>(other)
+    "hello"
+  end
+end
+
+test_equal("hello", [BadComparator.new] <=> [BadComparator.new])

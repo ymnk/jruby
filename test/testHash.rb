@@ -48,6 +48,7 @@ test_equal(20, h.default(2))
 test_equal(nil, h.default)
 
 h.default = 5
+test_equal(5,h.default)
 test_equal(nil, h.default_proc)
 
 test_equal(5, h[12])
@@ -78,3 +79,9 @@ end
   h.each{|*a| test_equal([[:key, :value]], a)}
   h.each{|k,v| test_equal([:key, :value], [k,v])}
 }
+
+# each_pair should splat args correctly
+{:a=>:b}.each_pair do |*x|
+        test_equal(:a,x[0])
+        test_equal(:b,x[1])
+end

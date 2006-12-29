@@ -41,6 +41,7 @@ import java.io.OutputStream;
 import java.lang.ref.WeakReference;
 import java.nio.channels.Channel;
 
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.IOHandler;
 import org.jruby.util.IOHandlerJavaIO;
@@ -175,6 +176,24 @@ public class RubyIO extends RubyObject {
         } catch (IOException e) {
             throw runtime.newIOError(e.getMessage());
         }
+        modes = handler.getModes();
+        
+        registerIOHandler(handler);
+    }
+    
+    public RubyIO(IRuby runtime, InputStream inputStream) {
+        super(runtime, runtime.getClass("IO"));
+        
+        if (inputStream == null) {
+            throw runtime.newIOError("Opening invalid stream");
+        }
+        
+        try {
+            handler = new IOHandlerUnseekable(runtime, inputStream, null);
+        } catch (IOException e) {
+            throw runtime.newIOError(e.getMessage());
+        }
+        
         modes = handler.getModes();
         
         registerIOHandler(handler);
@@ -499,7 +518,7 @@ public class RubyIO extends RubyObject {
      */
     public IRubyObject addString(IRubyObject anObject) {
         // Claims conversion is done via 'to_s' in docs.
-        IRubyObject strObject = anObject.callMethod("to_s");
+        IRubyObject strObject = anObject.callMethod(getRuntime().getCurrentContext(), "to_s");
 
         write(strObject);
         
@@ -594,19 +613,20 @@ public class RubyIO extends RubyObject {
 
         IRubyObject fs = getRuntime().getGlobalVariables().get("$,");
         IRubyObject rs = getRuntime().getGlobalVariables().get("$\\");
-
+        ThreadContext context = getRuntime().getCurrentContext();
+        
         for (int i = 0; i < args.length; i++) {
             if (i > 0 && !fs.isNil()) {
-                callMethod("write", fs);
+                callMethod(context, "write", fs);
             }
             if (args[i].isNil()) {
-                callMethod("write", getRuntime().newString("nil"));
+                callMethod(context, "write", getRuntime().newString("nil"));
             } else {
-                callMethod("write", args[i]);
+                callMethod(context, "write", args[i]);
             }
         }
         if (!rs.isNil()) {
-            callMethod("write", rs);
+            callMethod(context, "write", rs);
         }
 
         return getRuntime().getNil();
@@ -614,7 +634,7 @@ public class RubyIO extends RubyObject {
 
     public IRubyObject printf(IRubyObject[] args) {
     	checkArgumentCount(args, 1, -1);
-        callMethod("write", RubyKernel.sprintf(this, args));
+        callMethod(getRuntime().getCurrentContext(), "write", RubyKernel.sprintf(this, args));
         return getRuntime().getNil();
     }
     
@@ -633,7 +653,7 @@ public class RubyIO extends RubyObject {
         } else if (object.isKindOf(getRuntime().getFixnum())){
             c = RubyNumeric.fix2int(object);
         } else { // What case will this work for?
-            c = RubyNumeric.fix2int(object.callMethod("to_i"));
+            c = RubyNumeric.fix2int(object.callMethod(getRuntime().getCurrentContext(), "to_i"));
         }
 
         try {
@@ -838,10 +858,10 @@ public class RubyIO extends RubyObject {
 
         // Fixme: Only F_SETFL is current supported
         if (realCmd == 1L) {  // cmd is F_SETFL
-            boolean block = false;
+            boolean block = true;
             
             if((realArg & IOModes.NONBLOCK) == IOModes.NONBLOCK) {
-                block = true;
+                block = false;
             }
             
  	    if(!(handler instanceof IOHandlerNio)) {
@@ -861,9 +881,11 @@ public class RubyIO extends RubyObject {
 
     public IRubyObject puts(IRubyObject[] args) {
     	checkArgumentCount(args, 0, -1);
-    	
+        
+    	ThreadContext context = getRuntime().getCurrentContext();
+        
         if (args.length == 0) {
-            callMethod("write", getRuntime().newString("\n"));
+            callMethod(context, "write", getRuntime().newString("\n"));
             return getRuntime().getNil();
         }
 
@@ -877,7 +899,7 @@ public class RubyIO extends RubyObject {
             } else {
                 line = args[i].toString();
             }
-            callMethod("write", getRuntime().newString(line+
+            callMethod(getRuntime().getCurrentContext(), "write", getRuntime().newString(line+
             		(line.endsWith("\n") ? "" : "\n")));
         }
         return getRuntime().getNil();
@@ -935,7 +957,7 @@ public class RubyIO extends RubyObject {
             String buf = ((IOHandlerNio)handler).readpartial(RubyNumeric.fix2int(args[0]));
             IRubyObject strbuf = getRuntime().newString((buf == null ? "" : buf));
             if(args.length > 1) {
-                args[1].callMethod("<<",strbuf);
+                args[1].callMethod(getRuntime().getCurrentContext(),"<<", strbuf);
                 return args[1];
             } 
 
@@ -1019,9 +1041,10 @@ public class RubyIO extends RubyObject {
      */
     public IRubyObject each_byte() {
     	try {
+            ThreadContext context = getRuntime().getCurrentContext();
             for (int c = handler.getc(); c != -1; c = handler.getc()) {
                 assert c < 256;
-                getRuntime().getCurrentContext().yield(getRuntime().newFixnum(c));
+                context.yield(getRuntime().newFixnum(c));
             }
 
             return getRuntime().getNil();
@@ -1038,9 +1061,10 @@ public class RubyIO extends RubyObject {
      * <p>Invoke a block for each line.</p>
      */
     public RubyIO each_line(IRubyObject[] args) {
+        ThreadContext context = getRuntime().getCurrentContext();
         for (IRubyObject line = internalGets(args); !line.isNil(); 
         	line = internalGets(args)) {
-            getRuntime().getCurrentContext().yield(line);
+            context.yield(line);
         }
         
         return this;

@@ -16,10 +16,10 @@ import org.jruby.internal.runtime.GlobalVariables;
 import org.jruby.internal.runtime.ThreadService;
 import org.jruby.javasupport.JavaSupport;
 import org.jruby.lexer.yacc.ISourcePosition;
-import org.jruby.parser.Parser;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CacheMap;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.GlobalVariable;
 import org.jruby.runtime.ObjectSpace;
 import org.jruby.runtime.ThreadContext;
@@ -43,7 +43,9 @@ public interface IRuby {
 	 */
 	public IRubyObject evalScript(String script);
 
-	public IRubyObject eval(Node node);
+    public IRubyObject eval(Node node);
+
+    public IRubyObject compileAndRun(Node node);
 
 	public RubyClass getObject();
     
@@ -52,6 +54,8 @@ public interface IRuby {
     public RubyClass getString();
     
     public RubyClass getFixnum();
+    
+    public IRubyObject getTmsStruct();
 
 	/** Returns the "true" instance from the instance pool.
 	 * @return The "true" instance.
@@ -127,12 +131,16 @@ public interface IRuby {
     
     public void setCurrentDirectory(String dir);
     
+    public long getStartTime();
+    
     public InputStream getIn();
     public PrintStream getOut();
     public PrintStream getErr();
 
 	public boolean isClassDefined(String name);
 
+    public boolean isObjectSpaceEnabled();
+    
 	/** Getter for property rubyTopSelf.
 	 * @return Value of property rubyTopSelf.
 	 */
@@ -148,6 +156,16 @@ public interface IRuby {
 	 */
 	public void setVerbose(IRubyObject verbose);
 
+    /** Getter for property isDebug.
+	 * @return Value of property isDebug.
+	 */
+	public IRubyObject getDebug();
+
+	/** Setter for property isDebug.
+	 * @param verbose New value of property isDebug.
+	 */
+	public void setDebug(IRubyObject debug);
+
     public JavaSupport getJavaSupport();
 
     /** Defines a global variable
@@ -159,11 +177,25 @@ public interface IRuby {
 	 */
 	public void defineReadonlyVariable(String name, IRubyObject value);
 
-	public Node parse(Reader content, String file);
+    /**
+     * Parse the source specified by the reader and return an AST
+     * 
+     * @param content to be parsed
+     * @param file the name of the file to be used in warnings/errors
+     * @param scope that this content is being parsed under
+     * @return the top of the AST
+     */
+	public Node parse(Reader content, String file, DynamicScope scope);
 
-	public Node parse(String content, String file);
-
-    public Parser getParser();
+    /**
+     * Parse the source specified by the string and return an AST
+     * 
+     * @param content to be parsed
+     * @param file the name of the file to be used in warnings/errors
+     * @param scope that this content is being parsed under
+     * @return the top of the AST
+     */
+	public Node parse(String content, String file, DynamicScope scope);
 
 	public ThreadService getThreadService();
 
@@ -216,7 +248,7 @@ public interface IRuby {
 	 * MRI: eval.c - call_trace_func
 	 *
 	 */
-	public void callTraceFunction(String event, ISourcePosition position,
+	public void callTraceFunction(ThreadContext context, String event, ISourcePosition position,
 			IRubyObject self, String name, IRubyObject type);
 
 	public RubyProc getTraceFunction();
@@ -315,9 +347,9 @@ public interface IRuby {
 
     public RaiseException newNotImplementedError(String message);
 
-    public RaiseException newNoMethodError(String message);
+    public RaiseException newNoMethodError(String message, String name);
 
-    public RaiseException newNameError(String message);
+    public RaiseException newNameError(String message, String name);
 
     public RaiseException newLocalJumpError(String message);
 
@@ -371,4 +403,7 @@ public interface IRuby {
 
     public boolean registerInspecting(Object obj);
     public void unregisterInspecting(Object obj);
+
+    public void setEncoding(String encoding);
+    public String getEncoding();
 }

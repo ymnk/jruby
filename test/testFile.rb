@@ -37,6 +37,11 @@ test_equal("/a", File.dirname("/a/b"))
 test_equal("/a", File.dirname("/a/b/"))
 test_equal("/", File.dirname("/"))
 
+test_equal("", File.extname(""))
+test_equal("", File.extname("abc"))
+test_equal(".foo", File.extname("abc.foo"))
+test_equal(".foo", File.extname("abc.bar.foo"))
+
 # expand_path
 
 ##### fnmatch #####
@@ -147,3 +152,10 @@ test_ok(stat2.file?)
 test_equal("directory", stat.ftype)
 test_equal("file", stat2.ftype)
 test_ok(stat2.readable?)
+
+# Test File.symlink? if possible
+system("ln -s build.xml build.xml.link")
+if File.exist? "build.xml.link"
+  test_ok(File.symlink?("build.xml.link"))
+  File.delete("build.xml.link")
+end

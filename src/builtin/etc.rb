@@ -1,13 +1,15 @@
-Struct.new("Tms", :utime, :stime, :cutime, :cstime)
-
-module Process
-    def self.times
-      Struct::Tms.new(0, 0, 0, 0)
-    end
+module Signal
+  def self.trap(sig)
+    # do nothing
+  end
 end
 
-module Signal
-	def self.trap(sig)
-		# do nothing
-	end
+class Continuation
+  def [](*args)
+    call(*args)
+  end
+  
+  def call(*args)
+    warn "Continuation#call: Continuations are not implemented in JRuby and will not work"
+  end
 end

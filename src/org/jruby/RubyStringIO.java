@@ -12,6 +12,7 @@
  * rights and limitations under the License.
  *
  * Copyright (C) 2006 Ola Bini <ola@ologix.com>
+ * Copyright (C) 2006 Ryan Bell <ryan.l.bell@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -106,7 +107,7 @@ public class RubyStringIO extends RubyObject {
         RubyString str = recv.getRuntime().newString("");
         IRubyObject mode = recv.getRuntime().getNil();
         if (args.length > 0) {
-            str = (RubyString)args[0];
+            str = args[0].convertToString();
             if (args.length > 1) {
                 mode = args[1];
             }
@@ -140,7 +141,7 @@ public class RubyStringIO extends RubyObject {
     public IRubyObject initialize(IRubyObject[] args) {
         internal = new StringBuffer();
         if (checkArgumentCount(args, 0, 2) > 0) {
-            internal.append(((RubyString)args[0]).getValue());
+            internal.append(args[0].convertToString().getValue());
         }
         return this;
     }
@@ -186,8 +187,9 @@ public class RubyStringIO extends RubyObject {
 
    public IRubyObject each(IRubyObject[] args) {
        IRubyObject line = gets(args);
+       ThreadContext context = getRuntime().getCurrentContext();
        while (!line.isNil()) {
-           getRuntime().getCurrentContext().yield(line);
+           context.yield(line);
            line = gets(args);
        }
        return this;
@@ -330,6 +332,10 @@ public class RubyStringIO extends RubyObject {
     }
 
     public IRubyObject puts(IRubyObject[] obj) {
+        if (obj.length == 0) {
+            append(getRuntime().newString("\n"));
+        }
+        
         for (int i=0,j=obj.length;i<j;i++) {
             append(obj[i]);
             internal.replace((int)pos,(int)(++pos),("\n"));
@@ -360,8 +366,8 @@ public class RubyStringIO extends RubyObject {
             return getRuntime().newString("");
         } else {
             if (args.length>1) {
-                ((RubyString)args[1]).cat(buf);
-                ret = args[1];
+                ret = args[1].convertToString();
+								((RubyString)ret).setValue(buf);
             } else {
                 ret = getRuntime().newString(buf);
             }
@@ -398,8 +404,10 @@ public class RubyStringIO extends RubyObject {
             pos = 0L;
             lineno = 0;
             eof = false;
+            closedRead = false;
+            closedWrite = false;
             internal = new StringBuffer();
-            internal.append(((RubyString)str).getValue());
+            internal.append(str.convertToString().getValue());
         }
         return this;
     }

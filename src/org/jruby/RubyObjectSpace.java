@@ -34,6 +34,7 @@ package org.jruby;
 import java.util.Iterator;
 
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RubyObjectSpace {
@@ -46,6 +47,7 @@ public class RubyObjectSpace {
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyObjectSpace.class);
         objectSpaceModule.defineModuleFunction("each_object", callbackFactory.getOptSingletonMethod("each_object"));
         objectSpaceModule.defineModuleFunction("garbage_collect", callbackFactory.getSingletonMethod("garbage_collect"));
+        objectSpaceModule.defineModuleFunction("_id2ref", callbackFactory.getSingletonMethod("id2ref", RubyFixnum.class));
         objectSpaceModule.defineModuleFunction("define_finalizer", 
         		callbackFactory.getOptSingletonMethod("define_finalizer"));
         objectSpaceModule.defineModuleFunction("undefine_finalizer", 
@@ -57,13 +59,34 @@ public class RubyObjectSpace {
     // FIXME: Figure out feasibility of this...
     public static IRubyObject define_finalizer(IRubyObject recv, IRubyObject[] args) {
         // Put in to fake tempfile.rb out.
+        recv.getRuntime().getWarnings().warn("JRuby does not currently support defining finalizers");
         return recv;
     }
 
     // FIXME: Figure out feasibility of this...
     public static IRubyObject undefine_finalizer(IRubyObject recv, IRubyObject[] args) {
         // Put in to fake other stuff out.
+        recv.getRuntime().getWarnings().warn("JRuby does not currently support defining finalizers");
         return recv;
+    }
+
+    public static IRubyObject id2ref(IRubyObject recv, RubyFixnum id) {
+        IRuby runtime = id.getRuntime();
+        long longId = id.getLongValue();
+        if (longId == 0) {
+            return runtime.getFalse();
+        } else if (longId == 2) {
+            return runtime.getTrue();
+        } else if (longId == 4) {
+            return runtime.getNil();
+        } else if (longId % 2 != 0) { // odd
+            return runtime.newFixnum((longId - 1) / 2);
+        } else {
+            IRubyObject object = runtime.getObjectSpace().id2ref(longId);
+            if (object == null)
+                runtime.newRangeError("not an id value");
+            return object;
+        }
     }
     
     public static IRubyObject each_object(IRubyObject recv, IRubyObject[] args) {
@@ -76,9 +99,10 @@ public class RubyObjectSpace {
         int count = 0;
         Iterator iter = recv.getRuntime().getObjectSpace().iterator(rubyClass);
         IRubyObject obj = null;
+        ThreadContext context = recv.getRuntime().getCurrentContext();
         while ((obj = (IRubyObject)iter.next()) != null) {
             count++;
-            recv.getRuntime().getCurrentContext().yield(obj);
+            context.yield(obj);
         }
         return recv.getRuntime().newFixnum(count);
     }

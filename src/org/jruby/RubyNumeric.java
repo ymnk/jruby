@@ -18,6 +18,7 @@
  * Copyright (C) 2002-2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
+ * Copyright (C) 2006 Antti Karanta <Antti.Karanta@napa.fi>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -36,6 +37,7 @@ package org.jruby;
 import java.math.BigInteger;
 
 import org.jruby.exceptions.RaiseException;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -90,6 +92,14 @@ public class RubyNumeric extends RubyObject {
         return (int) val;
     }
 
+    public static RubyInteger str2inum(IRuby runtime, RubyString str, int base) {
+        return str2inum(runtime,str,base,false);
+    }
+
+    public static RubyNumeric int2fix(IRuby runtime, long val) {
+        return RubyFixnum.newFixnum(runtime,val);
+    }
+
     /**
      * Converts a string representation of an integer to the integer value. 
      * Parsing starts at the beginning of the string (after leading and 
@@ -109,13 +119,17 @@ public class RubyNumeric extends RubyObject {
      * @param base  the expected base of the number (2, 8, 10 or 16), or 0 
      *              if the method should determine the base automatically 
      *              (defaults to 10).
+     * @param raise if the string is not a valid integer, raise error, otherwise return 0
      * @return  a RubyFixnum or (if necessary) a RubyBignum representing 
      *          the result of the conversion, which will be zero if the 
      *          conversion failed.
      */
-    public static RubyInteger str2inum(IRuby runtime, RubyString str, int base) {
+    public static RubyInteger str2inum(IRuby runtime, RubyString str, int base, boolean raise) {
         StringBuffer sbuf = new StringBuffer(str.toString().trim());
         if (sbuf.length() == 0) {
+            if(raise) {
+                throw runtime.newArgumentError("invalid value for Integer: " + str.callMethod(runtime.getCurrentContext(),"inspect").toString());
+            }
             return RubyFixnum.zero(runtime);
         }
         int pos = 0;
@@ -127,6 +141,9 @@ public class RubyNumeric extends RubyObject {
             sbuf.deleteCharAt(pos);
         }
         if (pos == sbuf.length()) {
+            if(raise) {
+                throw runtime.newArgumentError("invalid value for Integer: " + str.callMethod(runtime.getCurrentContext(),"inspect").toString());
+            }
             return RubyFixnum.zero(runtime);
         }
         if (sbuf.charAt(pos) == '0') {
@@ -159,15 +176,29 @@ public class RubyNumeric extends RubyObject {
             }
         }
         if (!digitsFound) {
+            if(raise) {
+                throw runtime.newArgumentError("invalid value for Integer: " + str.callMethod(runtime.getCurrentContext(),"inspect").toString());
+            }
             return RubyFixnum.zero(runtime);
         }
         try {
             long l = Long.parseLong(sbuf.substring(0, pos), radix);
             return runtime.newFixnum(l);
         } catch (NumberFormatException ex) {
-            BigInteger bi = new BigInteger(sbuf.substring(0, pos), radix);
-            return new RubyBignum(runtime, bi);
+            try {
+                BigInteger bi = new BigInteger(sbuf.substring(0, pos), radix);
+                return new RubyBignum(runtime, bi);
+            } catch(NumberFormatException e) {
+                if(raise) {
+                    throw runtime.newArgumentError("invalid value for Integer: " + str.callMethod(runtime.getCurrentContext(),"inspect").toString());
+                }
+                return RubyFixnum.zero(runtime);
+            }
         }
+    }
+
+    public static RubyFloat str2fnum(IRuby runtime, RubyString arg) {
+        return str2fnum(runtime,arg,false);
     }
 
     /**
@@ -179,15 +210,19 @@ public class RubyNumeric extends RubyObject {
      * 
      * @param runtime  the ruby runtime
      * @param arg   the string to be converted
+     * @param raise if the string is not a valid float, raise error, otherwise return 0.0
      * @return  a RubyFloat representing the result of the conversion, which
      *          will be 0.0 if the conversion failed.
      */
-    public static RubyFloat str2fnum(IRuby runtime, RubyString arg) {
+    public static RubyFloat str2fnum(IRuby runtime, RubyString arg, boolean raise) {
         String str = arg.toString().trim();
         double d = 0.0;
         int pos = str.length();
         for (int i = 0; i < pos; i++) {
             if ("0123456789eE+-.".indexOf(str.charAt(i)) == -1) {
+                if(raise) {
+                    throw runtime.newArgumentError("invalid value for Float(): " + arg.callMethod(runtime.getCurrentContext(),"inspect").toString());
+                }
                 pos = i + 1;
                 break;
             }
@@ -196,6 +231,9 @@ public class RubyNumeric extends RubyObject {
             try {
                 d = Double.parseDouble(str.substring(0, pos));
             } catch (NumberFormatException ex) {
+                if(raise) {
+                    throw runtime.newArgumentError("invalid value for Float(): " + arg.callMethod(runtime.getCurrentContext(),"inspect").toString());
+                }
                 continue;
             }
             break;
@@ -211,7 +249,7 @@ public class RubyNumeric extends RubyObject {
         IRubyObject result;
         
         try {
-            result = other.callMethod("coerce", this);
+            result = other.callMethod(getRuntime().getCurrentContext(), "coerce", this);
         } catch (RaiseException e) {
             if (error) {
                 throw getRuntime().newTypeError(other.getMetaClass().getName() + 
@@ -230,8 +268,7 @@ public class RubyNumeric extends RubyObject {
 
     protected IRubyObject callCoerced(String method, IRubyObject other) {
         IRubyObject[] args = getCoerced(other, true);
-
-        return args[0].callMethod(method, args[1]);
+        return args[0].callMethod(getRuntime().getCurrentContext(), method, args[1]);
     }
     
     public RubyNumeric asNumeric() {
@@ -248,12 +285,48 @@ public class RubyNumeric extends RubyObject {
 
         return getRuntime().newArray(other.convertToFloat(), convertToFloat());
     }
+    
+    public IRubyObject to_int() {
+        return callMethod(getRuntime().getCurrentContext(), "to_i", IRubyObject.NULL_ARRAY);
+    }
 
     /** num_clone
      *
      */
     public IRubyObject rbClone() {
         return this;
+    }
+    
+    public IRubyObject op_ge(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            return getRuntime().newBoolean(compareValue((RubyNumeric) other) >= 0);
+        } 
+        
+        return RubyComparable.op_ge(this, other);
+    }
+    
+    public IRubyObject op_gt(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            return getRuntime().newBoolean(compareValue((RubyNumeric) other) > 0);
+        } 
+        
+        return RubyComparable.op_gt(this, other);
+    }
+
+    public IRubyObject op_le(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            return getRuntime().newBoolean(compareValue((RubyNumeric) other) <= 0);
+        } 
+        
+        return RubyComparable.op_le(this, other);
+    }
+    
+    public IRubyObject op_lt(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            return getRuntime().newBoolean(compareValue((RubyNumeric) other) < 0);
+        } 
+        
+        return RubyComparable.op_lt(this, other);
     }
 
     /** num_uplus
@@ -269,21 +342,21 @@ public class RubyNumeric extends RubyObject {
     public IRubyObject op_uminus() {
         RubyArray coerce = (RubyArray) coerce(RubyFixnum.zero(getRuntime()));
 
-        return (RubyNumeric) coerce.entry(0).callMethod("-", coerce.entry(1));
+        return (RubyNumeric) coerce.entry(0).callMethod(getRuntime().getCurrentContext(), "-", coerce.entry(1));
     }
     
     public IRubyObject cmp(IRubyObject other) {
-    	if (!(other instanceof RubyNumeric)) {
-    		return getRuntime().getNil();
-    	}
-    	
-        return getRuntime().newFixnum(compareValue((RubyNumeric) other));
+        if (other instanceof RubyNumeric) {
+            return getRuntime().newFixnum(compareValue((RubyNumeric) other));
+        }
+
+        return other.respondsTo("to_int") ? callCoerced("<=>", other) : getRuntime().getNil();
     }
 
     public IRubyObject divmod(IRubyObject other) {
     	if (other instanceof RubyNumeric) {
     	    RubyNumeric denominator = (RubyNumeric) other;
-            RubyNumeric div = (RubyNumeric) callMethod("/", denominator);
+            RubyNumeric div = (RubyNumeric) callMethod(getRuntime().getCurrentContext(), "/", denominator);
             if (div instanceof RubyFloat) {
                 double d = Math.floor(((RubyFloat) div).getValue());
                 if (((RubyFloat) div).getValue() > d) {
@@ -302,7 +375,7 @@ public class RubyNumeric extends RubyObject {
      */
     public IRubyObject modulo(IRubyObject other) {
     	if (other instanceof RubyNumeric) {
-            return (RubyNumeric) callMethod("%", other);
+            return (RubyNumeric) callMethod(getRuntime().getCurrentContext(), "%", other);
     	}
     	
     	return callCoerced("modulo", other);
@@ -315,11 +388,12 @@ public class RubyNumeric extends RubyObject {
     	if (other instanceof RubyNumeric) {
             IRubyObject mod = modulo(other);
             final RubyNumeric zero = RubyFixnum.zero(getRuntime());
+            ThreadContext context = getRuntime().getCurrentContext();
 
-            if (callMethod("<", zero).isTrue() && other.callMethod(">", zero).isTrue() || 
-                callMethod(">", zero).isTrue() && other.callMethod("<", zero).isTrue()) {
+            if (callMethod(context, "<", zero).isTrue() && other.callMethod(context, ">", zero).isTrue() || 
+                callMethod(context, ">", zero).isTrue() && other.callMethod(context, "<", zero).isTrue()) {
 
-                return (RubyNumeric) mod.callMethod("-", other);
+                return (RubyNumeric) mod.callMethod(context, "-", other);
             }
 
             return mod;
@@ -372,8 +446,9 @@ public class RubyNumeric extends RubyObject {
      *
      */
     public RubyNumeric abs() {
-        if (callMethod("<", RubyFixnum.zero(getRuntime())).isTrue()) {
-            return (RubyNumeric) callMethod("-@");
+        ThreadContext context = getRuntime().getCurrentContext();
+        if (callMethod(context, "<", RubyFixnum.zero(getRuntime())).isTrue()) {
+            return (RubyNumeric) callMethod(context, "-@");
         }
 		return this;
     }
@@ -397,7 +472,7 @@ public class RubyNumeric extends RubyObject {
      *
      */
     public IRubyObject nonzero_p() {
-        if (callMethod("zero?").isTrue()) {
+        if (callMethod(getRuntime().getCurrentContext(), "zero?").isTrue()) {
             return getRuntime().getNil();
         }
         return this;

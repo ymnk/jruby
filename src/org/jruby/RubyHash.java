@@ -89,7 +89,10 @@ public class RubyHash extends RubyObject implements Map {
     }
     
     public IRubyObject getDefaultValue(IRubyObject[] args) {
-        return defaultValueCallback != null && args.length>0 ? defaultValueCallback.execute(this, args) : getRuntime().getNil();
+        if(defaultValueCallback == null || (args.length == 0 && !capturedDefaultProc.isNil())) {
+            return getRuntime().getNil();
+        }
+        return defaultValueCallback.execute(this,args);
     }
 
     public IRubyObject setDefaultValue(final IRubyObject defaultValue) {
@@ -214,6 +217,8 @@ public class RubyHash extends RubyObject implements Map {
         final StringBuffer sb = new StringBuffer("{");
         boolean firstEntry = true;
         
+        ThreadContext context = getRuntime().getCurrentContext();
+        
         for (Iterator iter = valueMap.entrySet().iterator(); iter.hasNext(); ) {
             Map.Entry entry = (Map.Entry) iter.next();
             IRubyObject key = (IRubyObject) entry.getKey();
@@ -221,8 +226,9 @@ public class RubyHash extends RubyObject implements Map {
             if (!firstEntry) {
                 sb.append(sep);
             }
-            sb.append(key.callMethod("inspect")).append(arrow);
-            sb.append(value.callMethod("inspect"));
+            
+            sb.append(key.callMethod(context, "inspect")).append(arrow);
+            sb.append(value.callMethod(context, "inspect"));
             firstEntry = false;
         }
         sb.append("}");
@@ -292,7 +298,7 @@ public class RubyHash extends RubyObject implements Map {
     public IRubyObject aref(IRubyObject key) {
         IRubyObject value = (IRubyObject) valueMap.get(key);
 
-        return value != null ? value : callMethod("default", new IRubyObject[] {key});
+        return value != null ? value : callMethod(getRuntime().getCurrentContext(), "default", new IRubyObject[] {key});
     }
 
     public IRubyObject fetch(IRubyObject[] args) {
@@ -323,14 +329,25 @@ public class RubyHash extends RubyObject implements Map {
         return getRuntime().newBoolean(valueMap.containsValue(value));
     }
 
-    public RubyHash each() {
+	public RubyHash each() {
+		return eachInternal(false);
+	}
+
+	public RubyHash each_pair() {
+		return eachInternal(true);
+	}
+
+    protected RubyHash eachInternal(boolean aValue) {
+        ThreadContext context = getRuntime().getCurrentContext();
         for (Iterator iter = entryIterator(); iter.hasNext();) {
             checkRehashing();
             Map.Entry entry = (Map.Entry) iter.next();
-            getRuntime().getCurrentContext().yield(getRuntime().newArray((IRubyObject)entry.getKey(), (IRubyObject)entry.getValue()));
+            context.yieldCurrentBlock(getRuntime().newArray((IRubyObject)entry.getKey(), (IRubyObject)entry.getValue()), null, null, aValue);
         }
         return this;
     }
+
+	
 
     private void checkRehashing() {
         if (isRehashing) {
@@ -339,19 +356,21 @@ public class RubyHash extends RubyObject implements Map {
     }
 
     public RubyHash each_value() {
+        ThreadContext context = getRuntime().getCurrentContext();
 		for (Iterator iter = valueIterator(); iter.hasNext();) {
             checkRehashing();
 			IRubyObject value = (IRubyObject) iter.next();
-			getRuntime().getCurrentContext().yield(value);
+			context.yield(value);
 		}
 		return this;
 	}
 
 	public RubyHash each_key() {
+        ThreadContext context = getRuntime().getCurrentContext();
 		for (Iterator iter = keyIterator(); iter.hasNext();) {
 			checkRehashing();
             IRubyObject key = (IRubyObject) iter.next();
-			getRuntime().getCurrentContext().yield(key);
+			context.yield(key);
 		}
 		return this;
 	}
@@ -444,10 +463,11 @@ public class RubyHash extends RubyObject implements Map {
 	public IRubyObject reject_bang() {
 		modify();
 		boolean isModified = false;
+        ThreadContext context = getRuntime().getCurrentContext();
 		for (Iterator iter = keyIterator(); iter.hasNext();) {
 			IRubyObject key = (IRubyObject) iter.next();
 			IRubyObject value = (IRubyObject) valueMap.get(key);
-			IRubyObject shouldDelete = getRuntime().getCurrentContext().yieldCurrentBlock(getRuntime().newArray(key, value), null, null, true);
+			IRubyObject shouldDelete = context.yieldCurrentBlock(getRuntime().newArray(key, value), null, null, true);
 			if (shouldDelete.isTrue()) {
 				valueMap.remove(key);
 				isModified = true;

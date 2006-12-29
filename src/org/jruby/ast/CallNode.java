@@ -34,6 +34,7 @@ package org.jruby.ast;
 import java.io.IOException;
 import java.util.List;
 
+import org.jruby.ast.types.INameNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -43,12 +44,13 @@ import org.jruby.lexer.yacc.ISourcePosition;
  * 
  * @author  jpetersen
  */
-public final class CallNode extends Node {
+public final class CallNode extends Node implements INameNode, BlockAcceptingNode {
     static final long serialVersionUID = -1993752395320088525L;
 
     private final Node receiverNode;
     private String name;
     private final Node argsNode;
+    private IterNode iterNode;
 
     public CallNode(ISourcePosition position, Node receiverNode, String name, Node argsNode) {
         super(position, NodeTypes.CALLNODE);
@@ -70,6 +72,14 @@ public final class CallNode extends Node {
      **/
     public Instruction accept(NodeVisitor iVisitor) {
         return iVisitor.visitCallNode(this);
+    }
+    
+    public IterNode getIterNode() {
+        return iterNode;
+    }
+    
+    public void setIterNode(IterNode iterNode) {
+        this.iterNode = iterNode;
     }
 
     /**

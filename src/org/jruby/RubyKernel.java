@@ -21,6 +21,8 @@
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 Kiel Hodges <jruby-devel@selfsosoft.com>
  * Copyright (C) 2006 Evan Buswell <evan@heron.sytes.net>
+ * Copyright (C) 2006 Ola Bini <ola@ologix.com>
+ * Copyright (C) 2006 Michael Studman <codehaus@michaelstudman.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -50,6 +52,7 @@ import java.util.regex.Pattern;
 import org.jruby.ast.util.ArgsUtil;
 import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.exceptions.MainExitException;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ICallable;
@@ -80,10 +83,10 @@ public class RubyKernel {
         module.defineModuleFunction("Integer", callbackFactory.getSingletonMethod("new_integer", IRubyObject.class));
         module.defineModuleFunction("String", callbackFactory.getSingletonMethod("new_string", IRubyObject.class));
         module.defineModuleFunction("`", callbackFactory.getSingletonMethod("backquote", IRubyObject.class));
-        // TODO: Implement Kernel#abort
+        module.defineModuleFunction("abort", callbackFactory.getOptSingletonMethod("abort"));
         module.defineModuleFunction("at_exit", callbackFactory.getSingletonMethod("at_exit"));
         module.defineModuleFunction("autoload", callbackFactory.getSingletonMethod("autoload", IRubyObject.class, IRubyObject.class));
-        // TODO: Implement Kernel#autoload?
+        module.definePublicModuleFunction("autoload?", callbackFactory.getSingletonMethod("autoload_p", IRubyObject.class));
         module.defineModuleFunction("binding", callbackFactory.getSingletonMethod("binding"));
         module.defineModuleFunction("block_given?", callbackFactory.getSingletonMethod("block_given"));
         // TODO: Implement Kernel#callcc
@@ -104,7 +107,7 @@ public class RubyKernel {
         module.defineModuleFunction("gsub", callbackFactory.getOptSingletonMethod("gsub"));
         module.defineModuleFunction("gsub!", callbackFactory.getOptSingletonMethod("gsub_bang"));
         // TODO: Add deprecation to Kernel#iterator? (maybe formal deprecation mech.)
-        module.defineAlias("iterator?", "block_given?");
+        module.defineModuleFunction("iterator?", callbackFactory.getSingletonMethod("block_given"));
         module.defineModuleFunction("lambda", callbackFactory.getSingletonMethod("proc"));
         module.defineModuleFunction("load", callbackFactory.getOptSingletonMethod("load"));
         module.defineModuleFunction("local_variables", callbackFactory.getSingletonMethod("local_variables"));
@@ -118,7 +121,7 @@ public class RubyKernel {
         module.defineModuleFunction("proc", callbackFactory.getSingletonMethod("proc"));
         // TODO: implement Kernel#putc
         module.defineModuleFunction("puts", callbackFactory.getOptSingletonMethod("puts"));
-        module.defineAlias("raise", "fail");
+        module.defineModuleFunction("raise", callbackFactory.getOptSingletonMethod("raise"));
         module.defineModuleFunction("rand", callbackFactory.getOptSingletonMethod("rand"));
         module.defineModuleFunction("readline", callbackFactory.getOptSingletonMethod("readline"));
         module.defineModuleFunction("readlines", callbackFactory.getOptSingletonMethod("readlines"));
@@ -128,14 +131,14 @@ public class RubyKernel {
         module.defineModuleFunction("set_trace_func", callbackFactory.getSingletonMethod("set_trace_func", IRubyObject.class));
         module.defineModuleFunction("sleep", callbackFactory.getSingletonMethod("sleep", IRubyObject.class));
         module.defineModuleFunction("split", callbackFactory.getOptSingletonMethod("split"));
-        module.defineAlias("sprintf", "format");
+        module.defineModuleFunction("sprintf", callbackFactory.getOptSingletonMethod("sprintf"));
         module.defineModuleFunction("srand", callbackFactory.getOptSingletonMethod("srand"));
         module.defineModuleFunction("sub", callbackFactory.getOptSingletonMethod("sub"));
         module.defineModuleFunction("sub!", callbackFactory.getOptSingletonMethod("sub_bang"));
         // Skipping: Kernel#syscall (too system dependent)
         module.defineModuleFunction("system", callbackFactory.getOptSingletonMethod("system"));
         // TODO: Implement Kernel#exec differently?
-        module.defineAlias("exec", "system");
+        module.defineModuleFunction("exec", callbackFactory.getOptSingletonMethod("system"));
         // TODO: Implement Kernel#test (partial impl)
         module.defineModuleFunction("throw", callbackFactory.getOptSingletonMethod("rbThrow"));
         // TODO: Implement Kernel#trace_var
@@ -185,7 +188,7 @@ public class RubyKernel {
         module.definePublicModuleFunction("respond_to?", objectCallbackFactory.getOptMethod("respond_to"));
         module.definePublicModuleFunction("send", objectCallbackFactory.getOptMethod("send"));
         module.defineAlias("__send__", "send");
-        module.definePublicModuleFunction("singleton_methods", objectCallbackFactory.getMethod("singleton_methods"));
+        module.definePublicModuleFunction("singleton_methods", objectCallbackFactory.getOptMethod("singleton_methods"));
         module.definePublicModuleFunction("taint", objectCallbackFactory.getMethod("taint"));
         module.definePublicModuleFunction("tainted?", objectCallbackFactory.getMethod("tainted"));
         module.definePublicModuleFunction("untaint", objectCallbackFactory.getMethod("untaint"));
@@ -197,15 +200,39 @@ public class RubyKernel {
         return recv.getRuntime().pushExitBlock(recv.getRuntime().newProc());
     }
 
-    public static IRubyObject autoload(IRubyObject recv, IRubyObject symbol, final IRubyObject file) {
+    public static IRubyObject autoload_p(final IRubyObject recv, IRubyObject symbol) {
+        String name = symbol.asSymbol();
+        if(recv instanceof RubyModule) {
+            name = ((RubyModule)recv).getName() + "::" + name;
+        }
+        IAutoloadMethod m = recv.getRuntime().getLoadService().autoloadFor(name);
+        if(m == null) {
+            return recv.getRuntime().getNil();
+        } else {
+            return recv.getRuntime().newString(m.file());
+        }
+    }
+
+    public static IRubyObject autoload(final IRubyObject recv, IRubyObject symbol, final IRubyObject file) {
         final LoadService loadService = recv.getRuntime().getLoadService();
-        loadService.addAutoload(symbol.asSymbol(), new IAutoloadMethod() {
+        final String baseName = symbol.asSymbol();
+        String nm = baseName;
+        if(recv instanceof RubyModule) {
+            nm = ((RubyModule)recv).getName() + "::" + nm;
+        }
+        loadService.addAutoload(nm, new IAutoloadMethod() {
+                public String file() {
+                    return file.toString();
+                }
             /**
              * @see org.jruby.runtime.load.IAutoloadMethod#load(IRuby, String)
              */
             public IRubyObject load(IRuby runtime, String name) {
                 loadService.require(file.toString());
-                return runtime.getObject().getConstant(name);
+                if(recv instanceof RubyModule) {
+                    return ((RubyModule)recv).getConstant(baseName);
+                }
+                return runtime.getObject().getConstant(baseName);
             }
         });
         return recv;
@@ -218,7 +245,7 @@ public class RubyKernel {
         }
 
         String name = args[0].asSymbol();
-        String description = recv.callMethod("inspect").toString();
+        String description = recv.callMethod(runtime.getCurrentContext(), "inspect").toString();
         boolean noClass = description.length() > 0 && description.charAt(0) == '#';
         ThreadContext tc = runtime.getCurrentContext();
         Visibility lastVis = tc.getLastVisibility();
@@ -227,7 +254,7 @@ public class RubyKernel {
         String msg = new PrintfFormat(format).sprintf(new Object[] { name, description, 
             noClass ? "" : ":", noClass ? "" : recv.getType().getName()});
 
-        throw lastCallType == CallType.VARIABLE ? runtime.newNameError(msg) : runtime.newNoMethodError(msg);
+        throw lastCallType == CallType.VARIABLE ? runtime.newNameError(msg, name) : runtime.newNoMethodError(msg, name);
     }
 
     public static IRubyObject open(IRubyObject recv, IRubyObject[] args) {
@@ -272,6 +299,13 @@ public class RubyKernel {
         return line;
     }
 
+    public static IRubyObject abort(IRubyObject recv, IRubyObject[] args) {
+        if(recv.checkArgumentCount(args,0,1) == 1) {
+            recv.getRuntime().getGlobalVariables().get("$stderr").callMethod(recv.getRuntime().getCurrentContext(),"puts",args[0]);
+        }
+        throw new MainExitException(1,true);
+    }
+
     public static IRubyObject new_array(IRubyObject recv, IRubyObject object) {
         IRubyObject value = object.convertToTypeWithCheck("Array", "to_ary");
         
@@ -283,7 +317,7 @@ public class RubyKernel {
             }
             
             // Strange that Ruby has custom code here and not convertToTypeWithCheck equivalent.
-            value = object.callMethod("to_a");
+            value = object.callMethod(recv.getRuntime().getCurrentContext(), "to_a");
             if (value.getMetaClass() != recv.getRuntime().getClass("Array")) {
                 throw recv.getRuntime().newTypeError("`to_a' did not return Array");
                
@@ -294,25 +328,47 @@ public class RubyKernel {
     }
     
     public static IRubyObject new_float(IRubyObject recv, IRubyObject object) {
-        return object.callMethod("to_f");
+        if(object instanceof RubyString) {
+            return RubyNumeric.str2fnum(recv.getRuntime(),(RubyString)object,true);
+        } else {
+            return object.callMethod(recv.getRuntime().getCurrentContext(), "to_f");
+        }
     }
     
     public static IRubyObject new_integer(IRubyObject recv, IRubyObject object) {
-        return object.callMethod("to_i");
+        ThreadContext context = recv.getRuntime().getCurrentContext();
+        
+        if(object instanceof RubyString) {
+            String val = object.toString();
+            if(val.length() > 0 && val.charAt(0) == '0') {
+                if(val.length() > 1) {
+                    if(val.charAt(1) == 'x') {
+                        return RubyNumeric.str2inum(recv.getRuntime(),recv.getRuntime().newString(val.substring(2)),16,true);
+                    } else if(val.charAt(1) == 'b') {
+                        return RubyNumeric.str2inum(recv.getRuntime(),recv.getRuntime().newString(val.substring(2)),2,true);
+                    } else {
+                        return RubyNumeric.str2inum(recv.getRuntime(),recv.getRuntime().newString(val.substring(1)),8,true);
+                    }
+                }
+            }
+            return RubyNumeric.str2inum(recv.getRuntime(),(RubyString)object,10,true);
+        }
+        return object.callMethod(context,"to_i");
     }
     
     public static IRubyObject new_string(IRubyObject recv, IRubyObject object) {
-        return object.callMethod("to_s");
+        return object.callMethod(recv.getRuntime().getCurrentContext(), "to_s");
     }
     
     
     public static IRubyObject p(IRubyObject recv, IRubyObject[] args) {
         IRubyObject defout = recv.getRuntime().getGlobalVariables().get("$>");
+        ThreadContext context = recv.getRuntime().getCurrentContext();
 
         for (int i = 0; i < args.length; i++) {
             if (args[i] != null) {
-                defout.callMethod("write", args[i].callMethod("inspect"));
-                defout.callMethod("write", recv.getRuntime().newString("\n"));
+                defout.callMethod(context, "write", args[i].callMethod(context, "inspect"));
+                defout.callMethod(context, "write", recv.getRuntime().newString("\n"));
             }
         }
         return recv.getRuntime().getNil();
@@ -320,16 +376,18 @@ public class RubyKernel {
 
     public static IRubyObject puts(IRubyObject recv, IRubyObject[] args) {
         IRubyObject defout = recv.getRuntime().getGlobalVariables().get("$>");
+        ThreadContext context = recv.getRuntime().getCurrentContext();
         
-        defout.callMethod("puts", args);
+        defout.callMethod(context, "puts", args);
 
         return recv.getRuntime().getNil();
     }
 
     public static IRubyObject print(IRubyObject recv, IRubyObject[] args) {
         IRubyObject defout = recv.getRuntime().getGlobalVariables().get("$>");
+        ThreadContext context = recv.getRuntime().getCurrentContext();
 
-        defout.callMethod("print", args);
+        defout.callMethod(context, "print", args);
 
         return recv.getRuntime().getNil();
     }
@@ -343,7 +401,9 @@ public class RubyKernel {
             	args = ArgsUtil.popArray(args);
             }
 
-            defout.callMethod("write", RubyKernel.sprintf(recv, args));
+            ThreadContext context = recv.getRuntime().getCurrentContext();
+
+            defout.callMethod(context, "write", RubyKernel.sprintf(recv, args));
         }
 
         return recv.getRuntime().getNil();
@@ -521,21 +581,10 @@ public class RubyKernel {
     public static RubyArray local_variables(IRubyObject recv) {
         final IRuby runtime = recv.getRuntime();
         RubyArray localVariables = runtime.newArray();
-        ThreadContext tc = runtime.getCurrentContext();
-
-        if (tc.getFrameScope().getLocalNames() != null) {
-            for (int i = 2; i < tc.getFrameScope().getLocalNames().length; i++) {
-				String variableName = (String) tc.getFrameScope().getLocalNames()[i];
-                if (variableName != null) {
-                    localVariables.append(runtime.newString(variableName));
-                }
-            }
-        }
-
-        Iterator dynamicNames = tc.getCurrentDynamicVars().names().iterator();
-        while (dynamicNames.hasNext()) {
-            String name = (String) dynamicNames.next();
-            localVariables.append(runtime.newString(name));
+        
+        String[] names = runtime.getCurrentContext().getCurrentScope().getAllNamesInScope();
+        for (int i = 0; i < names.length; i++) {
+            localVariables.append(runtime.newString(names[i]));
         }
 
         return localVariables;
@@ -559,7 +608,7 @@ public class RubyKernel {
         RubyArray newArgs = recv.getRuntime().newArray(args);
         newArgs.shift();
 
-        return ((StringMetaClass)str.getMetaClass()).format.call(recv.getRuntime(), str, str.getMetaClass(), "%", new IRubyObject[] {newArgs}, false);
+        return ((StringMetaClass)str.getMetaClass()).format.call(recv.getRuntime().getCurrentContext(), str, str.getMetaClass(), "%", new IRubyObject[] {newArgs}, false);
     }
 
     public static IRubyObject raise(IRubyObject recv, IRubyObject[] args) {
@@ -575,6 +624,8 @@ public class RubyKernel {
         }
 
         IRubyObject exception;
+        ThreadContext context = recv.getRuntime().getCurrentContext();
+        
         if (args.length == 1) {
             if (args[0] instanceof RubyString) {
                 throw new RaiseException(RubyException.newInstance(runtime.getClass("RuntimeError"), args));
@@ -583,13 +634,13 @@ public class RubyKernel {
             if (!args[0].respondsTo("exception")) {
                 throw runtime.newTypeError("exception class/object expected");
             }
-            exception = args[0].callMethod("exception");
+            exception = args[0].callMethod(context, "exception");
         } else {
             if (!args[0].respondsTo("exception")) {
                 throw runtime.newTypeError("exception class/object expected");
             }
             
-            exception = args[0].callMethod("exception", args[1]);
+            exception = args[0].callMethod(context, "exception", args[1]);
         }
         
         if (!exception.isKindOf(runtime.getClass("Exception"))) {
@@ -618,14 +669,13 @@ public class RubyKernel {
     }
 
     public static IRubyObject load(IRubyObject recv, IRubyObject[] args) {
-        RubyString file = (RubyString)args[0];
+        RubyString file = args[0].convertToString();
         recv.getRuntime().getLoadService().load(file.toString());
         return recv.getRuntime().getTrue();
     }
 
     public static IRubyObject eval(IRubyObject recv, IRubyObject[] args) {
-        IRuby runtime = recv.getRuntime();
-        RubyString src = (RubyString) args[0];
+        RubyString src = args[0].convertToString();
         IRubyObject scope = null;
         String file = "(eval)";
         
@@ -642,17 +692,13 @@ public class RubyKernel {
         //int line = args.length > 3 ? RubyNumeric.fix2int(args[3]) : 1;
 
         src.checkSafeString();
-        ThreadContext tc = runtime.getCurrentContext();
-
-        if (scope == null && tc.getPreviousFrame() != null) {
-            try {
-                tc.preKernelEval();
-                return recv.evalSimple(src, file);
-            } finally {
-                tc.postKernelEval();
-            }
+        ThreadContext context = recv.getRuntime().getCurrentContext();
+        
+        if (scope == null) {
+            scope = recv.getRuntime().newBinding();
         }
-        return recv.evalWithBinding(src, scope, file);
+        
+        return recv.evalWithBinding(context, src, scope, file);
     }
 
     public static IRubyObject caller(IRubyObject recv, IRubyObject[] args) {
@@ -666,8 +712,10 @@ public class RubyKernel {
     }
 
     public static IRubyObject rbCatch(IRubyObject recv, IRubyObject tag) {
+        ThreadContext context = recv.getRuntime().getCurrentContext();
         try {
-            return recv.getRuntime().getCurrentContext().yield(tag);
+            context.pushCatch(tag.asSymbol());
+            return context.yield(tag);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ThrowJump) {
 	            if (je.getPrimaryData().equals(tag.asSymbol())) {
@@ -675,21 +723,33 @@ public class RubyKernel {
 	            }
         	}
        		throw je;
+        } finally {
+       		context.popCatch();
         }
     }
 
     public static IRubyObject rbThrow(IRubyObject recv, IRubyObject[] args) {
         IRuby runtime = recv.getRuntime();
-        JumpException je = new JumpException(JumpException.JumpType.ThrowJump);
+
         String tag = args[0].asSymbol();
-        IRubyObject value = args.length > 1 ? args[1] : recv.getRuntime().getNil();
-        RubyException nameException = new RubyException(runtime, runtime.getClass("NameError"), "uncaught throw '" + tag + '\'');
-        
-        je.setPrimaryData(tag);
-        je.setSecondaryData(value);
-        je.setTertiaryData(nameException);
-        
-        throw je;
+        String[] catches = runtime.getCurrentContext().getActiveCatches();
+
+        String message = "uncaught throw '" + tag + '\'';
+
+        //Ordering of array traversal not important, just intuitive
+        for (int i = catches.length - 1 ; i >= 0 ; i--) {
+            if (tag.equals(catches[i])) {
+                //Catch active, throw for catch to handle
+                JumpException je = new JumpException(JumpException.JumpType.ThrowJump);
+
+                je.setPrimaryData(tag);
+                je.setSecondaryData(args.length > 1 ? args[1] : runtime.getNil());
+                throw je;
+            }
+        }
+
+        //No catch active for this throw
+        throw runtime.newNameError(message, tag);
     }
 
     public static IRubyObject trap(IRubyObject recv, IRubyObject[] args) {
@@ -725,8 +785,9 @@ public class RubyKernel {
     }
 
     public static IRubyObject loop(IRubyObject recv) {
+        ThreadContext context = recv.getRuntime().getCurrentContext();
         while (true) {
-            recv.getRuntime().getCurrentContext().yield(recv.getRuntime().getNil());
+            context.yield(recv.getRuntime().getNil());
 
             Thread.yield();
         }
@@ -831,7 +892,7 @@ public class RubyKernel {
         String [] spaceDelimitedTokens = command.split(" ", 2);
         String [] slashDelimitedTokens = spaceDelimitedTokens[0].split("/");
         String finalToken = slashDelimitedTokens[slashDelimitedTokens.length-1];
-        if (finalToken.indexOf("ruby") != -1 || finalToken.endsWith(".rb"))
+        if (finalToken.indexOf("ruby") != -1 || finalToken.endsWith(".rb") || finalToken.indexOf("irb") != -1)
             return true;
         else
             return false;
@@ -843,12 +904,14 @@ public class RubyKernel {
     	private PrintStream out;
     	private PrintStream err;
     	private int result;
+    	private File dir;
     	
-    	public InProcessScript(String[] argArray, InputStream in, PrintStream out, PrintStream err) {
+    	public InProcessScript(String[] argArray, InputStream in, PrintStream out, PrintStream err, File dir) {
     		this.argArray = argArray;
     		this.in = in;
     		this.out = out;
     		this.err = err;
+    		this.dir = dir;
     	}
 
 		public int getResult() {
@@ -860,31 +923,44 @@ public class RubyKernel {
 		}
 		
         public void run() {
-            result = new Main(in, out, err).run(argArray);
+            String oldDir = System.getProperty("user.dir");
+            try {
+                System.setProperty("user.dir", dir.getAbsolutePath());
+                result = new Main(in, out, err).run(argArray);
+            } finally {
+                System.setProperty("user.dir", oldDir);
+            }
         }
     }
 
+    public static int runInShell(IRuby runtime, IRubyObject[] rawArgs) {
+        return runInShell(runtime,rawArgs,runtime.getOutputStream());
+    }
+
     public static int runInShell(IRuby runtime, IRubyObject[] rawArgs, OutputStream output) {
+        OutputStream error = runtime.getErrorStream();
+        InputStream input = runtime.getInputStream();
         try {
             // startup scripts set jruby.shell to /bin/sh for Unix, cmd.exe for Windows
             String shell = System.getProperty("jruby.shell");
             rawArgs[0] = runtime.newString(repairDirSeps(rawArgs[0].toString()));
             Process aProcess = null;
             InProcessScript ipScript = null;
+            File pwd = new File(runtime.evalScript("Dir.pwd").toString());
             
             if (isRubyCommand(rawArgs[0].toString())) {
                 List args = parseCommandLine(rawArgs);
-                PrintStream redirect = new PrintStream(output);
                 String command = (String)args.get(0);
 
-                String[] argArray = new String[args.size()-1];
                 // snip off ruby or jruby command from list of arguments
                 // leave alone if the command is the name of a script
                 int startIndex = command.endsWith(".rb") ? 0 : 1;
-                args.subList(startIndex,args.size()).toArray(argArray);
-
-                // FIXME: Where should we get in and err from?
-                ipScript = new InProcessScript(argArray, System.in, redirect, redirect);
+                if(command.trim().endsWith("irb")) {
+                    startIndex = 0;
+                    args.set(0,System.getProperty("jruby.home") + File.separator + "bin" + File.separator + "jirb");
+                }
+                String[] argArray = (String[])args.subList(startIndex,args.size()).toArray(new String[0]);
+                ipScript = new InProcessScript(argArray, runtime.getInputStream(), new PrintStream(output), new PrintStream(runtime.getErrorStream()), pwd);
                 
                 // execute ruby command in-process
                 ipScript.start();
@@ -897,7 +973,7 @@ public class RubyKernel {
                 argArray[0] = shell;
                 argArray[1] = shellSwitch;
                 argArray[2] = rawArgs[0].toString();
-                aProcess = Runtime.getRuntime().exec(argArray);
+                aProcess = Runtime.getRuntime().exec(argArray, new String[]{}, pwd);
             } else {
                 // execute command directly, no wildcard expansion
                 if (rawArgs.length > 1) {
@@ -905,39 +981,14 @@ public class RubyKernel {
                     for (int i=0;i<rawArgs.length;i++) {
                         argArray[i] = rawArgs[i].toString();
                     }
-                    aProcess = Runtime.getRuntime().exec(argArray);
+                    aProcess = Runtime.getRuntime().exec(argArray, new String[]{}, pwd);
                 } else {
-                    aProcess = Runtime.getRuntime().exec(rawArgs[0].toString());
+                    aProcess = Runtime.getRuntime().exec(rawArgs[0].toString(), new String[]{}, pwd);
                 }
             }
             
             if (aProcess != null) {
-                InputStream processOutput = aProcess.getInputStream();
-                
-                // Fairly innefficient impl, but readLine is unable to tell
-                // whether the last line in a process ended with a newline or not.
-                int b;
-                boolean crSeen = false;
-                while ((b = processOutput.read()) != -1) {
-                    if (b == '\r') {
-                        crSeen = true;
-                    } else {
-                        if (crSeen) {
-                            if (b != '\n') {
-                                output.write('\r');
-                            }
-                            crSeen = false;
-                        }
-                        output.write(b);
-                    }
-                }
-                if (crSeen) {
-                    output.write('\r');
-                }
-                aProcess.getErrorStream().close();
-                aProcess.getOutputStream().close();
-                processOutput.close();
-                
+                handleStreams(aProcess,input,output,error);
                 return aProcess.waitFor();
             } else if (ipScript != null) {
             	return ipScript.getResult();
@@ -949,6 +1000,56 @@ public class RubyKernel {
         } catch (InterruptedException e) {
             throw runtime.newThreadError("unexpected interrupt");
         }
+    }
+    
+    private static void handleStreams(Process p, InputStream in, OutputStream out, OutputStream err) throws IOException {
+        InputStream pOut = p.getInputStream();
+        InputStream pErr = p.getErrorStream();
+        OutputStream pIn = p.getOutputStream();
+
+        boolean done = false;
+        int b;
+        boolean proc = false;
+        while(!done) {
+            if(pOut.available() > 0) {
+                byte[] input = new byte[pOut.available()];
+                if((b = pOut.read(input)) == -1) {
+                    done = true;
+                } else {
+                    out.write(input);
+                }
+                proc = true;
+            }
+            if(pErr.available() > 0) {
+                byte[] input = new byte[pErr.available()];
+                if((b = pErr.read(input)) != -1) {
+                    err.write(input);
+                }
+                proc = true;
+            }
+            if(in.available() > 0) {
+                byte[] input = new byte[in.available()];
+                if((b = in.read(input)) != -1) {
+                    pIn.write(input);
+                }
+                proc = true;
+            }
+            if(!proc) {
+                if((b = pOut.read()) == -1) {
+                    if((b = pErr.read()) == -1) {
+                        done = true;
+                    } else {
+                        err.write(b);
+                    }
+                } else {
+                    out.write(b);
+                }
+            }
+            proc = false;
+        }
+        pOut.close();
+        pErr.close();
+        pIn.close();
     }
 
     public static RubyInteger srand(IRubyObject recv, IRubyObject[] args) {
@@ -994,8 +1095,7 @@ public class RubyKernel {
 
     public static RubyBoolean system(IRubyObject recv, IRubyObject[] args) {
         IRuby runtime = recv.getRuntime();
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        int resultCode = runInShell(runtime, args, output);
+        int resultCode = runInShell(runtime, args);
         recv.getRuntime().getGlobalVariables().set("$?", RubyProcess.RubyStatus.newProcessStatus(runtime, resultCode));
         return runtime.newBoolean(resultCode == 0);
     }

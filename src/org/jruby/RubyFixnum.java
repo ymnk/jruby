@@ -34,6 +34,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
@@ -75,15 +76,15 @@ public class RubyFixnum extends RubyInteger {
     }
 
     public static RubyFixnum zero(IRuby runtime) {
-        return runtime.newFixnum(0);
+        return newFixnum(runtime, 0);
     }
 
     public static RubyFixnum one(IRuby runtime) {
-        return runtime.newFixnum(1);
+        return newFixnum(runtime, 1);
     }
 
     public static RubyFixnum minus_one(IRuby runtime) {
-        return runtime.newFixnum(-1);
+        return newFixnum(runtime, -1);
     }
 
     protected int compareValue(RubyNumeric other) {
@@ -100,7 +101,27 @@ public class RubyFixnum extends RubyInteger {
     }
 
     public RubyFixnum hash() {
-        return newFixnum((int) value ^ (int) (value >> 32));
+        return newFixnum(hashCode());
+    }
+    
+    public int hashCode() {
+        return (int) value ^ (int) (value >> 32);
+    }
+    
+    public boolean equals(Object other) {
+        if (other == this) {
+            return true;
+        }
+        
+        if (other instanceof RubyFixnum) { 
+            RubyFixnum num = (RubyFixnum)other;
+            
+            if (num.value == value) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     // Methods of the Fixnum Class (fix_*):
@@ -122,7 +143,7 @@ public class RubyFixnum extends RubyInteger {
     }
 
     public RubyFixnum newFixnum(long newValue) {
-        return getRuntime().newFixnum(newValue);
+        return newFixnum(getRuntime(), newValue);
     }
 
     public boolean singletonMethodsAllowed() {
@@ -267,7 +288,7 @@ public class RubyFixnum extends RubyInteger {
 
     public IRubyObject op_or(IRubyObject other) {
         if (other instanceof RubyBignum) {
-            return (RubyInteger) other.callMethod("|", this);
+            return (RubyInteger) other.callMethod(getRuntime().getCurrentContext(), "|", this);
         } else if (other instanceof RubyNumeric) {
             return newFixnum(value | ((RubyNumeric) other).getLongValue());
         }
@@ -325,7 +346,7 @@ public class RubyFixnum extends RubyInteger {
 
     public IRubyObject op_xor(IRubyObject other) {
         if (other instanceof RubyBignum) {
-            return (RubyInteger) other.callMethod("^", this);
+            return (RubyInteger) other.callMethod(getRuntime().getCurrentContext(), "^", this);
         } else if (other instanceof RubyNumeric) {
             return newFixnum(value ^ ((RubyNumeric) other).getLongValue());
         }
@@ -386,8 +407,10 @@ public class RubyFixnum extends RubyInteger {
     }
 
     public IRubyObject times() {
+        IRuby runtime = getRuntime();
+        ThreadContext context = runtime.getCurrentContext();
         for (long i = 0; i < value; i++) {
-            getRuntime().getCurrentContext().yield(newFixnum(i));
+            context.yield(newFixnum(runtime, i));
         }
         return this;
     }

@@ -665,8 +665,14 @@ public class PrintfFormat {
                     break;
                 case 'd':
                 case 'D':
-                	s2 = printDFormat((long)s);
-                	break;
+                case 'i':
+                case 'I':
+                    s2 = printDFormat((long)s);
+                    break;
+                case 'c':
+                case 'C':
+                    s2 = printCFormat((char)s);
+                    break;
                 default :
                     throw new IllegalArgumentException("Cannot format a double with a format using a " + conversionCharacter + " conversion character.");
             }

@@ -107,6 +107,8 @@ public class RubyThread extends RubyObject {
                 callbackFactory.getMethod("isStopped"));
         threadClass.defineMethod("wakeup", 
                 callbackFactory.getMethod("wakeup"));
+        //        threadClass.defineMethod("value", 
+        //                callbackFactory.getMethod("value"));
         threadClass.defineMethod("kill", 
                 callbackFactory.getMethod("kill"));
         threadClass.defineMethod("exit",
@@ -260,7 +262,7 @@ public class RubyThread extends RubyObject {
             IRubyObject raiseException = receivedException;
             receivedException = null;
             RubyModule kernelModule = getRuntime().getModule("Kernel");
-            kernelModule.callMethod("raise", raiseException);
+            kernelModule.callMethod(getRuntime().getCurrentContext(), "raise", raiseException);
         }
     }
 

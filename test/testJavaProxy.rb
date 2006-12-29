@@ -42,3 +42,19 @@ class RoomTest
 end
 
 RoomTest.new.testObject
+
+###### test synchronized method
+
+# FIXME: this doesn't actually test that we're successfully synchronizing
+obj = java.lang.Object.new
+result = nil
+test_no_exception {
+    result = obj.synchronized { "foo" }
+}
+test_equal("foo", result)
+test_exception {
+    obj.wait 1
+}
+test_no_exception {
+    obj.synchronized { obj.wait 1 }
+}

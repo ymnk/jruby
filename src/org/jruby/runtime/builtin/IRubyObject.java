@@ -16,6 +16,7 @@
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2006 Ola Bini <ola.bini@ki.se>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -37,6 +38,7 @@ import java.util.Map;
 
 import org.jruby.MetaClass;
 import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyClass;
 import org.jruby.RubyFloat;
@@ -45,6 +47,7 @@ import org.jruby.RubyModule;
 import org.jruby.RubyString;
 import org.jruby.ast.Node;
 import org.jruby.runtime.CallType;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.callback.Callback;
 import org.jruby.runtime.marshal.MarshalStream;
 
@@ -72,17 +75,19 @@ public interface IRubyObject {
     IRubyObject setInstanceVariable(String string, IRubyObject rubyObject);
     
     Map getInstanceVariables();
+    Map getInstanceVariablesSnapshot();
 
-    IRubyObject callMethod(RubyModule context, String name, IRubyObject[] args, CallType callType);
+    IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, String name, IRubyObject[] args, CallType callType);
     
-    IRubyObject callMethod(String name, IRubyObject[] args, CallType callType);
+    IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, CallType callType);
     
     /**
      * RubyMethod funcall.
+     * @param context TODO
      * @param string
      * @return RubyObject
      */
-    IRubyObject callMethod(String string);
+    IRubyObject callMethod(ThreadContext context, String string);
 
     /**
      * RubyMethod isNil.
@@ -106,11 +111,12 @@ public interface IRubyObject {
 
     /**
      * RubyMethod funcall.
+     * @param context TODO
      * @param string
      * @param arg
      * @return RubyObject
      */
-    IRubyObject callMethod(String string, IRubyObject arg);
+    IRubyObject callMethod(ThreadContext context, String string, IRubyObject arg);
 
     /**
      * RubyMethod getRubyClass.
@@ -158,11 +164,12 @@ public interface IRubyObject {
 
     /**
      * RubyMethod callMethod.
+     * @param context TODO
      * @param method
      * @param rubyArgs
      * @return IRubyObject
      */
-    IRubyObject callMethod(String method, IRubyObject[] rubyArgs);
+    IRubyObject callMethod(ThreadContext context, String method, IRubyObject[] rubyArgs);
 
     /**
      * RubyMethod eval.
@@ -174,21 +181,23 @@ public interface IRubyObject {
     /**
      * Evaluate the given string under the specified binding object. If the binding is not a Proc or Binding object
      * (RubyProc or RubyBinding) throw an appropriate type error.
+     * @param context TODO
      * @param evalString The string containing the text to be evaluated
      * @param binding The binding object under which to perform the evaluation
      * @param file The filename to use when reporting errors during the evaluation
      * @return An IRubyObject result from the evaluation
      */
-    IRubyObject evalWithBinding(IRubyObject evalString, IRubyObject binding, String file);
+    IRubyObject evalWithBinding(ThreadContext context, IRubyObject evalString, IRubyObject binding, String file);
 
     /**
      * Evaluate the given string.
+     * @param context TODO
      * @param evalString The string containing the text to be evaluated
-     * @param binding The binding object under which to perform the evaluation
      * @param file The filename to use when reporting errors during the evaluation
+     * @param binding The binding object under which to perform the evaluation
      * @return An IRubyObject result from the evaluation
      */
-    IRubyObject evalSimple(IRubyObject evalString, String file);
+    IRubyObject evalSimple(ThreadContext context, IRubyObject evalString, String file);
 
     /**
      * RubyMethod extendObject.
@@ -310,4 +319,37 @@ public interface IRubyObject {
     boolean singletonMethodsAllowed();
 
 	Iterator instanceVariableNames();
+
+    /**
+     * rb_scan_args
+     *
+     * This method will take the arguments specified, fill in an array and return it filled
+     * with nils for every argument not provided. It's guaranteed to always return a new array.
+     * 
+     * @param args the arguments to check
+     * @param required the amount of required arguments
+     * @param optional the amount of optional arguments
+     * @return a new array containing all arguments provided, and nils in those spots not provided.
+     * 
+     */
+    IRubyObject[] scanArgs(IRubyObject[] args, int required, int optional);
+
+    /**
+     * Our version of Data_Wrap_Struct.
+     *
+     * This method will just set a private pointer to the object provided. This pointer is transient
+     * and will not be accessible from Ruby.
+     *
+     * @param obj the object to wrap
+     */
+    void dataWrapStruct(Object obj);
+
+    /**
+     * Our version of Data_Get_Struct.
+     *
+     * Returns a wrapped data value if there is one, otherwise returns null.
+     *
+     * @return the object wrapped.
+     */
+    Object dataGetStruct();
 }

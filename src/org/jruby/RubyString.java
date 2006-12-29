@@ -66,7 +66,7 @@ public class RubyString extends RubyObject {
             super(implementationClass, arity, visibility);
         }
         
-        public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+        public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
             RubyString s = (RubyString)receiver;
             
             return invoke(s, args);
@@ -145,7 +145,27 @@ public class RubyString extends RubyObject {
 	}
 
     public RubyFixnum hash() {
-        return getRuntime().newFixnum(toString().hashCode());
+        return getRuntime().newFixnum(hashCode());
+    }
+    
+    public int hashCode() {
+        return toString().hashCode();
+    }
+    
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        
+        if (other instanceof RubyString) {
+            RubyString string = (RubyString)other;
+            
+            if (string.toString().equals(toString())) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     // Common enough check to make it a convenience method.
@@ -158,9 +178,9 @@ public class RubyString extends RubyObject {
 	 */
 	public static RubyString objAsString(IRubyObject obj) {
 		return (RubyString) (obj instanceof RubyString ? obj : 
-			obj.callMethod("to_s"));
+			obj.callMethod(obj.getRuntime().getCurrentContext(), "to_s"));
 	}
-
+    
 	/** rb_str_cmp
 	 *
 	 */
@@ -270,7 +290,7 @@ public class RubyString extends RubyObject {
 		RubyString thisLCString = getRuntime().newString(toString().toLowerCase());
 		RubyString lcString = getRuntime().newString(stringValue(other).toString().toLowerCase());
 
-		return ((StringMetaClass)thisLCString.getMetaClass()).op_cmp.call(getRuntime(), thisLCString, thisLCString.getMetaClass(), "<=>", new IRubyObject[] {lcString}, false);
+		return ((StringMetaClass)thisLCString.getMetaClass()).op_cmp.call(getRuntime().getCurrentContext(), thisLCString, thisLCString.getMetaClass(), "<=>", new IRubyObject[] {lcString}, false);
 	}
     
 	/** rb_str_match
@@ -280,9 +300,9 @@ public class RubyString extends RubyObject {
 		if (other instanceof RubyRegexp) {
 			return ((RubyRegexp) other).match(this);
 		} else if (other instanceof RubyString) {
-			return RubyRegexp.newRegexp((RubyString) other, 0, null).match(this);
+                    throw getRuntime().newTypeError("type mismatch: String given");
 		}
-		return other.callMethod("=~", this);
+		return other.callMethod(getRuntime().getCurrentContext(), "=~", this);
 	}
 
 	/** rb_str_match2
@@ -336,6 +356,38 @@ public class RubyString extends RubyObject {
         return this;
 	}
 
+    public IRubyObject op_ge(IRubyObject other) {
+        if (other instanceof RubyString) {
+            return getRuntime().newBoolean(cmp((RubyString) other) >= 0);
+        }
+        
+        return RubyComparable.op_ge(this, other);
+    }
+    
+    public IRubyObject op_gt(IRubyObject other) {
+        if (other instanceof RubyString) {
+            return getRuntime().newBoolean(cmp((RubyString) other) > 0);
+        }
+        
+        return RubyComparable.op_gt(this, other);
+    }
+    
+    public IRubyObject op_le(IRubyObject other) {
+        if (other instanceof RubyString) {
+            return getRuntime().newBoolean(cmp((RubyString) other) <= 0);
+        }
+        
+        return RubyComparable.op_le(this, other);
+    }
+    
+    public IRubyObject op_lt(IRubyObject other) {
+        if (other instanceof RubyString) {
+            return getRuntime().newBoolean(cmp((RubyString) other) < 0);
+        }
+        
+        return RubyComparable.op_lt(this, other);
+    }
+    
 	/** rb_str_upcase
 	 *
 	 */
@@ -470,6 +522,8 @@ public class RubyString extends RubyObject {
 				sb.append('\\').append('v');
 			} else if (c == '\u0007') {
 				sb.append('\\').append('a');
+			} else if (c == '\u0008') {
+				sb.append('\\').append('b');
 			} else if (c == '\u001B') {
 				sb.append('\\').append('e');
 			} else {
@@ -1165,12 +1219,28 @@ public class RubyString extends RubyObject {
 		}
 		RubyRegexp pat = RubyRegexp.regexpValue(args[0]);
 
-		if (pat.search(toString(), 0) >= 0) {
+        String intern = toString();
+        boolean utf8 = pat.getCode() == RubyRegexp.Code.UTF8;
+
+        if(utf8) {
+            try {
+                intern = new String(toString().getBytes("PLAIN"),"UTF8");
+            } catch(Exception e) {
+            }
+        }
+
+		if (pat.search(intern, 0) >= 0) {
 			RubyMatchData match = (RubyMatchData) tc.getBackref();
 			RubyString newStr = match.pre_match();
 			newStr.append(iter ? tc.yield(match.group(0)) : pat.regsub(repl, match));
 			newStr.append(match.post_match());
 			newStr.setTaint(isTaint() || repl.isTaint());
+            if(utf8) {
+                try {
+                    newStr.setValue(new String(newStr.toString().getBytes("UTF8"),"ISO8859_1"));
+                } catch(Exception e) {
+                }
+            }
 			if (bang) {
 				replace(newStr);
 				return this;
@@ -1557,8 +1627,9 @@ public class RubyString extends RubyObject {
         RubyString afterEnd = stringValue(end.succ());
         RubyString current = beg;
 
+        ThreadContext context = getRuntime().getCurrentContext();
         while (!current.equals(afterEnd)) {
-            getRuntime().getCurrentContext().yield(current);
+            context.yield(current);
             if (!excl && current.equals(end)) {
                 break;
             }
@@ -2211,8 +2282,9 @@ public class RubyString extends RubyObject {
 	public RubyString each_byte() {
 		byte[] lByteValue = toByteArray();
 		int lLength = lByteValue.length;
+        ThreadContext context = getRuntime().getCurrentContext();
 		for (int i = 0; i < lLength; i++) {
-			getRuntime().getCurrentContext().yield(getRuntime().newFixnum(Math.abs(lByteValue[i])));
+			context.yield(getRuntime().newFixnum(Math.abs(lByteValue[i])));
 		}
 		return this;
 	}

@@ -289,3 +289,32 @@ def inits; @inits; end
 end
 
 test_equal([FooNew, ClassB], ClassA.new().inits)
+
+module Foo
+  Bar = Class.new
+end
+
+test_equal("Foo::Bar",Foo::Bar.name)
+
+Fred = Module.new do
+  def meth1
+     "hello" 
+  end
+end
+
+a = "my string"
+a.extend(Fred)
+test_equal("hello", a.meth1)
+
+# Chain of includes deals with method cache flush
+module MT_A
+  def foo
+  end
+end
+module MT_B
+  include MT_A
+  alias :foo_x :foo
+end
+class MT_C
+  include MT_B
+end

@@ -14,7 +14,7 @@
  * Copyright (C) 2001-2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
- * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2004-2006 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 Charles O Nutter <headius@headius.com>
  * 
@@ -42,7 +42,6 @@ import org.apache.bsf.BSFManager;
 import org.apache.bsf.util.BSFEngineImpl;
 import org.apache.bsf.util.BSFFunctions;
 import org.jruby.IRuby;
-import org.jruby.RubyException;
 import org.jruby.ast.Node;
 import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.RaiseException;
@@ -50,9 +49,9 @@ import org.jruby.javasupport.Java;
 import org.jruby.javasupport.JavaEmbedUtils;
 import org.jruby.javasupport.JavaObject;
 import org.jruby.javasupport.JavaUtil;
+import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.GlobalVariable;
 import org.jruby.runtime.IAccessor;
-import org.jruby.runtime.Scope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -69,18 +68,22 @@ public class JRubyEngine extends BSFEngineImpl {
             // add a new method conext
             String[] names = new String[paramNames.size()];
             paramNames.toArray(names);
+
             threadContext.preBsfApply(names);
-            Scope scope = threadContext.getFrameScope();
+            
+            // FIXME: This is broken.  We are assigning BSF globals as local vars in the top-level
+            // scope.  This may be ok, but we are overwriting $~ and $_.  Leaving for now.
+            DynamicScope scope = threadContext.getCurrentScope();
 
             // set global variables
             for (int i = 0, size = args.size(); i < size; i++) {
-                scope.setValue(i, JavaEmbedUtils.javaToRuby(runtime, args.get(i)));
+                scope.setValue(i, JavaEmbedUtils.javaToRuby(runtime, args.get(i)), 0);
             }
 
         	// See eval todo about why this is commented out
             //runtime.setPosition(file, line);
 
-            Node node = runtime.getParser().parse(file, funcBody.toString());
+            Node node = runtime.parse(file, funcBody.toString(), null);
             return JavaEmbedUtils.rubyToJava(runtime, runtime.getTopSelf().eval(node), Object.class);
         } finally {
             threadContext.postBsfApply();
@@ -165,7 +168,7 @@ public class JRubyEngine extends BSFEngineImpl {
 	    	if (je.getJumpType() == JumpException.JumpType.RaiseJump) {
 	            runtime.printError(((RaiseException)je).getException());
 	    	} else if (je.getJumpType() == JumpException.JumpType.ThrowJump) {
-	            runtime.printError((RubyException)je.getTertiaryData());
+	            runtime.getErrorStream().println("internal error: throw jump caught");
 	    	} else if (je.getJumpType() == JumpException.JumpType.BreakJump) {
 	            runtime.getErrorStream().println("break without block.");
 	        } else if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
@@ -186,7 +189,7 @@ public class JRubyEngine extends BSFEngineImpl {
         public IRubyObject getValue() {
             IRubyObject result = JavaUtil.convertJavaToRuby(runtime, bean.bean, bean.type);
             if (result instanceof JavaObject) {
-                return runtime.getModule("JavaUtilities").callMethod("wrap", result);
+                return runtime.getModule("JavaUtilities").callMethod(runtime.getCurrentContext(), "wrap", result);
             }
             return result;
         }
@@ -209,7 +212,7 @@ public class JRubyEngine extends BSFEngineImpl {
         public IRubyObject getValue() {
             IRubyObject result = JavaUtil.convertJavaToRuby(runtime, functions, BSFFunctions.class);
             if (result instanceof JavaObject) {
-                return runtime.getModule("JavaUtilities").callMethod("wrap", result);
+                return runtime.getModule("JavaUtilities").callMethod(runtime.getCurrentContext(), "wrap", result);
             }
             return result;
         }

@@ -112,7 +112,7 @@ public class RubyClass extends RubyModule {
         if (superType == null) {
             superType = getRuntime().getObject();
         }
-        superType.callMethod("inherited", this);
+        superType.callMethod(getRuntime().getCurrentContext(), "inherited", this);
     }
 
     /** rb_singleton_class_clone
@@ -193,10 +193,8 @@ public class RubyClass extends RubyModule {
             superClass = runtime.getObject();
         }
 
-        RubyClass newClass = superClass.subclass();
         ThreadContext tc = runtime.getCurrentContext();
-
-        newClass.makeMetaClass(superClass.getMetaClass(), tc.peekCRef());
+        RubyClass newClass = superClass.newSubClass(null,tc.peekCRef());
 
         // call "initialize" method
         newClass.callInit(args);
@@ -276,12 +274,23 @@ public class RubyClass extends RubyModule {
     }
 
     public RubyClass newSubClass(String name, SinglyLinkedList parentCRef) {
-        RubyClass newClass = new RubyClass(runtime, runtime.getClass("Class"), this, parentCRef, name);
+        RubyClass classClass = runtime.getClass("Class");
+        
+        // Cannot subclass 'Class' or metaclasses
+        if (this == classClass) {
+            throw runtime.newTypeError("can't make subclass of Class");
+        } else if (this instanceof MetaClass) {
+            throw runtime.newTypeError("can't make subclass of virtual class");
+        }
+
+        RubyClass newClass = new RubyClass(runtime, classClass, this, parentCRef, name);
 
         newClass.makeMetaClass(getMetaClass(), newClass.getCRef());
         newClass.inheritedBy(this);
 
-        ((RubyModule)parentCRef.getValue()).setConstant(name, newClass);
+        if(null != name) {
+            ((RubyModule)parentCRef.getValue()).setConstant(name, newClass);
+        }
 
         return newClass;
     }

@@ -60,9 +60,14 @@ public class CommandlineParser {
     private boolean processLineEnds = false;
     private boolean split = false;
     private boolean verbose = false;
+    private boolean debug = false;
     private boolean showVersion = false;
     private String[] scriptArguments = null;
     private boolean shouldRunInterpreter = true;
+
+    private boolean objectSpaceEnabled = true;
+    private boolean compilerEnabled = false;
+    private String encoding = "ISO8859_1";
 
     public int argumentIndex = 0;
     public int characterIndex = 0;
@@ -74,16 +79,20 @@ public class CommandlineParser {
     }
 
     private void processArguments() {
+
         while (argumentIndex < arguments.length && isInterpreterArgument(arguments[argumentIndex])) {
             processArgument();
             argumentIndex++;
         }
+
         if (! hasInlineScript()) {
             if (argumentIndex < arguments.length) {
                 setScriptFileName(arguments[argumentIndex]); //consume the file name
                 argumentIndex++;
             }
         }
+
+
         // Remaining arguments are for the script itself
         scriptArguments = new String[arguments.length - argumentIndex];
         System.arraycopy(arguments, argumentIndex, getScriptArguments(), 0, getScriptArguments().length);
@@ -102,7 +111,11 @@ public class CommandlineParser {
                     shouldRunInterpreter = false;
                     break;
                 case 'I' :
-                    loadPaths.add(grabValue(" -I must be followed by a directory name to add to lib path"));
+                    String s = grabValue(" -I must be followed by a directory name to add to lib path");
+                    String[] ls = s.split(":");
+                    for(int i=0;i<ls.length;i++) {
+                        loadPaths.add(ls[i]);
+                    }
                     break FOR;
                 case 'r' :
                     requiredLibraries.add(grabValue("-r must be followed by a package to require"));
@@ -118,11 +131,21 @@ public class CommandlineParser {
                     assumePrinting = true;
                     assumeLoop = true;
                     break;
+                case 'O' :
+                    objectSpaceEnabled = false;
+                    break;
+                case 'C' :
+                    compilerEnabled = true;
+                    break;
                 case 'n' :
                     assumeLoop = true;
                     break;
                 case 'a' :
                     split = true;
+                    break;
+                case 'd' :
+                    debug = true;
+                    verbose = true;
                     break;
                 case 'l' :
                     processLineEnds = true;
@@ -134,10 +157,25 @@ public class CommandlineParser {
                 case 'w' :
                     verbose = true;
                     break;
+                case 'K':
+                    // FIXME: No argument seems to work for -K in MRI plus this should not
+                    // siphon off additional args 'jruby -K ~/scripts/foo'.  Also better error
+                    // processing.
+                    String eArg = grabValue("provide a value for -K");
+                    
+                    if ("u".equals(eArg) || "U".equals(eArg) || "UTF8".equals(eArg)) {
+                        encoding = "UTF-8";
+                    }
+                    
+                    break;
                 case '-' :
                     if (argument.equals("--version")) {
                         setShowVersion(true);
                         break FOR;
+                    } else if(argument.equals("--debug")) {
+                        debug = true;
+                        verbose = true;
+                        break;
                     } else {
                         if (argument.equals("--")) {
                             // ruby interpreter compatibilty 
@@ -186,7 +224,7 @@ public class CommandlineParser {
     public boolean shouldRunInterpreter() {
         return isShouldRunInterpreter();
     }
-
+    
     private boolean isSourceFromStdin() {
         return getScriptFileName() == null;
     }
@@ -196,10 +234,10 @@ public class CommandlineParser {
             if (hasInlineScript()) {
                 return new StringReader(inlineScript());
             } else if (isSourceFromStdin()) {
-                return new InputStreamReader(System.in, "ISO8859_1");
+                return new InputStreamReader(System.in, encoding);
             } else {
                 File file = new File(getScriptFileName());
-                return new BufferedReader(new InputStreamReader(new FileInputStream(file), "ISO8859_1"));
+                return new BufferedReader(new InputStreamReader(new FileInputStream(file), encoding));
             }
         } catch (IOException e) {
             throw new MainExitException(1, "Error opening script file: " + e.getMessage());
@@ -248,6 +286,10 @@ public class CommandlineParser {
         return verbose;
     }
 
+    public boolean isDebug() {
+        return debug;
+    }
+
     public boolean isShowVersion() {
         return showVersion;
     }
@@ -263,5 +305,17 @@ public class CommandlineParser {
 
     public boolean isShouldRunInterpreter() {
         return shouldRunInterpreter;
+    }
+    
+    public boolean isObjectSpaceEnabled() {
+        return objectSpaceEnabled;
+    }
+    
+    public boolean isCompilerEnabled() {
+        return compilerEnabled;
+    }
+    
+    public String getEncoding() {
+        return encoding;
     }
 }

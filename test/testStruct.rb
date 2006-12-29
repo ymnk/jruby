@@ -38,3 +38,16 @@ test_exception(ArgumentError) { s.new(1,2,3,4,5,6,7) }
 a = Struct.new(:x, :y)
 a1 = a.new(5, 7)
 test_equal(5, a1.x)
+
+# Struct::Tms
+tms = Struct::Tms.new(0, 0, 0, 0)
+test_ok(tms != nil)
+
+# Struct creation with a block
+a = Struct.new(:foo, :bar) {
+  def hello
+    "hello"
+  end
+}
+
+test_equal("hello", a.new(0, 0).hello)

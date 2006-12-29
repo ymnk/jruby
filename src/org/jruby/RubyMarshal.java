@@ -40,6 +40,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.Constants;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
@@ -58,6 +59,8 @@ public class RubyMarshal {
         module.defineSingletonMethod("dump", callbackFactory.getOptSingletonMethod("dump"));
         module.defineSingletonMethod("load", callbackFactory.getOptSingletonMethod("load"));
         module.defineSingletonMethod("restore", callbackFactory.getOptSingletonMethod("load"));
+        module.defineConstant("MAJOR_VERSION", runtime.newFixnum(Constants.MARSHAL_MAJOR));
+        module.defineConstant("MINOR_VERSION", runtime.newFixnum(Constants.MARSHAL_MINOR));
 
         return module;
     }
@@ -121,7 +124,7 @@ public class RubyMarshal {
             if (in instanceof RubyIO) {
                 rawInput = ((RubyIO) in).getInStream();
             } else if (in.respondsTo("to_str")) {
-                RubyString inString = (RubyString) in.callMethod("to_str");
+                RubyString inString = (RubyString) in.callMethod(recv.getRuntime().getCurrentContext(), "to_str");
                 rawInput = new ByteArrayInputStream(inString.toByteArray());
             } else {
                 throw recv.getRuntime().newTypeError("instance of IO needed");

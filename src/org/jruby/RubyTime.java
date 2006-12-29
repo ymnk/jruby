@@ -54,7 +54,6 @@ public class RubyTime extends RubyObject {
 	private Calendar cal;
     private long usec;
 
-    private static final RubyDateFormat rubyDateFormat = new RubyDateFormat("-", Locale.US);
     private static final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("-", Locale.US);
 
     public RubyTime(IRuby runtime, RubyClass rubyClass) {
@@ -134,13 +133,60 @@ public class RubyTime extends RubyObject {
     }
 
     public RubyString strftime(IRubyObject format) {
+        final RubyDateFormat rubyDateFormat = new RubyDateFormat("-", Locale.US);
         rubyDateFormat.setCalendar(cal);
         rubyDateFormat.applyPattern(format.toString());
         String result = rubyDateFormat.format(cal.getTime());
 
         return getRuntime().newString(result);
     }
+    
+    public IRubyObject op_ge(IRubyObject other) {
+        if (other instanceof RubyTime) {
+            return getRuntime().newBoolean(cmp((RubyTime) other) >= 0);
+        }
+        
+        return RubyComparable.op_ge(this, other);
+    }
+    
+    public IRubyObject op_gt(IRubyObject other) {
+        if (other instanceof RubyTime) {
+            return getRuntime().newBoolean(cmp((RubyTime) other) > 0);
+        }
+        
+        return RubyComparable.op_gt(this, other);
+    }
+    
+    public IRubyObject op_le(IRubyObject other) {
+        if (other instanceof RubyTime) {
+            return getRuntime().newBoolean(cmp((RubyTime) other) <= 0);
+        }
+        
+        return RubyComparable.op_le(this, other);
+    }
+    
+    public IRubyObject op_lt(IRubyObject other) {
+        if (other instanceof RubyTime) {
+            return getRuntime().newBoolean(cmp((RubyTime) other) < 0);
+        }
+        
+        return RubyComparable.op_lt(this, other);
+    }
+    
+    private int cmp(RubyTime other) {
+        long millis = getTimeInMillis();
+		long millis_other = other.getTimeInMillis();
+        long usec_other = other.usec;
+        
+		if (millis > millis_other || (millis == millis_other && usec > usec_other)) {
+		    return 1;
+		} else if (millis < millis_other || (millis == millis_other && usec < usec_other)) {
+		    return -1;
+		} 
 
+        return 0;
+    }
+    
     public IRubyObject op_plus(IRubyObject other) {
         long time = getTimeInMillis();
 
@@ -172,40 +218,47 @@ public class RubyTime extends RubyObject {
 
 		return newTime;
     }
-    
+
     public IRubyObject same2(IRubyObject other) {
-        return (RubyNumeric.fix2int(callMethod("<=>", other)) == 0) ? getRuntime().getTrue() : getRuntime().getFalse();
+        return (RubyNumeric.fix2int(callMethod(getRuntime().getCurrentContext(), "<=>", other)) == 0) ? getRuntime().getTrue() : getRuntime().getFalse();
     }
 
     public IRubyObject op_cmp(IRubyObject other) {
-        long millis = getTimeInMillis();
-        
         if (other.isNil()) {
         	return other;
         }
         
-        if (other instanceof RubyFloat || other instanceof RubyBignum) {
-            double time = millis / 1000.0;
+        if (other instanceof RubyTime) {
+            return getRuntime().newFixnum(cmp((RubyTime) other));
+        }
+        
+        long millis = getTimeInMillis();
 
-            double time_other = ((RubyNumeric) other).getDoubleValue();
+        if(other instanceof RubyNumeric) {
+            if (other instanceof RubyFloat || other instanceof RubyBignum) {
+                double time = millis / 1000.0;
 
-            if (time > time_other) {
-                return RubyFixnum.one(getRuntime());
-            } else if (time < time_other) {
-                return RubyFixnum.minus_one(getRuntime());
-            } else {
+                double time_other = ((RubyNumeric) other).getDoubleValue();
+
+                if (time > time_other) {
+                    return RubyFixnum.one(getRuntime());
+                } else if (time < time_other) {
+                    return RubyFixnum.minus_one(getRuntime());
+                }
+
                 return RubyFixnum.zero(getRuntime());
             }
-        }
-		long millis_other = (other instanceof RubyTime) ? ((RubyTime) other).getTimeInMillis() : RubyNumeric.num2long(other) * 1000;
+            long millis_other = RubyNumeric.num2long(other) * 1000;
 
-		if (millis > millis_other) {
-		    return RubyFixnum.one(getRuntime());
-		} else if (millis < millis_other) {
-		    return RubyFixnum.minus_one(getRuntime());
-		} else {
-		    return RubyFixnum.zero(getRuntime());
-		}
+            if (millis > millis_other || (millis == millis_other && usec > 0)) {
+                return RubyFixnum.one(getRuntime());
+            } else if (millis < millis_other || (millis == millis_other && usec < 0)) {
+                return RubyFixnum.minus_one(getRuntime());
+            }
+
+            return RubyFixnum.zero(getRuntime());
+        }
+        return getRuntime().getNil();
     }
 
     public RubyString asctime() {
@@ -239,6 +292,14 @@ public class RubyTime extends RubyObject {
 
     public RubyInteger usec() {
         return getRuntime().newFixnum(microseconds());
+    }
+    
+    public void setMicroseconds(long mic) {
+        long millis = getTimeInMillis() % 1000;
+        long withoutMillis = getTimeInMillis() - millis;
+        withoutMillis += (mic / 1000);
+        cal.setTimeInMillis(withoutMillis);
+        usec = mic % 1000;
     }
     
     public long microseconds() {

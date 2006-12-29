@@ -36,6 +36,7 @@ import org.jruby.parser.Parser;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CacheMap;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.GlobalVariable;
 import org.jruby.runtime.ObjectSpace;
 import org.jruby.runtime.ThreadContext;
@@ -168,6 +169,10 @@ public class BaseMockRuby implements IRuby {
 		throw new MockException();
 	}
 
+	public IRubyObject getDebug() {
+		throw new MockException();
+	}
+
 	public boolean isBlockGiven() {
 		throw new MockException();
 	}
@@ -180,6 +185,10 @@ public class BaseMockRuby implements IRuby {
 	public void setVerbose(IRubyObject verbose) {
 		throw new MockException();
 
+	}
+
+	public void setDebug(IRubyObject debug) {
+		throw new MockException();
 	}
 
 	public Visibility getCurrentVisibility() {
@@ -283,7 +292,7 @@ public class BaseMockRuby implements IRuby {
 
 	}
 
-	public void callTraceFunction(String event, ISourcePosition position,
+	public void callTraceFunction(ThreadContext context, String event, ISourcePosition position,
 			IRubyObject self, String name, IRubyObject type) {
 		throw new MockException();
 
@@ -503,12 +512,12 @@ public class BaseMockRuby implements IRuby {
 		
 	}
 
-	public RaiseException newNoMethodError(String message) {
+	public RaiseException newNoMethodError(String message, String name) {
 		throw new MockException();
 		
 	}
 
-	public RaiseException newNameError(String message) {
+	public RaiseException newNameError(String message, String name) {
 		throw new MockException();
 		
 	}
@@ -659,4 +668,34 @@ public class BaseMockRuby implements IRuby {
     public void unregisterInspecting(Object o) {
         throw new MockException();
     }
+
+    public boolean isObjectSpaceEnabled() {
+        return true;
+    }
+
+    public IRubyObject compileAndRun(Node node) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Node parse(Reader content, String file, DynamicScope scope) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Node parse(String content, String file, DynamicScope scope) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    
+    public IRubyObject getTmsStruct() {
+        return null;
+    }
+    
+    public long getStartTime() {
+        return 0;
+    }
+    
+    public void setEncoding(String encoding) {}
+    public String getEncoding() { return null; }
 }

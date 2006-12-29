@@ -36,11 +36,13 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Iterator;
+import java.util.Map;
 
 import org.jruby.IRuby;
 import org.jruby.RubyBoolean;
 import org.jruby.RubyClass;
 import org.jruby.RubyFixnum;
+import org.jruby.RubyFloat;
 import org.jruby.RubyString;
 import org.jruby.RubySymbol;
 import org.jruby.runtime.Constants;
@@ -116,18 +118,14 @@ public class MarshalStream extends FilterOutputStream {
     
     public void writeInstanceVars(IRubyObject obj, MarshalStream output) throws IOException {
     	IRuby runtime = obj.getRuntime();
-        output.dumpInt(obj.getInstanceVariables().size());
-        
-        for (Iterator iter = obj.instanceVariableNames(); iter.hasNext();) {
+        Map iVars = obj.getInstanceVariablesSnapshot();
+        output.dumpInt(iVars.size());
+        for (Iterator iter = iVars.keySet().iterator(); iter.hasNext();) {
             String name = (String) iter.next();
-            IRubyObject value = obj.getInstanceVariable(name);
-
-            // Between getting name and retrieving value the instance variable could have been
-            // removed
-            if (value != null) {
-            	output.dumpObject(runtime.newSymbol(name));
-            	output.dumpObject(value);
-            }
+            IRubyObject value = (IRubyObject)iVars.get(name);
+            
+            output.dumpObject(runtime.newSymbol(name));
+            output.dumpObject(value);
         }
     }
 
@@ -145,6 +143,8 @@ public class MarshalStream extends FilterOutputStream {
         } else if (value instanceof RubyBoolean) {
             return false;
         } else if (value instanceof RubyFixnum) {
+            return false;
+        } else if (value instanceof RubyFloat) {
             return false;
         }
         return true;
@@ -171,7 +171,7 @@ public class MarshalStream extends FilterOutputStream {
         out.write(TYPE_USERDEF);
         dumpObject(RubySymbol.newSymbol(runtime, value.getMetaClass().getName()));
 
-        RubyString marshaled = (RubyString) value.callMethod("_dump", runtime.newFixnum(depthLimit)); 
+        RubyString marshaled = (RubyString) value.callMethod(runtime.getCurrentContext(), "_dump", runtime.newFixnum(depthLimit)); 
         dumpString(marshaled.toString());
     }
 
@@ -179,7 +179,7 @@ public class MarshalStream extends FilterOutputStream {
         out.write(TYPE_USRMARSHAL);
         dumpObject(RubySymbol.newSymbol(runtime, value.getMetaClass().getName()));
 
-        IRubyObject marshaled =  value.callMethod("marshal_dump"); 
+        IRubyObject marshaled =  value.callMethod(runtime.getCurrentContext(), "marshal_dump"); 
         dumpObject(marshaled);
     }
 

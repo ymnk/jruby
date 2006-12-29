@@ -48,6 +48,7 @@ import org.jruby.RubyNumeric;
 import org.jruby.RubyString;
 import org.jruby.RubyTime;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.collections.SinglyLinkedList;
 
@@ -80,7 +81,13 @@ public class TimeMetaClass extends ObjectMetaClass {
             defineSingletonMethod("utc", Arity.optional(), "new_utc"); 
             defineSingletonMethod("gm", Arity.optional(), "new_utc"); 
             defineSingletonMethod("_load", Arity.singleArgument(), "s_load"); 
-                    
+            
+            // To override Comparable with faster String ones
+            defineMethod(">=", Arity.singleArgument(), "op_ge");
+            defineMethod(">", Arity.singleArgument(), "op_gt");
+            defineMethod("<=", Arity.singleArgument(), "op_le");
+            defineMethod("<", Arity.singleArgument(), "op_lt");
+            
             defineMethod("===", Arity.singleArgument(), "same2");
             defineMethod("+", Arity.singleArgument(), "op_plus"); 
             defineMethod("-", Arity.singleArgument(), "op_minus"); 
@@ -250,6 +257,10 @@ public class TimeMetaClass extends ObjectMetaClass {
         } else {
             len = checkArgumentCount(args, 1, 7);
         }
+        ThreadContext tc = getRuntime().getCurrentContext();
+        if(!(args[0] instanceof RubyNumeric)) {
+            args[0] = args[0].callMethod(tc,"to_i");
+        }
         int year = (int)RubyNumeric.num2long(args[0]);
         int month = 0;
         
@@ -282,6 +293,9 @@ public class TimeMetaClass extends ObjectMetaClass {
 
         for (int i = 0; len > i + 2; i++) {
             if (!args[i + 2].isNil()) {
+                if(!(args[i+2] instanceof RubyNumeric)) {
+                    args[i+2] = args[i+2].callMethod(tc,"to_i");
+                }
                 int_args[i] = (int)RubyNumeric.num2long(args[i + 2]);
                 if (time_min[i] > int_args[i] || int_args[i] > time_max[i]) {
                     throw getRuntime().newArgumentError("Argument out of range.");

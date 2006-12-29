@@ -66,18 +66,18 @@ public class RubyStringScanner extends RubyObject {
 	}
 	
 	public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args) {
-        RubyStringScanner result = new RubyStringScanner(recv.getRuntime());
+        RubyStringScanner result = new RubyStringScanner(recv.getRuntime(),(RubyClass)recv);
         result.callInit(args);
         return result;
     }
 	
-	protected RubyStringScanner(IRuby runtime) {
-		super(runtime, runtime.getClass("StringScanner"));
+	protected RubyStringScanner(IRuby runtime, RubyClass type) {
+		super(runtime, type);
 	}
 	
 	public IRubyObject initialize(IRubyObject[] args) {
 		if (checkArgumentCount(args, 0, 2) > 0) {
-			scanner = new StringScanner(((RubyString)args[0]).getValue());
+			scanner = new StringScanner(args[0].convertToString().getValue());
 		} else {
 			scanner = new StringScanner();
 		}

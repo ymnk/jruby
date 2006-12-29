@@ -122,8 +122,8 @@ public class TestRubyHash extends TestRubyBase {
     public void testIterating() throws Exception {
         assertEquals("[\"foo\", \"bar\"]", eval("$h.each {|pair| p pair}"));
         assertEquals("{\"foo\"=>\"bar\"}", eval("p $h.each {|pair| }"));
-        assertEquals("[\"foo\", \"bar\"]", eval("$h.each_pair {|pair| p pair}"));
-        assertEquals("{\"foo\"=>\"bar\"}", eval("p $h.each_pair {|pair| }"));
+        assertTrue(eval("$h.each_pair {|pair| p pair}").indexOf("[\"foo\", \"bar\"]") != -1);
+        assertTrue(eval("p $h.each_pair {|pair| }").indexOf("{\"foo\"=>\"bar\"}") != -1);
 
         assertEquals("\"foo\"", eval("$h.each_key {|k| p k}"));
         assertEquals("{\"foo\"=>\"bar\"}", eval("p $h.each_key {|k| }"));
@@ -169,7 +169,7 @@ public class TestRubyHash extends TestRubyBase {
         assertEquals("nil", eval("p $h.default"));
         eval("$h.default = 'missing'");
         assertEquals("\"missing\"", eval("p $h['njet']"));
-        assertEquals("nil", eval("p $h.default"));
+        assertEquals("\"missing\"", eval("p $h.default"));
     }
 
     /**

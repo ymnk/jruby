@@ -184,5 +184,9 @@ test_equal(1 - SCORE, 1 - @duck)
 test_equal(SCORE + SCORE, @duck + @duck)
 
 test_ok(@duck > 1)
+test_ok(1 < @duck)
+test_ok(@duck >= 1)
+test_ok(1 <= @duck)    
 
-        
+# test Numeric#to_int
+test_equal(1234, 1234.to_int)

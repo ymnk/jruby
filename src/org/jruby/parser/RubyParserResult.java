@@ -30,13 +30,14 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.parser;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.jruby.ast.BlockNode;
+import org.jruby.ast.CommentNode;
 import org.jruby.ast.Node;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.runtime.DynamicScope;
 
 /**
  */
@@ -44,51 +45,24 @@ public class RubyParserResult {
     private final List beginNodes = new ArrayList();
     private final List endNodes = new ArrayList();
     private Node ast;
-    private List blockVariables;
-    private List localVariables;
-    private InputStream afterEndStream;
     private boolean endSeen;
+    private List commentNodes = new ArrayList();
+    private DynamicScope scope;
 
-    /**
-     * Constructor for RubyParserResult.
-     */
-    public RubyParserResult() {
-        super();
+    public List getCommentNodes() {
+        return commentNodes;
     }
-
-    /**
-     * Gets the localVariables.
-     * @return Returns a List
-     */
-    public List getLocalVariables() {
-        return localVariables;
-    }
-
-    /**
-     * Gets the blockVariables.
-     * @return Returns a List
-     */
-    public List getBlockVariables() {
-        return blockVariables;
-    }
-
-    /**
-     * Gets the afterEndStream.
-     * @return Returns a InputStream
-     */
-    public InputStream getAfterEndStream() {
-        return afterEndStream;
-    }
-
+    
     public Node getAST() {
         return ast;
     }
-    /**
-     * Sets the afterEndStream.
-     * @param afterEndStream The afterEndStream to set
-     */
-    public void setAfterEndStream(InputStream afterEndStream) {
-        this.afterEndStream = afterEndStream;
+    
+    public DynamicScope getScope() {
+        return scope;
+    }
+    
+    public void setScope(DynamicScope scope) {
+        this.scope = scope;
     }
 
     /**
@@ -99,23 +73,12 @@ public class RubyParserResult {
         this.ast = ast;
     }
 
-    /**
-     * Sets the blockVariables.
-     * @param blockVariables The blockVariables to set
-     */
-    public void setBlockVariables(List blockVariables) {
-        this.blockVariables = blockVariables;
-    }
-
-    /**
-     * Sets the localVariables.
-     * @param localVariables The localVariables to set
-     */
-    public void setLocalVariables(List localVariables) {
-        this.localVariables = localVariables;
+    public void addComment(CommentNode node) {
+        commentNodes.add(node);
     }
     
-    public void addBeginNode(Node node) {
+    public void addBeginNode(StaticScope scope, Node node) {
+        // FIXME: We need to add BEGIN nodes properly
     	beginNodes.add(node);
     }
     
