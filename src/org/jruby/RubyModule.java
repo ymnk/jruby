@@ -43,6 +43,7 @@ import java.util.Map;
 
 import org.jruby.internal.runtime.methods.AliasMethod;
 import org.jruby.internal.runtime.methods.CallbackMethod;
+import org.jruby.internal.runtime.methods.FastCallbackMethod;
 import org.jruby.internal.runtime.methods.MethodMethod;
 import org.jruby.internal.runtime.methods.ProcMethod;
 import org.jruby.internal.runtime.methods.UndefinedMethod;
@@ -409,8 +410,18 @@ public class RubyModule extends RubyObject {
         addMethod(name, new CallbackMethod(this, method, visibility));
     }
 
+    public void defineFastMethod(String name, Callback method) {
+        Visibility visibility = name.equals("initialize") ?
+                Visibility.PRIVATE : Visibility.PUBLIC;
+        addMethod(name, new FastCallbackMethod(this, method, visibility));
+    }
+
     public void definePrivateMethod(String name, Callback method) {
         addMethod(name, new CallbackMethod(this, method, Visibility.PRIVATE));
+    }
+
+    public void defineFastPrivateMethod(String name, Callback method) {
+        addMethod(name, new FastCallbackMethod(this, method, Visibility.PRIVATE));
     }
 
     public void undefineMethod(String name) {
@@ -582,6 +593,22 @@ public class RubyModule extends RubyObject {
     public void definePublicModuleFunction(String name, Callback method) {
         defineMethod(name, method);
         defineSingletonMethod(name, method);
+    }
+
+    /** rb_define_module_function
+     *
+     */
+    public void defineFastModuleFunction(String name, Callback method) {
+        defineFastPrivateMethod(name, method);
+        defineFastSingletonMethod(name, method);
+    }
+
+    /** rb_define_module_function
+     *
+     */
+    public void defineFastPublicModuleFunction(String name, Callback method) {
+        defineFastMethod(name, method);
+        defineFastSingletonMethod(name, method);
     }
 
     private IRubyObject getConstantInner(String name, boolean exclude) {

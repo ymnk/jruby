@@ -293,6 +293,13 @@ public class RubyObject implements Cloneable, IRubyObject {
         getSingletonClass().defineMethod(name, method);
     }
 
+    /** rb_define_singleton_method
+     *
+     */
+    public void defineFastSingletonMethod(String name, Callback method) {
+        getSingletonClass().defineFastMethod(name, method);
+    }
+
     public void addSingletonMethod(String name, DynamicMethod method) {
         getSingletonClass().addMethod(name, method);
     }

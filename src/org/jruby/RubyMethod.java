@@ -70,7 +70,7 @@ public class RubyMethod extends RubyObject {
     	
 		CallbackFactory callbackFactory = runtime.callbackFactory(RubyMethod.class);
         
-		methodClass.defineMethod("arity", 
+		methodClass.defineFastMethod("arity", 
 				callbackFactory.getMethod("arity"));
 		methodClass.defineMethod("to_proc", 
 				callbackFactory.getMethod("to_proc"));

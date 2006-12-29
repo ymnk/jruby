@@ -30,6 +30,7 @@ package org.jruby.runtime.builtin.meta;
 import org.jruby.IRuby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
+import org.jruby.internal.runtime.methods.FastReflectedMethod;
 import org.jruby.internal.runtime.methods.ReflectedMethod;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Visibility;
@@ -265,6 +266,32 @@ public abstract class AbstractMetaClass extends RubyClass {
 				arity, Visibility.PRIVATE));
 	}
 
+	public void defineFastMethod(String name, Arity arity) {
+		defineFastMethod(name, arity, name);
+	}
+
+	public void defineFastMethod(String name, Arity arity, String java_name) {
+		assert name != null;
+		assert arity != null;
+		assert java_name != null;
+
+		Visibility visibility = name.equals("initialize") ? Visibility.PRIVATE
+				: Visibility.PUBLIC;
+
+		addMethod(name, new FastReflectedMethod(this, builtinClass, java_name,
+				arity, visibility));
+	}
+
+	public void defineFastPrivateMethod(String name, Arity arity) {
+		addMethod(name, new FastReflectedMethod(this, builtinClass, name, arity,
+				Visibility.PRIVATE));
+	}
+
+	public void defineFastPrivateMethod(String name, Arity arity, String java_name) {
+		addMethod(name, new FastReflectedMethod(this, builtinClass, java_name,
+				arity, Visibility.PRIVATE));
+	}
+
 	public void defineSingletonMethod(String name, Arity arity) {
 		defineSingletonMethod(name, arity, name);
 	}
@@ -280,6 +307,24 @@ public abstract class AbstractMetaClass extends RubyClass {
 		getSingletonClass().addMethod(
 				name,
 				new ReflectedMethod(this, getClass(), java_name, arity,
+						visibility));
+	}
+
+	public void defineFastSingletonMethod(String name, Arity arity) {
+		defineSingletonMethod(name, arity, name);
+	}
+
+	public void defineFastSingletonMethod(String name, Arity arity, String java_name) {
+		assert name != null;
+		assert arity != null;
+		assert java_name != null;
+
+		Visibility visibility = name.equals("initialize") ? Visibility.PRIVATE
+				: Visibility.PUBLIC;
+
+		getSingletonClass().addMethod(
+				name,
+				new FastReflectedMethod(this, getClass(), java_name, arity,
 						visibility));
 	}
 
