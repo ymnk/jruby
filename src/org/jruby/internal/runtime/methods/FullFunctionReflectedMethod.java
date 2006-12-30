@@ -44,13 +44,13 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
-public class ReflectedMethod extends AbstractMethod {
+public class FullFunctionReflectedMethod extends AbstractMethod {
     private Method method;
     private Class type;
     private String methodName;
     private Arity arity;
     
-    public ReflectedMethod(RubyModule implementationClass, Class type, String methodName, 
+    public FullFunctionReflectedMethod(RubyModule implementationClass, Class type, String methodName, 
         Arity arity, Visibility visibility) {
     	super(implementationClass, visibility);
     	this.type = type;
@@ -151,8 +151,8 @@ public class ReflectedMethod extends AbstractMethod {
 	}
 
 	public DynamicMethod dup() {
-		ReflectedMethod newMethod = 
-		    new ReflectedMethod(getImplementationClass(), type, methodName, arity, getVisibility());
+		FullFunctionReflectedMethod newMethod = 
+		    new FullFunctionReflectedMethod(getImplementationClass(), type, methodName, arity, getVisibility());
 		
 		newMethod.method = method;
 		

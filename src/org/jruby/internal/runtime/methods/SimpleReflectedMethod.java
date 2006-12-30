@@ -44,13 +44,13 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
-public class FastReflectedMethod extends AbstractMethod {
+public class SimpleReflectedMethod extends AbstractMethod {
     private Method method;
     private Class type;
     private String methodName;
     private Arity arity;
     
-    public FastReflectedMethod(RubyModule implementationClass, Class type, String methodName, 
+    public SimpleReflectedMethod(RubyModule implementationClass, Class type, String methodName, 
         Arity arity, Visibility visibility) {
     	super(implementationClass, visibility);
     	this.type = type;
@@ -151,8 +151,8 @@ public class FastReflectedMethod extends AbstractMethod {
 	}
 
 	public DynamicMethod dup() {
-		FastReflectedMethod newMethod = 
-		    new FastReflectedMethod(getImplementationClass(), type, methodName, arity, getVisibility());
+		SimpleReflectedMethod newMethod = 
+		    new SimpleReflectedMethod(getImplementationClass(), type, methodName, arity, getVisibility());
 		
 		newMethod.method = method;
 		

@@ -42,8 +42,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.jruby.internal.runtime.methods.AliasMethod;
-import org.jruby.internal.runtime.methods.CallbackMethod;
-import org.jruby.internal.runtime.methods.FastCallbackMethod;
+import org.jruby.internal.runtime.methods.FullFunctionCallbackMethod;
+import org.jruby.internal.runtime.methods.SimpleCallbackMethod;
 import org.jruby.internal.runtime.methods.MethodMethod;
 import org.jruby.internal.runtime.methods.ProcMethod;
 import org.jruby.internal.runtime.methods.UndefinedMethod;
@@ -407,21 +407,21 @@ public class RubyModule extends RubyObject {
     public void defineMethod(String name, Callback method) {
         Visibility visibility = name.equals("initialize") ?
                 Visibility.PRIVATE : Visibility.PUBLIC;
-        addMethod(name, new CallbackMethod(this, method, visibility));
+        addMethod(name, new FullFunctionCallbackMethod(this, method, visibility));
     }
 
     public void defineFastMethod(String name, Callback method) {
         Visibility visibility = name.equals("initialize") ?
                 Visibility.PRIVATE : Visibility.PUBLIC;
-        addMethod(name, new FastCallbackMethod(this, method, visibility));
+        addMethod(name, new SimpleCallbackMethod(this, method, visibility));
     }
 
     public void definePrivateMethod(String name, Callback method) {
-        addMethod(name, new CallbackMethod(this, method, Visibility.PRIVATE));
+        addMethod(name, new FullFunctionCallbackMethod(this, method, Visibility.PRIVATE));
     }
 
     public void defineFastPrivateMethod(String name, Callback method) {
-        addMethod(name, new FastCallbackMethod(this, method, Visibility.PRIVATE));
+        addMethod(name, new SimpleCallbackMethod(this, method, Visibility.PRIVATE));
     }
 
     public void undefineMethod(String name) {
@@ -871,7 +871,7 @@ public class RubyModule extends RubyObject {
                 method.setVisibility(visibility);
             } else {
                 final ThreadContext context = getRuntime().getCurrentContext();
-                addMethod(name, new CallbackMethod(this, new Callback() {
+                addMethod(name, new FullFunctionCallbackMethod(this, new Callback() {
                     public IRubyObject execute(IRubyObject self, IRubyObject[] args) {
                         return context.callSuper(context.getFrameArgs());
                     }

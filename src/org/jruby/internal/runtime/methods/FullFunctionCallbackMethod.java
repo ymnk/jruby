@@ -44,10 +44,10 @@ import org.jruby.runtime.callback.Callback;
 
 /**
  */
-public class CallbackMethod extends AbstractMethod {
+public class FullFunctionCallbackMethod extends AbstractMethod {
     private Callback callback;
 
-    public CallbackMethod(RubyModule implementationClass, Callback callback, Visibility visibility) {
+    public FullFunctionCallbackMethod(RubyModule implementationClass, Callback callback, Visibility visibility) {
         super(implementationClass, visibility);
         this.callback = callback;
     }
@@ -86,6 +86,6 @@ public class CallbackMethod extends AbstractMethod {
     }
     
     public DynamicMethod dup() {
-        return new CallbackMethod(getImplementationClass(), callback, getVisibility());
+        return new FullFunctionCallbackMethod(getImplementationClass(), callback, getVisibility());
     }
 }
