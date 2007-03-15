@@ -337,6 +337,14 @@ public class ByteList implements Comparable, CharSequence, Serializable {
         return chars;
     }
 
+    public char[] toCharArray() {
+        char[] chars = new char[realSize];
+        for (int i = 0; i < bytes.length; i++) {
+            chars[i] = (char) (bytes[i] & 0xFF);
+        }
+        return chars;
+    }
+
     public char charAt(int ix) {
         return (char)(this.bytes[ix] & 0xFF);
     }

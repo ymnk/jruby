@@ -217,7 +217,7 @@ public class MarshalStream extends FilterOutputStream {
             break;
         case ClassIndex.REGEXP:
             write('/');
-            RubyRegexp.marshalTo((RubyRegexp)value, this);
+            //            RubyRegexp.marshalTo((RubyRegexp)value, this);
             break;
         case ClassIndex.STRING:
             write('"');

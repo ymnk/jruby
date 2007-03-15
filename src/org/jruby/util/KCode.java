@@ -56,11 +56,9 @@ public class KCode {
         switch(lang.charAt(0)) {
         case 'E':
         case 'e':
-            runtime.getWarnings().warn("JRuby supports only Unicode regexp.");
             return EUC;
         case 'S':
         case 's':
-            runtime.getWarnings().warn("JRuby supports only Unicode regexp.");
             return SJIS;
         case 'U':
         case 'u':
@@ -98,13 +96,7 @@ public class KCode {
     }
 
     public int flags() {
-        int flags = 0;
-        if (this == UTF8) {
-            flags |= jregex.REFlags.UNICODE;
-        }
-        //        flags |= Pattern.UNIX_LINES;
-
-        return flags;
+        return 0;
     }
 }
 	

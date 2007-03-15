@@ -45,8 +45,6 @@ import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import jregex.Matcher;
-import jregex.Pattern;
 
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
@@ -512,7 +510,7 @@ public class RubyString extends RubyObject {
      *
      */
     public IRubyObject match2() {
-        return RubyRegexp.newRegexp(this, 0, null).match2();
+        return null;// RubyRegexp.newRegexp(this, 0, null).match2();
     }
 
     /**
@@ -521,6 +519,7 @@ public class RubyString extends RubyObject {
      * @param pattern Regexp or String
      */
     public IRubyObject match3(IRubyObject pattern) {
+        /*
         if (pattern instanceof RubyRegexp) {
             return ((RubyRegexp)pattern).search2(toString());
         } else if (pattern instanceof RubyString) {
@@ -530,7 +529,7 @@ public class RubyString extends RubyObject {
             // FIXME: is this cast safe?
             RubyRegexp regexp = RubyRegexp.newRegexp((RubyString) pattern.callMethod(getRuntime().getCurrentContext(), "to_str"), 0, null);
             return regexp.search2(toString());
-        }
+            }*/
 
         // not regexp and not string, can't convert
         throw getRuntime().newTypeError("wrong argument type " + pattern.getMetaClass().getBaseName() + " (expected Regexp)");
@@ -1449,6 +1448,7 @@ public class RubyString extends RubyObject {
         } else {
             throw getRuntime().newArgumentError("wrong number of arguments");
         }
+        /*
         RubyRegexp pat = RubyRegexp.regexpValue(args[0]);
 
         String intern = toString();
@@ -1469,7 +1469,7 @@ public class RubyString extends RubyObject {
             
             return newStr;
         }
-
+            */
         return bang ? getRuntime().getNil() : this;
     }
 
@@ -1500,6 +1500,7 @@ public class RubyString extends RubyObject {
             throw getRuntime().newArgumentError("wrong number of arguments");
         }
         boolean taint = repl.isTaint();
+        /*
         RubyRegexp pat = RubyRegexp.regexpValue(args[0]);
 
         String str = toString();
@@ -1545,6 +1546,8 @@ public class RubyString extends RubyObject {
         RubyString result = newString(sbuf);
         result.setTaint(isTaint() || taint);
         return result;
+        */
+        return null;
     }
 
     /** rb_str_index_m
@@ -1585,6 +1588,7 @@ public class RubyString extends RubyObject {
             // RubyRegexp doesn't (yet?) support reverse searches, so we
             // find all matches and use the last one--very inefficient.
             // XXX - find a better way
+            /*
             pos = ((RubyRegexp) args[0]).search(toString(), reverse ? 0 : pos);
 
             int dummy = pos;
@@ -1592,6 +1596,7 @@ public class RubyString extends RubyObject {
                 pos = dummy;
                 dummy = ((RubyRegexp) args[0]).search(toString(), pos + 1);
             }
+            */
         } else if (args[0] instanceof RubyString) {
             String sub = ((RubyString) args[0]).toString();
             StringBuffer sb = new StringBuffer(toString());
@@ -1639,15 +1644,17 @@ public class RubyString extends RubyObject {
      */
     public IRubyObject aref(IRubyObject[] args) {
         if (checkArgumentCount(args, 1, 2) == 2) {
+            /*
             if (args[0] instanceof RubyRegexp) {
                 IRubyObject match = RubyRegexp.regexpValue(args[0]).match(toString(), 0);
                 long idx = args[1].convertToInteger().getLongValue();
                 getRuntime().getCurrentContext().setBackref(match);
                 return RubyRegexp.nth_match((int) idx, match);
             }
+            */
             return substr(RubyNumeric.fix2int(args[0]), RubyNumeric.fix2int(args[1]));
         }
-
+        /*
         if (args[0] instanceof RubyRegexp) {
             return RubyRegexp.regexpValue(args[0]).search(toString(), 0) >= 0 ?
                 RubyRegexp.last_match(getRuntime().getCurrentContext().getBackref()) :
@@ -1660,6 +1667,7 @@ public class RubyString extends RubyObject {
             return begLen == null ? getRuntime().getNil() :
                 substr((int) begLen[0], (int) begLen[1]);
         }
+        */
         int idx = (int) args[0].convertToInteger().getLongValue();
         if (idx < 0) {
             idx += value.length();
@@ -1677,6 +1685,7 @@ public class RubyString extends RubyObject {
      *
      */
     private void subpatSet(RubyRegexp regexp, int nth, IRubyObject repl) {
+        /*
         int found = regexp.search(this.toString(), 0);
         if (found == -1) {
             throw getRuntime().newIndexError("regexp not matched");
@@ -1705,7 +1714,7 @@ public class RubyString extends RubyObject {
         int len = (int) (match.end(nth) - beg);
 
         replace(beg, len, stringValue(repl));
-
+        */
     }
 
     /** rb_str_aset, rb_str_aset_m
@@ -1953,6 +1962,7 @@ public class RubyString extends RubyObject {
      *
      */
     public RubyArray split(IRubyObject[] args) {
+        /*
         RubyRegexp pattern;
         Ruby runtime = getRuntime();
         boolean isWhitespace = false;
@@ -2115,8 +2125,10 @@ public class RubyString extends RubyObject {
 
             resultArray.append(string);
         }
-
+        
         return resultArray;
+        */
+        return null;
     }
 
     private static int getLimit(IRubyObject[] args) {
@@ -2130,6 +2142,7 @@ public class RubyString extends RubyObject {
      *
      */
     public IRubyObject scan(IRubyObject arg, Block block) {
+        /*
         RubyRegexp pattern = RubyRegexp.regexpValue(arg);
         int start = 0;
         ThreadContext tc = getRuntime().getCurrentContext();
@@ -2168,6 +2181,7 @@ public class RubyString extends RubyObject {
             }
 
         }
+        */
         return this;
     }
 
@@ -2720,6 +2734,7 @@ public class RubyString extends RubyObject {
         if (strLen == 0) {
             return this;
         }
+        /*
         String sep;
         if (checkArgumentCount(args, 0, 1) == 1) {
             sep = RubyRegexp.escapeSpecialChars(stringValue(args[0]).toString());
@@ -2753,6 +2768,7 @@ public class RubyString extends RubyObject {
         if (start < strLen) {
             block.yield(tc, substr(start, strLen - start));
         }
+        */
         return this;
     }
 

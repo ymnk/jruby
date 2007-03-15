@@ -117,7 +117,7 @@ public class UnmarshalStream extends BufferedInputStream {
             	rubyObj = RubyFloat.unmarshalFrom(this);
             	break;
             case '/' :
-                rubyObj = RubyRegexp.unmarshalFrom(this);
+                //                rubyObj = RubyRegexp.unmarshalFrom(this);
                 break;
             case ':' :
                 rubyObj = RubySymbol.unmarshalFrom(this);

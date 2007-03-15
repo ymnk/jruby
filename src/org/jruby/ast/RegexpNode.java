@@ -31,9 +31,9 @@
 package org.jruby.ast;
 
 import java.util.List;
-import jregex.Pattern;
 
-import org.jruby.RegexpTranslator;
+import org.rej.Pattern;
+
 import org.jruby.ast.types.ILiteralNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
@@ -47,10 +47,7 @@ import org.jruby.util.ByteList;
 public class RegexpNode extends Node implements ILiteralNode {
     static final long serialVersionUID = -1566813018564622077L;
 
-    private static final RegexpTranslator translator = new RegexpTranslator();
-    
     private Pattern pattern;
-    private int flags;
     private final ByteList value;
     private final int options;
     
@@ -82,17 +79,12 @@ public class RegexpNode extends Node implements ILiteralNode {
     }
     
     public int getFlags() {
-        if (pattern == null) {
-            pattern = translator.translate(value.toString(), options, 0);
-            flags = translator.flagsFor(options,0);
-        }
-        return flags;
+        return options;
     }
 
     public Pattern getPattern() {
         if (pattern == null) {
-            pattern = translator.translate(value.toString(), options, 0);
-            flags = translator.flagsFor(options,0);
+            pattern = Pattern.compile(value.toCharArray(), options);
         }
         return pattern;
     }

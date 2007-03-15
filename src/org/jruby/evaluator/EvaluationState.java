@@ -1611,8 +1611,8 @@ public class EvaluationState {
             lang = "u";
         }
         try {
-            return RubyRegexp.newRegexp(runtime, iVisited.getPattern(), iVisited.getFlags(), lang);
-        } catch(jregex.PatternSyntaxException e) {
+            return RubyRegexp.newRegexp(runtime, iVisited.getPattern(), lang);
+        } catch(org.rej.PatternSyntaxException e) {
             //                    System.err.println(iVisited.getValue().toString());
             //                    e.printStackTrace();
             throw runtime.newRegexpError(e.getMessage());
@@ -1644,7 +1644,7 @@ public class EvaluationState {
 
         try {
             return RubyRegexp.newRegexp(runtime, string.toString(), iVisited.getOptions(), lang);
-        } catch(jregex.PatternSyntaxException e) {
+        } catch(org.rej.PatternSyntaxException e) {
         //                    System.err.println(iVisited.getValue().toString());
         //                    e.printStackTrace();
             throw runtime.newRegexpError(e.getMessage());
