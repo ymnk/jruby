@@ -35,16 +35,20 @@ import org.jruby.Ruby;
 import org.jruby.charset.PlainCharset;
 import org.jruby.runtime.builtin.IRubyObject;
 
+import org.rej.Pattern;
+
 public class KCode {
-    public static final KCode NIL = new KCode(null);
-    public static final KCode NONE = new KCode("NONE");
-    public static final KCode UTF8 = new KCode("UTF8");
-    public static final KCode SJIS = new KCode("SJIS");
-    public static final KCode EUC = new KCode("EUC");
+    public static final KCode NIL = new KCode(null, Pattern.ASCII);
+    public static final KCode NONE = new KCode("NONE", Pattern.ASCII);
+    public static final KCode UTF8 = new KCode("UTF8", Pattern.UTF8);
+    public static final KCode SJIS = new KCode("SJIS", Pattern.SJIS);
+    public static final KCode EUC = new KCode("EUC", Pattern.EUC);
 
     private String kcode;
+    private Pattern.CompileContext ctx;
 
-    private KCode(String kcode) {
+    private KCode(String kcode, Pattern.CompileContext ctx) {
+        this.ctx = ctx;
         this.kcode = kcode;
     }
 
@@ -70,6 +74,10 @@ public class KCode {
             return NONE;
         }
         return NIL;
+    }
+
+    public Pattern.CompileContext getContext() {
+        return ctx;
     }
 
     public IRubyObject kcode(Ruby runtime) {

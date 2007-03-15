@@ -298,6 +298,9 @@ public interface IRubyObject {
      */
     void setTaint(boolean b);
 
+    IRubyObject taint();
+    IRubyObject untaint();
+
     /**
      * RubyMethod checkSafeString.
      */

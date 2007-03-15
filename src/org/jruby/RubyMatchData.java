@@ -37,16 +37,18 @@ import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 
+import org.rej.Registers;
+
 /**
  *
  * @author  amoore
  */
 public class RubyMatchData extends RubyObject {
-    private String original;
-
-    public RubyMatchData(Ruby runtime, String original) {
+    char[] str;
+    Registers regs;
+    
+    public RubyMatchData(Ruby runtime) {
         super(runtime, runtime.getClass("MatchData"));
-        this.original = original;
     }
 
     public static RubyClass createMatchDataClass(Ruby runtime) {
@@ -55,7 +57,7 @@ public class RubyMatchData extends RubyObject {
         runtime.defineGlobalConstant("MatchingData", matchDataClass);
 
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyMatchData.class);
-
+        /*
         matchDataClass.defineFastMethod("captures", callbackFactory.getFastMethod("captures"));
         matchDataClass.defineFastMethod("inspect", callbackFactory.getFastMethod("inspect"));
         matchDataClass.defineFastMethod("size", callbackFactory.getFastMethod("size"));
@@ -69,7 +71,7 @@ public class RubyMatchData extends RubyObject {
         matchDataClass.defineFastMethod("post_match", callbackFactory.getFastMethod("post_match"));
         matchDataClass.defineFastMethod("to_s", callbackFactory.getFastMethod("to_s"));
         matchDataClass.defineFastMethod("string", callbackFactory.getFastMethod("string"));
-
+        */
         matchDataClass.getMetaClass().undefineMethod("new");
 
         return matchDataClass;

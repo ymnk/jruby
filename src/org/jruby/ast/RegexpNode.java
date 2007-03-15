@@ -32,13 +32,13 @@ package org.jruby.ast;
 
 import java.util.List;
 
-import org.rej.Pattern;
-
 import org.jruby.ast.types.ILiteralNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.util.ByteList;
+
+import org.jruby.RubyRegexp;
 
 /** Represents a simple regular expression literal.
  *
@@ -47,13 +47,12 @@ import org.jruby.util.ByteList;
 public class RegexpNode extends Node implements ILiteralNode {
     static final long serialVersionUID = -1566813018564622077L;
 
-    private Pattern pattern;
+    private RubyRegexp pattern;
     private final ByteList value;
     private final int options;
     
     public RegexpNode(ISourcePosition position, ByteList value, int options) {
         super(position, NodeTypes.REGEXPNODE);
-        
         this.value = value;
         this.options = options;
     }
@@ -82,10 +81,12 @@ public class RegexpNode extends Node implements ILiteralNode {
         return options;
     }
 
-    public Pattern getPattern() {
-        if (pattern == null) {
-            pattern = Pattern.compile(value.toCharArray(), options);
-        }
+    public void setPattern(RubyRegexp p) {
+        this.pattern = p;
+        this.pattern.setLiteral();
+    }
+
+    public RubyRegexp getPattern() {
         return pattern;
     }
     

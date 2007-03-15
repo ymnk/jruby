@@ -1610,13 +1610,12 @@ public class EvaluationState {
         } else if((opts & 64) != 0) { // param s
             lang = "u";
         }
-        try {
-            return RubyRegexp.newRegexp(runtime, iVisited.getPattern(), lang);
-        } catch(org.rej.PatternSyntaxException e) {
-            //                    System.err.println(iVisited.getValue().toString());
-            //                    e.printStackTrace();
-            throw runtime.newRegexpError(e.getMessage());
+        RubyRegexp p = iVisited.getPattern();
+        if(p == null) {
+            p = RubyRegexp.newRegexp(runtime, iVisited.getValue().toCharArray(), iVisited.getFlags(), lang);
+            iVisited.setPattern(p);
         }
+        return p;
     }
 
     private static IRubyObject dregexpNode(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block aBlock) {
@@ -1642,13 +1641,7 @@ public class EvaluationState {
             lang = "u";
         }
 
-        try {
-            return RubyRegexp.newRegexp(runtime, string.toString(), iVisited.getOptions(), lang);
-        } catch(org.rej.PatternSyntaxException e) {
-        //                    System.err.println(iVisited.getValue().toString());
-        //                    e.printStackTrace();
-            throw runtime.newRegexpError(e.getMessage());
-        }
+        return RubyRegexp.newRegexp(runtime, string.toString(), iVisited.getOptions(), lang);
     }
     
     private static String getArgumentDefinition(Ruby runtime, ThreadContext context, Node node, String type, IRubyObject self, Block block) {

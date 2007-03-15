@@ -58,4 +58,14 @@ public class Registers {
             beg[i] = end[i] = -1;
         }
     }
+
+    public Registers copy() {
+        Registers n = new Registers();
+        n.allocated = n.num_regs = num_regs;
+        n.beg = new int[num_regs];
+        n.end = new int[num_regs];
+        System.arraycopy(beg,0,n.beg,0,num_regs);
+        System.arraycopy(end,0,n.end,0,num_regs);
+        return n;
+    }
 }// Registers

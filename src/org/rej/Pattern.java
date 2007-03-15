@@ -312,22 +312,19 @@ public class Pattern {
     public final static class CompileContext {
         public final char[] translate;
         public final int current_mbctype;
+        public final char[] re_mbctab;
         public CompileContext() {
-            this(null,MBCTYPE_ASCII);
+            this(null,MBCTYPE_ASCII,mbctab_ascii);
         }
         public CompileContext(char[] t) {
-            this(t,MBCTYPE_ASCII);
+            this(t,MBCTYPE_ASCII,mbctab_ascii);
         }
-        public CompileContext(char[] t, int mbc) {
+        public CompileContext(char[] t, int mbc, char[] mbctab) {
             this.translate = t;
             this.current_mbctype = mbc;
+            this.re_mbctab = mbctab;
         }
     }
-
-    public final static CompileContext ASCII = new CompileContext(ASCII_TRANSLATE_TABLE, MBCTYPE_ASCII);
-    public final static CompileContext UTF8 = new CompileContext(ASCII_TRANSLATE_TABLE, MBCTYPE_UTF8);
-    public final static CompileContext SJIS = new CompileContext(ASCII_TRANSLATE_TABLE, MBCTYPE_SJIS);
-    public final static CompileContext EUC = new CompileContext(ASCII_TRANSLATE_TABLE, MBCTYPE_EUC);
 
     private CompileContext ctx;
     private char[] b;
@@ -628,12 +625,12 @@ public class Pattern {
                         if(had_char_class > 0 && c == '-' && p[pix] != ']') {
                             err("invalid regular expression; can't use character class as a start value of range");
                         }
-                        if(ismbchar(c)) {
-                            if(pix + mbclen(c) - 1 >= pend) {
+                        if(ismbchar(c,ctx)) {
+                            if(pix + mbclen(c,ctx) - 1 >= pend) {
                                 err("premature end of regular expression");
                             }
                             c = MBC2WC(c, p, pix);
-                            pix += mbclen(c) - 1;
+                            pix += mbclen(c,ctx) - 1;
                             had_mbchar++;
                         }
                         had_char_class = 0;
@@ -667,7 +664,7 @@ public class Pattern {
                             case 'W':
                                 for(c = 0; c < 256; c++) {
                                     if(re_syntax_table[c] != Sword &&
-                                       ((ctx.current_mbctype>0 && re_mbctab[c] == 0) ||
+                                       ((ctx.current_mbctype>0 && ctx.re_mbctab[c] == 0) ||
                                         (ctx.current_mbctype==0 && re_syntax_table[c] != Sword2))) {
                                         SET_LIST_BIT(c);
                                     }
@@ -745,12 +742,12 @@ public class Pattern {
                             }
                             default:
                                 c = read_backslash(c);
-                                if(ismbchar(c)) {
-                                    if(pix + mbclen(c) - 1 >= pend) {
+                                if(ismbchar(c,ctx)) {
+                                    if(pix + mbclen(c,ctx) - 1 >= pend) {
                                         err("premature end of regular expression");
                                     }
                                     c = MBC2WC(c, p, pix);
-                                    pix += mbclen(c) - 1;
+                                    pix += mbclen(c,ctx) - 1;
                                     had_mbchar++;
                                 }
                                 break;
@@ -1619,13 +1616,13 @@ public class Pattern {
             if(gotoNormalChar) {
                 /* Expects the character in `c'.  */
                 had_mbchar = 0;
-                if(ismbchar(c)) {
+                if(ismbchar(c,ctx)) {
                     had_mbchar = 1;
                     c1 = (char)pix;
                 }
             }
             if(gotoNormalChar || gotoNumericChar) {
-                nextp = pix + mbclen(c) - 1;
+                nextp = pix + mbclen(c,ctx) - 1;
 
                 if(pending_exact==-1 || pending_exact + b[pending_exact] + 1 != bix || 
                    b[pending_exact] >= (c1!=0 ? 0176 : 0177) || (nextp < pend &&
@@ -1645,7 +1642,7 @@ public class Pattern {
                 BUFPUSH(c);
                 b[pending_exact]++;
                 if(had_mbchar!=0) {
-                    int len = mbclen(c) - 1;
+                    int len = mbclen(c,ctx) - 1;
                     while(len-- > 0) {
                         if(pix == pend) {
                             err("premature end of regular expression");
@@ -1704,7 +1701,7 @@ public class Pattern {
 
             for(i=1; i<len; i++) {
                 if(buffer[must+i] == 0xff ||
-                    (ctx.current_mbctype!=0 && ismbchar(buffer[must+i]))) {
+                   (ctx.current_mbctype!=0 && ismbchar(buffer[must+i],ctx))) {
                     options |= RE_OPTIMIZE_NO_BM;
                     break;
                 }
@@ -2067,7 +2064,7 @@ public class Pattern {
 
     private final char MBC2WC(char c, char[] p, int pix) {
         if(ctx.current_mbctype == MBCTYPE_UTF8) {
-            int n = mbclen(c) - 1;
+            int n = mbclen(c,ctx) - 1;
             c &= (1<<(6-n)) - 1;
             while(n-- > 0) {
                 c = (char)(c << 6 | (p[pix++] & ((1<<6)-1)));
@@ -2133,12 +2130,12 @@ public class Pattern {
         return p[pix++];
     }
 
-    private final static boolean ismbchar(int c) {
-        return re_mbctab[c] != 0;
+    public final static boolean ismbchar(int c, CompileContext ctx) {
+        return ctx.re_mbctab[c] != 0;
     }
 
-    private final static int mbclen(char c) {
-        return re_mbctab[c] + 1;
+    public final static int mbclen(char c, CompileContext ctx) {
+        return ctx.re_mbctab[c] + 1;
     }
 
     private final static void set_list_bits(long c1, long c2, char[] b, int bix) {
@@ -2186,6 +2183,14 @@ public class Pattern {
 
     private void re_warning(String msg) {
         warnings.add(msg);
+    }
+
+    public List getWarnings() {
+        return warnings;
+    }
+
+    public void clearWarnings() {
+        warnings.clear();
     }
 
     private static void err(String msg) throws PatternSyntaxException {
@@ -2241,6 +2246,12 @@ public class Pattern {
     }
 
     private Pattern() {}
+    public Pattern(char[] b, int all, char[] fmap, int flags) {
+        buffer = b;
+        allocated = all;
+        fastmap = fmap;
+        options = flags;
+    }
 
     private char[] buffer;	  /* Space holding the compiled pattern commands.  */
     private int allocated;	  /* Size of space that `buffer' points to. */
@@ -2251,7 +2262,7 @@ public class Pattern {
     private int must;         /* Pointer to exact pattern which strings should have
 			                     to be matched.  */
     private int[] must_skip;  /* Pointer to exact pattern skip table for bm_search */
-    private long options;  	  /* Flags for options such as extended_pattern. */
+    public  long options;  	  /* Flags for options such as extended_pattern. */
     private int re_nsub;	  /* Number of subexpressions found by the compiler. */
     private char fastmap_accurate;
 			                  /* Set to zero when a new pattern is stored,
@@ -2389,12 +2400,12 @@ public class Pattern {
 
                             startpos_adjust: while(range > 0) {
                                 c = string[pix++];
-                                if(ismbchar(c)) {
+                                if(ismbchar(c,ctx)) {
                                     int len;
                                     if(fastmap[c] != 0) {
                                         break;
                                     }
-                                    len = mbclen(c) - 1;
+                                    len = mbclen(c,ctx) - 1;
                                     while(len-- > 0) {
                                         c = string[pix++];
                                         range--;
@@ -2452,8 +2463,8 @@ public class Pattern {
                     break;
                 } else if(range > 0) {
                     int d = startpos;
-                    if(ismbchar(string[d])) {
-                        int len = mbclen(string[d]) - 1;
+                    if(ismbchar(string[d],ctx)) {
+                        int len = mbclen(string[d],ctx) - 1;
                         range-=len;
                         startpos+=len;
                         if(range==0) {
@@ -2468,7 +2479,7 @@ public class Pattern {
                     {
                         int s = 0;
                         int d = startpos;
-                        for(pix = d; pix-- > s && ismbchar(string[pix]); );
+                        for(pix = d; pix-- > s && ismbchar(string[pix],ctx); );
                         if(((d - pix)&1) == 0) {
                             if(range == 0) {
                                 break;
@@ -2487,13 +2498,13 @@ public class Pattern {
     private final boolean IS_A_LETTER(char[] d, int dix, int dend) {
         return re_syntax_table[d[dix]] == Sword ||
             (ctx.current_mbctype != 0 ? 
-             (re_mbctab[d[dix]] != 0 && d[dix+mbclen(d[dix])]<=dend):
+             (ctx.re_mbctab[d[dix]] != 0 && d[dix+mbclen(d[dix],ctx)]<=dend):
              re_syntax_table[d[dix]] == Sword2);
     }
 
     private final boolean PREV_IS_A_LETTER(char[] d, int dix, int dend) {
         return ((ctx.current_mbctype == MBCTYPE_SJIS)?
-                IS_A_LETTER(d,dix-(((dix-1)!=0&&ismbchar(d[dix-2]))?2:1),dend):
+                IS_A_LETTER(d,dix-(((dix-1)!=0&&ismbchar(d[dix-2],ctx))?2:1),dend):
                 ((ctx.current_mbctype!=0 && (d[dix-1] >= 0x80)) ||
                  IS_A_LETTER(d,dix-1,dend)));
     }
@@ -2512,12 +2523,12 @@ public class Pattern {
         char cc;
         while(len>0) {
             cc = s[p1++];
-            if(ismbchar(cc)) {
+            if(ismbchar(cc,ctx)) {
                 int n;
                 if(cc != s[p2++]) {
                     return 1;
                 }
-                for(n=mbclen(cc)-1; n>0; n--) {
+                for(n=mbclen(cc,ctx)-1; n>0; n--) {
                     if(--len == 0 || s[p1++] != s[p2++]) {
                         return 1;
                     }
@@ -2895,14 +2906,14 @@ public class Pattern {
                     case anychar:
                         if(d == dend) {break fail1;}
 
-                        if(ismbchar(string[d])) {
-                            if(d + mbclen(string[d]) > dend) {
+                        if(ismbchar(string[d],ctx)) {
+                            if(d + mbclen(string[d],ctx) > dend) {
                                 break fail1;
                             }
                             for(int this_reg = 0; this_reg < num_regs; this_reg++) {
                                 reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
                             }
-                            d += mbclen(string[d]);
+                            d += mbclen(string[d],ctx);
                             break;
                         }
                         if((optz&RE_OPTION_MULTILINE)==0
@@ -2955,14 +2966,14 @@ public class Pattern {
                             }
 
                             if(d == dend) {break fail1;}
-                            if(ismbchar(string[d])) {
-                                if(d + mbclen(string[d]) > dend) {
+                            if(ismbchar(string[d],ctx)) {
+                                if(d + mbclen(string[d],ctx) > dend) {
                                     break fail1;
                                 }
                                 for(int this_reg = 0; this_reg < num_regs; this_reg++) {
                                     reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
                                 }
-                                d += mbclen(string[d]);
+                                d += mbclen(string[d],ctx);
                                 continue;
                             }
                             if((optz&RE_OPTION_MULTILINE)==0 &&
@@ -2985,8 +2996,8 @@ public class Pattern {
                         if(d == dend) {break fail1;}
 
                         c = string[d++];
-                        if(ismbchar(c)) {
-                            if(d + mbclen(c) - 1 <= dend) {
+                        if(ismbchar(c,ctx)) {
+                            if(d + mbclen(c,ctx) - 1 <= dend) {
                                 cc = c;
                                 c = MBC2WC(c, string, d);
                                 not = is_in_list_mbc(c, p, pix);
@@ -3167,7 +3178,7 @@ public class Pattern {
                             } else if(p[p2+3] == charset ||
                                       p[p2+3] == charset_not) {
                                 boolean not;
-                                if(ismbchar(c)) {
+                                if(ismbchar(c,ctx)) {
                                     int pp = p1+3;
                                     c = MBC2WC(c, p, pp);
                                 }
@@ -3763,8 +3774,8 @@ public class Pattern {
                         if(!IS_A_LETTER(string,d,dend)) {
                             break fail1;
                         }
-                        if(ismbchar(string[d]) && d + mbclen(string[d]) - 1 < dend) {
-                            d += mbclen(string[d]) - 1;
+                        if(ismbchar(string[d],ctx) && d + mbclen(string[d],ctx) - 1 < dend) {
+                            d += mbclen(string[d],ctx) - 1;
                         }
                         d++;
                         for(int this_reg = 0; this_reg < num_regs; this_reg++) {
@@ -3776,8 +3787,8 @@ public class Pattern {
                         if(IS_A_LETTER(string, d, dend)) {
                             break fail1;
                         }
-                        if(ismbchar(string[d]) && d + mbclen(string[d]) - 1 < dend) {
-                            d += mbclen(string[d]) - 1;
+                        if(ismbchar(string[d],ctx) && d + mbclen(string[d],ctx) - 1 < dend) {
+                            d += mbclen(string[d],ctx) - 1;
                         }
                         d++;
                         for(int this_reg = 0; this_reg < num_regs; this_reg++) {
@@ -3803,12 +3814,12 @@ public class Pattern {
                                     continue;
                                 }
                                 c = string[d++];
-                                if(ismbchar(c)) {
+                                if(ismbchar(c,ctx)) {
                                     int n;
                                     if(c != p[pix++]) {
                                         break fail1;
                                     }
-                                    for(n = mbclen(c) - 1; n > 0; n--) {
+                                    for(n = mbclen(c,ctx) - 1; n > 0; n--) {
                                         if(--mcnt==0
                                            || d == dend
                                            || string[d++] != p[pix++]) {
@@ -4019,7 +4030,7 @@ public class Pattern {
         if(c == 0xff) {
             c = little[littleix+1];
             fescape = true;
-        } else if(translate!=null && !ismbchar(c)) {
+        } else if(translate!=null && !ismbchar(c,ctx)) {
             c = translate[c];
         }
 
@@ -4032,10 +4043,10 @@ public class Pattern {
                     }
                     bigix++;
                 }
-            } else if(translate!=null && !ismbchar(c)) {
+            } else if(translate!=null && !ismbchar(c,ctx)) {
                 while(bigix < bend) {
-                    if(ismbchar(big[bigix])) {
-                        bigix+=mbclen(big[bigix])-1;
+                    if(ismbchar(big[bigix],ctx)) {
+                        bigix+=mbclen(big[bigix],ctx)-1;
                     } else if(translate[big[bigix]] == c) {
                         break;
                     }
@@ -4046,8 +4057,8 @@ public class Pattern {
                     if(big[bigix] == c) {
                         break;
                     }
-                    if(ismbchar(big[bigix])) {
-                        bigix+=mbclen(big[bigix])-1;
+                    if(ismbchar(big[bigix],ctx)) {
+                        bigix+=mbclen(big[bigix],ctx)-1;
                     }
                     bigix++;
                 }
@@ -4058,7 +4069,7 @@ public class Pattern {
             }
 
             if(bigix<bend) {
-                bigix+=mbclen(big[bigix]);
+                bigix+=mbclen(big[bigix],ctx);
             }
         }
 
@@ -4293,7 +4304,7 @@ public class Pattern {
           case MBCTYPE_SJIS:
           case MBCTYPE_UTF8:
               for(j = 0x80; j < 256; j++) {
-                  if(re_mbctab[j] != 0) {
+                  if(ctx.re_mbctab[j] != 0) {
                       fastmap[j] = 1;
                   }
               }
@@ -4318,7 +4329,7 @@ public class Pattern {
           case MBCTYPE_SJIS:
           case MBCTYPE_UTF8:
               for(j = 0x80; j < 256; j++) {
-                  if(re_mbctab[j] == 0) {
+                  if(ctx.re_mbctab[j] == 0) {
                       fastmap[j] = 1;
                   }
               }
@@ -4351,7 +4362,7 @@ public class Pattern {
                       if(c < 0x100) {
                           fastmap[beg] = 2;
                           options |= RE_OPTIMIZE_BMATCH;
-                      } else if(ismbchar((char)beg)) {
+                      } else if(ismbchar((char)beg,ctx)) {
                           fastmap[beg] = 1;
                       }
                       beg++;
@@ -4372,14 +4383,14 @@ public class Pattern {
                 /* NOTE: Charset_not for single-byte chars might contain
                    multi-byte chars.  See set_list_bits(). */
                 for(j = p[pix] * 8; j < 256; j++) {
-                    if(!ismbchar(j)) {
+                    if(!ismbchar(j,ctx)) {
                         fastmap[j] = 1;
                     }
                 }
 
                 for(j = p[pix++] * 8 - 1; j >= 0; j--) {
                     if((p[pix + j / 8] & (1 << (j % 8))) == 0) {
-                        if(!ismbchar(j)) {
+                        if(!ismbchar(j,ctx)) {
                             fastmap[j] = 1;
                         }
                     }
@@ -4391,7 +4402,7 @@ public class Pattern {
                     size = EXTRACT_UNSIGNED(p,pix-2);
                     if(size == 0) {
                         for(j = 0x80; j < 256; j++) {
-                            if(ismbchar(j)) {
+                            if(ismbchar(j,ctx)) {
                                 fastmap[j] = 1;
                             }
                         }
@@ -4401,7 +4412,7 @@ public class Pattern {
                         int cc = EXTRACT_MBC(p,pix+j*8);
                         beg = WC2MBC1ST(cc);
                         while(c <= beg) {
-                            if(ismbchar((int)c)) {
+                            if(ismbchar((int)c, ctx)) {
                                 fastmap[(int)c] = 1;
                             }
                             c++;
@@ -4410,7 +4421,7 @@ public class Pattern {
                         if(cc < 0xff) {
                             num_literal = 1;
                             while(c <= cc) {
-                                if(ismbchar((int)c)) {
+                                if(ismbchar((int)c, ctx)) {
                                     fastmap[(int)c] = 1;
                                 }
                                 c++;
@@ -4423,7 +4434,7 @@ public class Pattern {
                         if(num_literal != 0) {
                             fastmap[j] = 1;
                         }
-                        if(ismbchar(j)) {
+                        if(ismbchar(j,ctx)) {
                             fastmap[j] = 1;
                         }
                     }
@@ -4556,7 +4567,6 @@ public class Pattern {
         2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
         3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 0, 0,
     };
-    private static char[] re_mbctab = mbctab_ascii;
 
     public static void main(String[] args) throws Exception {
         char[] ccc = args[1].toCharArray();
@@ -4631,4 +4641,9 @@ public class Pattern {
             System.err.println(iter.next());
         }
     }
+
+    public final static CompileContext ASCII = new CompileContext(ASCII_TRANSLATE_TABLE, MBCTYPE_ASCII, mbctab_ascii);
+    public final static CompileContext UTF8 = new CompileContext(ASCII_TRANSLATE_TABLE, MBCTYPE_UTF8, mbctab_utf8);
+    public final static CompileContext SJIS = new CompileContext(ASCII_TRANSLATE_TABLE, MBCTYPE_SJIS, mbctab_sjis);
+    public final static CompileContext EUC = new CompileContext(ASCII_TRANSLATE_TABLE, MBCTYPE_EUC, mbctab_euc);
 }// Pattern
