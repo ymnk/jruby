@@ -57,6 +57,8 @@ import org.jruby.util.KCode;
 import org.jruby.util.Pack;
 import org.jruby.util.Sprintf;
 
+import org.rej.Pattern;
+
 /**
  *
  * @author  jpetersen
@@ -1962,180 +1964,85 @@ public class RubyString extends RubyObject {
      *
      */
     public RubyArray split(IRubyObject[] args) {
-        /*
-        RubyRegexp pattern;
         Ruby runtime = getRuntime();
-        boolean isWhitespace = false;
-
-        // get the pattern based on args
-        if (args.length == 0 || args[0].isNil()) {
-            isWhitespace = true;
-            IRubyObject defaultPattern = runtime.getGlobalVariables().get("$;");
-            
-            if (defaultPattern.isNil()) {
-                pattern = RubyRegexp.newRegexp(runtime, "\\s+", 0, null);
-            } else {
-                // FIXME: Is toString correct here?
-                pattern = RubyRegexp.newRegexp(runtime, defaultPattern.toString(), 0, null);
-            }
-        } else if (args[0] instanceof RubyRegexp) {
-            // Even if we have whitespace-only explicit regexp we do not
-            // mark it as whitespace.  Apparently, this is so ruby can
-            // still get the do not ignore the front match behavior.
-            pattern = RubyRegexp.regexpValue(args[0]);
+        IRubyObject spat, limit;
+        boolean awk_split = false;
+        int beg, end, i = 0;
+        int lim = 0;
+        IRubyObject result, tmp;
+        
+        if(checkArgumentCount(args,0,2) > 0) {
+            spat = args[0];
         } else {
-            String stringPattern = RubyString.stringValue(args[0]).toString();
-
-            if (stringPattern.equals(" ")) {
-                isWhitespace = true;
-                pattern = RubyRegexp.newRegexp(getRuntime(), "\\s+", 0, null);
-            } else {
-                pattern = RubyRegexp.newRegexp(getRuntime(), RubyRegexp.escapeSpecialChars(stringPattern), 0, null);
-            }
+            spat = runtime.getNil();
         }
-
-        int limit = getLimit(args);
-        String[] result = null;
-        // attempt to convert to Unicode when appropriate
-        String splitee = toString();
-        boolean unicodeSuccess = false;
-        if (getRuntime().getKCode() == KCode.UTF8) {
-            // We're in UTF8 mode; try to convert the string to UTF8, but fall back on raw bytes if we can't decode
-            // TODO: all this decoder and charset stuff could be centralized...in KCode perhaps?
-            CharsetDecoder decoder = Charset.forName("UTF-8").newDecoder();
-            decoder.onMalformedInput(CodingErrorAction.REPORT);
-            decoder.onUnmappableCharacter(CodingErrorAction.REPORT);
-
-            try {
-                splitee = decoder.decode(ByteBuffer.wrap(value.bytes())).toString();
-                unicodeSuccess = true;
-            } catch (CharacterCodingException cce) {
-                // ignore, just use the unencoded string
-            }
-        }
-
-
-        if (limit == 1) {
-            if (splitee.length() == 0) {
-                return runtime.newArray();
-            } else {
+        if(args.length > 1) {
+            limit = args[1];
+            lim = RubyNumeric.num2int(limit);
+            if(lim <= 0) {
+                limit = runtime.getNil();
+            } else if(lim == 1) {
+                if(value.length() == 0) {
+                    return runtime.newArray();
+                }
                 return runtime.newArray(this);
             }
+            i = 1;
         } else {
-            List list = new ArrayList();
-            int numberOfHits = 0;
-            int stringLength = splitee.length();
-
-            Pattern pat = pattern.getPattern();
-            Matcher matt = pat.matcher(splitee);
-
-            int startOfCurrentHit = 0;
-            int endOfCurrentHit = 0;
-            String group = null;
-
-            // TODO: There's a fast path in here somewhere that could just use Pattern.split
-
-            if (matt.find()) {
-                // we have matches, proceed
-
-                // end of current hit is start of first match
-                endOfCurrentHit = matt.start();
-
-                // filter out starting whitespace matches for non-regex whitespace splits
-                if (endOfCurrentHit != 0 || !isWhitespace) {
-                    // not a non-regex whitespace split, proceed
-
-                    numberOfHits++;
-
-                    // skip first positive lookahead match
-                    if (matt.end() != 0) {
-
-                        // add the first hit
-                        list.add(splitee.substring(startOfCurrentHit, endOfCurrentHit));
-
-                        // add any matched groups found while splitting the first hit
-                        for (int groupIndex = 1; groupIndex < matt.groupCount(); groupIndex++) {
-                            group = matt.group(groupIndex);
-                            if (group == null) continue;
-                            
-                            list.add(group);
-                        }
-                    }
-                }
-
-                // advance start to the end of the current hit
-                startOfCurrentHit = matt.end();
-
-                // ensure we haven't exceeded the hit limit
-                if (numberOfHits + 1 != limit) {
-                    // loop over the remaining matches
-                    while (matt.find()) {
-                        // end of current hit is start of the next match
-                        endOfCurrentHit = matt.start();
-                        numberOfHits++;
-
-                        // add the current hit
-                        list.add(splitee.substring(startOfCurrentHit, endOfCurrentHit));
-
-                        // add any matched groups found while splitting the current hit
-                        for (int groupIndex = 1; groupIndex < matt.groupCount(); groupIndex++) {
-                            group = matt.group(groupIndex);
-                            if (group == null) continue;
-                            
-                            list.add(group);
-                        }
-
-                        // advance start to the end of the current hit
-                        startOfCurrentHit = matt.end();
-                    }
-                }
-            }
-
-            if (numberOfHits == 0) {
-                // we found no hits, use the entire string
-                list.add(splitee);
-            } else if (startOfCurrentHit <= stringLength) {
-                // our last match ended before the end of the string, add remainder
-                list.add(splitee.substring(startOfCurrentHit, stringLength));
-            }
-
-            // Remove trailing whitespace when limit 0 is specified
-            if (limit == 0 && list.size() > 0) {
-                for (int size = list.size() - 1;
-                        size >= 0 && ((String) list.get(size)).length() == 0;
-                        size--) {
-                    list.remove(size);
-                }
-            }
-
-            result = (String[])list.toArray(new String[list.size()]);
+            limit = runtime.getNil();
         }
 
-        // convert arraylist of strings to RubyArray of RubyStrings
-        RubyArray resultArray = getRuntime().newArray(result.length);
-
-        for (int i = 0; i < result.length; i++) {
-            RubyString string = runtime.newString(result[i]);
-
-            // if we're in unicode mode and successfully converted to a unicode string before,
-            // make sure to keep unicode in the split values
-            if (unicodeSuccess && getRuntime().getKCode() == KCode.UTF8) {
-                string.setUnicodeValue(result[i]);
+        boolean goto_fs_set = false;
+        if(spat.isNil()) {
+            IRubyObject fs = runtime.getGlobalVariables().get("$;");
+            if(!fs.isNil()) {
+                spat = fs;
+                goto_fs_set = true;
+            } else {
+                awk_split = true;
             }
-
-            resultArray.append(string);
+        } else {
+            goto_fs_set = true;
         }
-        
-        return resultArray;
-        */
+
+        if(goto_fs_set) {
+            if(spat instanceof RubyString && ((RubyString)spat).value.length() == 1) {
+                if(((RubyString)spat).value.charAt(0) == ' ') {
+                    awk_split = true;
+                } else {
+                    spat = RubyRegexp.newRegexp(RubyRegexp.quote(spat,(KCode)null),0,null);
+                }
+            } else {
+                spat = get_pat(spat, true);
+            }
+        }
+
+
+
         return null;
     }
 
-    private static int getLimit(IRubyObject[] args) {
-        if (args.length == 2) {
-            return RubyNumeric.fix2int(args[1]);
+    private IRubyObject get_pat(IRubyObject pat, boolean quote) {
+        IRubyObject val;
+
+        if(pat instanceof RubyRegexp) {
+            return pat;
+        } else if(pat instanceof RubyString) {
+        } else {
+            val = pat.checkStringType();
+            if(val.isNil()) {
+                if(!(pat instanceof RubyRegexp)) {
+                    throw getRuntime().newTypeError("wrong argument type " + pat.getMetaClass().getName() + " (expected Regexp)");
+                }
+            }
+            pat = val;
         }
-        return 0;
+
+        if(quote) {
+            pat = RubyRegexp.quote(pat,(KCode)null);
+        }
+
+        return RubyRegexp.newRegexp(pat,0,null);
     }
 
     /** rb_str_scan

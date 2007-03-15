@@ -130,6 +130,10 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         return newRegexp(runtime, pattern.toCharArray(), options, kcode);
     }
 
+    public static RubyRegexp newRegexp(IRubyObject ptr, int options, String kcode) {
+        return newRegexp(ptr.getRuntime(), ptr.convertToString().getByteList().toCharArray(), options, kcode);
+    }
+
     public static RubyRegexp newRegexp(Ruby runtime, char[] pattern, int options, String kcode) {
         RubyRegexp rr = new RubyRegexp(runtime);
         rr.initialize(pattern,pattern.length,options);
@@ -391,6 +395,32 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             return getRuntime().getNil();
         }
         return RubyFixnum.newFixnum(getRuntime(),start);
+    }
+
+    public static RubyRegexp regexpValue(IRubyObject obj) {
+        if(obj instanceof RubyRegexp) {
+            return (RubyRegexp)obj;
+        } else if (obj instanceof RubyString) {
+            return newRegexp(obj.getRuntime(), obj.toString(), 0, null);
+        } else {
+            throw obj.getRuntime().newArgumentError("can't convert arg to Regexp");
+        }
+    }
+
+    /** rb_reg_s_quote
+     * 
+     */
+    public static RubyString quote(IRubyObject recv, IRubyObject[] args) {
+        //TODO:implement
+        return null;
+    }
+
+    /** rb_reg_quote
+     *
+     */
+    public static RubyString quote(IRubyObject str, KCode kcode) {
+        //TODO:implement
+        return null;
     }
 
     /** rb_reg_nth_match
