@@ -327,69 +327,61 @@ public class Pattern {
     }
 
     private CompileContext ctx;
-    private char[] b;
-    private int bix;
-    private char[] p;
-    private int pix;
-    private int pend;
-    private char c, c1;
-    private int p0;
-    private long optz;
 
-    private void compile(char[] pattern, int start, int length, CompileContext ctx) throws PatternSyntaxException {
-        this.ctx = ctx;
-        b = buffer;
-        bix = 0;
-        p = pattern;
-        pix = start;
-        pend = start+length;
-        c1 = 0;
-        int[] numlen = new int[1];
-        int nextp;
+    private static class CompilationEnvironment {
+        public CompileContext ctx;
+        public char[] b;
+        public int bix;
+        public char[] p;
+        public int pix;
+        public int pend;
+        public char c, c1;
+        public int p0;
+        public long optz;
+        public int[] numlen = new int[0];
+        public int nextp;
 
         /* Address of the count-byte of the most recently inserted `exactn'
            command.  This makes it possible to tell whether a new exact-match
            character can be added to that command or requires a new `exactn'
            command.  */
 
-        int pending_exact = -1;
+        public int pending_exact = -1;
 
         /* Address of the place where a forward-jump should go to the end of
            the containing expression.  Each alternative of an `or', except the
            last, ends with a forward-jump of this sort.  */
 
-        int fixup_alt_jump = -1;
+        public int fixup_alt_jump = -1;
         
         /* Address of start of the most recently finished expression.
            This tells postfix * where to find the start of its operand.  */
 
-        int laststart = -1;
+        public int laststart = -1;
 
         /* In processing a repeat, 1 means zero matches is allowed.  */
 
-        boolean zero_times_ok = false;
+        public boolean zero_times_ok = false;
 
         /* In processing a repeat, 1 means many matches is allowed.  */
 
-        boolean many_times_ok = false;
+        public boolean many_times_ok = false;
 
-        /* In processing a repeat, 1 means non-greedy matches.  */
-
-        boolean greedy = false;
+        public boolean greedy = false;
 
         /* Address of beginning of regexp, or inside of last (.  */
 
-        int begalt = 0;
+        public int begalt = 0;
 
         /* Place in the uncompiled pattern (i.e., the {) to
            which to go back if the interval is invalid.  */
-        int beg_interval;
+        public int beg_interval;
 
         /* In processing an interval, at least this many matches must be made.  */
-        int lower_bound;
+        public int lower_bound;
 
         /* In processing an interval, at most this many matches can be made.  */
-        int upper_bound;
+        public int upper_bound;
 
         /* Stack of information saved by ( and restored by ).
            Five stack elements are pushed by each (:
@@ -399,1070 +391,1131 @@ public class Pattern {
            Fourth, the value of regnum.
            Fifth, the type of the paren. */
 
-        int[] stacka = new int[40];
-        int[] stackb = stacka;
-        int stackp = 0;
-        int stacke = 40;
+        public int[] stacka = new int[40];
+        public int[] stackb = stacka;
+        public int stackp = 0;
+        public int stacke = 40;
 
         /* Counts ('s as they are encountered.  Remembered for the matching ),
            where it becomes the register number to put in the stop_memory
            command.  */
 
-        int regnum = 1;
+        public int regnum = 1;
 
-        int range = 0;
-        int had_mbchar = 0;
-        int had_num_literal = 0;
-        int had_char_class = 0;
+        public int range = 0;
+        public int had_mbchar = 0;
+        public int had_num_literal = 0;
+        public int had_char_class = 0;
 
-        optz = options;
+        public boolean gotoRepeat=false;
+        public boolean gotoNormalChar=false;
+        public boolean gotoNumericChar=false;
 
-        fastmap_accurate = 0;
-        must = -1;
-        must_skip = null;
+        public Pattern self;
 
-        if(allocated == 0) {
-            allocated = INIT_BUF_SIZE;
-            /* EXTEND_BUFFER loses when allocated is 0.  */
-            buffer = new char[INIT_BUF_SIZE];
-            b = buffer;
+        public final void PATFETCH() {
+            if(pix == pend) {
+                err("premature end of regular expression");
+            }
+            c = p[pix++];
+            if(TRANSLATE_P()) {
+                c = ctx.translate[c];
+            }
         }
 
-        boolean gotoRepeat=false;
-        boolean gotoNormalChar=false;
-        boolean gotoNumericChar=false;
+        public final boolean TRANSLATE_P() {
+            return ((optz&RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null);
+        }
 
-        mainParse: while(pix != pend) {
-            c = PATFETCH();
+        public final boolean MAY_TRANSLATE() {
+            return ((self.options&(RE_OPTION_IGNORECASE|RE_MAY_IGNORECASE))!=0 && ctx.translate!=null);
+        }
 
-            mainSwitch: do {
-                switch(c) {
-                case '$':
-                    if((optz & RE_OPTION_SINGLELINE) != 0) {
-                        BUFPUSH(endbuf);
+        public final void BUFPUSH(char ch) {
+            GET_BUFFER_SPACE(1);
+            b[bix++] = ch;
+        }
+
+        public final void PATFETCH_RAW() {
+            if(pix == pend) {
+                err("premature end of regular expression");
+            }
+            c = p[pix++];
+        }
+
+        public final void PATFETCH_RAW_c1() {
+            if(pix == pend) {
+                err("premature end of regular expression");
+            }
+            c1 = p[pix++];
+        }
+
+        public final void dollar() {
+            if((optz & RE_OPTION_SINGLELINE) != 0) {
+                BUFPUSH(endbuf);
+            } else {
+                p0 = pix;
+                /* When testing what follows the $,
+                   look past the \-constructs that don't consume anything.  */
+                while(p0 != pend) {
+                    if(p[p0] == '\\' && p0 + 1 != pend && (p[p0+1] == 'b' || p[p0+1] == 'B')) {
+                        p0 += 2;
                     } else {
-                        p0 = pix;
-                        /* When testing what follows the $,
-                           look past the \-constructs that don't consume anything.  */
-                        while(p0 != pend) {
-                            if (p[p0] == '\\' && p0 + 1 != pend && (p[p0+1] == 'b' || p[p0+1] == 'B')) {
-                                p0 += 2;
-                            } else {
-                                break;
-                            }
-                        }
-                        BUFPUSH(endline);
-                    }
-                    break;
-
-                case '^':
-                    if((optz & RE_OPTION_SINGLELINE) != 0) {
-                        BUFPUSH(begbuf);
-                    } else {
-                        BUFPUSH(begline);
-                    }
-                    break;
-
-                case '+':
-                case '?':
-                case '*':
-                    if(!gotoRepeat) {
-                        /* If there is no previous pattern, char not special. */
-                        if(laststart==-1) {
-                            err("invalid regular expression; there's no previous pattern, to which '"+
-                                (char)c
-                                +"' would define cardinality at " + pix);
-                        }
-                        /* If there is a sequence of repetition chars,
-                           collapse it down to just one.  */
-                        zero_times_ok = c != '+';
-                        many_times_ok = c != '?';
-                        greedy = true;
-
-                        if(pix != pend) {
-                            c = PATFETCH();
-                            switch (c) {
-                            case '?':
-                                greedy = false;
-                                break;
-                            case '*':
-                            case '+':
-                                err("nested *?+ in regexp");
-                            default:
-                                pix--;
-                                break;
-                            }
-                        }
-                    } else {
-                        gotoRepeat = false;
-                    }
-
-                    /* Star, etc. applied to an empty pattern is equivalent
-                       to an empty pattern.  */
-                    if(laststart==-1) {
                         break;
                     }
-                    
-                    if(greedy && many_times_ok && b[laststart] == anychar && bix-laststart <= 2) {
-                        if(b[bix - 1] == stop_paren) {
-                            bix--;
-                        }
-                        if(zero_times_ok) {
-                            b[laststart] = anychar_repeat;
-                        } else {
-                            BUFPUSH(anychar_repeat);
-                        }
-                        break;
-                    }
-                    /* Now we know whether or not zero matches is allowed
-                       and also whether or not two or more matches is allowed.  */
-                    if(many_times_ok) {
-                        /* If more than one repetition is allowed, put in at the
-                           end a backward relative jump from b to before the next
-                           jump we're going to put in below (which jumps from
-                           laststart to after this jump).  */
-                        GET_BUFFER_SPACE(3);
-                        store_jump(b,bix,greedy?maybe_finalize_jump:finalize_push,laststart-3);
-                        bix += 3;  	/* Because store_jump put stuff here.  */
-                    }
-
-                    /* On failure, jump from laststart to next pattern, which will be the
-                       end of the buffer after this jump is inserted.  */
-                    GET_BUFFER_SPACE(3);
-                    insert_jump(on_failure_jump, b, laststart, bix + 3, bix);
-                    bix += 3;
-
-                    if(zero_times_ok) {
-                        if(!greedy) {
-                            GET_BUFFER_SPACE(3);
-                            insert_jump(try_next, b, laststart, bix + 3, bix);
-                            bix += 3;
-                        }
-                    } else {
-                        /* At least one repetition is required, so insert a
-                           `dummy_failure_jump' before the initial
-                           `on_failure_jump' instruction of the loop. This
-                           effects a skip over that instruction the first time
-                           we hit that loop.  */
-                        GET_BUFFER_SPACE(3);
-                        insert_jump(dummy_failure_jump, b, laststart, laststart + 6, bix);
-                        bix += 3;
-                    }
-                    break;
-
-                case '.':
-                    laststart = bix;
-                    BUFPUSH(anychar);
-                    break;
-
-                case '[': {
-                    if(pix == pend) {
-                        err("invalid regular expression; '[' can't be the last character ie. can't start range at the end of pattern");
-                    }
-
-                    while((bix + 9 + 32) > allocated) {
-                        EXTEND_BUFFER();
-                    }
-
-                    laststart = bix;
-                    if(p[pix] == '^') {
-                        BUFPUSH(charset_not);
-                        pix++;
-                    } else {
-                        BUFPUSH(charset);
-                    }
-                    p0 = pix;
-
-                    BUFPUSH((char)32);
-                    Arrays.fill(b,bix,bix + 32 + 2,(char)0);
-
-                    had_mbchar = 0;
-                    had_num_literal = 0;
-                    had_char_class = 0;
-
-                    boolean gotoRangeRepeat=false;
-                    int size;
-                    int last = -1;
-
-                    /* Read in characters and ranges, setting map bits.  */
-                    charsetLoop: for (;;) {
-                        if(!gotoRangeRepeat) {
-                            size = -1;
-                            last = -1;
-                            if((size = EXTRACT_UNSIGNED(b,bix+32))!=0 || ctx.current_mbctype!=0) {
-                                /* Ensure the space is enough to hold another interval
-                                   of multi-byte chars in charset(_not)?.  */
-                                size = 32 + 2 + size*8 + 8;
-                                while(bix + size + 1 > allocated) {
-                                    EXTEND_BUFFER();
-                                }
-                            }
-                        } else {
-                            gotoRangeRepeat = false;
-                        }
-
-                        if(range>0 && had_char_class>0) {
-                            err("invalid regular expression; can't use character class as an end value of range");
-                        }
-                        c = PATFETCH_RAW();
-
-                        if(c == ']') {
-                            if(pix == p0 + 1) {
-                                if(pix == pend) {
-                                    err("invalid regular expression; empty character class");
-                                }
-                                re_warning("character class has `]' without escape");
-                            } else {
-                                /* Stop if this isn't merely a ] inside a bracket
-                                   expression, but rather the end of a bracket
-                                   expression.  */
-                                break charsetLoop;
-                            }
-                        }
-                        /* Look ahead to see if it's a range when the last thing
-                           was a character class.  */
-                        if(had_char_class > 0 && c == '-' && p[pix] != ']') {
-                            err("invalid regular expression; can't use character class as a start value of range");
-                        }
-                        if(ismbchar(c,ctx)) {
-                            if(pix + mbclen(c,ctx) - 1 >= pend) {
-                                err("premature end of regular expression");
-                            }
-                            c = MBC2WC(c, p, pix);
-                            pix += mbclen(c,ctx) - 1;
-                            had_mbchar++;
-                        }
-                        had_char_class = 0;
-
-                        if(c == '-' && ((pix != p0 + 1 && p[pix] != ']') ||
-                                        (p[pix] == '-' && p[pix+1] != ']') ||
-                                        range>0)) {
-                            re_warning("character class has `-' without escape");
-                        }
-                        if(c == '[' && p[pix] != ':') {
-                            re_warning("character class has `[' without escape");
-                        }
-
-
-                        /* \ escapes characters when inside [...].  */
-                        if(c == '\\') {
-                            c = PATFETCH_RAW();
-                            switch(c) {
-                            case 'w':
-                                for(c = 0; c < 256; c++) {
-                                    if (re_syntax_table[c] == Sword || (ctx.current_mbctype==0 && re_syntax_table[c] == Sword2)) {
-                                        SET_LIST_BIT(c);
-                                    }
-                                }
-                                if(ctx.current_mbctype != 0) {
-                                    set_list_bits(0x80, 0xffffffff, b, bix);
-                                }
-                                had_char_class = 1;
-                                last = -1;
-                                continue charsetLoop;
-                            case 'W':
-                                for(c = 0; c < 256; c++) {
-                                    if(re_syntax_table[c] != Sword &&
-                                       ((ctx.current_mbctype>0 && ctx.re_mbctab[c] == 0) ||
-                                        (ctx.current_mbctype==0 && re_syntax_table[c] != Sword2))) {
-                                        SET_LIST_BIT(c);
-                                    }
-                                }
-                                had_char_class = 1;
-                                last = -1;
-                                continue charsetLoop;
-
-                            case 's':
-                                for(c = 0; c < 256; c++) {
-                                    if(Character.isWhitespace(c)) {
-                                        SET_LIST_BIT(c);
-                                    }
-                                }
-                                had_char_class = 1;
-                                last = -1;
-                                continue charsetLoop;
-                            case 'S':
-                                for(c = 0; c < 256; c++) {
-                                    if(!Character.isWhitespace(c)) {
-                                        SET_LIST_BIT(c);
-                                    }
-                                }
-                                if(ctx.current_mbctype>0) {
-                                    set_list_bits(0x80, 0xffffffff, b, bix);
-                                }
-                                had_char_class = 1;
-                                last = -1;
-                                continue charsetLoop;
-                            case 'd':
-                                for(c = '0'; c <= '9'; c++) {
-                                    SET_LIST_BIT(c);
-                                }
-                                had_char_class = 1;
-                                last = -1;
-                                continue charsetLoop;
-                            case 'D':
-                                for(c = 0; c < 256; c++) {
-                                    if(!Character.isDigit(c)) {
-                                        SET_LIST_BIT(c);
-                                    }
-                                }
-                                if(ctx.current_mbctype>0) {
-                                    set_list_bits(0x80, 0xffffffff, b, bix);
-                                }
-                                had_char_class = 1;
-                                last = -1;
-                                continue charsetLoop;
-                            case 'x':
-                                c = (char)scan_hex(p, pix, 2, numlen);
-                                if(numlen[0] == 0) {
-                                    err("Invalid escape character syntax");
-                                }
-                                pix += numlen[0];
-                                had_num_literal = 1;
-                                break;
-                            case '0': case '1': case '2': case '3': case '4':
-                            case '5': case '6': case '7': case '8': case '9':
-                                pix--;
-                                c = (char)scan_oct(p, pix, 3, numlen);
-                                pix += numlen[0];
-                                had_num_literal = 1;
-                                break;
-                            case 'M':
-                            case 'C':
-                            case 'c': {
-                                --pix;
-                                c = (char)read_special(p, pix, pend, numlen);
-                                if(c > 255) {
-                                    err("Invalid escape character syntax");
-                                }
-                                pix = numlen[0];
-                                had_num_literal = 1;
-                                break;
-                            }
-                            default:
-                                c = read_backslash(c);
-                                if(ismbchar(c,ctx)) {
-                                    if(pix + mbclen(c,ctx) - 1 >= pend) {
-                                        err("premature end of regular expression");
-                                    }
-                                    c = MBC2WC(c, p, pix);
-                                    pix += mbclen(c,ctx) - 1;
-                                    had_mbchar++;
-                                }
-                                break;
-                            }
-                        } else if(c == '[' && p[pix] == ':') { /* [:...:] */
-                            /* Leave room for the null.  */
-                            char[] str = new char[7];
-                            c = PATFETCH_RAW();
-                            c1 = 0;
-
-                            /* If pattern is `[[:'.  */
-                            if(pix == pend) {
-                                err("invalid regular expression; re can't end '[[:'");
-                            }
-
-                            for(;;) {
-                                c = PATFETCH_RAW();
-                                if(c == ':' || c == ']' || pix == pend || c1 == 6) {
-                                    break;
-                                }
-                                str[c1++] = c;
-                            }
-                            String _str = new String(str,0,c1);
-
-                            /* If isn't a word bracketed by `[:' and `:]':
-                               undo the ending character, the letters, and
-                               the leading `:' and `['.  */
-                                
-                            if(c == ':' && p[pix] == ']') {
-                                int ch;
-                                boolean is_alnum = _str.equals("alnum");
-                                boolean is_alpha = _str.equals("alpha");
-                                boolean is_blank = _str.equals("blank");
-                                boolean is_cntrl = _str.equals("cntrl");
-                                boolean is_digit = _str.equals("digit");
-                                boolean is_graph = _str.equals("graph");
-                                boolean is_lower = _str.equals("lower");
-                                boolean is_print = _str.equals("print");
-                                boolean is_punct = _str.equals("punct");
-                                boolean is_space = _str.equals("space");
-                                boolean is_upper = _str.equals("upper");
-                                boolean is_xdigit= _str.equals("xdigit");
-
-                                if (!(is_alnum || is_alpha || is_blank || is_cntrl ||
-                                      is_digit || is_graph || is_lower || is_print ||
-                                      is_punct || is_space || is_upper || is_xdigit)){
-                                    err("invalid regular expression; [:"+_str+":] is not a character class");
-                                }
-                                
-                                /* Throw away the ] at the end of the character class.  */
-                                    
-                                c = PATFETCH();
-
-                                if(pix == pend)  {
-                                    err("invalid regular expression; range doesn't have ending ']' after a character class");
-                                }
-
-                                for (ch = 0; ch < 256; ch++) {
-                                    if (      (is_alnum  && Character.isLetterOrDigit(ch))
-                                              || (is_alpha  && Character.isLetter(ch))
-                                              || (is_blank  && (ch == ' ' || ch == '\t'))
-                                              || (is_cntrl  && Character.isISOControl(ch))
-                                              || (is_digit  && Character.isDigit(ch))
-                                              || (is_graph  && (!Character.isWhitespace(ch) && !Character.isISOControl(ch)))
-                                              || (is_lower  && Character.isLowerCase(ch))
-                                              || (is_print  && (' ' == ch || (!Character.isWhitespace(ch) && !Character.isISOControl(ch))))
-                                              || (is_punct  && (!Character.isLetterOrDigit(ch) && !Character.isWhitespace(ch) && !Character.isISOControl(ch)))
-                                              || (is_space  && Character.isWhitespace(ch))
-                                              || (is_upper  && Character.isUpperCase(ch))
-                                              || (is_xdigit && HEXDIGIT.indexOf(ch) != -1)) {
-                                        SET_LIST_BIT((char)ch);
-                                    }
-                                }
-                                had_char_class = 1;
-                                continue charsetLoop;
-                            } else {
-                                c1 += 2;
-                                pix -= c1;
-                                re_warning("character class has `[' without escape");
-                                c = '[';
-                            }
-                        }
-
-                        /* Get a range.  */
-                        if(range > 0) {
-                            if(last > c) {
-                                err("invalid regular expression");
-                            }
-                            range = 0;
-                            if(had_mbchar == 0) {
-                                if((optz & RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null) {
-                                    for (;last<=c;last++) {
-                                        char cx = ctx.translate[last];
-                                        SET_LIST_BIT(cx);
-                                    }
-                                } else {
-                                    for(;last<=c;last++) {
-                                        SET_LIST_BIT((char)last);
-                                    }
-                                }
-                            } else if (had_mbchar == 2) {
-                                set_list_bits(last, c, b, bix);
-                            } else {
-                                /* restriction: range between sbc and mbc */
-                                err("invalid regular expression");
-                            }
-                        } else if(p[pix] == '-' && p[pix+1] != ']') {
-                            last = c;
-
-                            c1 = PATFETCH_RAW();
-                            range = 1;
-                            gotoRangeRepeat = true;
-                            continue charsetLoop;
-                        } else {
-                            if(((optz & RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null) && c < 0x100) {
-                                c = ctx.translate[c];
-                            }
-                            if(had_mbchar == 0 && (ctx.current_mbctype == 0 || had_num_literal == 0)) {
-                                SET_LIST_BIT(c);
-                                had_num_literal = 0;
-                            } else {
-                                set_list_bits(c, c, b, bix);
-                            }
-                        }
-                        had_mbchar = 0;
-                    }
-
-                    /* Discard any character set/class bitmap bytes that are all
-                       0 at the end of the map. Decrement the map-length byte too.  */
-                    while(b[bix-1] > 0 && b[bix+b[bix-1]-1] == 0) {
-                        b[bix-1]--; 
-                    }
-                    if(b[bix-1] != 32) {
-                        System.arraycopy(b,bix+32,b,bix+b[bix-1],2+EXTRACT_UNSIGNED(b,bix+32)*8);
-                    }
-                    bix += b[bix-1] + 2 + EXTRACT_UNSIGNED(b,bix+b[bix-1])*8;
-                    had_num_literal = 0;
-                    break;
                 }
-                case '(': {
-                    int old_options = (int)optz;
-                    int push_option = 0;
-                    int casefold = 0;
-                    
-                    c = PATFETCH();
+                BUFPUSH(endline);
+            }
+        }
 
-                    if(c == '?') {
-                        boolean negative = false;
+        public final void caret() {
+            if((optz & RE_OPTION_SINGLELINE) != 0) {
+                BUFPUSH(begbuf);
+            } else {
+                BUFPUSH(begline);
+            }
+        }
 
-                        if(pix == pend) {
-                            err("premature end of regular expression");
-                        }
-                        
-                        c = p[pix++];
-
-                        switch (c) {
-                        case 'x': case 'm': case 'i': case '-':
-                            for(;;) {
-                                switch (c) {
-                                case '-':
-                                    negative = true;
-                                    break;
-                                case ':':
-                                case ')':
-                                    break;
-                                case 'x':
-                                    if(negative) {
-                                        optz &= ~RE_OPTION_EXTENDED;
-                                    } else {
-                                        optz |= RE_OPTION_EXTENDED;
-                                    }
-                                    break;
-                                case 'm':
-                                    if(negative) {
-                                        if((optz&RE_OPTION_MULTILINE) != 0) {
-                                            optz &= ~RE_OPTION_MULTILINE;
-                                        }
-                                    }else if ((optz&RE_OPTION_MULTILINE) == 0) {
-                                        optz |= RE_OPTION_MULTILINE;
-                                    }
-                                    push_option = 1;
-                                    break;
-                                case 'i':
-                                    if(negative) {
-                                        if((optz&RE_OPTION_IGNORECASE) != 0) {
-                                            optz &= ~RE_OPTION_IGNORECASE;
-                                        }
-                                    } else if ((optz&RE_OPTION_IGNORECASE) == 0) {
-                                        optz |= RE_OPTION_IGNORECASE;
-                                    }
-                                    casefold = 1;
-                                    break;
-                                default:
-                                    err("undefined (?...) inline option");
-                                }
-                                if(c == ')') {
-                                    c = '#';	/* read whole in-line options */
-                                    break;
-                                }
-                                if(c == ':') {
-                                    break;
-                                }
-                                
-                                if(pix == pend) {
-                                    err("premature end of regular expression");
-                                }
-                                c = p[pix++];
-                            }
-                            break;
-
-                        case '#':
-                            for(;;) {
-                                if(pix == pend) {
-                                    err("premature end of regular expression");
-                                }
-                                c = p[pix++];
-                                if((optz & RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null) {
-                                    c = ctx.translate[c];
-                                }
-                                if(c == ')') {
-                                    break;
-                                }
-                            }
-                            c = '#';
-                            break;
-
-                        case ':':
-                        case '=':
-                        case '!':
-                        case '>':
-                            break;
-                        default:
-                            err("undefined (?...) sequence");
-                        }
-                    } else {
-                        pix--;
-                        c = '(';
-                    }
-                    if(c == '#') {
-                        if(push_option!=0) {
-                            BUFPUSH(option_set);
-                            BUFPUSH((char)optz);
-                        }
-                        if(casefold!=0) {
-                            if((optz & RE_OPTION_IGNORECASE) != 0) {
-                                BUFPUSH(casefold_on);
-                            } else {
-                                BUFPUSH(casefold_off);
-                            }
-                        }
-                        break;
-                    }
-                    if(stackp+8 >= stacke) {
-                        int[] stackx;
-                        int xlen = stacke;
-                        stackx = new int[2*xlen];
-                        System.arraycopy(stackb,0,stackx,0,xlen);
-                        stackb = stackx;
-                        stacke = 2*xlen;
-                    }
-
-                    /* Laststart should point to the start_memory that we are about
-                       to push (unless the pattern has RE_NREGS or more ('s).  */
-                    /* obsolete: now RE_NREGS is just a default register size. */
-                    stackb[stackp++] = bix;    
-                    stackb[stackp++] = fixup_alt_jump != -1 ? fixup_alt_jump - 0 + 1 : 0;
-                    stackb[stackp++] = begalt;
-                    switch(c) {
-                    case '(':
-                        BUFPUSH(start_memory);
-                        BUFPUSH((char)regnum);
-                        stackb[stackp++] = regnum++;
-                        stackb[stackp++] = bix;
-                        BUFPUSH((char)0);
-                        /* too many ()'s to fit in a byte. (max 254) */
-                        if(regnum >= 255) {
-                            err("regular expression too big");
-                        }
-                        break;
-                    case '=':
-                    case '!':
-                    case '>':
-                        BUFPUSH(start_nowidth);
-                        stackb[stackp++] = bix;
-                        BUFPUSH((char)0);
-                        BUFPUSH((char)0);
-                        if(c != '!') {
-                            break;
-                        }
-                        BUFPUSH(on_failure_jump);
-                        stackb[stackp++] = bix;
-                        BUFPUSH((char)0);
-                        BUFPUSH((char)0);
-                        break;
-                    case ':':
-                        BUFPUSH(start_paren);
-                        pending_exact = -1;
-                    default:
-                        break;
-                    }
-                    if(push_option != 0) {
-                        BUFPUSH(option_set);
-                        BUFPUSH((char)optz);
-                    }
-                    if(casefold != 0) {
-                        if((optz & RE_OPTION_IGNORECASE)!=0) {
-                            BUFPUSH(casefold_on);
-                        } else {
-                            BUFPUSH(casefold_off);
-                        }
-                    }
-                    stackb[stackp++] = c;
-                    stackb[stackp++] = old_options;
-                    fixup_alt_jump = -1;
-                    laststart = -1;
-                    begalt = bix;
+        public final void prepareRepeat() {
+            if(!gotoRepeat) {
+                /* If there is no previous pattern, char not special. */
+                if(laststart==-1) {
+                    err("invalid regular expression; there's no previous pattern, to which '"+
+                        (char)c
+                        +"' would define cardinality at " + pix);
                 }
-                break;
-                case ')':
-                    if(stackp == 0) { 
-                        err("unmatched )");
-                    }
-
-                    pending_exact = -1;
-                    if(fixup_alt_jump != -1) {
-                        /* Push a dummy failure point at the end of the
-                           alternative for a possible future
-                           `finalize_jump' to pop.  See comments at
-                           `push_dummy_failure' in `re_match'.  */
-                        BUFPUSH(push_dummy_failure);
-                        
-                        /* We allocated space for this jump when we assigned
-                           to `fixup_alt_jump', in the `handle_alt' case below.  */
-                        store_jump(b, fixup_alt_jump, jump, bix);
-                    }
-                    if(optz != stackb[stackp-1]) {
-                        if (((optz ^ stackb[stackp-1]) & RE_OPTION_IGNORECASE) != 0) {
-                            BUFPUSH((optz&RE_OPTION_IGNORECASE) != 0 ? casefold_off:casefold_on);
-                        }
-                        if ((optz ^ stackb[stackp-1]) != RE_OPTION_IGNORECASE) {
-                            BUFPUSH(option_set);
-                            BUFPUSH((char)stackb[stackp-1]);
-                        }
-                    }
-                    p0 = bix;
-                    optz = stackb[--stackp];
-                    switch(c = (char)stackb[--stackp]) {
-                    case '(': {
-                        int v1 = stackb[--stackp];
-                        buffer[v1] = (char)(regnum - stackb[stackp-1]);
-                        GET_BUFFER_SPACE(3);
-                        b[bix++] = stop_memory;
-                        b[bix++] = (char)stackb[stackp-1];
-                        b[bix++] = (char)(regnum - stackb[stackp-1]);
-                        stackp--;
-                    }
-                        break;
-
-                    case '!':
-                        BUFPUSH(pop_and_fail);
-                        /* back patch */
-
-                        STORE_NUMBER(buffer,stackb[stackp-1], bix - stackb[stackp-1] - 2);
-                        stackp--;
-                        /* fall through */
-                    case '=':
-                        BUFPUSH(stop_nowidth);
-                        /* tell stack-pos place to start_nowidth */
-                        STORE_NUMBER(buffer,stackb[stackp-1], bix - stackb[stackp-1] - 2);
-                        BUFPUSH((char)0); /* space to hold stack pos */
-                        BUFPUSH((char)0);
-                        stackp--;
-                        break;
-                    case '>':
-                        BUFPUSH(stop_backtrack);
-                        /* tell stack-pos place to start_nowidth */
-                        STORE_NUMBER(buffer,stackb[stackp-1], bix - stackb[stackp-1] - 2);
-                        BUFPUSH((char)0); /* space to hold stack pos */
-                        BUFPUSH((char)0);
-                        stackp--;
-                        break;
-                    case ':':
-                        BUFPUSH(stop_paren);
-                        break;
-                    default:
-                        break;
-                    }
-                    begalt = stackb[--stackp];
-                    stackp--;
-                    fixup_alt_jump = stackb[stackp] != 0 ? stackb[stackp]  - 1 : -1;
-                    laststart = stackb[--stackp];
-                    if(c == '!' || c == '=') {
-                        laststart = bix;
-                    }
-                    break;
-                case '|':
-                    /* Insert before the previous alternative a jump which
-                       jumps to this alternative if the former fails.  */
-                    GET_BUFFER_SPACE(3);
-                    insert_jump(on_failure_jump, b, begalt, bix + 6, bix);
-                    pending_exact = -1;
-                    bix += 3;
-                    /* The alternative before this one has a jump after it
-                       which gets executed if it gets matched.  Adjust that
-                       jump so it will jump to this alternative's analogous
-                       jump (put in below, which in turn will jump to the next
-                       (if any) alternative's such jump, etc.).  The last such
-                       jump jumps to the correct final destination.  A picture:
-                       _____ _____ 
-                       |   | |   |   
-                       |   v |   v 
-                       a | b   | c   
-                       
-                       If we are at `b', then fixup_alt_jump right now points to a
-                       three-byte space after `a'.  We'll put in the jump, set
-                       fixup_alt_jump to right after `b', and leave behind three
-                       bytes which we'll fill in when we get to after `c'.  */
-
-                    if(fixup_alt_jump != -1) {
-                        store_jump(b, fixup_alt_jump, jump_past_alt, bix);
-                    }
-
-                    /* Mark and leave space for a jump after this alternative,
-                       to be filled in later either by next alternative or
-                       when know we're at the end of a series of alternatives.  */
-                    fixup_alt_jump = bix;
-                    GET_BUFFER_SPACE(3);
-                    bix += 3;
-                    laststart = -1;
-                    begalt = bix;
-                    break;
-                case '{':
-                unfetch_interval: do {
-                    /* If there is no previous pattern, this is an invalid pattern.  */
-                    if(laststart == -1) {
-                        err("invalid regular expression; there's no previous pattern, to which '{' would define cardinality at " + pix);
-                    }
-                    if(pix == pend) {
-                        err("invalid regular expression; '{' can't be last character");
-                    }
-
-                    beg_interval = pix - 1;
-
-                    lower_bound = -1;			/* So can see if are set.  */
-                    upper_bound = -1;
-
-                    if(pix != pend) {
-                        c = PATFETCH();
-                        while(Character.isDigit(c)) {
-                            if(lower_bound < 0) {
-                                lower_bound = 0;
-                            }
-                            lower_bound = lower_bound * 10 + c - '0';
-                            if(pix == pend) {
-                                break;
-                            }
-                            c = PATFETCH();
-                        }
-                    } 	
-
-                    if(c == ',') {
-                        if(pix != pend) {
-                            c = PATFETCH();
-                            while(Character.isDigit(c)) {
-                                if(upper_bound < 0) {
-                                    upper_bound = 0;
-                                }
-                                upper_bound = lower_bound * 10 + c - '0';
-                                if(pix == pend) {
-                                    break;
-                                }
-                                c = PATFETCH();
-                            }
-                        } 	
-                    } else {
-                        /* Interval such as `{1}' => match exactly once. */
-                        upper_bound = lower_bound;
-                    }
-
-                    if(lower_bound < 0 || c != '}') {
-                        break unfetch_interval;
-                    }
-
-                    if(lower_bound >= RE_DUP_MAX || upper_bound >= RE_DUP_MAX) {
-                        err("too big quantifier in {,}");
-                    }
-                    if(upper_bound < 0) {
-                        upper_bound = RE_DUP_MAX;
-                    }
-                    if(lower_bound > upper_bound) {
-                        err("can't do {n,m} with n > m");
-                    }
-
-                    beg_interval = 0;
-                    pending_exact = 0;
-                    
-                    greedy = true;
-
-                    if(pix != pend) {
-                        c = PATFETCH();
-                        if(c == '?') {
-                            greedy = false;
-                        } else {
-                            pix--;
-                        }
-                    }
-
-                    if(lower_bound == 0) {
-                        zero_times_ok = true;
-                        if(upper_bound == RE_DUP_MAX) {
-                            many_times_ok = true;
-                            gotoRepeat = true;
-                            c = '*';
-                            continue mainSwitch;
-                        }
-                        if(upper_bound == 1) {
-                            many_times_ok = false;
-                            gotoRepeat = true;
-                            c = '*';
-                            continue mainSwitch;
-                        }
-                    }
-                    if(lower_bound == 1) {
-                        if(upper_bound == 1) {
-                            /* No need to repeat */
-                            break mainSwitch;
-                        }
-                        if(upper_bound == RE_DUP_MAX) {
-                            many_times_ok = true;
-                            zero_times_ok = false;
-                            gotoRepeat = true;
-                            c = '*';
-                            continue mainSwitch;
-                        }
-                    }
-
-                    /* If upper_bound is zero, don't want to succeed at all; 
-                       jump from laststart to b + 3, which will be the end of
-                       the buffer after this jump is inserted.  */
-
-                    if(upper_bound == 0) {
-                        GET_BUFFER_SPACE(3);
-                        insert_jump(jump, b, laststart, bix + 3, bix);
-                        bix += 3;
-                        break mainSwitch;
-                    }
-
-                    /* If lower_bound == upper_bound, repeat count can be removed */
-                    if(lower_bound == upper_bound) {
-                        int mcnt;
-                        int skip_stop_paren = 0;
-
-                        if(b[bix-1] == stop_paren) {
-                            skip_stop_paren = 1;
-                            bix--;
-                        }
-
-                        if (b[laststart] == exactn && b[laststart+1]+2 == bix - laststart && b[laststart+1]*lower_bound < 256) {
-                            mcnt = b[laststart+1];
-                            GET_BUFFER_SPACE((lower_bound-1)*mcnt);
-                            b[laststart+1] = (char)(lower_bound*mcnt);
-                            while(--lower_bound > 0) {
-                                System.arraycopy(b,laststart+2,b,bix,mcnt);
-                                bix+=mcnt;
-                            }
-                            if(skip_stop_paren != 0) {
-                                BUFPUSH(stop_paren);
-                            }
-                            break mainSwitch;
-                        }
-
-                        if(lower_bound < 5 && bix - laststart < 10) {
-                            /* 5 and 10 are the magic numbers */
-                            mcnt = bix - laststart;
-                            GET_BUFFER_SPACE((lower_bound-1)*mcnt);
-                            while(--lower_bound > 0) {
-                                System.arraycopy(b, laststart, b, bix, mcnt);
-                                bix+=mcnt;
-                            }
-                            if(skip_stop_paren!=0) {
-                                BUFPUSH(stop_paren);
-                            }
-                            break mainSwitch;
-                        }
-                        if(skip_stop_paren!=0) {
-                            bix++; /* push back stop_paren */
-                        }
-                    }
-
-                    /* Otherwise, we have a nontrivial interval.  When
-                       we're all done, the pattern will look like:
-                       set_number_at <jump count> <upper bound>
-                       set_number_at <succeed_n count> <lower bound>
-                       succeed_n <after jump addr> <succed_n count>
-                       <body of loop>
-                       jump_n <succeed_n addr> <jump count>
-                       (The upper bound and `jump_n' are omitted if
-                       `upper_bound' is 1, though.)  */
-                    { /* If the upper bound is > 1, we need to insert
-                         more at the end of the loop.  */
-                        int nbytes = upper_bound == 1 ? 10 : 20;
-                        GET_BUFFER_SPACE(nbytes);
-
-                        /* Initialize lower bound of the `succeed_n', even
-                           though it will be set during matching by its
-                           attendant `set_number_at' (inserted next),
-                           because `re_compile_fastmap' needs to know.
-                           Jump to the `jump_n' we might insert below.  */
-                        insert_jump_n(succeed_n, b, laststart, bix + (nbytes/2), bix, lower_bound);
-                        bix += 5; 	/* Just increment for the succeed_n here.  */
-                        
-                        /* Code to initialize the lower bound.  Insert 
-                           before the `succeed_n'.  The `5' is the last two
-                           bytes of this `set_number_at', plus 3 bytes of
-                           the following `succeed_n'.  */
-                        insert_op_2(set_number_at, b, laststart, bix, 5, lower_bound);
-                        bix += 5;
-
-                        if(upper_bound > 1) {
-                            /* More than one repetition is allowed, so
-                               append a backward jump to the `succeed_n'
-                               that starts this interval.
-                               
-                               When we've reached this during matching,
-                               we'll have matched the interval once, so
-                               jump back only `upper_bound - 1' times.  */
-                            GET_BUFFER_SPACE(5);
-                            store_jump_n(b, bix, greedy?jump_n:finalize_push_n, laststart + 5, upper_bound - 1);
-                            bix += 5;
-
-                            /* The location we want to set is the second
-                               parameter of the `jump_n'; that is `b-2' as
-                               an absolute address.  `laststart' will be
-                               the `set_number_at' we're about to insert;
-                               `laststart+3' the number to set, the source
-                               for the relative address.  But we are
-                               inserting into the middle of the pattern --
-                               so everything is getting moved up by 5.
-                               Conclusion: (b - 2) - (laststart + 3) + 5,
-                               i.e., b - laststart.
-
-                               We insert this at the beginning of the loop
-                               so that if we fail during matching, we'll
-                               reinitialize the bounds.  */
-                            insert_op_2(set_number_at, b, laststart, bix, bix - laststart, upper_bound - 1);
-                            bix += 5;
-                        }
-                    }
-
-                    break mainSwitch;
-                } while(false);
-                // unfetch_interval:
-                /* If an invalid interval, match the characters as literals.  */
-                re_warning("regexp has invalid interval");
-                pix = beg_interval;
-                beg_interval = 0;
-                /* normal_char and normal_backslash need `c'.  */
-                c = PATFETCH();
-                gotoNormalChar = true;
-                break mainSwitch;
-                case '\\':
-                    if(pix == pend) {
-                        err("invalid regular expression; '\\' can't be last character");
-                    }
-                    /* Do not translate the character after the \, so that we can
-                       distinguish, e.g., \B from \b, even if we normally would
-                       translate, e.g., B to b.  */
-                    c = p[pix++];
+                /* If there is a sequence of repetition chars,
+                   collapse it down to just one.  */
+                zero_times_ok = c != '+';
+                many_times_ok = c != '?';
+                greedy = true;
+                
+                if(pix != pend) {
+                    PATFETCH();
                     switch (c) {
-                    case 's':
-                    case 'S':
-                    case 'd':
-                    case 'D':
-                        while(bix + 9 + 32 > allocated) {
+                    case '?':
+                        greedy = false;
+                        break;
+                    case '*':
+                    case '+':
+                        err("nested *?+ in regexp");
+                    default:
+                        pix--;
+                        break;
+                    }
+                }
+            } else {
+                gotoRepeat = false;
+            }
+        }
+
+        public final void mainRepeat() {
+            /* Now we know whether or not zero matches is allowed
+               and also whether or not two or more matches is allowed.  */
+            if(many_times_ok) {
+                /* If more than one repetition is allowed, put in at the
+                   end a backward relative jump from b to before the next
+                   jump we're going to put in below (which jumps from
+                   laststart to after this jump).  */
+                GET_BUFFER_SPACE(3);
+                store_jump(b,bix,greedy?maybe_finalize_jump:finalize_push,laststart-3);
+                bix += 3;  	/* Because store_jump put stuff here.  */
+            }
+
+            /* On failure, jump from laststart to next pattern, which will be the
+               end of the buffer after this jump is inserted.  */
+            GET_BUFFER_SPACE(3);
+            insert_jump(on_failure_jump, b, laststart, bix + 3, bix);
+            bix += 3;
+
+            if(zero_times_ok) {
+                if(!greedy) {
+                    GET_BUFFER_SPACE(3);
+                    insert_jump(try_next, b, laststart, bix + 3, bix);
+                    bix += 3;
+                }
+            } else {
+                /* At least one repetition is required, so insert a
+                   `dummy_failure_jump' before the initial
+                   `on_failure_jump' instruction of the loop. This
+                   effects a skip over that instruction the first time
+                   we hit that loop.  */
+                GET_BUFFER_SPACE(3);
+                insert_jump(dummy_failure_jump, b, laststart, laststart + 6, bix);
+                bix += 3;
+            }
+        }
+
+        public final void dot() { 
+            laststart = bix;
+            BUFPUSH(anychar);
+        }
+
+        public final void prepareCharset() {
+            if(pix == pend) {
+                err("invalid regular expression; '[' can't be the last character ie. can't start range at the end of pattern");
+            }
+
+            while((bix + 9 + 32) > self.allocated) {
+                EXTEND_BUFFER();
+            }
+
+            laststart = bix;
+            if(p[pix] == '^') {
+                BUFPUSH(charset_not);
+                pix++;
+            } else {
+                BUFPUSH(charset);
+            }
+            p0 = pix;
+            
+            BUFPUSH((char)32);
+            Arrays.fill(b,bix,bix + 32 + 2,(char)0);
+                    
+            had_mbchar = 0;
+            had_num_literal = 0;
+            had_char_class = 0;
+        }
+
+        public int last = -1;
+
+        public final void charset_w() {
+            for(c = 0; c < 256; c++) {
+                if(re_syntax_table[c] == Sword || (ctx.current_mbctype==0 && re_syntax_table[c] == Sword2)) {
+                    SET_LIST_BIT(c);
+                }
+            }
+            if(ctx.current_mbctype != 0) {
+                set_list_bits(0x80, 0xffffffff, b, bix);
+            }
+            had_char_class = 1;
+            last = -1;
+        }
+
+        public final void charset_W() {
+            for(c = 0; c < 256; c++) {
+                if(re_syntax_table[c] != Sword &&
+                   ((ctx.current_mbctype>0 && ctx.re_mbctab[c] == 0) ||
+                    (ctx.current_mbctype==0 && re_syntax_table[c] != Sword2))) {
+                    SET_LIST_BIT(c);
+                }
+            }
+            had_char_class = 1;
+            last = -1;
+        }
+
+        public final void charset_s() {
+            for(c = 0; c < 256; c++) {
+                if(Character.isWhitespace(c)) {
+                    SET_LIST_BIT(c);
+                }
+            }
+            had_char_class = 1;
+            last = -1;
+        }
+
+        public final void charset_S() {
+            for(c = 0; c < 256; c++) {
+                if(!Character.isWhitespace(c)) {
+                    SET_LIST_BIT(c);
+                }
+            }
+            if(ctx.current_mbctype>0) {
+                set_list_bits(0x80, 0xffffffff, b, bix);
+            }
+            had_char_class = 1;
+            last = -1;
+        }
+
+        public final void charset_d() {
+            for(c = '0'; c <= '9'; c++) {
+                SET_LIST_BIT(c);
+            }
+            had_char_class = 1;
+            last = -1;
+        }
+
+        public final void charset_D() {
+            for(c = 0; c < 256; c++) {
+                if(!Character.isDigit(c)) {
+                    SET_LIST_BIT(c);
+                }
+            }
+            if(ctx.current_mbctype>0) {
+                set_list_bits(0x80, 0xffffffff, b, bix);
+            }
+            had_char_class = 1;
+            last = -1;
+        }
+
+        public final void charset_x() {
+            c = (char)scan_hex(p, pix, 2, numlen);
+            if(numlen[0] == 0) {
+                err("Invalid escape character syntax");
+            }
+            pix += numlen[0];
+            had_num_literal = 1;
+        }
+
+        public final void charset_digit() {
+            pix--;
+            c = (char)scan_oct(p, pix, 3, numlen);
+            pix += numlen[0];
+            had_num_literal = 1;
+        }
+
+        public final void charset_special() {
+            --pix;
+            c = (char)read_special(p, pix, pend, numlen);
+            if(c > 255) {
+                err("Invalid escape character syntax");
+            }
+            pix = numlen[0];
+            had_num_literal = 1;
+        }
+
+        public final void charset_default() {
+            c = read_backslash(c);
+            if(ismbchar(c,ctx)) {
+                if(pix + mbclen(c,ctx) - 1 >= pend) {
+                    err("premature end of regular expression");
+                }
+                c = self.MBC2WC(c, p, pix);
+                pix += mbclen(c,ctx) - 1;
+                had_mbchar++;
+            }
+        }
+
+        public final void charset_posixclass(String _str) {
+            int ch;
+            boolean is_alnum = _str.equals("alnum");
+            boolean is_alpha = _str.equals("alpha");
+            boolean is_blank = _str.equals("blank");
+            boolean is_cntrl = _str.equals("cntrl");
+            boolean is_digit = _str.equals("digit");
+            boolean is_graph = _str.equals("graph");
+            boolean is_lower = _str.equals("lower");
+            boolean is_print = _str.equals("print");
+            boolean is_punct = _str.equals("punct");
+            boolean is_space = _str.equals("space");
+            boolean is_upper = _str.equals("upper");
+            boolean is_xdigit= _str.equals("xdigit");
+
+            if (!(is_alnum || is_alpha || is_blank || is_cntrl ||
+                  is_digit || is_graph || is_lower || is_print ||
+                  is_punct || is_space || is_upper || is_xdigit)){
+                err("invalid regular expression; [:"+_str+":] is not a character class");
+            }
+                                
+            /* Throw away the ] at the end of the character class.  */
+                                    
+            PATFETCH();
+
+            if(pix == pend)  {
+                err("invalid regular expression; range doesn't have ending ']' after a character class");
+            }
+
+            for(ch = 0; ch < 256; ch++) {
+                if(      (is_alnum  && Character.isLetterOrDigit(ch))
+                         || (is_alpha  && Character.isLetter(ch))
+                         || (is_blank  && (ch == ' ' || ch == '\t'))
+                         || (is_cntrl  && Character.isISOControl(ch))
+                         || (is_digit  && Character.isDigit(ch))
+                         || (is_graph  && (!Character.isWhitespace(ch) && !Character.isISOControl(ch)))
+                         || (is_lower  && Character.isLowerCase(ch))
+                         || (is_print  && (' ' == ch || (!Character.isWhitespace(ch) && !Character.isISOControl(ch))))
+                         || (is_punct  && (!Character.isLetterOrDigit(ch) && !Character.isWhitespace(ch) && !Character.isISOControl(ch)))
+                         || (is_space  && Character.isWhitespace(ch))
+                         || (is_upper  && Character.isUpperCase(ch))
+                         || (is_xdigit && HEXDIGIT.indexOf(ch) != -1)) {
+                    SET_LIST_BIT((char)ch);
+                }
+            }
+            had_char_class = 1;
+        }
+
+        public final void charset_range() {
+            if(last > c) {
+                err("invalid regular expression");
+            }
+            range = 0;
+            if(had_mbchar == 0) {
+                if((optz & RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null) {
+                    for (;last<=c;last++) {
+                        char cx = ctx.translate[last];
+                        SET_LIST_BIT(cx);
+                    }
+                } else {
+                    for(;last<=c;last++) {
+                        SET_LIST_BIT((char)last);
+                    }
+                }
+            } else if (had_mbchar == 2) {
+                set_list_bits(last, c, b, bix);
+            } else {
+                /* restriction: range between sbc and mbc */
+                err("invalid regular expression");
+            }
+        }
+
+        public final void charset_range_trans() {
+            if(((optz & RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null) && c < 0x100) {
+                c = ctx.translate[c];
+            }
+            if(had_mbchar == 0 && (ctx.current_mbctype == 0 || had_num_literal == 0)) {
+                SET_LIST_BIT(c);
+                had_num_literal = 0;
+            } else {
+                set_list_bits(c, c, b, bix);
+            }
+        }
+
+        public final void main_charset() {
+            boolean gotoRangeRepeat=false;
+            int size;
+            last = -1;
+
+            /* Read in characters and ranges, setting map bits.  */
+            charsetLoop: for (;;) {
+                if(!gotoRangeRepeat) {
+                    size = -1;
+                    last = -1;
+                    if((size = EXTRACT_UNSIGNED(b,bix+32))!=0 || ctx.current_mbctype!=0) {
+                        /* Ensure the space is enough to hold another interval
+                           of multi-byte chars in charset(_not)?.  */
+                        size = 32 + 2 + size*8 + 8;
+                        while(bix + size + 1 > self.allocated) {
                             EXTEND_BUFFER();
                         }
+                    }
+                } else {
+                    gotoRangeRepeat = false;
+                }
 
-                        laststart = bix;
-                        if(c == 's' || c == 'd') {
-                            b[bix++] = charset;
-                        } else {
-                            b[bix++] = charset_not;
-                        }
-                        b[bix++] = 32;
-                        Arrays.fill(b,bix,bix+34,(char)0);
-                        if(c == 's' || c == 'S') {
-                            SET_LIST_BIT(' ');
-                            SET_LIST_BIT('\t');
-                            SET_LIST_BIT('\n');
-                            SET_LIST_BIT('\r');
-                            SET_LIST_BIT('\f');
-                        } else {
-                            char cc;
-                            for (cc = '0'; cc <= '9'; cc++) {
-                                SET_LIST_BIT(cc);
-                            }
-                        }
+                if(range>0 && had_char_class>0) {
+                    err("invalid regular expression; can't use character class as an end value of range");
+                }
+                PATFETCH_RAW();
 
-                        while(b[bix-1] > 0 && b[bix+b[bix-1]-1] == 0) { 
-                            b[bix-1]--;
+                if(c == ']') {
+                    if(pix == p0 + 1) {
+                        if(pix == pend) {
+                            err("invalid regular expression; empty character class");
                         }
-                        if(b[bix-1] != 32) {
-                            System.arraycopy(b,bix+32,b,bix+b[bix-1],  2 + EXTRACT_UNSIGNED(b,bix+32)*8);
-                        }
-                        bix += b[bix-1] + 2 + EXTRACT_UNSIGNED(b, bix+b[bix-1])*8;
-                        break;
+                        self.re_warning("character class has `]' without escape");
+                    } else {
+                        /* Stop if this isn't merely a ] inside a bracket
+                           expression, but rather the end of a bracket
+                           expression.  */
+                        break charsetLoop;
+                    }
+                }
+                /* Look ahead to see if it's a range when the last thing
+                   was a character class.  */
+                if(had_char_class > 0 && c == '-' && p[pix] != ']') {
+                    err("invalid regular expression; can't use character class as a start value of range");
+                }
+                if(ismbchar(c,ctx)) {
+                    if(pix + mbclen(c,ctx) - 1 >= pend) {
+                        err("premature end of regular expression");
+                    }
+                    c = self.MBC2WC(c, p, pix);
+                    pix += mbclen(c,ctx) - 1;
+                    had_mbchar++;
+                }
+                had_char_class = 0;
+
+                if(c == '-' && ((pix != p0 + 1 && p[pix] != ']') ||
+                                  (p[pix] == '-' && p[pix+1] != ']') ||
+                                  range>0)) {
+                    self.re_warning("character class has `-' without escape");
+                }
+                if(c == '[' && p[pix] != ':') {
+                    self.re_warning("character class has `[' without escape");
+                }
+
+
+                /* \ escapes characters when inside [...].  */
+                if(c == '\\') {
+                    PATFETCH_RAW();
+                    switch(c) {
                     case 'w':
-                        laststart = bix;
-                        BUFPUSH(wordchar);
-                        break;
+                        charset_w();
+                        continue charsetLoop;
                     case 'W':
-                        laststart = bix;
-                        BUFPUSH(notwordchar);
+                        charset_W();
+                        continue charsetLoop;
+                    case 's':
+                        charset_s();
+                        continue charsetLoop;
+                    case 'S':
+                        charset_S();
+                        continue charsetLoop;
+                    case 'd':
+                        charset_d();
+                        continue charsetLoop;
+                    case 'D':
+                        charset_D();
+                        continue charsetLoop;
+                    case 'x':
+                        charset_x();
                         break;
+                    case '0': case '1': case '2': case '3': case '4':
+                    case '5': case '6': case '7': case '8': case '9':
+                        charset_digit();
+                        break;
+                    case 'M':
+                    case 'C':
+                    case 'c':
+                        charset_special();
+                        break;
+                    default:
+                        charset_default();
+                        break;
+                    }
+                } else if(c == '[' && p[pix] == ':') { /* [:...:] */
+                    /* Leave room for the null.  */
+                    char[] str = new char[7];
+                    PATFETCH_RAW();
+                    c1 = 0;
 
-                        /******************* NOT IN RUBY
+                    /* If pattern is `[[:'.  */
+                    if(pix == pend) {
+                        err("invalid regular expression; re can't end '[[:'");
+                    }
+
+                    for(;;) {
+                        PATFETCH_RAW();
+                        if(c == ':' || c == ']' || pix == pend || c1 == 6) {
+                            break;
+                        }
+                        str[c1++] = c;
+                    }
+                    String _str = new String(str,0,c1);
+
+                    /* If isn't a word bracketed by `[:' and `:]':
+                       undo the ending character, the letters, and
+                       the leading `:' and `['.  */
+                                
+                    if(c == ':' && p[pix] == ']') {
+                        charset_posixclass(_str);
+                        continue charsetLoop;
+                    } else {
+                        c1 += 2;
+                        pix -= c1;
+                        self.re_warning("character class has `[' without escape");
+                        c = '[';
+                    }
+                }
+
+                /* Get a range.  */
+                if(range > 0) {
+                    charset_range();
+                } else if(p[pix] == '-' && p[pix+1] != ']') {
+                    last = c;
+                    PATFETCH_RAW_c1();
+                    range = 1;
+                    gotoRangeRepeat = true;
+                    continue charsetLoop;
+                } else {
+                    charset_range_trans();
+                }
+                had_mbchar = 0;
+            }
+        }
+
+        public final void compact_charset() {
+            /* Discard any character set/class bitmap bytes that are all
+               0 at the end of the map. Decrement the map-length byte too.  */
+            while(b[bix-1] > 0 && b[bix+b[bix-1]-1] == 0) {
+                b[bix-1]--; 
+            }
+            if(b[bix-1] != 32) {
+                System.arraycopy(b,bix+32,b,bix+b[bix-1],2+EXTRACT_UNSIGNED(b,bix+32)*8);
+            }
+            bix += b[bix-1] + 2 + EXTRACT_UNSIGNED(b,bix+b[bix-1])*8;
+            had_num_literal = 0;
+        }
+
+        public int old_options;
+        public int push_option = 0;
+        public int casefold = 0;
+
+        public final void group_settings() {
+            boolean negative = false;
+
+            if(pix == pend) {
+                err("premature end of regular expression");
+            }
+                        
+            c = p[pix++];
+
+            switch (c) {
+            case 'x': case 'm': case 'i': case '-':
+                for(;;) {
+                    switch (c) {
+                    case '-':
+                        negative = true;
+                        break;
+                    case ':':
+                    case ')':
+                        break;
+                    case 'x':
+                        if(negative) {
+                            optz &= ~RE_OPTION_EXTENDED;
+                        } else {
+                            optz |= RE_OPTION_EXTENDED;
+                        }
+                        break;
+                    case 'm':
+                        if(negative) {
+                            if((optz&RE_OPTION_MULTILINE) != 0) {
+                                optz &= ~RE_OPTION_MULTILINE;
+                            }
+                        }else if ((optz&RE_OPTION_MULTILINE) == 0) {
+                            optz |= RE_OPTION_MULTILINE;
+                        }
+                        push_option = 1;
+                        break;
+                    case 'i':
+                        if(negative) {
+                            if((optz&RE_OPTION_IGNORECASE) != 0) {
+                                optz &= ~RE_OPTION_IGNORECASE;
+                            }
+                        } else if ((optz&RE_OPTION_IGNORECASE) == 0) {
+                            optz |= RE_OPTION_IGNORECASE;
+                        }
+                        casefold = 1;
+                        break;
+                    default:
+                        err("undefined (?...) inline option");
+                    }
+                    if(c == ')') {
+                        c = '#';	/* read whole in-line options */
+                        break;
+                    }
+                    if(c == ':') {
+                        break;
+                    }
+                                
+                    if(pix == pend) {
+                        err("premature end of regular expression");
+                    }
+                    c = p[pix++];
+                }
+                break;
+
+            case '#':
+                for(;;) {
+                    if(pix == pend) {
+                        err("premature end of regular expression");
+                    }
+                    c = p[pix++];
+                    if((optz & RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null) {
+                        c = ctx.translate[c];
+                    }
+                    if(c == ')') {
+                        break;
+                    }
+                }
+                c = '#';
+                break;
+
+            case ':':
+            case '=':
+            case '!':
+            case '>':
+                break;
+            default:
+                err("undefined (?...) sequence");
+            }
+        }
+
+        public final void group_start() {
+            old_options = (int)optz;
+            push_option = 0;
+            casefold = 0;
+            PATFETCH();
+            
+            if(c == '?') {
+                group_settings();
+            } else {
+                pix--;
+                c = '(';
+            }
+        }
+
+        public final void DOUBLE_STACK() {
+            int[] stackx;
+            int xlen = stacke;
+            stackx = new int[2*xlen];
+            System.arraycopy(stackb,0,stackx,0,xlen);
+            stackb = stackx;
+            stacke = 2*xlen;
+        }
+
+        public final void group_start_end() {
+            if(stackp+8 >= stacke) {
+                DOUBLE_STACK();
+            }
+
+            /* Laststart should point to the start_memory that we are about
+               to push (unless the pattern has RE_NREGS or more ('s).  */
+            /* obsolete: now RE_NREGS is just a default register size. */
+            stackb[stackp++] = bix;    
+            stackb[stackp++] = fixup_alt_jump != -1 ? fixup_alt_jump - 0 + 1 : 0;
+            stackb[stackp++] = begalt;
+            switch(c) {
+            case '(':
+                BUFPUSH(start_memory);
+                BUFPUSH((char)regnum);
+                stackb[stackp++] = regnum++;
+                stackb[stackp++] = bix;
+                BUFPUSH((char)0);
+                /* too many ()'s to fit in a byte. (max 254) */
+                if(regnum >= 255) {
+                    err("regular expression too big");
+                }
+                break;
+            case '=':
+            case '!':
+            case '>':
+                BUFPUSH(start_nowidth);
+                stackb[stackp++] = bix;
+                BUFPUSH((char)0);
+                BUFPUSH((char)0);
+                if(c != '!') {
+                    break;
+                }
+                BUFPUSH(on_failure_jump);
+                stackb[stackp++] = bix;
+                BUFPUSH((char)0);
+                BUFPUSH((char)0);
+                break;
+            case ':':
+                BUFPUSH(start_paren);
+                pending_exact = -1;
+            default:
+                break;
+            }
+            if(push_option != 0) {
+                BUFPUSH(option_set);
+                BUFPUSH((char)optz);
+            }
+            if(casefold != 0) {
+                if((optz & RE_OPTION_IGNORECASE)!=0) {
+                    BUFPUSH(casefold_on);
+                } else {
+                    BUFPUSH(casefold_off);
+                }
+            }
+            stackb[stackp++] = c;
+            stackb[stackp++] = old_options;
+            fixup_alt_jump = -1;
+            laststart = -1;
+            begalt = bix;
+        }
+
+        public final void group_end() {
+            if(stackp == 0) { 
+                err("unmatched )");
+            }
+
+            pending_exact = -1;
+            if(fixup_alt_jump != -1) {
+                /* Push a dummy failure point at the end of the
+                   alternative for a possible future
+                   `finalize_jump' to pop.  See comments at
+                   `push_dummy_failure' in `re_match'.  */
+                BUFPUSH(push_dummy_failure);
+                        
+                /* We allocated space for this jump when we assigned
+                   to `fixup_alt_jump', in the `handle_alt' case below.  */
+                store_jump(b, fixup_alt_jump, jump, bix);
+            }
+            if(optz != stackb[stackp-1]) {
+                if (((optz ^ stackb[stackp-1]) & RE_OPTION_IGNORECASE) != 0) {
+                    BUFPUSH((optz&RE_OPTION_IGNORECASE) != 0 ? casefold_off:casefold_on);
+                }
+                if ((optz ^ stackb[stackp-1]) != RE_OPTION_IGNORECASE) {
+                    BUFPUSH(option_set);
+                    BUFPUSH((char)stackb[stackp-1]);
+                }
+            }
+            p0 = bix;
+            optz = stackb[--stackp];
+            switch(c = (char)stackb[--stackp]) {
+            case '(': {
+                int v1 = stackb[--stackp];
+                self.buffer[v1] = (char)(regnum - stackb[stackp-1]);
+                GET_BUFFER_SPACE(3);
+                b[bix++] = stop_memory;
+                b[bix++] = (char)stackb[stackp-1];
+                b[bix++] = (char)(regnum - stackb[stackp-1]);
+                stackp--;
+            }
+                break;
+
+            case '!':
+                BUFPUSH(pop_and_fail);
+                /* back patch */
+
+                STORE_NUMBER(self.buffer,stackb[stackp-1], bix - stackb[stackp-1] - 2);
+                stackp--;
+                /* fall through */
+            case '=':
+                BUFPUSH(stop_nowidth);
+                /* tell stack-pos place to start_nowidth */
+                STORE_NUMBER(self.buffer,stackb[stackp-1], bix - stackb[stackp-1] - 2);
+                BUFPUSH((char)0); /* space to hold stack pos */
+                BUFPUSH((char)0);
+                stackp--;
+                break;
+            case '>':
+                BUFPUSH(stop_backtrack);
+                /* tell stack-pos place to start_nowidth */
+                STORE_NUMBER(self.buffer,stackb[stackp-1], bix - stackb[stackp-1] - 2);
+                BUFPUSH((char)0); /* space to hold stack pos */
+                BUFPUSH((char)0);
+                stackp--;
+                break;
+            case ':':
+                BUFPUSH(stop_paren);
+                break;
+            default:
+                break;
+            }
+            begalt = stackb[--stackp];
+            stackp--;
+            fixup_alt_jump = stackb[stackp] != 0 ? stackb[stackp]  - 1 : -1;
+            laststart = stackb[--stackp];
+            if(c == '!' || c == '=') {
+                laststart = bix;
+            }
+        }
+
+        public final void alt() {
+            /* Insert before the previous alternative a jump which
+               jumps to this alternative if the former fails.  */
+            GET_BUFFER_SPACE(3);
+            insert_jump(on_failure_jump, b, begalt, bix + 6, bix);
+            pending_exact = -1;
+            bix += 3;
+            /* The alternative before this one has a jump after it
+               which gets executed if it gets matched.  Adjust that
+               jump so it will jump to this alternative's analogous
+               jump (put in below, which in turn will jump to the next
+               (if any) alternative's such jump, etc.).  The last such
+               jump jumps to the correct final destination.  A picture:
+               _____ _____ 
+               |   | |   |   
+               |   v |   v 
+               a | b   | c   
+                       
+               If we are at `b', then fixup_alt_jump right now points to a
+               three-byte space after `a'.  We'll put in the jump, set
+               fixup_alt_jump to right after `b', and leave behind three
+               bytes which we'll fill in when we get to after `c'.  */
+
+            if(fixup_alt_jump != -1) {
+                store_jump(b, fixup_alt_jump, jump_past_alt, bix);
+            }
+
+            /* Mark and leave space for a jump after this alternative,
+               to be filled in later either by next alternative or
+               when know we're at the end of a series of alternatives.  */
+            fixup_alt_jump = bix;
+            GET_BUFFER_SPACE(3);
+            bix += 3;
+            laststart = -1;
+            begalt = bix;
+        }
+
+        public final void start_bounded_repeat() {
+            /* If there is no previous pattern, this is an invalid pattern.  */
+            if(laststart == -1) {
+                err("invalid regular expression; there's no previous pattern, to which '{' would define cardinality at " + pix);
+            }
+            if(pix == pend) {
+                err("invalid regular expression; '{' can't be last character");
+            }
+
+            beg_interval = pix - 1;
+
+            lower_bound = -1;			/* So can see if are set.  */
+            upper_bound = -1;
+
+            if(pix != pend) {
+                PATFETCH();
+                while(Character.isDigit(c)) {
+                    if(lower_bound < 0) {
+                        lower_bound = 0;
+                    }
+                    lower_bound = lower_bound * 10 + c - '0';
+                    if(pix == pend) {
+                        break;
+                    }
+                    PATFETCH();
+                }
+            } 	
+
+            if(c == ',') {
+                if(pix != pend) {
+                    PATFETCH();
+                    while(Character.isDigit(c)) {
+                        if(upper_bound < 0) {
+                            upper_bound = 0;
+                        }
+                        upper_bound = lower_bound * 10 + c - '0';
+                        if(pix == pend) {
+                            break;
+                        }
+                        PATFETCH();
+                    }
+                } 	
+            } else {
+                /* Interval such as `{1}' => match exactly once. */
+                upper_bound = lower_bound;
+            }
+        }
+
+        public final int continue_bounded_repeat() {
+            if(lower_bound >= RE_DUP_MAX || upper_bound >= RE_DUP_MAX) {
+                err("too big quantifier in {,}");
+            }
+            if(upper_bound < 0) {
+                upper_bound = RE_DUP_MAX;
+            }
+            if(lower_bound > upper_bound) {
+                err("can't do {n,m} with n > m");
+            }
+
+            beg_interval = 0;
+            pending_exact = 0;
+                    
+            greedy = true;
+
+            if(pix != pend) {
+                PATFETCH();
+                if(c == '?') {
+                    greedy = false;
+                } else {
+                    pix--;
+                }
+            }
+
+            if(lower_bound == 0) {
+                zero_times_ok = true;
+                if(upper_bound == RE_DUP_MAX) {
+                    many_times_ok = true;
+                    gotoRepeat = true;
+                    c = '*';
+                    return 1;
+                }
+                if(upper_bound == 1) {
+                    many_times_ok = false;
+                    gotoRepeat = true;
+                    c = '*';
+                    return 1;
+                }
+            }
+            if(lower_bound == 1) {
+                if(upper_bound == 1) {
+                    /* No need to repeat */
+                    return 2;
+                }
+                if(upper_bound == RE_DUP_MAX) {
+                    many_times_ok = true;
+                    zero_times_ok = false;
+                    gotoRepeat = true;
+                    c = '*';
+                    return 1;
+                }
+            }
+
+            /* If upper_bound is zero, don't want to succeed at all; 
+               jump from laststart to b + 3, which will be the end of
+               the buffer after this jump is inserted.  */
+
+            if(upper_bound == 0) {
+                GET_BUFFER_SPACE(3);
+                insert_jump(jump, b, laststart, bix + 3, bix);
+                bix += 3;
+                return 2;
+            }
+
+            /* If lower_bound == upper_bound, repeat count can be removed */
+            if(lower_bound == upper_bound) {
+                int mcnt;
+                int skip_stop_paren = 0;
+
+                if(b[bix-1] == stop_paren) {
+                    skip_stop_paren = 1;
+                    bix--;
+                }
+
+                if (b[laststart] == exactn && b[laststart+1]+2 == bix - laststart && b[laststart+1]*lower_bound < 256) {
+                    mcnt = b[laststart+1];
+                    GET_BUFFER_SPACE((lower_bound-1)*mcnt);
+                    b[laststart+1] = (char)(lower_bound*mcnt);
+                    while(--lower_bound > 0) {
+                        System.arraycopy(b,laststart+2,b,bix,mcnt);
+                        bix+=mcnt;
+                    }
+                    if(skip_stop_paren != 0) {
+                        BUFPUSH(stop_paren);
+                    }
+                    return 2;
+                }
+
+                if(lower_bound < 5 && bix - laststart < 10) {
+                    /* 5 and 10 are the magic numbers */
+                    mcnt = bix - laststart;
+                    GET_BUFFER_SPACE((lower_bound-1)*mcnt);
+                    while(--lower_bound > 0) {
+                        System.arraycopy(b, laststart, b, bix, mcnt);
+                        bix+=mcnt;
+                    }
+                    if(skip_stop_paren!=0) {
+                        BUFPUSH(stop_paren);
+                    }
+                    return 2;
+                }
+                if(skip_stop_paren!=0) {
+                    bix++; /* push back stop_paren */
+                }
+            }
+            return 0;
+        }
+
+        public final void bounded_nontrivial() {
+            /* Otherwise, we have a nontrivial interval.  When
+               we're all done, the pattern will look like:
+               set_number_at <jump count> <upper bound>
+               set_number_at <succeed_n count> <lower bound>
+               succeed_n <after jump addr> <succed_n count>
+               <body of loop>
+               jump_n <succeed_n addr> <jump count>
+               (The upper bound and `jump_n' are omitted if
+               `upper_bound' is 1, though.)  */
+            /* If the upper bound is > 1, we need to insert
+               more at the end of the loop.  */
+            int nbytes = upper_bound == 1 ? 10 : 20;
+            GET_BUFFER_SPACE(nbytes);
+
+            /* Initialize lower bound of the `succeed_n', even
+               though it will be set during matching by its
+               attendant `set_number_at' (inserted next),
+               because `re_compile_fastmap' needs to know.
+               Jump to the `jump_n' we might insert below.  */
+            insert_jump_n(succeed_n, b, laststart, bix + (nbytes/2), bix, lower_bound);
+            bix += 5; 	/* Just increment for the succeed_n here.  */
+                        
+            /* Code to initialize the lower bound.  Insert 
+               before the `succeed_n'.  The `5' is the last two
+               bytes of this `set_number_at', plus 3 bytes of
+               the following `succeed_n'.  */
+            insert_op_2(set_number_at, b, laststart, bix, 5, lower_bound);
+            bix += 5;
+
+            if(upper_bound > 1) {
+                /* More than one repetition is allowed, so
+                   append a backward jump to the `succeed_n'
+                   that starts this interval.
+                               
+                   When we've reached this during matching,
+                   we'll have matched the interval once, so
+                   jump back only `upper_bound - 1' times.  */
+                GET_BUFFER_SPACE(5);
+                store_jump_n(b, bix, greedy?jump_n:finalize_push_n, laststart + 5, upper_bound - 1);
+                bix += 5;
+
+                /* The location we want to set is the second
+                   parameter of the `jump_n'; that is `b-2' as
+                   an absolute address.  `laststart' will be
+                   the `set_number_at' we're about to insert;
+                   `laststart+3' the number to set, the source
+                   for the relative address.  But we are
+                   inserting into the middle of the pattern --
+                   so everything is getting moved up by 5.
+                   Conclusion: (b - 2) - (laststart + 3) + 5,
+                   i.e., b - laststart.
+
+                   We insert this at the beginning of the loop
+                   so that if we fail during matching, we'll
+                   reinitialize the bounds.  */
+                insert_op_2(set_number_at, b, laststart, bix, bix - laststart, upper_bound - 1);
+                bix += 5;
+            }
+        }
+        
+        public final void unfetch_interval() {
+            // unfetch_interval:
+            /* If an invalid interval, match the characters as literals.  */
+            self.re_warning("regexp has invalid interval");
+            pix = beg_interval;
+            beg_interval = 0;
+            /* normal_char and normal_backslash need `c'.  */
+            PATFETCH();
+            gotoNormalChar = true;
+        }
+
+        public final void escape() {
+            if(pix == pend) {
+                err("invalid regular expression; '\\' can't be last character");
+            }
+            /* Do not translate the character after the \, so that we can
+               distinguish, e.g., \B from \b, even if we normally would
+               translate, e.g., B to b.  */
+            c = p[pix++];
+            switch (c) {
+            case 's':
+            case 'S':
+            case 'd':
+            case 'D':
+                while(bix + 9 + 32 > self.allocated) {
+                    EXTEND_BUFFER();
+                }
+
+                laststart = bix;
+                if(c == 's' || c == 'd') {
+                    b[bix++] = charset;
+                } else {
+                    b[bix++] = charset_not;
+                }
+                b[bix++] = 32;
+                Arrays.fill(b,bix,bix+34,(char)0);
+                if(c == 's' || c == 'S') {
+                    SET_LIST_BIT(' ');
+                    SET_LIST_BIT('\t');
+                    SET_LIST_BIT('\n');
+                    SET_LIST_BIT('\r');
+                    SET_LIST_BIT('\f');
+                } else {
+                    char cc;
+                    for (cc = '0'; cc <= '9'; cc++) {
+                        SET_LIST_BIT(cc);
+                    }
+                }
+
+                while(b[bix-1] > 0 && b[bix+b[bix-1]-1] == 0) { 
+                    b[bix-1]--;
+                }
+                if(b[bix-1] != 32) {
+                    System.arraycopy(b,bix+32,b,bix+b[bix-1],  2 + EXTRACT_UNSIGNED(b,bix+32)*8);
+                }
+                bix += b[bix-1] + 2 + EXTRACT_UNSIGNED(b, bix+b[bix-1])*8;
+                break;
+            case 'w':
+                laststart = bix;
+                BUFPUSH(wordchar);
+                break;
+            case 'W':
+                laststart = bix;
+                BUFPUSH(notwordchar);
+                break;
+
+                /******************* NOT IN RUBY
                     case '<':
                         SH(wordbeg);
                         break;
@@ -1470,148 +1523,118 @@ public class Pattern {
                     case '>':
                         SH(wordend);
                         break;
-                        ********************/
+                ********************/
 
-                    case 'b':
-                        BUFPUSH(wordbound);
-                        break;
+            case 'b':
+                BUFPUSH(wordbound);
+                break;
 
-                    case 'B':
-                        BUFPUSH(notwordbound);
-                        break;
+            case 'B':
+                BUFPUSH(notwordbound);
+                break;
 
-                    case 'A':
-                        BUFPUSH(begbuf);
-                        break;
+            case 'A':
+                BUFPUSH(begbuf);
+                break;
 
-                    case 'Z':
-                        if((options & RE_OPTION_SINGLELINE) == 0) {
-                            BUFPUSH(endbuf2);
+            case 'Z':
+                if((self.options & RE_OPTION_SINGLELINE) == 0) {
+                    BUFPUSH(endbuf2);
+                    break;
+                }
+                /* fall through */
+            case 'z':
+                BUFPUSH(endbuf);
+                break;
+
+            case 'G':
+                BUFPUSH(begpos);
+                break;
+
+                /* hex */
+            case 'x':
+                had_mbchar = 0;
+                c = (char)scan_hex(p, pix, 2, numlen);
+                if(numlen[0] == 0) {
+                    err("Invalid escape character syntax");
+                }
+                pix += numlen[0];
+                had_num_literal = 1;
+                gotoNumericChar = true;
+                return;
+
+                /* octal */
+            case '0':
+                had_mbchar = 0;
+                c = (char)scan_oct(p, pix, 2, numlen);
+                pix += numlen[0];
+                had_num_literal = 1;
+                gotoNumericChar = true;
+                return;
+
+                /* back-ref or octal */
+            case '1': case '2': case '3':
+            case '4': case '5': case '6':
+            case '7': case '8': case '9':
+                pix--;
+                p0 = pix;
+                had_mbchar = 0;
+                c1 = 0;
+
+                if(pix != pend) {
+                    PATFETCH();
+                    while(Character.isDigit(c)) {
+                        if(c1 < 0) {
+                            c1 = 0;
+                        }
+                        c1 = (char)(c1 * 10 + c - '0');
+                        if(pix == pend) {
                             break;
                         }
-                        /* fall through */
-                    case 'z':
-                        BUFPUSH(endbuf);
-                        break;
-
-                    case 'G':
-                        BUFPUSH(begpos);
-                        break;
-
-                        /* hex */
-                    case 'x':
-                        had_mbchar = 0;
-                        c = (char)scan_hex(p, pix, 2, numlen);
-                        if(numlen[0] == 0) {
-                            err("Invalid escape character syntax");
-                        }
-                        pix += numlen[0];
-                        had_num_literal = 1;
-                        gotoNumericChar = true;
-                        break mainSwitch;
-
-                        /* octal */
-                    case '0':
-                        had_mbchar = 0;
-                        c = (char)scan_oct(p, pix, 2, numlen);
-                        pix += numlen[0];
-                        had_num_literal = 1;
-                        gotoNumericChar = true;
-                        break mainSwitch;
-
-                        /* back-ref or octal */
-                    case '1': case '2': case '3':
-                    case '4': case '5': case '6':
-                    case '7': case '8': case '9':
-                        pix--;
-                        p0 = pix;
-                        had_mbchar = 0;
-                        c1 = 0;
-
-                        if(pix != pend) {
-                            c = PATFETCH();
-                            while(Character.isDigit(c)) {
-                                if(c1 < 0) {
-                                    c1 = 0;
-                                }
-                                c1 = (char)(c1 * 10 + c - '0');
-                                if(pix == pend) {
-                                    break;
-                                }
-                                c = PATFETCH();
-                            }
-                        } 	
-
-                        if(!Character.isDigit(c)) {
-                            pix--;
-                        }
-                        
-                        if(9 < c1 && c1 >= regnum) {
-                            /* need to get octal */
-                            c = (char)(scan_oct(p, p0, 3, numlen) & 0xff);
-                            pix = p0 + numlen[0];
-                            c1 = 0;
-                            had_num_literal = 1;
-                            gotoNumericChar = true;
-                            break mainSwitch;
-                        }
-
-                        laststart = bix;
-                        BUFPUSH(duplicate);
-                        BUFPUSH((char)c1);
-                        break;
-
-                    case 'M':
-                    case 'C':
-                    case 'c':
-                        p0 = --pix;
-                        int[] p00 = new int[]{p0};
-                        c = (char)read_special(p, pix, pend, p00);
-                        p0 = p00[0];
-                        if(c > 255) {
-                            err("Invalid escape character syntax");
-                        }
-                        pix = p0;
-                        had_num_literal = 1;
-                        gotoNumericChar = true;
-                        break mainSwitch;
-                    default:
-                        c = read_backslash(c);
-                        gotoNormalChar = true;
-                        break mainSwitch;
+                        PATFETCH();
                     }
-                    break mainSwitch;
-                case '#':
-                    if((optz & RE_OPTION_EXTENDED) != 0) {
-                        while(pix != pend) {
-                            c = PATFETCH();
-                            if(c == '\n') {
-                                break;
-                            }
-                        }
-                        break mainSwitch;
-                    }
-                    gotoNormalChar = true;
-                    break mainSwitch;
+                } 	
 
-                case ' ':
-                case '\t':
-                case '\f':
-                case '\r':
-                case '\n':
-                    if((optz & RE_OPTION_EXTENDED) != 0) {
-                        break mainSwitch;
-                    }
-                default:
-                    if(c == ']') {
-                        re_warning("regexp has `]' without escape");
-                    } else if(c == '}') {
-                        re_warning("regexp has `}' without escape");
-                    }
-                    gotoNormalChar = true;
+                if(!Character.isDigit(c)) {
+                    pix--;
                 }
-            } while(gotoRepeat);
-            
+                        
+                if(9 < c1 && c1 >= regnum) {
+                    /* need to get octal */
+                    c = (char)(scan_oct(p, p0, 3, numlen) & 0xff);
+                    pix = p0 + numlen[0];
+                    c1 = 0;
+                    had_num_literal = 1;
+                    gotoNumericChar = true;
+                    return;
+                }
+
+                laststart = bix;
+                BUFPUSH(duplicate);
+                BUFPUSH((char)c1);
+                break;
+
+            case 'M':
+            case 'C':
+            case 'c':
+                p0 = --pix;
+                int[] p00 = new int[]{p0};
+                c = (char)read_special(p, pix, pend, p00);
+                p0 = p00[0];
+                if(c > 255) {
+                    err("Invalid escape character syntax");
+                }
+                pix = p0;
+                had_num_literal = 1;
+                gotoNumericChar = true;
+                return;
+            default:
+                c = read_backslash(c);
+                gotoNormalChar = true;
+            }
+        }
+
+        public final void handle_num_or_normal() {
             if(gotoNormalChar) {
                 /* Expects the character in `c'.  */
                 had_mbchar = 0;
@@ -1657,81 +1680,375 @@ public class Pattern {
             }
         }
 
-        if(fixup_alt_jump!=-1) {
-            store_jump(b, fixup_alt_jump, jump, bix);
-        }
-        if(stackp > 0) {
-            err("unmatched (");
-        }
+        public final void finalize_compilation() {
+            if(fixup_alt_jump!=-1) {
+                store_jump(b, fixup_alt_jump, jump, bix);
+            }
+            if(stackp > 0) {
+                err("unmatched (");
+            }
 
-        /* set optimize flags */
-        laststart = 0;
-        if(laststart != bix) {
-            if(b[laststart] == dummy_failure_jump) {
-                laststart += 3;
-            } else if(b[laststart] == try_next) {
-                laststart += 3;
-            }
-            if(b[laststart] == anychar_repeat) {
-                options |= RE_OPTIMIZE_ANCHOR;
-            }
-        }
-        used = bix;
-        re_nsub = regnum;
-        laststart = 0;
-        if(laststart != bix) {
-            if(b[laststart] == start_memory) {
-                laststart += 3;
-            }
-            if(b[laststart] == exactn) {
-                options |= RE_OPTIMIZE_EXACTN;
-                must = laststart+1;
-            }
-        }
-        if(must==-1) {
-            must = calculate_must_string(buffer, bix);
-        }
-
-        if(ctx.current_mbctype == MBCTYPE_SJIS) {
-            options |= RE_OPTIMIZE_NO_BM;
-        } else if(must != -1) {
-            int i;
-            int len = buffer[must];
-
-            for(i=1; i<len; i++) {
-                if(buffer[must+i] == 0xff ||
-                   (ctx.current_mbctype!=0 && ismbchar(buffer[must+i],ctx))) {
-                    options |= RE_OPTIMIZE_NO_BM;
-                    break;
+            /* set optimize flags */
+            laststart = 0;
+            if(laststart != bix) {
+                if(b[laststart] == dummy_failure_jump) {
+                    laststart += 3;
+                } else if(b[laststart] == try_next) {
+                    laststart += 3;
+                }
+                if(b[laststart] == anychar_repeat) {
+                    self.options |= RE_OPTIMIZE_ANCHOR;
                 }
             }
-            if((options & RE_OPTIMIZE_NO_BM) == 0) {
-                must_skip = new int[256];
-                bm_init_skip(must_skip, buffer, must+1,
-                    buffer[must],
-                    (((options&(RE_OPTION_IGNORECASE|RE_MAY_IGNORECASE))!=0) && ctx.translate!=null)?ctx.translate:null);
+            self.used = bix;
+            self.re_nsub = regnum;
+            laststart = 0;
+            if(laststart != bix) {
+                if(b[laststart] == start_memory) {
+                    laststart += 3;
+                }
+                if(b[laststart] == exactn) {
+                    self.options |= RE_OPTIMIZE_EXACTN;
+                    self.must = laststart+1;
+                }
+            }
+            if(self.must==-1) {
+                self.must = calculate_must_string(self.buffer, bix);
+            }
+
+            if(ctx.current_mbctype == MBCTYPE_SJIS) {
+                self.options |= RE_OPTIMIZE_NO_BM;
+            } else if(self.must != -1) {
+                int i;
+                int len = self.buffer[self.must];
+
+                for(i=1; i<len; i++) {
+                    if(self.buffer[self.must+i] == 0xff ||
+                       (ctx.current_mbctype!=0 && ismbchar(self.buffer[self.must+i],ctx))) {
+                        self.options |= RE_OPTIMIZE_NO_BM;
+                        break;
+                    }
+                }
+                if((self.options & RE_OPTIMIZE_NO_BM) == 0) {
+                    self.must_skip = new int[256];
+                    bm_init_skip(self.must_skip, self.buffer, self.must+1,
+                                 self.buffer[self.must],
+                                 (((self.options&(RE_OPTION_IGNORECASE|RE_MAY_IGNORECASE))!=0) && ctx.translate!=null)?ctx.translate:null);
+                }
+            }
+
+            self.regstart = new int[regnum];
+            self.regend = new int[regnum];
+            self.old_regstart = new int[regnum];
+            self.old_regend = new int[regnum];
+            self.reg_info = new RegisterInfoType[regnum];
+            for(int x=0;x<self.reg_info.length;x++) {
+                self.reg_info[x] = new RegisterInfoType();
+            }
+            self.best_regstart = new int[regnum];
+            self.best_regend = new int[regnum];
+            /*
+              System.err.println("compiled into pattern of length: " + used);
+              for(int i=0;i<used;i++) {
+              System.err.print(" "+(int)buffer[i]);
+              }
+              System.err.println();
+            */
+        }
+
+
+        private final void SET_LIST_BIT(char c) {
+            b[bix+c/8] |= 1 << (c%8);
+        }
+
+        private final void GET_BUFFER_SPACE(int n) {
+            while(bix+n >= self.allocated) {
+                EXTEND_BUFFER();
             }
         }
 
-        regstart = new int[regnum];
-        regend = new int[regnum];
-        old_regstart = new int[regnum];
-        old_regend = new int[regnum];
-        reg_info = new RegisterInfoType[regnum];
-        for(int x=0;x<reg_info.length;x++) {
-            reg_info[x] = new RegisterInfoType();
+        private final void EXTEND_BUFFER() {
+            char[] old_buffer = self.buffer;
+            self.allocated *= 2;
+            self.buffer = new char[self.allocated];
+            b = self.buffer;
+            System.arraycopy(old_buffer,0,self.buffer,0,old_buffer.length);
         }
-        best_regstart = new int[regnum];
-        best_regend = new int[regnum];
-        /*
-        System.err.println("compiled into pattern of length: " + used);
-        for(int i=0;i<used;i++) {
-            System.err.print(" "+(int)buffer[i]);
+
+    }
+
+    private final static char read_backslash(char c) {
+        switch(c) {
+        case 'n':
+            return '\n';
+        case 't':
+            return '\t';
+        case 'r':
+            return '\r';
+        case 'f':
+            return '\f';
+        case 'v':
+            return 11;
+        case 'a':
+            return '\007';
+        case 'b':
+            return '\010';
+        case 'e':
+            return '\033';
         }
-        System.err.println();
-        */
-        b=null;
-        p=null;
+        return c;
+    }
+
+    private final static int read_special(char[] p, int pix, int pend, int[] pp) {
+        int c;
+        if(pix == pend) {
+            pp[0] = pix;
+            return ~0;
+        }
+        c = p[pix++];
+        switch(c) {
+        case 'M':
+            if(pix == pend) {
+                return ~0;
+            }
+            c = p[pix++];
+            if(c != '-') {
+                return -1;
+            }
+            if(pix == pend) {
+                return ~0;
+            }
+            c = p[pix++];
+            pp[0] = pix;
+            if(c == '\\') {
+                return read_special(p, --pix, pend, pp) | 0x80;
+            } else if(c == -1) { 
+                return ~0;
+            } else {
+                return ((c & 0xff) | 0x80);
+            }
+        case 'C':
+            if(pix == pend) {
+                return ~0;
+            }
+            c = p[pix++];
+            if(c != '-') {
+                return -1;
+            }
+        case 'c':
+            if(pix == pend) {
+                return ~0;
+            }
+            c = p[pix++];
+            pp[0] = pix;
+            if(c == '\\') {
+                c = read_special(p, --pix, pend, pp);
+            } else if(c == '?') {
+                return 0177;
+            } else if(c == -1) {
+                return ~0;
+            }
+            return c & 0x9f;
+        default:
+            pp[0] = pix+1;
+            return read_backslash((char)c);
+        }
+    }
+
+    private final static String HEXDIGIT = "0123456789abcdef0123456789ABCDEF";
+    private final static long scan_hex(char[] p, int start, int len, int[] retlen) {
+        int s = start;
+        long retval = 0;
+        int tmp;
+        while(len-- > 0 && p[s] != 0 && (tmp = HEXDIGIT.indexOf(p[s])) != -1) {
+            retval <<= 4;
+            retval |= (tmp & 15);
+            s++;
+        }
+        retlen[0] = s-start;
+        return retval;
+    }
+
+    private final static long scan_oct(char[] p, int start, int len, int[] retlen) {
+        int s = start;
+        long retval = 0;
+
+        while(len-- > 0 && p[s] >= '0' && p[s] <= '7') {
+            retval <<= 3;
+            retval |= (p[s++] - '0');
+        }
+        retlen[0] = s-start;
+        return retval;
+
+    }
+
+
+    private final int WC2MBC1ST(long c) {
+        if(ctx.current_mbctype != MBCTYPE_UTF8) {
+            return (int)((c<0x100) ? c : ((c>>8)&0xff));
+        } else {
+            return (int)utf8_firstbyte(c);
+        }
+    }
+
+    private void compile(char[] pattern, int start, int length, CompileContext ctx) throws PatternSyntaxException {
+        this.ctx = ctx;
+        CompilationEnvironment w = new CompilationEnvironment();
+        w.ctx = ctx;
+        w.b = buffer;
+        w.bix = 0;
+        w.p = pattern;
+        w.pix = start;
+        w.pend = start+length;
+        w.c1 = 0;
+        w.optz = options;
+        w.self = this;
+
+        fastmap_accurate = 0;
+        must = -1;
+        must_skip = null;
+
+        if(allocated == 0) {
+            allocated = INIT_BUF_SIZE;
+            /* EXTEND_BUFFER loses when allocated is 0.  */
+            buffer = new char[INIT_BUF_SIZE];
+            w.b = buffer;
+        }
+
+        mainParse: while(w.pix != w.pend) {
+            w.PATFETCH();
+
+            mainSwitch: do {
+                switch(w.c) {
+                case '$':
+                    w.dollar();
+                    break;
+
+                case '^':
+                    w.caret();
+                    break;
+
+                case '+':
+                case '?':
+                case '*':
+                    w.prepareRepeat();
+
+                    /* Star, etc. applied to an empty pattern is equivalent
+                       to an empty pattern.  */
+                    if(w.laststart==-1) {
+                        break;
+                    }
+                    
+                    if(w.greedy && w.many_times_ok && w.b[w.laststart] == anychar && w.bix-w.laststart <= 2) {
+                        if(w.b[w.bix - 1] == stop_paren) {
+                            w.bix--;
+                        }
+                        if(w.zero_times_ok) {
+                            w.b[w.laststart] = anychar_repeat;
+                        } else {
+                            w.BUFPUSH(anychar_repeat);
+                        }
+                        break;
+                    }
+
+                    w.mainRepeat();
+                    break;
+
+                case '.':
+                    w.dot();
+                    break;
+
+                case '[':
+                    w.prepareCharset();
+                    w.main_charset();
+                    w.compact_charset();
+                    break;
+
+                case '(':
+                    w.group_start();
+
+                    if(w.c == '#') {
+                        if(w.push_option!=0) {
+                            w.BUFPUSH(option_set);
+                            w.BUFPUSH((char)w.optz);
+                        }
+                        if(w.casefold!=0) {
+                            if((w.optz & RE_OPTION_IGNORECASE) != 0) {
+                                w.BUFPUSH(casefold_on);
+                            } else {
+                                w.BUFPUSH(casefold_off);
+                            }
+                        }
+                        break;
+                    }
+
+                    w.group_start_end();
+                    break;
+                case ')':
+                    w.group_end();
+                    break;
+                case '|':
+                    w.alt();
+                    break;
+                case '{':
+                unfetch_interval: do {
+                    w.start_bounded_repeat();
+                    
+                    if(w.lower_bound < 0 || w.c != '}') {
+                        break unfetch_interval;
+                    }
+                    switch(w.continue_bounded_repeat()) {
+                    case 0:
+                        break;
+                    case 1:
+                        continue mainSwitch;
+                    case 2:
+                        break mainSwitch;
+                    }
+                    w.bounded_nontrivial();
+                    break mainSwitch;
+                } while(false);
+                w.unfetch_interval();
+                break mainSwitch;
+
+                case '\\':
+                    w.escape();
+                    break mainSwitch;
+                case '#':
+                    if((w.optz & RE_OPTION_EXTENDED) != 0) {
+                        while(w.pix != w.pend) {
+                            w.PATFETCH();
+                            if(w.c == '\n') {
+                                break;
+                            }
+                        }
+                        break mainSwitch;
+                    }
+                    w.gotoNormalChar = true;
+                    break mainSwitch;
+
+                case ' ':
+                case '\t':
+                case '\f':
+                case '\r':
+                case '\n':
+                    if((w.optz & RE_OPTION_EXTENDED) != 0) {
+                        break mainSwitch;
+                    }
+                default:
+                    if(w.c == ']') {
+                        re_warning("regexp has `]' without escape");
+                    } else if(w.c == '}') {
+                        re_warning("regexp has `}' without escape");
+                    }
+                    w.gotoNormalChar = true;
+                }
+            } while(w.gotoRepeat);
+
+            w.handle_num_or_normal();
+        }
+
+        w.finalize_compilation();
     }
 
     /**
@@ -1874,110 +2191,6 @@ public class Pattern {
         return must;
     }
 
-    private final static char read_backslash(char c) {
-        switch(c) {
-        case 'n':
-            return '\n';
-        case 't':
-            return '\t';
-        case 'r':
-            return '\r';
-        case 'f':
-            return '\f';
-        case 'v':
-            return 11;
-        case 'a':
-            return '\007';
-        case 'b':
-            return '\010';
-        case 'e':
-            return '\033';
-        }
-        return c;
-    }
-
-    private final static int read_special(char[] p, int pix, int pend, int[] pp) {
-        int c;
-        if(pix == pend) {
-            pp[0] = pix;
-            return ~0;
-        }
-        c = p[pix++];
-        switch(c) {
-        case 'M':
-            if(pix == pend) {
-                return ~0;
-            }
-            c = p[pix++];
-            if(c != '-') {
-                return -1;
-            }
-            if(pix == pend) {
-                return ~0;
-            }
-            c = p[pix++];
-            pp[0] = pix;
-            if(c == '\\') {
-                return read_special(p, --pix, pend, pp) | 0x80;
-            } else if(c == -1) { 
-                return ~0;
-            } else {
-                return ((c & 0xff) | 0x80);
-            }
-        case 'C':
-            if(pix == pend) {
-                return ~0;
-            }
-            c = p[pix++];
-            if(c != '-') {
-                return -1;
-            }
-        case 'c':
-            if(pix == pend) {
-                return ~0;
-            }
-            c = p[pix++];
-            pp[0] = pix;
-            if(c == '\\') {
-                c = read_special(p, --pix, pend, pp);
-            } else if(c == '?') {
-                return 0177;
-            } else if(c == -1) {
-                return ~0;
-            }
-            return c & 0x9f;
-        default:
-            pp[0] = pix+1;
-            return read_backslash((char)c);
-        }
-    }
-
-    private final static String HEXDIGIT = "0123456789abcdef0123456789ABCDEF";
-    private final static long scan_hex(char[] p, int start, int len, int[] retlen) {
-        int s = start;
-        long retval = 0;
-        int tmp;
-        while(len-- > 0 && p[s] != 0 && (tmp = HEXDIGIT.indexOf(p[s])) != -1) {
-            retval <<= 4;
-            retval |= (tmp & 15);
-            s++;
-        }
-        retlen[0] = s-start;
-        return retval;
-    }
-
-    private final static long scan_oct(char[] p, int start, int len, int[] retlen) {
-        int s = start;
-        long retval = 0;
-
-        while(len-- > 0 && p[s] >= '0' && p[s] <= '7') {
-            retval <<= 3;
-            retval |= (p[s++] - '0');
-        }
-        retlen[0] = s-start;
-        return retval;
-
-    }
 
     private final static void insert_op_2(char op, char[] b, int there, int current_end, int num_1, int num_2) {
         int pfrom = current_end;
@@ -2086,48 +2299,6 @@ public class Pattern {
     }
     
 
-    private final int WC2MBC1ST(long c) {
-        if(ctx.current_mbctype != MBCTYPE_UTF8) {
-            return (int)((c<0x100) ? c : ((c>>8)&0xff));
-        } else {
-            return (int)utf8_firstbyte(c);
-        }
-    }
-
-    private final void SET_LIST_BIT(char c) {
-        b[bix+c/8] |= 1 << (c%8);
-    }
-
-    private final boolean TRANSLATE_P() {
-        return ((optz&RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null);
-    }
-
-    private final boolean MAY_TRANSLATE() {
-        return ((options&(RE_OPTION_IGNORECASE|RE_MAY_IGNORECASE))!=0 && ctx.translate!=null);
-    }
-
-    private final void BUFPUSH(char ch) {
-        GET_BUFFER_SPACE(1);
-        b[bix++] = ch;
-    }
-
-    private final char PATFETCH() {
-        if(pix == pend) {
-            err("premature end of regular expression");
-        }
-        char c = p[pix++];
-        if(TRANSLATE_P()) {
-            c = ctx.translate[c];
-        }
-        return c;
-    }
-
-    private final char PATFETCH_RAW() {
-        if(pix == pend) {
-            err("premature end of regular expression");
-        }
-        return p[pix++];
-    }
 
     public final static boolean ismbchar(int c, CompileContext ctx) {
         return ctx.re_mbctab[c] != 0;
@@ -2196,48 +2367,6 @@ public class Pattern {
         throw new PatternSyntaxException(msg);
     }
 
-    private final void GET_BUFFER_SPACE(int n) {
-        while(bix+n >= allocated) {
-            EXTEND_BUFFER();
-        }
-    }
-
-    private final boolean is_in_list_sbc(int cx, char[] b, int bix) {
-        int size = b[bix++];
-        return cx/8 < size && (b[bix + cx/8]&(1<<cx%8)) != 0;
-    }
-  
-    private final boolean is_in_list_mbc(int cx, char[] b, int bix) {
-        int size = b[bix++];
-        bix+=size+2;
-        size = EXTRACT_UNSIGNED(b,bix-2);
-        if(size == 0) {
-            return false;
-        }
-        int i,j;
-        for(i=0,j=size;i<j;) {
-            int k = (i+j)>>1;
-            if(cx > EXTRACT_MBC(b,bix+k*8+4)) {
-                i = k+1;
-            } else {
-                j = k;
-            }
-        }
-        return i<size && EXTRACT_MBC(b,bix+i*8) <= cx;
-    }        
-
-    private final boolean is_in_list(int cx, char[] b, int bix) {
-        return is_in_list_sbc(cx, b, bix) || (ctx.current_mbctype!=0 ? is_in_list_mbc(cx, b, bix) : false);
-    }
-
-    private final void EXTEND_BUFFER() {
-        char[] old_buffer = buffer;
-        allocated *= 2;
-        buffer = new char[allocated];
-        b = buffer;
-        System.arraycopy(old_buffer,0,buffer,0,old_buffer.length);
-    }
-
     private static Pattern emptyPattern(int flags) {
         Pattern p = new Pattern();
         p.options = flags;
@@ -2289,6 +2418,10 @@ public class Pattern {
     private RegisterInfoType[] reg_info;
     private int[] best_regstart;
     private int[] best_regend;
+    
+    public final boolean MAY_TRANSLATE() {
+        return ((options&(RE_OPTION_IGNORECASE|RE_MAY_IGNORECASE))!=0 && ctx.translate!=null);
+    }
 
 
     /**
@@ -2297,6 +2430,8 @@ public class Pattern {
     public int search(char[] string, int size, int startpos, int range, Registers regs) {
         int val=-1, anchor = 0, initpos = startpos;
         boolean doBegbuf = false;
+        int pix;
+        char c;
         /* Check for out-of-range starting position.  */
         if(startpos < 0 || startpos > size) {
             return -1;
@@ -2557,19 +2692,21 @@ public class Pattern {
     private final static int NUM_REG_ITEMS = 3;
     private final static int NUM_COUNT_ITEMS = 2;
 
-    /**
-     * @mri re_match_exec
-     */
-    public int match_exec(char[] string_arg, int size, int pos, int beg, Registers regs) {
-        p = buffer;
-        int p1=-1;
-        pix = 0;
-        pend = used;
-        int num_regs = re_nsub;
-        char[] string = string_arg;
-        optz = options;
-        int mcnt;
-        int d, dend;
+    private static class MatchEnvironment {
+        public char[] p;
+        public char c;
+        public int p1;
+        public int pix;
+        public int pend;
+        public int optz;
+        public int num_regs;
+        public char[] string;
+        public int mcnt;
+        public int d;
+        public int dend;
+        public int pos;
+
+        public CompileContext ctx;
 
         /* Failure point stack.  Each place that can handle a failure further
            down the line pushes a failure point on this stack.  It consists of
@@ -2580,36 +2717,218 @@ public class Pattern {
            scanning the strings.  If the latter is zero, the failure point is a
            ``dummy''; if a failure happens and the failure point is a dummy, it
            gets discarded and the next next one is tried.  */
+        public int[] stacka;
+        public int[] stackb;
+        public int stackp;
+        public int stacke;
 
-        int[] stacka;
-        int[] stackb;
-        int stackp;
-        int stacke;
+        public boolean best_regs_set = false;
+        public int num_failure_counts = 0;
 
-        boolean best_regs_set = false;
-        int num_failure_counts = 0;
+        public Pattern self;
+
+        public final boolean TRANSLATE_P() {
+            return ((optz&RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null);
+        }
+
+        public final boolean MAY_TRANSLATE() {
+            return ((self.options&(RE_OPTION_IGNORECASE|RE_MAY_IGNORECASE))!=0 && ctx.translate!=null);
+        }
+
+        public final void init_stack() {
+            /* Initialize the stack. */
+            stacka = new int[(num_regs*3 + 4)*160];
+            stackb = stacka;
+            stackp = 0;
+            stacke = stackb.length;
+        }
+
+        public final void init_registers() {
+            /* Initialize subexpression text positions to -1 to mark ones that no
+               ( or ( and ) or ) has been seen for. Also set all registers to
+               inactive and mark them as not having matched anything or ever
+               failed. */
+            for(mcnt = 0; mcnt < num_regs; mcnt++) {
+                self.regstart[mcnt] = self.regend[mcnt]
+                    = self.old_regstart[mcnt] = self.old_regend[mcnt]
+                    = self.best_regstart[mcnt] = self.best_regend[mcnt] = REG_UNSET_VALUE;
+                self.reg_info[mcnt].is_active = false;
+                self.reg_info[mcnt].matched_something = false;
+            }
+        }
+
+        public final void POP_FAILURE_COUNT() {
+            int ptr = stackb[--stackp];
+            int count = stackb[--stackp];
+            STORE_NUMBER(p, ptr, count);
+        }
+
+        public final void POP_FAILURE_POINT() {
+            long temp;
+            stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
+            temp = stackb[--stackp];	/* How many regs pushed.  */
+            temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
+            stackp -= temp; 		/* Remove the register info.  */
+            temp = stackb[--stackp];	/* How many counters pushed.  */
+            while(temp-- > 0) {
+                POP_FAILURE_COUNT();
+            }
+            num_failure_counts = 0;	/* Reset num_failure_counts.  */
+        }
+
+        public final void SET_REGS_MATCHED() {
+            for(int this_reg = 0; this_reg < num_regs; this_reg++) {
+                self.reg_info[this_reg].matched_something = self.reg_info[this_reg].is_active;
+            }
+        }
+
+        public final void PUSH_FAILURE_POINT(int pattern_place, int string_place) {
+            int last_used_reg, this_reg;
+
+            /* Find out how many registers are active or have been matched.
+               (Aside from register zero, which is only set at the end.) */
+            for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
+                if(self.regstart[last_used_reg]!=REG_UNSET_VALUE) {
+                    break;
+                }
+            }
+                        
+            if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
+                int[] stackx;
+                int xlen = stacke;
+                stackx = new int[2*xlen];
+                System.arraycopy(stackb,0,stackx,0,xlen);
+                stackb = stackx;
+                stacke = 2*xlen;
+            }
+            stackb[stackp++] = num_failure_counts;
+            num_failure_counts = 0;
+
+            /* Now push the info for each of those registers.  */
+            for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
+                stackb[stackp++] = self.regstart[this_reg];
+                stackb[stackp++] = self.regend[this_reg];
+                stackb[stackp++] = self.reg_info[this_reg].word;
+            }
+
+            /* Push how many registers we saved.  */
+            stackb[stackp++] = last_used_reg;
+                        
+            stackb[stackp++] = pattern_place;
+            stackb[stackp++] = string_place;
+            stackb[stackp++] = (int)optz; /* current option status */
+            stackb[stackp++] = 0; /* non-greedy flag */
+        }
+
+        public final boolean duplicate() {
+            int regno = p[pix++];   /* Get which register to match against */
+            int d2, dend2;
+
+            /* Check if there's corresponding group */
+            if(regno >= num_regs) {
+                return true;
+            }
+            /* Check if corresponding group is still open */
+            if(self.reg_info[regno].is_active) {
+                return true;
+            }
+
+            /* Where in input to try to start matching.  */
+            d2 = self.regstart[regno];
+            if(d2 == REG_UNSET_VALUE) {
+                return true;
+            }
+
+            /* Where to stop matching; if both the place to start and
+               the place to stop matching are in the same string, then
+               set to the place to stop, otherwise, for now have to use
+               the end of the first string.  */
+
+            dend2 = self.regend[regno];
+            if(dend2 == REG_UNSET_VALUE) {
+                return true;
+            }
+
+            for(;;) {
+                /* At end of register contents => success */
+                if(d2 == dend2) {
+                    break;
+                }
+
+                /* If necessary, advance to next segment in data.  */
+                if(d == dend) {return true;}
+
+                /* How many characters left in this segment to match.  */
+                mcnt = dend - d;
+
+                /* Want how many consecutive characters we can match in
+                   one shot, so, if necessary, adjust the count.  */
+                if(mcnt > dend2 - d2) {
+                    mcnt = dend2 - d2;
+                }
+
+                /* Compare that many; failure if mismatch, else move
+                   past them.  */
+                if(((self.options & RE_OPTION_IGNORECASE) != 0) ? self.memcmp_translate(string, d, d2, mcnt)!=0 : self.memcmp(string, d, d2, mcnt)!=0) {
+                    return true;
+                }
+                d += mcnt;
+                d2 += mcnt;
+            }
+            return false;
+        }
+
+        public final boolean is_in_list_sbc(int cx, char[] b, int bix) {
+            int size = b[bix++];
+            return cx/8 < size && (b[bix + cx/8]&(1<<cx%8)) != 0;
+        }
+  
+        public final boolean is_in_list_mbc(int cx, char[] b, int bix) {
+            int size = b[bix++];
+            bix+=size+2;
+            size = EXTRACT_UNSIGNED(b,bix-2);
+            if(size == 0) {
+                return false;
+            }
+            int i,j;
+            for(i=0,j=size;i<j;) {
+                int k = (i+j)>>1;
+                if(cx > EXTRACT_MBC(b,bix+k*8+4)) {
+                    i = k+1;
+                } else {
+                    j = k;
+                }
+            }
+            return i<size && EXTRACT_MBC(b,bix+i*8) <= cx;
+        }        
+
+        public final boolean is_in_list(int cx, char[] b, int bix) {
+            return is_in_list_sbc(cx, b, bix) || (ctx.current_mbctype!=0 ? is_in_list_mbc(cx, b, bix) : false);
+        }
+    }
+
+    /**
+     * @mri re_match_exec
+     */
+    public int match_exec(char[] string_arg, int size, int pos, int beg, Registers regs) {
+        MatchEnvironment w = new MatchEnvironment();
+        w.p = buffer;
+        w.p1=-1;
+        w.pend = used;
+        w.num_regs = re_nsub;
+        w.string = string_arg;
+        w.optz = (int)options;
+        w.self = this;
+        w.ctx = this.ctx;
+        w.pos = pos;
 
         if(regs != null) {
-            regs.init_regs(num_regs);
+            regs.init_regs(w.num_regs);
         }
 
-        /* Initialize the stack. */
-        stacka = new int[(num_regs*3 + 4)*160];
-        stackb = stacka;
-        stackp = 0;
-        stacke = stackb.length;
+        w.init_stack();
+        w.init_registers();
 
-        /* Initialize subexpression text positions to -1 to mark ones that no
-           ( or ( and ) or ) has been seen for. Also set all registers to
-           inactive and mark them as not having matched anything or ever
-           failed. */
-        for(mcnt = 0; mcnt < num_regs; mcnt++) {
-            regstart[mcnt] = regend[mcnt]
-                = old_regstart[mcnt] = old_regend[mcnt]
-                = best_regstart[mcnt] = best_regend[mcnt] = REG_UNSET_VALUE;
-            reg_info[mcnt].is_active = false;
-            reg_info[mcnt].matched_something = false;
-        }
 
         /* Set up pointers to ends of strings.
            Don't allow the second string to be empty unless both are empty.  */
@@ -2621,7 +2940,7 @@ public class Pattern {
            loop, `d' can be pointing at the end of a string, but it cannot
            equal string2.  */
 
-        d = pos; dend = size;
+        w.d = pos; w.dend = size;
 
         /* This loops over pattern commands.  It exits by returning from the
            function if match is complete, or it drops through if match fails
@@ -2631,67 +2950,55 @@ public class Pattern {
             mainLoop: for(;;) {
                 fail1: do {
                     /* End of pattern means we might have succeeded.  */
-                    if(pix == pend || gotoRestoreBestRegs) {
+                    if(w.pix == w.pend || gotoRestoreBestRegs) {
                         if(!gotoRestoreBestRegs) {
                             restore_best_regs: do {
                                 /* If not end of string, try backtracking.  Otherwise done.  */
-                                if((options&RE_OPTION_LONGEST)!=0 && d != dend) {
-                                    if(best_regs_set) {/* non-greedy, no need to backtrack */
+                                if((options&RE_OPTION_LONGEST)!=0 && w.d != w.dend) {
+                                    if(w.best_regs_set) {/* non-greedy, no need to backtrack */
                                         /* Restore best match.  */
-                                        d = best_regend[0];
+                                        w.d = best_regend[0];
 
-                                        for(mcnt = 0; mcnt < num_regs; mcnt++) {
-                                            regstart[mcnt] = best_regstart[mcnt];
-                                            regend[mcnt] = best_regend[mcnt];
+                                        for(w.mcnt = 0; w.mcnt < w.num_regs; w.mcnt++) {
+                                            regstart[w.mcnt] = best_regstart[w.mcnt];
+                                            regend[w.mcnt] = best_regend[w.mcnt];
                                         }
                                         break restore_best_regs;
                                     }
-                                    while(stackp != 0 && stackb[stackp-1] == NON_GREEDY) {
-                                        if(best_regs_set) {/* non-greedy, no need to backtrack */
-                                            d = best_regend[0];
+                                    while(w.stackp != 0 && w.stackb[w.stackp-1] == NON_GREEDY) {
+                                        if(w.best_regs_set) {/* non-greedy, no need to backtrack */
+                                            w.d = best_regend[0];
 
-                                            for(mcnt = 0; mcnt < num_regs; mcnt++) {
-                                                regstart[mcnt] = best_regstart[mcnt];
-                                                regend[mcnt] = best_regend[mcnt];
+                                            for(w.mcnt = 0; w.mcnt < w.num_regs; w.mcnt++) {
+                                                regstart[w.mcnt] = best_regstart[w.mcnt];
+                                                regend[w.mcnt] = best_regend[w.mcnt];
                                             }
                                             break restore_best_regs;
                                         }
-
-                                        long temp;
-                                        stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
-                                        temp = stackb[--stackp];	/* How many regs pushed.  */
-                                        temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
-                                        stackp -= temp; 		/* Remove the register info.  */
-                                        temp = stackb[--stackp];	/* How many counters pushed.  */
-                                        while(temp-- > 0) {
-                                            int ptr = stackb[--stackp];
-                                            int count = stackb[--stackp];
-                                            STORE_NUMBER(p, ptr, count);
-                                        }
-                                        num_failure_counts = 0;	/* Reset num_failure_counts.  */
+                                        w.POP_FAILURE_POINT();
                                     }
-                                    if(stackp != 0) {
+                                    if(w.stackp != 0) {
                                         /* More failure points to try.  */
 
                                         /* If exceeds best match so far, save it.  */
-                                        if(!best_regs_set || (d > best_regend[0])) {
-                                            best_regs_set = true;
-                                            best_regend[0] = d;	/* Never use regstart[0].  */
+                                        if(!w.best_regs_set || (w.d > best_regend[0])) {
+                                            w.best_regs_set = true;
+                                            best_regend[0] = w.d;	/* Never use regstart[0].  */
 
-                                            for(mcnt = 1; mcnt < num_regs; mcnt++) {
-                                                best_regstart[mcnt] = regstart[mcnt];
-                                                best_regend[mcnt] = regend[mcnt];
+                                            for(w.mcnt = 1; w.mcnt < w.num_regs; w.mcnt++) {
+                                                best_regstart[w.mcnt] = regstart[w.mcnt];
+                                                best_regend[w.mcnt] = regend[w.mcnt];
                                             }
                                         }
                                         break fail1;	       
                                     } /* If no failure points, don't restore garbage.  */
-                                    else if(best_regs_set) {
+                                    else if(w.best_regs_set) {
                                         /* Restore best match.  */
-                                        d = best_regend[0];
+                                        w.d = best_regend[0];
 
-                                        for(mcnt = 0; mcnt < num_regs; mcnt++) {
-                                            regstart[mcnt] = best_regstart[mcnt];
-                                            regend[mcnt] = best_regend[mcnt];
+                                        for(w.mcnt = 0; w.mcnt < w.num_regs; w.mcnt++) {
+                                            regstart[w.mcnt] = best_regstart[w.mcnt];
+                                            regend[w.mcnt] = best_regend[w.mcnt];
                                         }
                                     }
                                 }
@@ -2704,365 +3011,190 @@ public class Pattern {
                            to indices.  */
                         if(regs != null) {
                             regs.beg[0] = pos;
-                            regs.end[0] = d;
-                            for(mcnt = 1; mcnt < num_regs; mcnt++) {
-                                if(regend[mcnt] == REG_UNSET_VALUE) {
-                                    regs.beg[mcnt] = -1;
-                                    regs.end[mcnt] = -1;
+                            regs.end[0] = w.d;
+                            for(w.mcnt = 1; w.mcnt < w.num_regs; w.mcnt++) {
+                                if(regend[w.mcnt] == REG_UNSET_VALUE) {
+                                    regs.beg[w.mcnt] = -1;
+                                    regs.end[w.mcnt] = -1;
                                     continue;
                                 }
-                                regs.beg[mcnt] = regstart[mcnt];
-                                regs.end[mcnt] = regend[mcnt];
+                                regs.beg[w.mcnt] = regstart[w.mcnt];
+                                regs.end[w.mcnt] = regend[w.mcnt];
                             }
                         }
-                        return d - pos;
+                        return w.d - w.pos;
                     }
 
                     //                    System.err.println("--executing " + (int)p[pix] + " at " + pix);
-                    switch(p[pix++]) {
+                    switch(w.p[w.pix++]) {
                         /* ( [or `(', as appropriate] is represented by start_memory,
                            ) by stop_memory.  Both of those commands are followed by
                            a register number in the next byte.  The text matched
                            within the ( and ) is recorded under that number.  */
                     case start_memory:
-                        old_regstart[p[pix]] = regstart[p[pix]];
-                        regstart[p[pix]] = d;
-                        reg_info[p[pix]].is_active = true;
-                        reg_info[p[pix]].matched_something = false;
-                        pix += 2;
+                        old_regstart[w.p[w.pix]] = regstart[w.p[w.pix]];
+                        regstart[w.p[w.pix]] = w.d;
+                        reg_info[w.p[w.pix]].is_active = true;
+                        reg_info[w.p[w.pix]].matched_something = false;
+                        w.pix += 2;
                         continue mainLoop;
                     case stop_memory:
-                        old_regend[p[pix]] = regend[p[pix]];
-                        regend[p[pix]] = d;
-                        reg_info[p[pix]].is_active = false;
-                        pix += 2;
+                        old_regend[w.p[w.pix]] = regend[w.p[w.pix]];
+                        regend[w.p[w.pix]] = w.d;
+                        reg_info[w.p[w.pix]].is_active = false;
+                        w.pix += 2;
                         continue mainLoop;
                     case start_paren:
                     case stop_paren:
                         break;
                         /* \<digit> has been turned into a `duplicate' command which is
                            followed by the numeric value of <digit> as the register number.  */
-                    case duplicate: {
-                        int regno = p[pix++];   /* Get which register to match against */
-                        int d2, dend2;
-
-                        /* Check if there's corresponding group */
-                        if(regno >= num_regs) {
+                    case duplicate:
+                        if(w.duplicate()) {
                             break fail1;
                         }
-                        /* Check if corresponding group is still open */
-                        if(reg_info[regno].is_active) {
-                            break fail1;
-                        }
-
-                        /* Where in input to try to start matching.  */
-                        d2 = regstart[regno];
-                        if(d2 == REG_UNSET_VALUE) {
-                            break fail1;
-                        }
-
-                        /* Where to stop matching; if both the place to start and
-                           the place to stop matching are in the same string, then
-                           set to the place to stop, otherwise, for now have to use
-                           the end of the first string.  */
-
-                        dend2 = regend[regno];
-                        if(dend2 == REG_UNSET_VALUE) {
-                            break fail1;
-                        }
-
-                        for(;;) {
-                            /* At end of register contents => success */
-                            if(d2 == dend2) {
-                                break;
-                            }
-
-                            /* If necessary, advance to next segment in data.  */
-                            if(d == dend) {break fail1;}
-
-                            /* How many characters left in this segment to match.  */
-                            mcnt = dend - d;
-
-                            /* Want how many consecutive characters we can match in
-                               one shot, so, if necessary, adjust the count.  */
-                            if(mcnt > dend2 - d2) {
-                                mcnt = dend2 - d2;
-                            }
-
-                            /* Compare that many; failure if mismatch, else move
-                               past them.  */
-                            if(((options & RE_OPTION_IGNORECASE) != 0) ? memcmp_translate(string, d, d2, mcnt)!=0 : memcmp(string, d, d2, mcnt)!=0) {
-                                break fail1;
-                            }
-                            d += mcnt;
-                            d2 += mcnt;
-                        }
-                    }
                         break;
                     case start_nowidth:
-                        {
-                            int last_used_reg, this_reg;
-
-                            /* Find out how many registers are active or have been matched.
-                               (Aside from register zero, which is only set at the end.) */
-                            for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                    break;
-                                }
-                            }
-                        
-                            if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                int[] stackx;
-                                int xlen = stacke;
-                                stackx = new int[2*xlen];
-                                System.arraycopy(stackb,0,stackx,0,xlen);
-                                stackb = stackx;
-                                stacke = 2*xlen;
-                            }
-                            stackb[stackp++] = num_failure_counts;
-                            num_failure_counts = 0;
-
-                            /* Now push the info for each of those registers.  */
-                            for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                stackb[stackp++] = regstart[this_reg];
-                                stackb[stackp++] = regend[this_reg];
-                                stackb[stackp++] = reg_info[this_reg].word;
-                            }
-
-                            /* Push how many registers we saved.  */
-                            stackb[stackp++] = last_used_reg;
-                        
-                            stackb[stackp++] = -1;
-                            stackb[stackp++] = d;
-                            stackb[stackp++] = (int)optz; /* current option status */
-                            stackb[stackp++] = 0; /* non-greedy flag */
-                        }
-
-                        if(stackp > RE_DUP_MAX) {
+                        w.PUSH_FAILURE_POINT(-1,w.d);
+                        if(w.stackp > RE_DUP_MAX) {
                             return -2;
                         }
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix+=2;
-                        STORE_NUMBER(p, pix+mcnt, stackp);
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix+=2;
+                        STORE_NUMBER(w.p, w.pix+w.mcnt, w.stackp);
                         continue mainLoop;
                     case stop_nowidth:
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix+=2;
-                        stackp = mcnt;
-                        d = stackb[stackp-3];
-                        {
-                            long temp;
-                            stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
-                            temp = stackb[--stackp];	/* How many regs pushed.  */
-                            temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
-                            stackp -= temp; 		/* Remove the register info.  */
-                            temp = stackb[--stackp];	/* How many counters pushed.  */
-                            while(temp-- > 0) {
-                                int ptr = stackb[--stackp];
-                                int count = stackb[--stackp];
-                                STORE_NUMBER(p, ptr, count);
-                            }
-                            num_failure_counts = 0;	/* Reset num_failure_counts.  */
-                        }
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix+=2;
+                        w.stackp = w.mcnt;
+                        w.d = w.stackb[w.stackp-3];
+                        w.POP_FAILURE_POINT();
                         continue mainLoop;
                     case stop_backtrack:
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix+=2;
-                        stackp = mcnt;
-                        {
-                            long temp;
-                            stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
-                            temp = stackb[--stackp];	/* How many regs pushed.  */
-                            temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
-                            stackp -= temp; 		/* Remove the register info.  */
-                            temp = stackb[--stackp];	/* How many counters pushed.  */
-                            while(temp-- > 0) {
-                                int ptr = stackb[--stackp];
-                                int count = stackb[--stackp];
-                                STORE_NUMBER(p, ptr, count);
-                            }
-                            num_failure_counts = 0;	/* Reset num_failure_counts.  */
-                        }
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix+=2;
+                        w.stackp = w.mcnt;
+                        w.POP_FAILURE_POINT();
                         continue mainLoop;
                     case pop_and_fail:
-                        mcnt = EXTRACT_NUMBER(p, pix+1);
-                        stackp = mcnt;
-                        {
-                            long temp;
-                            stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
-                            temp = stackb[--stackp];	/* How many regs pushed.  */
-                            temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
-                            stackp -= temp; 		/* Remove the register info.  */
-                            temp = stackb[--stackp];	/* How many counters pushed.  */
-                            while(temp-- > 0) {
-                                int ptr = stackb[--stackp];
-                                int count = stackb[--stackp];
-                                STORE_NUMBER(p, ptr, count);
-                            }
-                            num_failure_counts = 0;	/* Reset num_failure_counts.  */
-                        }
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix+1);
+                        w.stackp = w.mcnt;
+                        w.POP_FAILURE_POINT();
                         break fail1;
                     case anychar:
-                        if(d == dend) {break fail1;}
+                        if(w.d == w.dend) {break fail1;}
 
-                        if(ismbchar(string[d],ctx)) {
-                            if(d + mbclen(string[d],ctx) > dend) {
+                        if(ismbchar(w.string[w.d],w.ctx)) {
+                            if(w.d + mbclen(w.string[w.d],w.ctx) > w.dend) {
                                 break fail1;
                             }
-                            for(int this_reg = 0; this_reg < num_regs; this_reg++) {
-                                reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
-                            }
-                            d += mbclen(string[d],ctx);
+                            w.SET_REGS_MATCHED();
+                            w.d += mbclen(w.string[w.d],w.ctx);
                             break;
                         }
-                        if((optz&RE_OPTION_MULTILINE)==0
-                           && (TRANSLATE_P() ? ctx.translate[string[d]] : string[d]) == '\n') {
+                        if((w.optz&RE_OPTION_MULTILINE)==0
+                           && (w.TRANSLATE_P() ? w.ctx.translate[w.string[w.d]] : w.string[w.d]) == '\n') {
                             break fail1;
                         }
-                        for(int this_reg = 0; this_reg < num_regs; this_reg++) {
-                            reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
-                        }
-                        d++;
+                        w.SET_REGS_MATCHED();
+                        w.d++;
                         break;
                     case anychar_repeat:
                         for (;;) {
-                            {
-                                int last_used_reg, this_reg;
-
-                                /* Find out how many registers are active or have been matched.
-                                   (Aside from register zero, which is only set at the end.) */
-                                for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                    if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                        break;
-                                    }
-                                }
-                        
-                                if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                    int[] stackx;
-                                    int xlen = stacke;
-                                    stackx = new int[2*xlen];
-                                    System.arraycopy(stackb,0,stackx,0,xlen);
-                                    stackb = stackx;
-                                    stacke = 2*xlen;
-                                }
-                                stackb[stackp++] = num_failure_counts;
-                                num_failure_counts = 0;
-
-                                /* Now push the info for each of those registers.  */
-                                for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                    stackb[stackp++] = regstart[this_reg];
-                                    stackb[stackp++] = regend[this_reg];
-                                    stackb[stackp++] = reg_info[this_reg].word;
-                                }
-
-                                /* Push how many registers we saved.  */
-                                stackb[stackp++] = last_used_reg;
-                        
-                                stackb[stackp++] = pix;
-                                stackb[stackp++] = d;
-                                stackb[stackp++] = (int)optz; /* current option status */
-                                stackb[stackp++] = 0; /* non-greedy flag */
-                            }
-
-                            if(d == dend) {break fail1;}
-                            if(ismbchar(string[d],ctx)) {
-                                if(d + mbclen(string[d],ctx) > dend) {
+                            w.PUSH_FAILURE_POINT(w.pix,w.d);
+                            if(w.d == w.dend) {break fail1;}
+                            if(ismbchar(w.string[w.d],w.ctx)) {
+                                if(w.d + mbclen(w.string[w.d],w.ctx) > w.dend) {
                                     break fail1;
                                 }
-                                for(int this_reg = 0; this_reg < num_regs; this_reg++) {
-                                    reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
-                                }
-                                d += mbclen(string[d],ctx);
+                                w.SET_REGS_MATCHED();
+                                w.d += mbclen(w.string[w.d],w.ctx);
                                 continue;
                             }
-                            if((optz&RE_OPTION_MULTILINE)==0 &&
-                               (TRANSLATE_P() ? ctx.translate[string[d]] : string[d]) == '\n') {
+                            if((w.optz&RE_OPTION_MULTILINE)==0 &&
+                               (w.TRANSLATE_P() ? w.ctx.translate[w.string[w.d]] : w.string[w.d]) == '\n') {
                                 break fail1;
                             }
-                            for(int this_reg = 0; this_reg < num_regs; this_reg++) {
-                                reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
-                            }
-                            d++;
+                            w.SET_REGS_MATCHED();
+                            w.d++;
                         }
 
                     case charset:
                     case charset_not: {
                         boolean not;	    /* Nonzero for charset_not.  */
                         boolean part = false;	    /* true if matched part of mbc */
-                        int dsave = d + 1;
+                        int dsave = w.d + 1;
                         int cc;
                     
-                        if(d == dend) {break fail1;}
+                        if(w.d == w.dend) {break fail1;}
 
-                        c = string[d++];
-                        if(ismbchar(c,ctx)) {
-                            if(d + mbclen(c,ctx) - 1 <= dend) {
-                                cc = c;
-                                c = MBC2WC(c, string, d);
-                                not = is_in_list_mbc(c, p, pix);
+                        w.c = w.string[w.d++];
+                        if(ismbchar(w.c,w.ctx)) {
+                            if(w.d + mbclen(w.c,w.ctx) - 1 <= w.dend) {
+                                cc = w.c;
+                                w.c = MBC2WC(w.c, w.string, w.d);
+                                not = w.is_in_list_mbc(w.c, w.p, w.pix);
                                 if(!not) {
-                                    part = not = is_in_list_sbc(cc, p, pix);
+                                    part = not = w.is_in_list_sbc(cc, w.p, w.pix);
                                 }
                             } else {
-                                not = is_in_list(c, p, pix);
+                                not = w.is_in_list(w.c, w.p, w.pix);
                             }
                         } else {
-                            if(TRANSLATE_P()) {
-                                c = ctx.translate[c];
+                            if(w.TRANSLATE_P()) {
+                                w.c = w.ctx.translate[w.c];
                             }
-                            not = is_in_list(c, p, pix);
+                            not = w.is_in_list(w.c, w.p, w.pix);
                         }
-                        if(p[pix-1] == charset_not) {
+                        if(w.p[w.pix-1] == charset_not) {
                             not = !not;
                         }
 
                         if(!not) {break fail1;}
                     
-                        pix += 1 + p[pix] + 2 + EXTRACT_UNSIGNED(p, pix + 1 + p[pix])*8;
-                        for(int this_reg = 0; this_reg < num_regs; this_reg++) {
-                            reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
-                        }
+                        w.pix += 1 + w.p[w.pix] + 2 + EXTRACT_UNSIGNED(w.p, w.pix + 1 + w.p[w.pix])*8;
+                        w.SET_REGS_MATCHED();
                     
                         if(part) {
-                            d = dsave;
+                            w.d = dsave;
                         }
                         continue mainLoop;
                     }
 
                     case begline:
-                        if(size == 0 || d == 0) {
+                        if(size == 0 || w.d == 0) {
                             continue mainLoop;
                         }
-                        if(string[d-1] == '\n' && d != dend) {
+                        if(w.string[w.d-1] == '\n' && w.d != w.dend) {
                             continue mainLoop;
                         }
                         break fail1;
                     case endline:
-                        if(d == dend) {
+                        if(w.d == w.dend) {
                             continue mainLoop;
-                        } else if(string[d] == '\n') {
+                        } else if(w.string[w.d] == '\n') {
                             continue mainLoop;
                         }
                         break fail1;
                         /* Match at the very beginning of the string. */
                     case begbuf:
-                        if(d==0) {
+                        if(w.d==0) {
                             continue mainLoop;
                         }
                         break fail1;
                         /* Match at the very end of the data. */
                     case endbuf:
-                        if(d == dend) {
+                        if(w.d == w.dend) {
                             continue mainLoop;
                         }
                         break fail1;
                         /* Match at the very end of the data. */
                     case endbuf2:
-                        if(d == dend) {
+                        if(w.d == w.dend) {
                             continue mainLoop;
                         }
                         /* .. or newline just before the end of the data. */
-                        if(string[d] == '\n' && d+1 == dend) {
+                        if(w.string[w.d] == '\n' && w.d+1 == w.dend) {
                             continue mainLoop;
                         }
                         break fail1;
@@ -3084,62 +3216,24 @@ public class Pattern {
                     
                         /* Match at the starting position. */
                     case begpos:
-                        if(d == beg) {
+                        if(w.d == beg) {
                             continue mainLoop;
                         }
                         break fail1;
 
                     case on_failure_jump:
                         //                on_failure:
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix+=2;
-
-                        {
-                            int last_used_reg, this_reg;
-
-                            /* Find out how many registers are active or have been matched.
-                               (Aside from register zero, which is only set at the end.) */
-                            for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                    break;
-                                }
-                            }
-                        
-                            if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                int[] stackx;
-                                int xlen = stacke;
-                                stackx = new int[2*xlen];
-                                System.arraycopy(stackb,0,stackx,0,xlen);
-                                stackb = stackx;
-                                stacke = 2*xlen;
-                            }
-                            stackb[stackp++] = num_failure_counts;
-                            num_failure_counts = 0;
-
-                            /* Now push the info for each of those registers.  */
-                            for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                stackb[stackp++] = regstart[this_reg];
-                                stackb[stackp++] = regend[this_reg];
-                                stackb[stackp++] = reg_info[this_reg].word;
-                            }
-
-                            /* Push how many registers we saved.  */
-                            stackb[stackp++] = last_used_reg;
-                        
-                            stackb[stackp++] = pix + mcnt;
-                            stackb[stackp++] = d;
-                            stackb[stackp++] = (int)optz; /* current option status */
-                            stackb[stackp++] = 0; /* non-greedy flag */
-                        }
-
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix+=2;
+                        w.PUSH_FAILURE_POINT(w.pix+w.mcnt,w.d);
                         continue mainLoop;
 
                         /* The end of a smart repeat has a maybe_finalize_jump back.
                            Change it either to a finalize_jump or an ordinary jump.  */
                     case maybe_finalize_jump:
-                        mcnt = EXTRACT_NUMBER(p,pix);
-                        pix+=2;
-                        p1 = pix;
+                        w.mcnt = EXTRACT_NUMBER(w.p,w.pix);
+                        w.pix+=2;
+                        w.p1 = w.pix;
 
                         /* Compare the beginning of the repeat with what in the
                            pattern follows its end. If we can establish that there
@@ -3155,52 +3249,52 @@ public class Pattern {
                            failure point which is what we will end up popping.  */
 
                         /* Skip over open/close-group commands.  */
-                        while(p1 + 2 < pend) {
-                            if(p[p1] == stop_memory ||
-                               p[p1] == start_memory) {
-                                p1 += 3;	/* Skip over args, too.  */
-                            } else if(p[p1] == stop_paren) {
-                                p1 += 1;
+                        while(w.p1 + 2 < w.pend) {
+                            if(w.p[w.p1] == stop_memory ||
+                               w.p[w.p1] == start_memory) {
+                                w.p1 += 3;	/* Skip over args, too.  */
+                            } else if(w.p[w.p1] == stop_paren) {
+                                w.p1 += 1;
                             } else {
                                 break;
                             }
                         }
-                        if(p1 == pend) {
-                            p[pix-3] = finalize_jump;
-                        } else if(p[p1] == exactn || p[p1] == endline) {
-                            c = p[p1] == endline ? '\n' : p[p1+2];
-                            int p2 = pix+mcnt;
+                        if(w.p1 == w.pend) {
+                            w.p[w.pix-3] = finalize_jump;
+                        } else if(w.p[w.p1] == exactn || w.p[w.p1] == endline) {
+                            w.c = w.p[w.p1] == endline ? '\n' : w.p[w.p1+2];
+                            int p2 = w.pix+w.mcnt;
                             /* p2[0] ... p2[2] are an on_failure_jump.
                                Examine what follows that.  */
-                            if(p[p2+3] == exactn && p[p2+5] != c) {
-                                p[pix-3] = finalize_jump;
-                            } else if(p[p2+3] == charset ||
-                                      p[p2+3] == charset_not) {
+                            if(w.p[p2+3] == exactn && w.p[p2+5] != w.c) {
+                                w.p[w.pix-3] = finalize_jump;
+                            } else if(w.p[p2+3] == charset ||
+                                      w.p[p2+3] == charset_not) {
                                 boolean not;
-                                if(ismbchar(c,ctx)) {
-                                    int pp = p1+3;
-                                    c = MBC2WC(c, p, pp);
+                                if(ismbchar(w.c,w.ctx)) {
+                                    int pp = w.p1+3;
+                                    w.c = MBC2WC(w.c, w.p, pp);
                                 }
                                 /* `is_in_list()' is TRUE if c would match */
                                 /* That means it is not safe to finalize.  */
-                                not = is_in_list(c, p, p2 + 4);
-                                if(p[p2+3] == charset_not) {
+                                not = w.is_in_list(w.c, w.p, p2 + 4);
+                                if(w.p[p2+3] == charset_not) {
                                     not = !not;
                                 }
                                 if(!not) {
-                                    p[pix-3] = finalize_jump;
+                                    w.p[w.pix-3] = finalize_jump;
                                 }
                             }
                         }
-                        pix -= 2;		/* Point at relative address again.  */
-                        if(p[pix-1] != finalize_jump) {
-                            p[pix-1] = jump;	
-                            mcnt = EXTRACT_NUMBER(p, pix);
-                            pix += 2;
-                            if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                        w.pix -= 2;		/* Point at relative address again.  */
+                        if(w.p[w.pix-1] != finalize_jump) {
+                            w.p[w.pix-1] = jump;	
+                            w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                            w.pix += 2;
+                            if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
                                 break fail1;
                             }
-                            pix += mcnt;
+                            w.pix += w.mcnt;
                             continue mainLoop;
                         }
                         /* Note fall through.  */
@@ -3214,38 +3308,12 @@ public class Pattern {
                            put on by the on_failure_jump.  */
 
                     case finalize_jump:
-                        if(stackp > 2 && stackb[stackp-3] == d) {
-                            pix = stackb[stackp-4];
-                            {
-                                long temp;
-                                stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
-                                temp = stackb[--stackp];	/* How many regs pushed.  */
-                                temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
-                                stackp -= temp; 		/* Remove the register info.  */
-                                temp = stackb[--stackp];	/* How many counters pushed.  */
-                                while(temp-- > 0) {
-                                    int ptr = stackb[--stackp];
-                                    int count = stackb[--stackp];
-                                    STORE_NUMBER(p, ptr, count);
-                                }
-                                num_failure_counts = 0;	/* Reset num_failure_counts.  */
-                            }
+                        if(w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {
+                            w.pix = w.stackb[w.stackp-4];
+                            w.POP_FAILURE_POINT();
                             continue mainLoop;
                         }
-                        if(stackp > NUM_NONREG_ITEMS+1) {
-                            long temp;
-                            stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
-                            temp = stackb[--stackp];	/* How many regs pushed.  */
-                            temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
-                            stackp -= temp; 		/* Remove the register info.  */
-                            temp = stackb[--stackp];	/* How many counters pushed.  */
-                            while(temp-- > 0) {
-                                int ptr = stackb[--stackp];
-                                int count = stackb[--stackp];
-                                STORE_NUMBER(p, ptr, count);
-                            }
-                            num_failure_counts = 0;	/* Reset num_failure_counts.  */
-                        }
+                        w.POP_FAILURE_POINT();
                         /* Note fall through.  */
 
                         /* We need this opcode so we can detect where alternatives end
@@ -3255,12 +3323,12 @@ public class Pattern {
                         /* Jump without taking off any failure points.  */
                     case jump:
                         //      nofinalize:
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix += 2;
-                        if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix += 2;
+                        if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
                             break fail1;
                         }
-                        pix += mcnt;
+                        w.pix += w.mcnt;
                         continue mainLoop;
                     case dummy_failure_jump:
                         /* Normally, the on_failure_jump pushes a failure point, which
@@ -3268,50 +3336,13 @@ public class Pattern {
                            finalize_jump, also, and with a pattern of, say, `a+', we
                            are skipping over the on_failure_jump, so we have to push
                            something meaningless for finalize_jump to pop.  */
-                        {
-                            int last_used_reg, this_reg;
-
-                            /* Find out how many registers are active or have been matched.
-                               (Aside from register zero, which is only set at the end.) */
-                            for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                    break;
-                                }
-                            }
-                        
-                            if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                int[] stackx;
-                                int xlen = stacke;
-                                stackx = new int[2*xlen];
-                                System.arraycopy(stackb,0,stackx,0,xlen);
-                                stackb = stackx;
-                                stacke = 2*xlen;
-                            }
-                            stackb[stackp++] = num_failure_counts;
-                            num_failure_counts = 0;
-
-                            /* Now push the info for each of those registers.  */
-                            for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                stackb[stackp++] = regstart[this_reg];
-                                stackb[stackp++] = regend[this_reg];
-                                stackb[stackp++] = reg_info[this_reg].word;
-                            }
-
-                            /* Push how many registers we saved.  */
-                            stackb[stackp++] = last_used_reg;
-                        
-                            stackb[stackp++] = -1;
-                            stackb[stackp++] = 0;
-                            stackb[stackp++] = (int)optz; /* current option status */
-                            stackb[stackp++] = 0; /* non-greedy flag */
-                        }
-
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix += 2;
-                        if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                        w.PUSH_FAILURE_POINT(-1,0);
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix += 2;
+                        if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
                             break fail1;
                         }
-                        pix += mcnt;
+                        w.pix += w.mcnt;
                         continue mainLoop;
 
                         /* At the end of an alternative, we need to push a dummy failure
@@ -3322,387 +3353,146 @@ public class Pattern {
                     case push_dummy_failure:
                         /* See comments just above at `dummy_failure_jump' about the
                            two zeroes.  */
-                        p1 = pix;
+                        w.p1 = w.pix;
                         /* Skip over open/close-group commands.  */
-                        while(p1 + 2 < pend) {
-                            if(p[p1] == stop_memory ||
-                               p[p1] == start_memory) {
-                                p1 += 3;	/* Skip over args, too.  */
-                            } else if(p[p1] == stop_paren) {
-                                p1 += 1;
+                        while(w.p1 + 2 < w.pend) {
+                            if(w.p[w.p1] == stop_memory ||
+                               w.p[w.p1] == start_memory) {
+                                w.p1 += 3;	/* Skip over args, too.  */
+                            } else if(w.p[w.p1] == stop_paren) {
+                                w.p1 += 1;
                             } else {
                                 break;
                             }
                         }
-                        if(p1 < pend && p[p1] == jump) {
-                            p[pix-1] = unused;
+                        if(w.p1 < w.pend && w.p[w.p1] == jump) {
+                            w.p[w.pix-1] = unused;
                         } else {
-                            {
-                                int last_used_reg, this_reg;
-
-                                /* Find out how many registers are active or have been matched.
-                                   (Aside from register zero, which is only set at the end.) */
-                                for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                    if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                        break;
-                                    }
-                                }
-                        
-                                if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                    int[] stackx;
-                                    int xlen = stacke;
-                                    stackx = new int[2*xlen];
-                                    System.arraycopy(stackb,0,stackx,0,xlen);
-                                    stackb = stackx;
-                                    stacke = 2*xlen;
-                                }
-                                stackb[stackp++] = num_failure_counts;
-                                num_failure_counts = 0;
-
-                                /* Now push the info for each of those registers.  */
-                                for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                    stackb[stackp++] = regstart[this_reg];
-                                    stackb[stackp++] = regend[this_reg];
-                                    stackb[stackp++] = reg_info[this_reg].word;
-                                }
-
-                                /* Push how many registers we saved.  */
-                                stackb[stackp++] = last_used_reg;
-                        
-                                stackb[stackp++] = -1;
-                                stackb[stackp++] = 0;
-                                stackb[stackp++] = (int)optz; /* current option status */
-                                stackb[stackp++] = 0; /* non-greedy flag */
-                            }
+                            w.PUSH_FAILURE_POINT(-1,0);
                         }
                         continue mainLoop;
 
                         /* Have to succeed matching what follows at least n times.  Then
                            just handle like an on_failure_jump.  */
                     case succeed_n: 
-                        mcnt = EXTRACT_NUMBER(p, pix + 2);
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix + 2);
                         /* Originally, this is how many times we HAVE to succeed.  */
-                        if(mcnt != 0) {
-                            mcnt--;
-                            pix += 2;
+                        if(w.mcnt != 0) {
+                            w.mcnt--;
+                            w.pix += 2;
 
-                            c = (char)EXTRACT_NUMBER(p, pix);
-                            if(stacke - stackp <= NUM_COUNT_ITEMS) {
+                            w.c = (char)EXTRACT_NUMBER(w.p, w.pix);
+                            if(w.stacke - w.stackp <= NUM_COUNT_ITEMS) {
                                 int[] stackx;
-                                int xlen = stacke;
+                                int xlen = w.stacke;
                                 stackx = new int[2*xlen];
-                                System.arraycopy(stackb,0,stackx,0,xlen);
-                                stackb = stackx;
-                                stacke = 2*xlen;
+                                System.arraycopy(w.stackb,0,stackx,0,xlen);
+                                w.stackb = stackx;
+                                w.stacke = 2*xlen;
                             }
-                            stackb[stackp++] = c;
-                            stackb[stackp++] = pix;
-                            num_failure_counts++;
+                            w.stackb[w.stackp++] = w.c;
+                            w.stackb[w.stackp++] = w.pix;
+                            w.num_failure_counts++;
 
-                            STORE_NUMBER(p, pix, mcnt);
-                            pix+=2;
+                            STORE_NUMBER(w.p, w.pix, w.mcnt);
+                            w.pix+=2;
 
-                            {
-                                int last_used_reg, this_reg;
-
-                                /* Find out how many registers are active or have been matched.
-                                   (Aside from register zero, which is only set at the end.) */
-                                for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                    if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                        break;
-                                    }
-                                }
-                        
-                                if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                    int[] stackx;
-                                    int xlen = stacke;
-                                    stackx = new int[2*xlen];
-                                    System.arraycopy(stackb,0,stackx,0,xlen);
-                                    stackb = stackx;
-                                    stacke = 2*xlen;
-                                }
-                                stackb[stackp++] = num_failure_counts;
-                                num_failure_counts = 0;
-
-                                /* Now push the info for each of those registers.  */
-                                for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                    stackb[stackp++] = regstart[this_reg];
-                                    stackb[stackp++] = regend[this_reg];
-                                    stackb[stackp++] = reg_info[this_reg].word;
-                                }
-
-                                /* Push how many registers we saved.  */
-                                stackb[stackp++] = last_used_reg;
-                        
-                                stackb[stackp++] = -1;
-                                stackb[stackp++] = 0;
-                                stackb[stackp++] = (int)optz; /* current option status */
-                                stackb[stackp++] = 0; /* non-greedy flag */
-                            }
+                            w.PUSH_FAILURE_POINT(-1,0);
                         } else  {
-                            mcnt = EXTRACT_NUMBER(p, pix);
-                            pix+=2;
-                            {
-                                int last_used_reg, this_reg;
-
-                                /* Find out how many registers are active or have been matched.
-                                   (Aside from register zero, which is only set at the end.) */
-                                for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                    if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                        break;
-                                    }
-                                }
-                        
-                                if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                    int[] stackx;
-                                    int xlen = stacke;
-                                    stackx = new int[2*xlen];
-                                    System.arraycopy(stackb,0,stackx,0,xlen);
-                                    stackb = stackx;
-                                    stacke = 2*xlen;
-                                }
-                                stackb[stackp++] = num_failure_counts;
-                                num_failure_counts = 0;
-
-                                /* Now push the info for each of those registers.  */
-                                for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                    stackb[stackp++] = regstart[this_reg];
-                                    stackb[stackp++] = regend[this_reg];
-                                    stackb[stackp++] = reg_info[this_reg].word;
-                                }
-
-                                /* Push how many registers we saved.  */
-                                stackb[stackp++] = last_used_reg;
-                        
-                                stackb[stackp++] = pix+mcnt;
-                                stackb[stackp++] = d;
-                                stackb[stackp++] = (int)optz; /* current option status */
-                                stackb[stackp++] = 0; /* non-greedy flag */
-                            }
+                            w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                            w.pix+=2;
+                            w.PUSH_FAILURE_POINT(w.pix+w.mcnt,w.d);
                         }
                         continue mainLoop;
 
                     case jump_n:
-                        mcnt = EXTRACT_NUMBER(p, pix + 2);
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix + 2);
                         /* Originally, this is how many times we CAN jump.  */
-                        if(mcnt!=0) {
-                            mcnt--;
+                        if(w.mcnt!=0) {
+                            w.mcnt--;
 
-                            c = (char)EXTRACT_NUMBER(p, pix+2);
-                            if(stacke - stackp <= NUM_COUNT_ITEMS) {
+                            w.c = (char)EXTRACT_NUMBER(w.p, w.pix+2);
+                            if(w.stacke - w.stackp <= NUM_COUNT_ITEMS) {
                                 int[] stackx;
-                                int xlen = stacke;
+                                int xlen = w.stacke;
                                 stackx = new int[2*xlen];
-                                System.arraycopy(stackb,0,stackx,0,xlen);
-                                stackb = stackx;
-                                stacke = 2*xlen;
+                                System.arraycopy(w.stackb,0,stackx,0,xlen);
+                                w.stackb = stackx;
+                                w.stacke = 2*xlen;
                             }
-                            stackb[stackp++] = c;
-                            stackb[stackp++] = pix+2;
-                            num_failure_counts++;
-                            STORE_NUMBER(p, pix + 2, mcnt);
-                            mcnt = EXTRACT_NUMBER(p, pix);
+                            w.stackb[w.stackp++] = w.c;
+                            w.stackb[w.stackp++] = w.pix+2;
+                            w.num_failure_counts++;
+                            STORE_NUMBER(w.p, w.pix + 2, w.mcnt);
+                            w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
                             //                            System.err.println("jump_n ix: " + mcnt);
-                            pix += 2;
-                            if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                            w.pix += 2;
+                            if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
                                 break fail1;
                             }
-                            pix += mcnt;
+                            w.pix += w.mcnt;
                             continue mainLoop;
                         }
                         /* If don't have to jump any more, skip over the rest of command.  */
                         else {
-                            pix += 4;
+                            w.pix += 4;
                         }
                         continue mainLoop;
                     case set_number_at:
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix+=2;
-                        p1 = pix + mcnt;
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix+=2;
-                        STORE_NUMBER(p, p1, mcnt);
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix+=2;
+                        w.p1 = w.pix + w.mcnt;
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix+=2;
+                        STORE_NUMBER(w.p, w.p1, w.mcnt);
                         continue mainLoop;
                     case try_next:
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix += 2;
-                        if(pix + mcnt < pend) {
-                            {
-                                int last_used_reg, this_reg;
-
-                                /* Find out how many registers are active or have been matched.
-                                   (Aside from register zero, which is only set at the end.) */
-                                for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                    if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                        break;
-                                    }
-                                }
-                        
-                                if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                    int[] stackx;
-                                    int xlen = stacke;
-                                    stackx = new int[2*xlen];
-                                    System.arraycopy(stackb,0,stackx,0,xlen);
-                                    stackb = stackx;
-                                    stacke = 2*xlen;
-                                }
-                                stackb[stackp++] = num_failure_counts;
-                                num_failure_counts = 0;
-
-                                /* Now push the info for each of those registers.  */
-                                for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                    stackb[stackp++] = regstart[this_reg];
-                                    stackb[stackp++] = regend[this_reg];
-                                    stackb[stackp++] = reg_info[this_reg].word;
-                                }
-
-                                /* Push how many registers we saved.  */
-                                stackb[stackp++] = last_used_reg;
-                        
-                                stackb[stackp++] = pix;
-                                stackb[stackp++] = d;
-                                stackb[stackp++] = (int)optz; /* current option status */
-                                stackb[stackp++] = 0; /* non-greedy flag */
-                            }
-                            stackb[stackp-1] = NON_GREEDY;
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix += 2;
+                        if(w.pix + w.mcnt < w.pend) {
+                            w.PUSH_FAILURE_POINT(w.pix,w.d);
+                            w.stackb[w.stackp-1] = NON_GREEDY;
                         }
-                        pix += mcnt;
+                        w.pix += w.mcnt;
                         continue mainLoop;
                     case finalize_push:
-                        {
-                            long temp;
-                            stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
-                            temp = stackb[--stackp];	/* How many regs pushed.  */
-                            temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
-                            stackp -= temp; 		/* Remove the register info.  */
-                            temp = stackb[--stackp];	/* How many counters pushed.  */
-                            while(temp-- > 0) {
-                                int ptr = stackb[--stackp];
-                                int count = stackb[--stackp];
-                                STORE_NUMBER(p, ptr, count);
-                            }
-                            num_failure_counts = 0;	/* Reset num_failure_counts.  */
-                        }
-                        mcnt = EXTRACT_NUMBER(p, pix);
-                        pix+=2;
-                        if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) { /* avoid infinite loop */
+                        w.POP_FAILURE_POINT();
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                        w.pix+=2;
+                        if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) { /* avoid infinite loop */
                             break fail1;
                         }
-                        {
-                            int last_used_reg, this_reg;
-
-                            /* Find out how many registers are active or have been matched.
-                               (Aside from register zero, which is only set at the end.) */
-                            for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                    break;
-                                }
-                            }
-                        
-                            if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                int[] stackx;
-                                int xlen = stacke;
-                                stackx = new int[2*xlen];
-                                System.arraycopy(stackb,0,stackx,0,xlen);
-                                stackb = stackx;
-                                stacke = 2*xlen;
-                            }
-                            stackb[stackp++] = num_failure_counts;
-                            num_failure_counts = 0;
-
-                            /* Now push the info for each of those registers.  */
-                            for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                stackb[stackp++] = regstart[this_reg];
-                                stackb[stackp++] = regend[this_reg];
-                                stackb[stackp++] = reg_info[this_reg].word;
-                            }
-
-                            /* Push how many registers we saved.  */
-                            stackb[stackp++] = last_used_reg;
-                        
-                            stackb[stackp++] = pix+mcnt;
-                            stackb[stackp++] = d;
-                            stackb[stackp++] = (int)optz; /* current option status */
-                            stackb[stackp++] = 0; /* non-greedy flag */
-                        }
-                        stackb[stackp-1] = NON_GREEDY;
+                        w.PUSH_FAILURE_POINT(w.pix+w.mcnt,w.d);
+                        w.stackb[w.stackp-1] = NON_GREEDY;
                         continue mainLoop;
                     case finalize_push_n:
-                        mcnt = EXTRACT_NUMBER(p, pix + 2); 
+                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix + 2); 
                         /* Originally, this is how many times we CAN jump.  */
-                        if(mcnt>0) {
+                        if(w.mcnt>0) {
                             int posx, i;
-                            mcnt--;
-                            STORE_NUMBER(p, pix + 2, mcnt);
-                            posx = EXTRACT_NUMBER(p, pix);
-                            i = EXTRACT_NUMBER(p,pix+posx+5);
+                            w.mcnt--;
+                            STORE_NUMBER(w.p, w.pix + 2, w.mcnt);
+                            posx = EXTRACT_NUMBER(w.p, w.pix);
+                            i = EXTRACT_NUMBER(w.p,w.pix+posx+5);
                             if(i > 0) {
-                                mcnt = EXTRACT_NUMBER(p, pix);
-                                pix += 2;
-                                if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                                w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
+                                w.pix += 2;
+                                if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
                                     break fail1;
                                 }
-                                pix += mcnt;
+                                w.pix += w.mcnt;
                                 continue mainLoop;
                             }
-                            {
-                                long temp;
-                                stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
-                                temp = stackb[--stackp];	/* How many regs pushed.  */
-                                temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
-                                stackp -= temp; 		/* Remove the register info.  */
-                                temp = stackb[--stackp];	/* How many counters pushed.  */
-                                while(temp-- > 0) {
-                                    int ptr = stackb[--stackp];
-                                    int count = stackb[--stackp];
-                                    STORE_NUMBER(p, ptr, count);
-                                }
-                                num_failure_counts = 0;	/* Reset num_failure_counts.  */
-                            }
-                            mcnt = EXTRACT_NUMBER(p,pix);
-                            pix+=2;
-                            {
-                                int last_used_reg, this_reg;
-
-                                /* Find out how many registers are active or have been matched.
-                                   (Aside from register zero, which is only set at the end.) */
-                                for(last_used_reg = num_regs-1; last_used_reg > 0; last_used_reg--) {
-                                    if(regstart[last_used_reg]!=REG_UNSET_VALUE) {
-                                        break;
-                                    }
-                                }
-                        
-                                if(stacke - stackp <= (last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                    int[] stackx;
-                                    int xlen = stacke;
-                                    stackx = new int[2*xlen];
-                                    System.arraycopy(stackb,0,stackx,0,xlen);
-                                    stackb = stackx;
-                                    stacke = 2*xlen;
-                                }
-                                stackb[stackp++] = num_failure_counts;
-                                num_failure_counts = 0;
-
-                                /* Now push the info for each of those registers.  */
-                                for(this_reg = 1; this_reg <= last_used_reg; this_reg++) {
-                                    stackb[stackp++] = regstart[this_reg];
-                                    stackb[stackp++] = regend[this_reg];
-                                    stackb[stackp++] = reg_info[this_reg].word;
-                                }
-
-                                /* Push how many registers we saved.  */
-                                stackb[stackp++] = last_used_reg;
-                        
-                                stackb[stackp++] = pix+mcnt;
-                                stackb[stackp++] = d;
-                                stackb[stackp++] = (int)optz; /* current option status */
-                                stackb[stackp++] = NON_GREEDY;
-                            }
-                            pix += 2;		/* skip n */
+                            w.POP_FAILURE_POINT();
+                            w.mcnt = EXTRACT_NUMBER(w.p,w.pix);
+                            w.pix+=2;
+                            w.PUSH_FAILURE_POINT(w.pix+w.mcnt,w.d);
+                            w.stackb[w.stackp-1] = NON_GREEDY;
+                            w.pix += 2;		/* skip n */
                         }
                         /* If don't have to push any more, skip over the rest of command.  */
                         else {
-                            pix += 4;
+                            w.pix += 4;
                         }
                         continue mainLoop;
                         /* Ignore these.  Used to ignore the n of succeed_n's which
@@ -3710,142 +3500,136 @@ public class Pattern {
                     case unused:
                         continue mainLoop;
                     case casefold_on:
-                        optz |= RE_OPTION_IGNORECASE;
+                        w.optz |= RE_OPTION_IGNORECASE;
                         continue mainLoop;
                     case casefold_off:
-                        optz &= ~RE_OPTION_IGNORECASE;
+                        w.optz &= ~RE_OPTION_IGNORECASE;
                         continue mainLoop;
                     case option_set:
-                        optz = p[pix++];
+                        w.optz = w.p[w.pix++];
                         continue mainLoop;
                     case wordbound:
-                        if(d == 0) {
-                            if(d == dend) {break fail1;}
-                            if(IS_A_LETTER(string,d,dend)) {
+                        if(w.d == 0) {
+                            if(w.d == w.dend) {break fail1;}
+                            if(IS_A_LETTER(w.string,w.d,w.dend)) {
                                 continue mainLoop;
                             } else {
                                 break fail1;
                             }
                         }
-                        if(d == dend) {
-                            if(PREV_IS_A_LETTER(string,d,dend)) {
+                        if(w.d == w.dend) {
+                            if(PREV_IS_A_LETTER(w.string,w.d,w.dend)) {
                                 continue mainLoop;
                             } else {
                                 break fail1;
                             }
                         }
-                        if(PREV_IS_A_LETTER(string,d,dend) != IS_A_LETTER(string,d,dend)) {
+                        if(PREV_IS_A_LETTER(w.string,w.d,w.dend) != IS_A_LETTER(w.string,w.d,w.dend)) {
                             continue mainLoop;
                         }
                         break fail1;
                     case notwordbound:
-                        if(d==0) {
-                            if(IS_A_LETTER(string, d, dend)) {
+                        if(w.d==0) {
+                            if(IS_A_LETTER(w.string, w.d, w.dend)) {
                                 break fail1;
                             } else {
                                 continue mainLoop;
                             }
                         }
-                        if(d == dend) {
-                            if(PREV_IS_A_LETTER(string, d, dend)) {
+                        if(w.d == w.dend) {
+                            if(PREV_IS_A_LETTER(w.string, w.d, w.dend)) {
                                 break fail1;
                             } else {
                                 continue mainLoop;
                             }
                         }
-                        if(PREV_IS_A_LETTER(string, d, dend) != IS_A_LETTER(string, d, dend)) {
+                        if(PREV_IS_A_LETTER(w.string, w.d, w.dend) != IS_A_LETTER(w.string, w.d, w.dend)) {
                             break fail1;
                         }
                         continue mainLoop;
                     case wordbeg:
-                        if(IS_A_LETTER(string, d, dend) && (d==0 || !PREV_IS_A_LETTER(string,d,dend))) {
+                        if(IS_A_LETTER(w.string, w.d, w.dend) && (w.d==0 || !PREV_IS_A_LETTER(w.string,w.d,w.dend))) {
                             continue mainLoop;
                         }
                         break fail1;
                     case wordend:
-                        if(d!=0 && PREV_IS_A_LETTER(string, d, dend)
-                           && (!IS_A_LETTER(string, d, dend) || d == dend)) {
+                        if(w.d!=0 && PREV_IS_A_LETTER(w.string, w.d, w.dend)
+                           && (!IS_A_LETTER(w.string, w.d, w.dend) || w.d == w.dend)) {
                             continue mainLoop;
                         }
                         break fail1;
                     case wordchar:
-                        if(d == dend) {break fail1;}
-                        if(!IS_A_LETTER(string,d,dend)) {
+                        if(w.d == w.dend) {break fail1;}
+                        if(!IS_A_LETTER(w.string,w.d,w.dend)) {
                             break fail1;
                         }
-                        if(ismbchar(string[d],ctx) && d + mbclen(string[d],ctx) - 1 < dend) {
-                            d += mbclen(string[d],ctx) - 1;
+                        if(ismbchar(w.string[w.d],w.ctx) && w.d + mbclen(w.string[w.d],w.ctx) - 1 < w.dend) {
+                            w.d += mbclen(w.string[w.d],w.ctx) - 1;
                         }
-                        d++;
-                        for(int this_reg = 0; this_reg < num_regs; this_reg++) {
-                            reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
-                        }
+                        w.d++;
+                        w.SET_REGS_MATCHED();
                         continue mainLoop;
                     case notwordchar:
-                        if(d == dend) {break fail1;}
-                        if(IS_A_LETTER(string, d, dend)) {
+                        if(w.d == w.dend) {break fail1;}
+                        if(IS_A_LETTER(w.string, w.d, w.dend)) {
                             break fail1;
                         }
-                        if(ismbchar(string[d],ctx) && d + mbclen(string[d],ctx) - 1 < dend) {
-                            d += mbclen(string[d],ctx) - 1;
+                        if(ismbchar(w.string[w.d],w.ctx) && w.d + mbclen(w.string[w.d],w.ctx) - 1 < w.dend) {
+                            w.d += mbclen(w.string[w.d],w.ctx) - 1;
                         }
-                        d++;
-                        for(int this_reg = 0; this_reg < num_regs; this_reg++) {
-                            reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
-                        }
+                        w.d++;
+                        w.SET_REGS_MATCHED();
                         continue mainLoop;
                     case exactn:
                         /* Match the next few pattern characters exactly.
                            mcnt is how many characters to match.  */
-                        mcnt = p[pix++];
+                        w.mcnt = w.p[w.pix++];
                         /* This is written out as an if-else so we don't waste time
                            testing `translate' inside the loop.  */
-                        if(TRANSLATE_P()) {
+                        if(w.TRANSLATE_P()) {
                             do {
-                                if(d == dend) {break fail1;}
-                                if(p[pix] == 0xff) {
-                                    pix++;  
-                                    if(--mcnt==0
-                                       || d == dend
-                                       || string[d++] != p[pix++]) {
+                                if(w.d == w.dend) {break fail1;}
+                                if(w.p[w.pix] == 0xff) {
+                                    w.pix++;  
+                                    if(--w.mcnt==0
+                                       || w.d == w.dend
+                                       || w.string[w.d++] != w.p[w.pix++]) {
                                         break fail1;
                                     }
                                     continue;
                                 }
-                                c = string[d++];
-                                if(ismbchar(c,ctx)) {
+                                w.c = w.string[w.d++];
+                                if(ismbchar(w.c,w.ctx)) {
                                     int n;
-                                    if(c != p[pix++]) {
+                                    if(w.c != w.p[w.pix++]) {
                                         break fail1;
                                     }
-                                    for(n = mbclen(c,ctx) - 1; n > 0; n--) {
-                                        if(--mcnt==0
-                                           || d == dend
-                                           || string[d++] != p[pix++]) {
+                                    for(n = mbclen(w.c,w.ctx) - 1; n > 0; n--) {
+                                        if(--w.mcnt==0
+                                           || w.d == w.dend
+                                           || w.string[w.d++] != w.p[w.pix++]) {
                                             break fail1;
                                         }
                                         continue;
                                     }
                                     /* compiled code translation needed for ruby */
-                                    if(ctx.translate[c] != ctx.translate[p[pix++]]) {
+                                    if(w.ctx.translate[w.c] != w.ctx.translate[w.p[w.pix++]]) {
                                         break fail1;
                                     }
                                 }
-                            } while(--mcnt > 0);
+                            } while(--w.mcnt > 0);
                         } else {
                             do {
-                                if(d == dend) {break fail1;}
-                                if(p[pix] == 0xff) {
-                                    pix++; mcnt--;
+                                if(w.d == w.dend) {break fail1;}
+                                if(w.p[w.pix] == 0xff) {
+                                    w.pix++; w.mcnt--;
                                 }
-                                if(string[d++] != p[pix++]) {
+                                if(w.string[w.d++] != w.p[w.pix++]) {
                                     break fail1;
                                 }
-                            } while(--mcnt > 0);
+                            } while(--w.mcnt > 0);
                         }
-                        for(int this_reg = 0; this_reg < num_regs; this_reg++) {
-                            reg_info[this_reg].matched_something = reg_info[this_reg].is_active;
-                        }
+                        w.SET_REGS_MATCHED();
                         continue mainLoop;
                     }
 
@@ -3853,38 +3637,25 @@ public class Pattern {
                 } while(false);
                 //fail:
                 fail2: do {
-                    if(stackp != 0) {
+                    if(w.stackp != 0) {
                         /* A restart point is known.  Restart there and pop it. */
                         int last_used_reg, this_reg;
 
                         /* If this failure point is from a dummy_failure_point, just
                            skip it.  */
-                        if(stackb[stackp-4] == -1 || (best_regs_set && stackb[stackp-1] == NON_GREEDY)) {
-                            {
-                                long temp;
-                                stackp -= NUM_NONREG_ITEMS;	/* Remove failure points (and flag). */
-                                temp = stackb[--stackp];	/* How many regs pushed.  */
-                                temp *= NUM_REG_ITEMS;	/* How much to take off the stack.  */
-                                stackp -= temp; 		/* Remove the register info.  */
-                                temp = stackb[--stackp];	/* How many counters pushed.  */
-                                while(temp-- > 0) {
-                                    int ptr = stackb[--stackp];
-                                    int count = stackb[--stackp];
-                                    STORE_NUMBER(p, ptr, count);
-                                }
-                                num_failure_counts = 0;	/* Reset num_failure_counts.  */
-                            }
+                        if(w.stackb[w.stackp-4] == -1 || (w.best_regs_set && w.stackb[w.stackp-1] == NON_GREEDY)) {
+                            w.POP_FAILURE_POINT();
                             continue fail2;
                         }
-                        stackp--;		/* discard greedy flag */
-                        optz = stackb[--stackp];
-                        d = stackb[--stackp];
-                        pix = stackb[--stackp];
+                        w.stackp--;		/* discard greedy flag */
+                        w.optz = w.stackb[--w.stackp];
+                        w.d = w.stackb[--w.stackp];
+                        w.pix = w.stackb[--w.stackp];
                         /* Restore register info.  */
-                        last_used_reg = stackb[--stackp];
+                        last_used_reg = w.stackb[--w.stackp];
 
                         /* Make the ones that weren't saved -1 or 0 again. */
-                        for(this_reg = num_regs - 1; this_reg > last_used_reg; this_reg--) {
+                        for(this_reg = w.num_regs - 1; this_reg > last_used_reg; this_reg--) {
                             regend[this_reg] = REG_UNSET_VALUE;
                             regstart[this_reg] = REG_UNSET_VALUE;
                             reg_info[this_reg].is_active = false;
@@ -3893,24 +3664,24 @@ public class Pattern {
 
                         /* And restore the rest from the stack.  */
                         for( ; this_reg > 0; this_reg--) {
-                            reg_info[this_reg].word = (char)stackb[--stackp];
-                            regend[this_reg] = stackb[--stackp];
-                            regstart[this_reg] = stackb[--stackp];
+                            reg_info[this_reg].word = (char)w.stackb[--w.stackp];
+                            regend[this_reg] = w.stackb[--w.stackp];
+                            regstart[this_reg] = w.stackb[--w.stackp];
                         }
-                        mcnt = stackb[--stackp];
-                        while(mcnt-->0) {
-                            int ptr = stackb[--stackp];
-                            int count = stackb[--stackp];
-                            STORE_NUMBER(p, ptr, count);
+                        w.mcnt = w.stackb[--w.stackp];
+                        while(w.mcnt-->0) {
+                            int ptr = w.stackb[--w.stackp];
+                            int count = w.stackb[--w.stackp];
+                            STORE_NUMBER(w.p, ptr, count);
                         }
-                        if(pix < pend) {
+                        if(w.pix < w.pend) {
                             int is_a_jump_n = 0;
                             int failed_paren = 0;
 
-                            p1 = pix;
+                            w.p1 = w.pix;
                             /* If failed to a backwards jump that's part of a repetition
                                loop, need to pop this failure point and use the next one.  */
-                            switch(p[p1]) {
+                            switch(w.p[w.p1]) {
                             case jump_n:
                             case finalize_push_n:
                                 is_a_jump_n = 1;
@@ -3918,56 +3689,22 @@ public class Pattern {
                             case finalize_jump:
                             case finalize_push:
                             case jump:
-                                p1++;
-                                mcnt = EXTRACT_NUMBER(p,p1);
-                                p1+=2;
-                                if(mcnt >= 0) {
+                                w.p1++;
+                                w.mcnt = EXTRACT_NUMBER(w.p,w.p1);
+                                w.p1+=2;
+                                if(w.mcnt >= 0) {
                                     break;	/* should be backward jump */
                                 }
-                                p1 += mcnt;
-                                if((is_a_jump_n!=0 && p[p1] == succeed_n) ||
-                                   (is_a_jump_n==0 && p[p1] == on_failure_jump)) {
+                                w.p1 += w.mcnt;
+                                if((is_a_jump_n!=0 && w.p[w.p1] == succeed_n) ||
+                                   (is_a_jump_n==0 && w.p[w.p1] == on_failure_jump)) {
                                     if(failed_paren!=0) {
-                                        p1++;
-                                        mcnt = EXTRACT_NUMBER(p, p1);
-                                        p1+=2;
-                                        {
-                                            int _last_used_reg, _this_reg;
+                                        w.p1++;
+                                        w.mcnt = EXTRACT_NUMBER(w.p, w.p1);
+                                        w.p1+=2;
 
-                                            /* Find out how many registers are active or have been matched.
-                                               (Aside from register zero, which is only set at the end.) */
-                                            for(_last_used_reg = num_regs-1; _last_used_reg > 0; _last_used_reg--) {
-                                                if(regstart[_last_used_reg]!=REG_UNSET_VALUE) {
-                                                    break;
-                                                }
-                                            }
-                        
-                                            if(stacke - stackp <= (_last_used_reg * NUM_REG_ITEMS + NUM_NONREG_ITEMS + 1)) {
-                                                int[] stackx;
-                                                int xlen = stacke;
-                                                stackx = new int[2*xlen];
-                                                System.arraycopy(stackb,0,stackx,0,xlen);
-                                                stackb = stackx;
-                                                stacke = 2*xlen;
-                                            }
-                                            stackb[stackp++] = num_failure_counts;
-                                            num_failure_counts = 0;
-
-                                            /* Now push the info for each of those registers.  */
-                                            for(_this_reg = 1; _this_reg <= _last_used_reg; _this_reg++) {
-                                                stackb[stackp++] = regstart[_this_reg];
-                                                stackb[stackp++] = regend[_this_reg];
-                                                stackb[stackp++] = reg_info[_this_reg].word;
-                                            }
-
-                                            /* Push how many registers we saved.  */
-                                            stackb[stackp++] = _last_used_reg;
-                        
-                                            stackb[stackp++] = p1+mcnt;
-                                            stackb[stackp++] = d;
-                                            stackb[stackp++] = (int)optz; /* current option status */
-                                            stackb[stackp++] = NON_GREEDY;
-                                        }
+                                        w.PUSH_FAILURE_POINT(w.p1+w.mcnt,w.d);
+                                        w.stackb[w.stackp-1] = NON_GREEDY;
                                     }
                                     continue fail2;
                                 }
@@ -3984,13 +3721,13 @@ public class Pattern {
                 } while(true);
             }        
 
-            if(best_regs_set) {
+            if(w.best_regs_set) {
                 gotoRestoreBestRegs=true;
-                d = best_regend[0];
+                w.d = best_regend[0];
 
-                for(mcnt = 0; mcnt < num_regs; mcnt++) {
-                    regstart[mcnt] = best_regstart[mcnt];
-                    regend[mcnt] = best_regend[mcnt];
+                for(w.mcnt = 0; w.mcnt < w.num_regs; w.mcnt++) {
+                    regstart[w.mcnt] = best_regstart[w.mcnt];
+                    regend[w.mcnt] = best_regend[w.mcnt];
                 }
                 continue restore_best_regs2;
             }
@@ -4005,7 +3742,7 @@ public class Pattern {
      */
     public boolean slow_match(char[] little, int littleix, int lend, char[] big, int bigix, int bend, char[] translate) {
         while(littleix < lend && bigix < bend) {
-            c = little[littleix++];
+            char c = little[littleix++];
             if(c == 0xff) {
                 c = little[littleix++];
             }
@@ -4024,7 +3761,7 @@ public class Pattern {
         int bend = bigix+blen;
         boolean fescape = false;
 
-        c = little[littleix];
+        char c = little[littleix];
 
         if(c == 0xff) {
             c = little[littleix+1];
@@ -4111,14 +3848,18 @@ public class Pattern {
         return -1;
     }
 
+    public final boolean TRANSLATE_P(long optz) {
+        return ((optz&RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null);
+    }
+
     /**
      * @mri re_compile_fastmap
      */
     private final void compile_fastmap() {
         int size = used;
-        p = buffer;
-        pix = 0;
-        pend = size;
+        char[] p = buffer;
+        int pix = 0;
+        int pend = size;
         int j,k;
         int is_a_succeed_n;
         
@@ -4126,7 +3867,7 @@ public class Pattern {
         int[] stackb = stacka;
         int stackp = 0;
         int stacke = 160;
-        optz = options;
+        long optz = options;
 
         Arrays.fill(fastmap, 0, 256, (char)0);
 
@@ -4142,13 +3883,13 @@ public class Pattern {
             switch(p[pix++]) {
             case exactn:
                 if(p[pix+1] == 0xff) {
-                    if(TRANSLATE_P()) {
+                    if(TRANSLATE_P(optz)) {
                         fastmap[ctx.translate[p[pix+2]]] = 2;
                     } else {
                         fastmap[p[pix+2]] = 2;
                     }
                     options |= RE_OPTIMIZE_BMATCH;
-                } else if(TRANSLATE_P()) {
+                } else if(TRANSLATE_P(optz)) {
                     fastmap[ctx.translate[p[pix+1]]] = 1;
                 } else {
                     fastmap[p[pix+1]] = 1;
@@ -4179,7 +3920,7 @@ public class Pattern {
                 options = p[pix++];
                 continue;
             case endline:
-                if(TRANSLATE_P()) {
+                if(TRANSLATE_P(optz)) {
                     fastmap[ctx.translate['\n']] = 1;
                 } else {
                     fastmap['\n'] = 1;
@@ -4340,7 +4081,7 @@ public class Pattern {
              multi-byte char.  See set_list_bits().  */
           for(j = p[pix++] * 8 - 1; j >= 0; j--) {
               if((p[pix + j / 8] & (1 << (j % 8))) != 0) {
-                  int tmp = TRANSLATE_P()?ctx.translate[j]:j;
+                  int tmp = TRANSLATE_P(optz)?ctx.translate[j]:j;
                   fastmap[tmp] = 1;
               }
           }
@@ -4567,7 +4308,7 @@ public class Pattern {
         3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 0, 0,
     };
 
-    public static void main(String[] args) throws Exception {
+    public static void tmain4(String[] args) throws Exception {
         char[] ccc = args[1].toCharArray();
         Registers reg = new Registers();
         System.out.println(Pattern.compile(args[0]).search(ccc,ccc.length,0,ccc.length,reg));
@@ -4580,7 +4321,7 @@ public class Pattern {
         Pattern.compile(args[0]);
     }
 
-    public static void tmain2(String[] args) throws Exception {
+    public static void main(String[] args) throws Exception {
         System.err.println("Speed test");
         java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(args[0]));
         java.util.List strings = new java.util.ArrayList();
@@ -4590,7 +4331,7 @@ public class Pattern {
         }
         reader.close();
         String[] sss = (String[])strings.toArray(new String[0]);
-        int times = 10;
+        int times = 1000;
 
         long b1 = System.currentTimeMillis();
 
