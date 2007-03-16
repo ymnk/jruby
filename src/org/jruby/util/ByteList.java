@@ -95,8 +95,9 @@ public class ByteList implements Comparable, CharSequence, Serializable {
     }
 
     public void delete(int start, int len) {
+        len = Math.min(len, realSize-start);
         realSize-=len;
-        System.arraycopy(bytes,start+len,bytes,start,realSize);
+        System.arraycopy(bytes,start+len,bytes,start,realSize-start);
     }
 
     public void append(byte b) {
@@ -132,6 +133,21 @@ public class ByteList implements Comparable, CharSequence, Serializable {
     public void append(byte[] moreBytes, int start, int len) {
         grow(len);
         System.arraycopy(moreBytes, start, bytes, realSize, len);
+        realSize += len;
+    }
+
+    public void insert(ByteList moreBytes, int at) {
+        insert(moreBytes.bytes,0,moreBytes.realSize,at);
+    }
+
+    public void insert(ByteList moreBytes, int start, int len, int at) {
+        insert(moreBytes.bytes,start,len,at);
+    }
+
+    public void insert(byte[] moreBytes, int start, int len, int at) {
+        grow(len);
+        System.arraycopy(bytes,at,bytes,at+len,Math.min(len,realSize-at));
+        System.arraycopy(moreBytes,start,bytes,at,len);
         realSize += len;
     }
 
@@ -276,12 +292,12 @@ public class ByteList implements Comparable, CharSequence, Serializable {
         return new ByteList(bytes, 0, realSize);
     }
 
-    private void grow(int increaseRequested) {
+    public void grow(int increaseRequested) {
         if (increaseRequested < 0) {
             return;
         }
         int newSize = realSize + increaseRequested;
-        if (bytes.length < newSize) {
+        while (bytes.length < newSize) {
             byte[] newBytes = new byte[(int) (newSize * FACTOR)];
             System.arraycopy(bytes,0,newBytes,0,realSize);
             bytes = newBytes;
@@ -339,7 +355,7 @@ public class ByteList implements Comparable, CharSequence, Serializable {
 
     public char[] toCharArray() {
         char[] chars = new char[realSize];
-        for (int i = 0; i < bytes.length; i++) {
+        for (int i = 0; i < realSize; i++) {
             chars[i] = (char) (bytes[i] & 0xFF);
         }
         return chars;

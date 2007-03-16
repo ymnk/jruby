@@ -60,15 +60,19 @@ public class RubyMatchData extends RubyObject {
         /*
         matchDataClass.defineFastMethod("captures", callbackFactory.getFastMethod("captures"));
         matchDataClass.defineFastMethod("inspect", callbackFactory.getFastMethod("inspect"));
+        */
         matchDataClass.defineFastMethod("size", callbackFactory.getFastMethod("size"));
         matchDataClass.defineFastMethod("length", callbackFactory.getFastMethod("size"));
-        matchDataClass.defineFastMethod("offset", callbackFactory.getFastMethod("offset", RubyFixnum.class));
+        matchDataClass.defineFastMethod("offset", callbackFactory.getFastMethod("offset", RubyKernel.IRUBY_OBJECT));
+        /*
         matchDataClass.defineFastMethod("begin", callbackFactory.getFastMethod("begin", RubyFixnum.class));
         matchDataClass.defineFastMethod("end", callbackFactory.getFastMethod("end", RubyFixnum.class));
         matchDataClass.defineFastMethod("to_a", callbackFactory.getFastMethod("to_a"));
         matchDataClass.defineFastMethod("[]", callbackFactory.getFastOptMethod("aref"));
+        */
         matchDataClass.defineFastMethod("pre_match", callbackFactory.getFastMethod("pre_match"));
         matchDataClass.defineFastMethod("post_match", callbackFactory.getFastMethod("post_match"));
+        /*
         matchDataClass.defineFastMethod("to_s", callbackFactory.getFastMethod("to_s"));
         matchDataClass.defineFastMethod("string", callbackFactory.getFastMethod("string"));
         */
@@ -76,5 +80,55 @@ public class RubyMatchData extends RubyObject {
 
         return matchDataClass;
     }
-   
+
+    /** match_size
+     *
+     */
+    public IRubyObject size() {
+        return getRuntime().newFixnum(regs.num_regs);
+    }
+
+    /** match_offset
+     *
+     */
+    public IRubyObject offset(IRubyObject index) {
+        int i = RubyNumeric.num2int(index);
+
+        if(i < 0 || regs.num_regs <= i) {
+            throw getRuntime().newIndexError("index " + i + " out of matches");
+        }
+
+        if(regs.beg[i] < 0) {
+            return getRuntime().newArray(getRuntime().getNil(),getRuntime().getNil());
+        }
+        return getRuntime().newArray(getRuntime().newFixnum(regs.beg[i]),getRuntime().newFixnum(regs.end[i]));
+    }
+
+    /** match_pre_match
+     *
+     */
+    public IRubyObject pre_match() {
+        if(regs.beg[0] == -1) {
+            return getRuntime().getNil();
+        }
+        RubyString str_ = RubyString.newString(getRuntime(),new String(str,0,regs.beg[0]));
+        if(isTaint()) {
+            str_.taint();
+        }
+        return str_;
+    }
+
+    /** match_post_match
+     *
+     */
+    public IRubyObject post_match() {
+        if(regs.beg[0] == -1) {
+            return getRuntime().getNil();
+        }
+        RubyString str_ = RubyString.newString(getRuntime(),new String(str,regs.end[0],str.length-regs.end[0]));
+        if(isTaint()) {
+            str_.taint();
+        }
+        return str_;
+    }
 }

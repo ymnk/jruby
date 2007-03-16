@@ -106,5 +106,12 @@ public class KCode {
     public int flags() {
         return 0;
     }
+
+    public String name() {
+        if(kcode != null) {
+            return kcode.toLowerCase();
+        }
+        return null;
+    }
 }
 	

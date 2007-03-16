@@ -379,7 +379,7 @@ public class Pattern {
 
         /* Address of beginning of regexp, or inside of last (.  */
 
-        int begalt = -1;
+        int begalt = 0;
 
         /* Place in the uncompiled pattern (i.e., the {) to
            which to go back if the interval is invalid.  */
@@ -425,7 +425,6 @@ public class Pattern {
             allocated = INIT_BUF_SIZE;
             /* EXTEND_BUFFER loses when allocated is 0.  */
             buffer = new char[INIT_BUF_SIZE];
-            begalt = 0;
             b = buffer;
         }
 
@@ -1432,7 +1431,7 @@ public class Pattern {
                             b[bix++] = charset_not;
                         }
                         b[bix++] = 32;
-                        Arrays.fill(b,bix,34,(char)0);
+                        Arrays.fill(b,bix,bix+34,(char)0);
                         if(c == 's' || c == 'S') {
                             SET_LIST_BIT(' ');
                             SET_LIST_BIT('\t');
