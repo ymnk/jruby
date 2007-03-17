@@ -68,6 +68,7 @@ test_globals
 test_hash
 #test_openssl
 test_primitive_to_java
+test_regexp
 test_string_printf
 test_symbol
 test_thread

@@ -82,6 +82,10 @@ public class RubyMatchData extends RubyObject {
         return matchDataClass;
     }
 
+    public IRubyObject inspect() {
+        return anyToString();
+    }
+
     private IRubyObject match_array(int start) {
         List ary = new ArrayList();
         boolean taint = isTaint();

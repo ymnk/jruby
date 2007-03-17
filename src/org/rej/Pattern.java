@@ -825,8 +825,8 @@ public class Pattern {
                 }
                 had_char_class = 0;
 
-                if(c == '-' && ((pix != p0 + 1 && p[pix] != ']') ||
-                                  (p[pix] == '-' && p[pix+1] != ']') ||
+                if(c == '-' && ((pix != p0 + 1 && pix < pend && p[pix] != ']') ||
+                                  (pix+2<pend && p[pix] == '-' && p[pix+1] != ']') ||
                                   range>0)) {
                     self.re_warning("character class has `-' without escape");
                 }
@@ -911,7 +911,7 @@ public class Pattern {
                 /* Get a range.  */
                 if(range > 0) {
                     charset_range();
-                } else if(p[pix] == '-' && p[pix+1] != ']') {
+                } else if(pix+2<pend && p[pix] == '-' && p[pix+1] != ']') {
                     last = c;
                     PATFETCH_RAW_c1();
                     range = 1;
@@ -1722,7 +1722,7 @@ public class Pattern {
                 int i;
                 int len = self.buffer[self.must];
 
-                for(i=1; i<len; i++) {
+                for(i=1; i<len && i < len; i++) {
                     if(self.buffer[self.must+i] == 0xff ||
                        (ctx.current_mbctype!=0 && ismbchar(self.buffer[self.must+i],ctx))) {
                         self.options |= RE_OPTIMIZE_NO_BM;
@@ -2122,7 +2122,7 @@ public class Pattern {
                 break;
             case casefold_on:
             case casefold_off:
-                return 0;		/* should not check must_string */
+                return -1;		/* should not check must_string */
             case pop_and_fail:
             case anychar:
             case anychar_repeat:
@@ -2717,8 +2717,8 @@ public class Pattern {
                             }
                         }
                     }
-
-                } while(false);
+                    break advance;
+                } while(true);
 
                 //advance:
 
@@ -2753,8 +2753,8 @@ public class Pattern {
                     }
                 }
             }
-        } while(false);
-
+            break begbuf_match;
+        } while(true);
         return -1;
     }
 
@@ -3175,7 +3175,7 @@ public class Pattern {
                         return w.d - w.pos;
                     }
 
-                    //                    System.err.println("--executing " + (int)p[pix] + " at " + pix);
+                    //System.err.println("--executing " + (int)w.p[w.pix] + " at " + w.pix);
                     switch(w.p[w.pix++]) {
                         /* ( [or `(', as appropriate] is represented by start_memory,
                            ) by stop_memory.  Both of those commands are followed by
@@ -3760,12 +3760,12 @@ public class Pattern {
                                            || w.string[w.d++] != w.p[w.pix++]) {
                                             break fail1;
                                         }
-                                        continue;
                                     }
-                                    /* compiled code translation needed for ruby */
-                                    if(w.ctx.translate[w.c] != w.ctx.translate[w.p[w.pix++]]) {
-                                        break fail1;
-                                    }
+                                    continue;
+                                }
+                                /* compiled code translation needed for ruby */
+                                if(w.ctx.translate[w.c] != w.ctx.translate[w.p[w.pix++]]) {
+                                    break fail1;
                                 }
                             } while(--w.mcnt > 0);
                         } else {
