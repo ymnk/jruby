@@ -264,7 +264,7 @@ public class EvaluationState {
                 case '~':
                     return backref;
                 case '&':
-                    return RubyRegexp.last_match_s(backref, new IRubyObject[0]);
+                    return RubyRegexp.last_match_s(backref, new IRubyObject[]{runtime.newFixnum(0)});
                 case '`':
                     return RubyRegexp.match_pre(backref);
                 case '\'':
