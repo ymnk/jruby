@@ -1715,6 +1715,12 @@ public class RubyString extends RubyObject {
      */
     public IRubyObject aref(IRubyObject[] args) {
         if(checkArgumentCount(args, 1, 2) == 2) {
+            if(args[0] instanceof RubyRegexp) {
+                if(((RubyRegexp)args[0]).search(this,0,false) >= 0) {
+                    return RubyRegexp.nth_match(RubyNumeric.fix2int(args[1]), getRuntime().getCurrentContext().getBackref());
+                }
+                return getRuntime().getNil();
+            }
             return substr(RubyNumeric.fix2int(args[0]), RubyNumeric.fix2int(args[1]));
         } else if(args[0] instanceof RubyRegexp) {
             if(((RubyRegexp)args[0]).search(this,0,false) >= 0) {
@@ -2158,8 +2164,8 @@ public class RubyString extends RubyObject {
             result.add(tmp);
         }
         if(limit.isNil() && lim == 0) {
-            while(result.size() > 0 && ((RubyString)result.get(0)).value.realSize == 0) {
-                result.remove(0);
+            while(result.size() > 0 && ((RubyString)result.get(result.size()-1)).value.realSize == 0) {
+                result.remove(result.size()-1);
             }
         }
         return getRuntime().newArray(result);

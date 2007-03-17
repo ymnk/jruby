@@ -2777,6 +2777,7 @@ public class Pattern {
             if(s[s1++] != ss[s2++]) {
                 return 1;
             }
+            len--;
         }
         return 0;
     }
@@ -2790,6 +2791,7 @@ public class Pattern {
             if(s[s1++] != ss[s2++]) {
                 return 1;
             }
+            len--;
         }
         return 0;
     }

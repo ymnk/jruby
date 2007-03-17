@@ -1044,4 +1044,16 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             return recv.callMethod(recv.getRuntime().getCurrentContext(),"new",_args);
         }
     }
+
+    public static RubyRegexp unmarshalFrom(UnmarshalStream input) throws java.io.IOException {
+        RubyRegexp result = newRegexp(input.getRuntime(), 
+                                      RubyString.byteListToString(input.unmarshalString()), input.unmarshalInt(), null);
+        input.registerLinkTarget(result);
+        return result;
+    }
+
+    public static void marshalTo(RubyRegexp regexp, MarshalStream output) throws java.io.IOException {
+        output.writeString(new String(regexp.str,0,regexp.len));
+        output.writeInt(((int)regexp.ptr.options) & EMBEDDABLE);
+    }
 }

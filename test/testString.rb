@@ -511,6 +511,5 @@ class FooStr < String
 end
 
 f = FooStr.new("AAAA")
-
 test_equal("AAAA", [f].join(','))
 

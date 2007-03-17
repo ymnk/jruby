@@ -230,6 +230,7 @@ public class RubyMatchData extends RubyObject {
     public IRubyObject string() {
         if(_str == null) {
             _str = RubyString.newString(getRuntime(),ByteList.plain(str));
+            _str.setFrozen(true);
         }
         return _str;
     }
