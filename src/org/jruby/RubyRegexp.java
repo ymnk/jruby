@@ -101,33 +101,24 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         regexpClass.defineConstant("MULTILINE", runtime.newFixnum(Pattern.RE_OPTION_MULTILINE));
 
         regexpClass.defineFastMethod("initialize", callbackFactory.getFastOptMethod("initialize_m"));
-        /*
         regexpClass.defineFastMethod("initialize_copy", callbackFactory.getFastMethod("initialize_copy",RubyKernel.IRUBY_OBJECT));
         regexpClass.defineFastMethod("hash", callbackFactory.getFastMethod("hash"));
         regexpClass.defineFastMethod("eql?", callbackFactory.getFastMethod("equal", RubyKernel.IRUBY_OBJECT));
         regexpClass.defineFastMethod("==", callbackFactory.getFastMethod("equal", RubyKernel.IRUBY_OBJECT));
-        */
         regexpClass.defineFastMethod("=~", callbackFactory.getFastMethod("match", RubyKernel.IRUBY_OBJECT));
         regexpClass.defineFastMethod("match", callbackFactory.getFastMethod("match_m", RubyKernel.IRUBY_OBJECT));
         regexpClass.defineFastMethod("===", callbackFactory.getFastMethod("eqq", RubyKernel.IRUBY_OBJECT));
         regexpClass.defineFastMethod("~", callbackFactory.getFastMethod("match2"));
-        /*
         regexpClass.defineFastMethod("to_s", callbackFactory.getFastMethod("to_s"));
         regexpClass.defineFastMethod("inspect", callbackFactory.getFastMethod("inspect"));
-        */
         regexpClass.defineFastMethod("source", callbackFactory.getFastMethod("source"));
         regexpClass.defineFastMethod("casefold?", callbackFactory.getFastMethod("casefold_p"));
         regexpClass.defineFastMethod("kcode", callbackFactory.getFastMethod("kcode"));
-        /*
-        regexpClass.getMetaClass().defineFastMethod("new", callbackFactory.getFastOptSingletonMethod("newInstance"));
-        regexpClass.getMetaClass().defineFastMethod("compile", callbackFactory.getFastOptSingletonMethod("newInstance"));
-        */
+        regexpClass.getMetaClass().defineAlias("compile","new");
         regexpClass.getMetaClass().defineFastMethod("quote", callbackFactory.getFastOptSingletonMethod("quote"));
         regexpClass.getMetaClass().defineFastMethod("escape", callbackFactory.getFastOptSingletonMethod("quote"));
         regexpClass.getMetaClass().defineFastMethod("last_match", callbackFactory.getFastOptSingletonMethod("last_match_s"));
-        /*
         regexpClass.getMetaClass().defineFastMethod("union", callbackFactory.getFastOptSingletonMethod("union"));
-        */
         return regexpClass;
     }
 
@@ -158,6 +149,49 @@ public class RubyRegexp extends RubyObject implements ReOptions {
 
     public Pattern getPattern() {
         return ptr;
+    }
+
+    public RubyFixnum hash() {
+        rb_reg_check(this);
+        int hashval = (int)ptr.options;
+        int len = this.len;
+        int p = 0;
+        while(len-->0) {
+            hashval = hashval * 33 + str[p++];
+        }
+        hashval = hashval + (hashval>>5);
+        return getRuntime().newFixnum(hashval);
+    }
+    
+    private final static boolean memcmp(char[] s1, char[] s2, int len) {
+        int x = 0;
+        while(len-->0) {
+            if(s1[x] != s2[x]) {
+                return false;
+            }
+            x++;
+        }
+        return true;
+    }
+
+    public IRubyObject equal(IRubyObject other) {
+        if(this == other) {
+            return getRuntime().getTrue();
+        }
+        if(!(other instanceof RubyRegexp)) {
+            return getRuntime().getFalse();
+        }
+        rb_reg_check(this);
+        rb_reg_check((RubyRegexp)other);
+        if(len != ((RubyRegexp)other).len) {
+            return getRuntime().getFalse();
+        }
+        if(memcmp(str,((RubyRegexp)other).str, len) &&
+           kcode == ((RubyRegexp)other).kcode &&
+           ptr.options == ((RubyRegexp)other).ptr.options) {
+            return getRuntime().getTrue();
+        }
+        return getRuntime().getFalse();
     }
 
     public IRubyObject match2() {
@@ -302,6 +336,48 @@ public class RubyRegexp extends RubyObject implements ReOptions {
 
     private final void rb_reg_raise(char[] s, int len, String err) {
         throw getRuntime().newRegexpError(err + ": " + rb_reg_desc(s,len));
+    }
+
+    /** rb_reg_init_copy
+     */
+    public IRubyObject initialize_copy(IRubyObject re) {
+        if(this == re) {
+            return this;
+        }
+        checkFrozen();
+
+        if(getMetaClass().getRealClass() != re.getMetaClass().getRealClass()) {
+            throw getRuntime().newTypeError("wrong argument type");
+	    }
+
+        rb_reg_check(re);
+
+        initialize(((RubyRegexp)re).str, ((RubyRegexp)re).len, ((RubyRegexp)re).rb_reg_options());
+        return this;
+    }
+
+    private int rb_reg_get_kcode() {
+        if(kcode == KCode.NONE) {
+            return 16;
+        } else if(kcode == KCode.EUC) {
+            return 32;
+        } else if(kcode == KCode.SJIS) {
+            return 48;
+        } else if(kcode == KCode.UTF8) {
+            return 64;
+        }
+        return 0;
+    }
+
+    /** rb_reg_options
+     */
+    private int rb_reg_options() {
+        rb_reg_check(this);
+        int options = (int)(ptr.options & (RE_OPTION_IGNORECASE|RE_OPTION_MULTILINE|RE_OPTION_EXTENDED));
+        if(!kcode_default) {
+            options |= rb_reg_get_kcode();
+        }
+        return options;
     }
 
     /** rb_reg_initialize_m
@@ -531,6 +607,18 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         return val;
     }
 
+    public int adjust_startpos(IRubyObject str, int pos, boolean reverse) {
+        int range;
+        rb_reg_check(this);
+        if(reverse) {
+            range = -pos;
+        } else {
+            range = ((RubyString)str).getByteList().length() - pos;
+        }
+
+        return ptr.adjust_startpos(ByteList.plain(((RubyString)str).getByteList().bytes), ((RubyString)str).getByteList().length(), pos, range);
+    }
+
     public IRubyObject casefold_p() {
         rb_reg_check(this);
         if((ptr.options & Pattern.RE_OPTION_IGNORECASE) != 0) {
@@ -546,6 +634,140 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             str.taint();
         }
         return str;
+    }
+
+    public IRubyObject inspect() {
+        rb_reg_check(this);
+        return getRuntime().newString(rb_reg_desc(str,len).toString());
+    }
+
+    private final static int EMBEDDABLE = Pattern.RE_OPTION_MULTILINE|Pattern.RE_OPTION_IGNORECASE|Pattern.RE_OPTION_EXTENDED;
+
+    public IRubyObject to_s() {
+        int options;
+        int l;
+        int p;
+        RubyString ss = getRuntime().newString("(?");
+        rb_reg_check(this);
+        options = (int)ptr.options;
+        p = 0;
+        l = len;
+
+        again: do {
+            if(l >= 4 && str[p] == '(' && str[p+1] == '?') {
+                boolean err = true;
+                p += 2;
+                if((l -= 2) > 0) {
+                    do {
+                        if(str[p] == 'm') {
+                            options |= Pattern.RE_OPTION_MULTILINE;
+                        } else if(str[p] == 'i') {
+                            options |= Pattern.RE_OPTION_IGNORECASE;
+                        } else if(str[p] == 'x') {
+                            options |= Pattern.RE_OPTION_EXTENDED;
+                        } else {
+                            break;
+                        }
+                        p++;
+                    } while(--l > 0);
+                }
+                if(l > 1 && str[p] == '-') {
+                    ++p;
+                    --l;
+                    do {
+                        if(str[p] == 'm') {
+                            options &= ~Pattern.RE_OPTION_MULTILINE;
+                        } else if(str[p] == 'i') {
+                            options &= ~Pattern.RE_OPTION_IGNORECASE;
+                        } else if(str[p] == 'x') {
+                            options &= ~Pattern.RE_OPTION_EXTENDED;
+                        } else {
+                            break;
+                        }
+                        p++;
+                    } while(--l > 0);
+                }
+                if(str[p] == ')') {
+                    --l;
+                    ++p;
+                    continue again;
+                }
+                if(str[p] == ':' && str[p+l-1] == ')') {
+                    try {
+                        Pattern.compile_s(str,++p,l-=2,kcode.getContext());
+                        err = false;
+                    } catch(Exception e) {
+                        err = true;
+                    }
+                }
+                if(err) {
+                    options = (int)ptr.options;
+                    p = 0;
+                    l = len;
+                }
+            }
+
+            if((options & RE_OPTION_MULTILINE)!=0) ss.cat("m");
+            if((options & RE_OPTION_IGNORECASE)!=0) ss.cat("i");
+            if((options & RE_OPTION_EXTENDED)!=0) ss.cat("x");
+
+            if((options&EMBEDDABLE) != EMBEDDABLE) {
+                ss.cat("-");
+                if((options & RE_OPTION_MULTILINE)==0) ss.cat("m");
+                if((options & RE_OPTION_IGNORECASE)==0) ss.cat("i");
+                if((options & RE_OPTION_EXTENDED)==0) ss.cat("x");
+            }
+            ss.cat(":");
+            rb_reg_expr_str(ss,p,l);
+            ss.cat(")");
+            ss.infectBy(this);
+            return ss;
+        } while(true);
+    }
+
+    private final boolean ISPRINT(char c) {
+        return (' ' == c || (!Character.isWhitespace(c) && !Character.isISOControl(c)));
+    }
+
+    private final void rb_reg_expr_str(RubyString ss, int s, int l) {
+        int p = s;
+        int pend = l;
+        boolean need_escape = false;
+        while(p<pend) {
+            if(str[p] == '/' || (!ISPRINT(str[p]) && !Pattern.ismbchar(str[p],kcode.getContext()))) {
+                need_escape = true;
+                break;
+            }
+            p += Pattern.mbclen(str[p],kcode.getContext());
+        }
+        if(!need_escape) {
+            ss.cat(str,s,l);
+        } else {
+            p = s; 
+            while(p<pend) {
+                if(str[p] == '\\') {
+                    int n = Pattern.mbclen(str[p+1],kcode.getContext()) + 1;
+                    ss.cat(str,p,n);
+                    p += n;
+                    continue;
+                } else if(str[p] == '/') {
+                    char c = '\\';
+                    ss.cat((byte)c);
+                    ss.cat(str,p,1);
+                } else if(Pattern.ismbchar(str[p],kcode.getContext())) {
+                    ss.cat(str,p,Pattern.mbclen(str[p],kcode.getContext()));
+                    p += Pattern.mbclen(str[p],kcode.getContext());
+                    continue;
+                } else if(ISPRINT(str[p])) {
+                    ss.cat(str,p,1);
+                } else if(!Character.isWhitespace(str[p])) {
+                    ss.cat(Integer.toString(str[p]&0377,8));
+                } else {
+                    ss.cat(str,p,1);
+                }
+                p++;
+            }
+        }
     }
 
     public static RubyRegexp regexpValue(IRubyObject obj) {
@@ -693,6 +915,13 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         return str;
     }
 
+    /** rb_reg_last_match
+     *
+     */
+    public static IRubyObject last_match(IRubyObject match) {
+        return nth_match(0,match);
+    }
+
     /** rb_reg_s_last_match
      *
      */
@@ -755,5 +984,64 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             return nil;
         }
         return nth_match(i,match);
+    }
+
+    /** rb_reg_s_union
+     *
+     */
+    public static IRubyObject union(IRubyObject recv, IRubyObject[] args) {
+        if(args.length == 0) {
+            return newRegexp(recv.getRuntime(),"(?!)",0,null);
+        } else if(args.length == 1) {
+            IRubyObject v = args[0].convertToTypeWithCheck("Regexp","to_regexp");
+            if(!v.isNil()) {
+                return v;
+            } else {
+                return newRegexp(quote(recv,args),0,null);
+            }
+        } else {
+            KCode kcode = null;
+            IRubyObject kcode_re = recv.getRuntime().getNil();
+            RubyString source = recv.getRuntime().newString("");
+            IRubyObject[] _args = new IRubyObject[3];
+
+            for(int i = 0; i < args.length; i++) {
+                if(0 < i) {
+                    source.cat("|");
+                }
+                IRubyObject v = args[i].convertToTypeWithCheck("Regexp","to_regexp");
+                if(!v.isNil()) {
+                    if(!((RubyRegexp)v).kcode_default) {
+                        if(kcode == null) {
+                            kcode_re = v;
+                            kcode = ((RubyRegexp)v).kcode;
+                        } else if(((RubyRegexp)v).kcode != kcode) {
+                            IRubyObject str1 = kcode_re.inspect();
+                            IRubyObject str2 = v.inspect();
+                            throw recv.getRuntime().newArgumentError("mixed kcode " + str1 + " and " + str2);
+                        }
+                    }
+                    v = ((RubyRegexp)v).to_s();
+                } else {
+                    v = quote(recv, new IRubyObject[]{args[i]});
+                }
+                source.append(v);
+            }
+
+            _args[0] = source;
+            _args[1] = recv.getRuntime().getNil();
+            if(kcode == null) {
+                _args[2] = recv.getRuntime().getNil();
+            } else if(kcode == KCode.NONE) {
+                _args[2] = recv.getRuntime().newString("n");
+            } else if(kcode == KCode.EUC) {
+                _args[2] = recv.getRuntime().newString("e");
+            } else if(kcode == KCode.SJIS) {
+                _args[2] = recv.getRuntime().newString("s");
+            } else if(kcode == KCode.UTF8) {
+                _args[2] = recv.getRuntime().newString("u");
+            }
+            return recv.callMethod(recv.getRuntime().getCurrentContext(),"new",_args);
+        }
     }
 }

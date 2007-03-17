@@ -338,7 +338,7 @@ public class Pattern {
         public char c, c1;
         public int p0;
         public long optz;
-        public int[] numlen = new int[0];
+        public int[] numlen = new int[1];
         public int nextp;
 
         /* Address of the count-byte of the most recently inserted `exactn'
@@ -1748,9 +1748,9 @@ public class Pattern {
             self.best_regstart = new int[regnum];
             self.best_regend = new int[regnum];
             /*
-              System.err.println("compiled into pattern of length: " + used);
-              for(int i=0;i<used;i++) {
-              System.err.print(" "+(int)buffer[i]);
+              System.err.println("compiled into pattern of length: " + self.used);
+              for(int i=0;i<self.used;i++) {
+              System.err.print(" "+(int)self.buffer[i]);
               }
               System.err.println();
             */
@@ -1860,7 +1860,7 @@ public class Pattern {
         int s = start;
         long retval = 0;
         int tmp;
-        while(len-- > 0 && p[s] != 0 && (tmp = HEXDIGIT.indexOf(p[s])) != -1) {
+        while(len-- > 0 && s<p.length && (tmp = HEXDIGIT.indexOf(p[s])) != -1) {
             retval <<= 4;
             retval |= (tmp & 15);
             s++;
@@ -1873,7 +1873,7 @@ public class Pattern {
         int s = start;
         long retval = 0;
 
-        while(len-- > 0 && p[s] >= '0' && p[s] <= '7') {
+        while(len-- > 0 && s<p.length && p[s] >= '0' && p[s] <= '7') {
             retval <<= 3;
             retval |= (p[s++] - '0');
         }
@@ -2056,6 +2056,13 @@ public class Pattern {
      */
     public static Pattern compile(char[] pattern, int start, int length, Pattern bufp) throws PatternSyntaxException {
         return compile(pattern,start,length,bufp,ASCII);
+    }
+
+    /**
+     * @mri re_compile_pattern
+     */
+    public static Pattern compile_s(char[] pattern, int start, int length, CompileContext ctx) throws PatternSyntaxException {
+        return compile(pattern,start,length,emptyPattern(0),ctx);
     }
 
     /**
@@ -2362,6 +2369,128 @@ public class Pattern {
     public void clearWarnings() {
         warnings.clear();
     }
+    
+    private static interface StartPos {
+        int startpos(char[] string, int pos);
+    }
+
+    private static class ASC_StartPos implements StartPos {
+        public int startpos(char[] string, int pos) {
+            return pos;
+        }
+    }
+
+    private static class SJIS_StartPos implements StartPos {
+        private boolean isfirst(char c) {
+            return mbctab_sjis[c] == 0;
+        }
+
+        private boolean istrail(char c) {
+            return mbctab_sjis_trail[c] != 0;
+        }
+
+        private int mbclen(char c) {
+            return mbctab_sjis[c] + 1;
+        }
+
+        public int startpos(char[] string, int pos) {
+            int i = pos, w;
+            if(i > 0 && istrail(string[i])) {
+                do {
+                    if(!isfirst(string[--i])) {
+                        ++i;
+                        break;
+                    }
+                } while (i > 0);
+            }
+            if(i == pos || i + (w = mbclen(string[i])) > pos) {
+                return i;
+            }
+            i += w;
+            return i + ((pos - i) & ~1);
+        }
+    }
+
+    private static class EUC_StartPos implements StartPos {
+        private boolean islead(char c) {
+            return ((c) - 0xA1) > 0xFE - 0xa1;
+        }
+
+        private int mbclen(char c) {
+            return mbctab_euc[c] + 1;
+        }
+
+        public int startpos(char[] string, int pos) {
+            int i = pos, w;
+            while(i > 0 && !islead(string[i])) {
+                --i;
+            }
+            if(i == pos || i + (w = mbclen(string[i])) > pos) {
+                return i;
+            }
+            i += w;
+            return i + ((pos - i) & ~1);
+        }
+    }
+
+    private static class UTF8_StartPos implements StartPos {
+        private boolean islead(char c) {
+            return (c & 0xC0) != 0x80;
+        }
+
+        private int mbclen(char c) {
+            return mbctab_utf8[c] + 1;
+        }
+
+        public int startpos(char[] string, int pos) {
+            int i = pos, w;
+
+            while(i > 0 && !islead(string[i])) {
+                --i;
+            }
+            if(i == pos || i + (w = mbclen(string[i])) > pos) {
+                return i;
+            }
+            return i + w;
+        }
+    }
+
+    private final static StartPos[] startpositions = {
+        new ASC_StartPos(),
+        new EUC_StartPos(),
+        new SJIS_StartPos(),
+        new UTF8_StartPos()};
+
+    public final static int mbc_startpos(char[] string, int startpos, CompileContext ctx) {
+        return startpositions[ctx.current_mbctype].startpos(string,startpos);
+    }
+    
+    public int adjust_startpos(char[] string, int size, int startpos, int range) {
+        /* Update the fastmap now if not correct already.  */
+        if(fastmap_accurate==0) {
+            compile_fastmap();
+        }
+
+        /* Adjust startpos for mbc string */
+        if(ctx.current_mbctype != 0 && startpos>0 && (options&RE_OPTIMIZE_BMATCH) == 0) {
+            int i = mbc_startpos(string, startpos, ctx);
+
+            if(i < startpos) {
+                if(range > 0) {
+                    startpos = i + mbclen(string[i],ctx);
+                } else {
+                    int len = mbclen(string[i],ctx);
+                    if(i + len <= startpos) {
+                        startpos = i + len;
+                    } else {
+                        startpos = i;
+                    }
+                }
+            }
+        }
+        return startpos;
+    }
+
 
     private static void err(String msg) throws PatternSyntaxException {
         throw new PatternSyntaxException(msg);
@@ -2501,12 +2630,13 @@ public class Pattern {
                 }
                 pend = size;
                 if((options&RE_OPTIMIZE_NO_BM) != 0) {
-                    //                                        System.err.println("doing slow_search");
+                    //                                                            System.err.println("doing slow_search");
                     pos = slow_search(buffer, must+1, len, string, pbeg, pend-pbeg, MAY_TRANSLATE()?ctx.translate:null);
+                    //                                        System.err.println("slow_search=" + pos);
                 } else {
-                    //                    System.err.println("doing bm_search (" + (must+1) + "," + len + "," + pbeg + "," +(pend-pbeg));
+                    //                                        System.err.println("doing bm_search (" + (must+1) + "," + len + "," + pbeg + "," +(pend-pbeg));
                     pos = bm_search(buffer, must+1, len, string, pbeg, pend-pbeg, must_skip, MAY_TRANSLATE()?ctx.translate:null);
-                    //                    System.err.println("bm_search=" + pos);
+                    //                                        System.err.println("bm_search=" + pos);
                 }
                 if(pos == -1) {
                     return -1;
@@ -2643,14 +2773,32 @@ public class Pattern {
                  IS_A_LETTER(d,dix-1,dend)));
     }
 
-    private final int memcmp(char[] s, int s1, int s2, int len) {
+    public final static int memcmp(byte[] s, int s1, byte[] ss, int s2, int len) {
         while(len > 0) {
-            if(s[s1++] != s[s2++]) {
+            if(s[s1++] != ss[s2++]) {
                 return 1;
             }
         }
         return 0;
     }
+
+    public final static int memcmp(byte[] s, int s1, int s2, int len) {
+        return memcmp(s,s1,s,s2,len);
+    }
+
+    public final static int memcmp(char[] s, int s1, char[] ss, int s2, int len) {
+        while(len > 0) {
+            if(s[s1++] != ss[s2++]) {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    public final static int memcmp(char[] s, int s1, int s2, int len) {
+        return memcmp(s,s1,s,s2,len);
+    }
+
     private final int memcmp_translate(char[] s, int s1, int s2, int len) {
         int p1 = s1;
         int p2 = s2;
@@ -3746,7 +3894,7 @@ public class Pattern {
             if(c == 0xff) {
                 c = little[littleix++];
             }
-            if(translate != null ? translate[big[bigix++]]==translate[c] : big[bigix++]==c) { 
+            if(!(translate != null ? translate[big[bigix++]]==translate[c] : big[bigix++]==c)) { 
                 break;
             }
         }
@@ -3808,7 +3956,6 @@ public class Pattern {
                 bigix+=mbclen(big[bigix],ctx);
             }
         }
-
         return -1;
     }
 

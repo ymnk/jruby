@@ -421,6 +421,24 @@ public class RubyString extends RubyObject {
         return newString(getRuntime(), (ByteList)value.clone());
     }
 
+    public RubyString cat(char[] str) {
+        value.append(ByteList.plain(str));
+        stringMutated();
+        return this;
+    }
+
+    public RubyString cat(char[] str, int start, int len) {
+        value.append(ByteList.plain(str), start, len);
+        stringMutated();
+        return this;
+    }
+
+    public RubyString cat(String str) {
+        value.append(ByteList.plain(str));
+        stringMutated();
+        return this;
+    }
+
     public RubyString cat(byte[] str) {
         value.append(str);
         stringMutated();
@@ -513,43 +531,20 @@ public class RubyString extends RubyObject {
      *
      */
     public IRubyObject match(IRubyObject other) {
-        if (other instanceof RubyRegexp) {
-            return ((RubyRegexp) other).match(this);
-        } else if (other instanceof RubyString) {
+        if(other instanceof RubyString) {
             throw getRuntime().newTypeError("type mismatch: String given");
+        } else if(other instanceof RubyRegexp) {
+            return ((RubyRegexp)other).match(this);
         }
-        return other.callMethod(getRuntime().getCurrentContext(), "=~", this);
+        return other.callMethod(getRuntime().getCurrentContext(),"=~",this);
     }
 
-    /** rb_str_match2
-     *
-     */
-    public IRubyObject match2() {
-        System.err.println("Calling unimplemented method String#match2");
-        return null;// RubyRegexp.newRegexp(this, 0, null).match2();
-    }
-
-    /**
-     * String#match(pattern)
+    /** rb_str_match_m
      *
      * @param pattern Regexp or String
      */
-    public IRubyObject match3(IRubyObject pattern) {
-        System.err.println("Calling unimplemented method String#match3");
-        /*
-        if (pattern instanceof RubyRegexp) {
-            return ((RubyRegexp)pattern).search2(toString());
-        } else if (pattern instanceof RubyString) {
-            RubyRegexp regexp = RubyRegexp.newRegexp((RubyString) pattern, 0, null);
-            return regexp.search2(toString());
-        } else if (pattern.respondsTo("to_str")) {
-            // FIXME: is this cast safe?
-            RubyRegexp regexp = RubyRegexp.newRegexp((RubyString) pattern.callMethod(getRuntime().getCurrentContext(), "to_str"), 0, null);
-            return regexp.search2(toString());
-            }*/
-
-        // not regexp and not string, can't convert
-        throw getRuntime().newTypeError("wrong argument type " + pattern.getMetaClass().getBaseName() + " (expected Regexp)");
+    public IRubyObject match_m(IRubyObject pattern) {
+        return get_pat(pattern,false).callMethod(getRuntime().getCurrentContext(),"match",this);
     }
 
     /** rb_str_capitalize
@@ -1501,10 +1496,10 @@ public class RubyString extends RubyObject {
                 str.taint();
             }
             
-            return this;
+            return str;
         }
 
-        return bang ? getRuntime().getNil() : this;
+        return bang ? getRuntime().getNil() : str;
     }
 
     /** rb_str_gsub
@@ -1653,11 +1648,9 @@ public class RubyString extends RubyObject {
      *	@fixme may be a problem with pos when doing reverse searches
      */
     private IRubyObject index(IRubyObject[] args, boolean reverse) {
-        System.err.println("Calling unimplemented method String#index");
-
         //FIXME may be a problem with pos when doing reverse searches
         int pos = 0;
-        if (reverse) {
+        if(reverse) {
             pos = value.length();
         }
         if (checkArgumentCount(args, 1, 2) == 2) {
@@ -1665,25 +1658,16 @@ public class RubyString extends RubyObject {
         }
         if (pos < 0) {
             pos += value.length();
-            if (pos < 0) {
+            if(pos < 0) {
+                if(args[0] instanceof RubyRegexp) {
+                    getRuntime().getCurrentContext().setBackref(getRuntime().getNil());
+                }
                 return getRuntime().getNil();
             }
         }
         if (args[0] instanceof RubyRegexp) {
-            int doNotLookPastIfReverse = pos;
-
-            // RubyRegexp doesn't (yet?) support reverse searches, so we
-            // find all matches and use the last one--very inefficient.
-            // XXX - find a better way
-            /*
-            pos = ((RubyRegexp) args[0]).search(toString(), reverse ? 0 : pos);
-
-            int dummy = pos;
-            while (reverse && dummy > -1 && dummy <= doNotLookPastIfReverse) {
-                pos = dummy;
-                dummy = ((RubyRegexp) args[0]).search(toString(), pos + 1);
-            }
-            */
+            pos = ((RubyRegexp)args[0]).adjust_startpos(this, pos, false);
+            pos = ((RubyRegexp)args[0]).search(this,pos,false);
         } else if (args[0] instanceof RubyString) {
             String sub = ((RubyString) args[0]).toString();
             StringBuffer sb = new StringBuffer(toString());
@@ -1730,23 +1714,13 @@ public class RubyString extends RubyObject {
      *
      */
     public IRubyObject aref(IRubyObject[] args) {
-        System.err.println("Calling unimplemented method String#aref");
-        if (checkArgumentCount(args, 1, 2) == 2) {
-            /*
-            if (args[0] instanceof RubyRegexp) {
-                IRubyObject match = RubyRegexp.regexpValue(args[0]).match(toString(), 0);
-                long idx = args[1].convertToInteger().getLongValue();
-                getRuntime().getCurrentContext().setBackref(match);
-                return RubyRegexp.nth_match((int) idx, match);
-            }
-            */
+        if(checkArgumentCount(args, 1, 2) == 2) {
             return substr(RubyNumeric.fix2int(args[0]), RubyNumeric.fix2int(args[1]));
-        }
-        /*
-        if (args[0] instanceof RubyRegexp) {
-            return RubyRegexp.regexpValue(args[0]).search(toString(), 0) >= 0 ?
-                RubyRegexp.last_match(getRuntime().getCurrentContext().getBackref()) :
-                getRuntime().getNil();
+        } else if(args[0] instanceof RubyRegexp) {
+            if(((RubyRegexp)args[0]).search(this,0,false) >= 0) {
+                return RubyRegexp.nth_match(0, getRuntime().getCurrentContext().getBackref());
+            }
+            return getRuntime().getNil();
         } else if (args[0] instanceof RubyString) {
             return toString().indexOf(stringValue(args[0]).toString()) != -1 ?
                 args[0] : getRuntime().getNil();
@@ -1755,7 +1729,7 @@ public class RubyString extends RubyObject {
             return begLen == null ? getRuntime().getNil() :
                 substr((int) begLen[0], (int) begLen[1]);
         }
-        */
+
         int idx = (int) args[0].convertToInteger().getLongValue();
         if (idx < 0) {
             idx += value.length();
@@ -1773,37 +1747,28 @@ public class RubyString extends RubyObject {
      *
      */
     private void subpatSet(RubyRegexp regexp, int nth, IRubyObject repl) {
-        System.err.println("Calling unimplemented method String#subpatSet");
-        /*
-        int found = regexp.search(this.toString(), 0);
-        if (found == -1) {
+        RubyMatchData match;
+        int start, end, len;
+        if(regexp.search(this, 0, false) < 0) {
             throw getRuntime().newIndexError("regexp not matched");
         }
-
-        RubyMatchData match = (RubyMatchData) getRuntime().getCurrentContext()
-                .getBackref();
-
-        if (nth >= match.getSize()) {
+        match = (RubyMatchData)getRuntime().getCurrentContext().getBackref();
+        if(nth >= match.regs.num_regs) {
             throw getRuntime().newIndexError("index " + nth + " out of regexp");
         }
-        if (nth < 0) {
-            if (-nth >= match.getSize()) {
+        if(nth < 0) {
+            if(-nth >= match.regs.num_regs) {
                 throw getRuntime().newIndexError("index " + nth + " out of regexp");
             }
-            nth += match.getSize();
+            nth += match.regs.num_regs;
         }
-
-        IRubyObject group = match.group(nth);
-        if (getRuntime().getNil().equals(group)) {
-            throw getRuntime().newIndexError(
-                    "regexp group " + nth + " not matched");
+        start = match.regs.beg[nth];
+        if(start == -1) {
+            throw getRuntime().newIndexError("regexp group " + nth + " not matched");
         }
-
-        int beg = (int) match.begin(nth);
-        int len = (int) (match.end(nth) - beg);
-
-        replace(beg, len, stringValue(repl));
-        */
+        end = match.regs.end[nth];
+        len = end - start;
+        replace(start, len, stringValue(repl));
     }
 
     /** rb_str_aset, rb_str_aset_m
@@ -2827,46 +2792,55 @@ public class RubyString extends RubyObject {
      *
      */
     public IRubyObject each_line(IRubyObject[] args, Block block) {
-        System.err.println("Calling unimplemented method String#each_line");
-        int strLen = value.length();
-        if (strLen == 0) {
-            return this;
-        }
-        /*
-        String sep;
-        if (checkArgumentCount(args, 0, 1) == 1) {
-            sep = RubyRegexp.escapeSpecialChars(stringValue(args[0]).toString());
+        IRubyObject rs;
+        int newline;
+        int p = 0;
+        int pend = value.realSize;
+        int s;
+        int ptr;
+        int len = value.realSize, rslen;
+        IRubyObject line;
+
+        if(checkArgumentCount(args,0,1) == 0) {
+            rs = getRuntime().getGlobalVariables().get("$/");
         } else {
-            sep = RubyRegexp.escapeSpecialChars(getRuntime().getGlobalVariables().get("$/").asSymbol());
+            rs = args[0];
         }
-        if (sep == null) {
-            sep = "(?:\\n|\\r\\n?)";
-        } else if (sep.length() == 0) {
-            sep = "(?:\\n|\\r\\n?){2,}";
-        }
-        RubyRegexp pat = RubyRegexp.newRegexp(getRuntime(), ".*?" + sep, RubyRegexp.RE_OPTION_MULTILINE, null);
-        int start = 0;
         ThreadContext tc = getRuntime().getCurrentContext();
 
-        // Fix for JRUBY-97: Temporary fix pending
-        // decision on UTF8-based string implementation.
-        // Move toString() call outside loop.
-        String toString = toString();
+        if(rs.isNil()) {
+            block.yield(tc, this);
+            return this;
+        }
 
-        if (pat.search(toString, start) != -1) {
-            RubyMatchData md = (RubyMatchData) tc.getBackref();
-            
-            block.yield(tc, md.group(0));
-            start = md.end(0);
-            while (md.find()) {
-                block.yield(tc, md.group(0));
-                start = md.end(0);
+        rs = rs.convertToString();
+        rslen = ((RubyString)rs).value.realSize;
+        if(rslen == 0) {
+            newline = '\n';
+        } else {
+            newline = (char)(((RubyString)rs).value.bytes[rslen-1] & 0xFF);
+        }
+
+        for(s = p, p+=rslen; p<pend; p++) {
+            if(rslen == 0 && value.bytes[p] == '\n') {
+                if(value.bytes[p++] != '\n') {
+                    continue;
+                }
+                while(value.bytes[p] == '\n') {
+                    p++;
+                }
+            }
+            if(0 < p && value.bytes[p-1] == newline && (rslen <= 1 || Pattern.memcmp(((RubyString)rs).value.bytes,0,value.bytes,p-rslen,rslen)==0)) {
+                block.yield(tc,substr(s,p-s));
+                s = p;
             }
         }
-        if (start < strLen) {
-            block.yield(tc, substr(start, strLen - start));
+        if(s != pend) {
+            if(p>pend) {
+                p = pend;
+            }
+            block.yield(tc,substr(s,p-s));
         }
-        */
         return this;
     }
 

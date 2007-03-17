@@ -18,6 +18,7 @@
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2007 Ola Bini <ola@ologix.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -33,9 +34,14 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import java.util.List;
+import java.util.ArrayList;
+
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
+
+import org.jruby.util.ByteList;
 
 import org.rej.Registers;
 
@@ -46,6 +52,7 @@ import org.rej.Registers;
 public class RubyMatchData extends RubyObject {
     char[] str;
     Registers regs;
+    private RubyString _str;
     
     public RubyMatchData(Ruby runtime) {
         super(runtime, runtime.getClass("MatchData"));
@@ -57,28 +64,69 @@ public class RubyMatchData extends RubyObject {
         runtime.defineGlobalConstant("MatchingData", matchDataClass);
 
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyMatchData.class);
-        /*
         matchDataClass.defineFastMethod("captures", callbackFactory.getFastMethod("captures"));
         matchDataClass.defineFastMethod("inspect", callbackFactory.getFastMethod("inspect"));
-        */
         matchDataClass.defineFastMethod("size", callbackFactory.getFastMethod("size"));
         matchDataClass.defineFastMethod("length", callbackFactory.getFastMethod("size"));
         matchDataClass.defineFastMethod("offset", callbackFactory.getFastMethod("offset", RubyKernel.IRUBY_OBJECT));
-        /*
-        matchDataClass.defineFastMethod("begin", callbackFactory.getFastMethod("begin", RubyFixnum.class));
-        matchDataClass.defineFastMethod("end", callbackFactory.getFastMethod("end", RubyFixnum.class));
+        matchDataClass.defineFastMethod("begin", callbackFactory.getFastMethod("begin", RubyKernel.IRUBY_OBJECT));
+        matchDataClass.defineFastMethod("end", callbackFactory.getFastMethod("end", RubyKernel.IRUBY_OBJECT));
         matchDataClass.defineFastMethod("to_a", callbackFactory.getFastMethod("to_a"));
         matchDataClass.defineFastMethod("[]", callbackFactory.getFastOptMethod("aref"));
-        */
         matchDataClass.defineFastMethod("pre_match", callbackFactory.getFastMethod("pre_match"));
         matchDataClass.defineFastMethod("post_match", callbackFactory.getFastMethod("post_match"));
-        /*
         matchDataClass.defineFastMethod("to_s", callbackFactory.getFastMethod("to_s"));
         matchDataClass.defineFastMethod("string", callbackFactory.getFastMethod("string"));
-        */
         matchDataClass.getMetaClass().undefineMethod("new");
 
         return matchDataClass;
+    }
+
+    private IRubyObject match_array(int start) {
+        List ary = new ArrayList();
+        boolean taint = isTaint();
+        for(int i=start;i<regs.num_regs;i++) {
+            if(regs.beg[i] == -1) {
+                ary.add(getRuntime().getNil());
+            } else {
+                IRubyObject _s = RubyString.newString(getRuntime(),ByteList.plain(str),regs.beg[i],regs.end[i]-regs.beg[i]);
+                if(taint) {
+                    _s.taint();
+                }
+                ary.add(_s);
+            }
+        }
+        return getRuntime().newArray(ary);
+    }
+
+    /** match_to_a
+     *
+     */
+    public IRubyObject to_a() {
+        return match_array(0);
+    }
+
+    /** match_captures
+     *
+     */
+    public IRubyObject captures() {
+        return match_array(1);
+    }
+
+    /** match_aref
+     *
+     */
+    public IRubyObject aref(IRubyObject[] args) {
+        IRubyObject idx;
+        IRubyObject rest = getRuntime().getNil();
+        if(checkArgumentCount(args,1,2) == 2) {
+            rest = args[1];
+        }
+        idx = args[0];
+        if(!rest.isNil() || !(idx instanceof RubyFixnum) || RubyNumeric.fix2int(idx) < 0) {
+            return ((RubyArray)to_a()).aref(args);
+        }
+        return RubyRegexp.nth_match(RubyNumeric.fix2int(idx),this);
     }
 
     /** match_size
@@ -86,6 +134,36 @@ public class RubyMatchData extends RubyObject {
      */
     public IRubyObject size() {
         return getRuntime().newFixnum(regs.num_regs);
+    }
+
+    /** match_begin
+     *
+     */
+    public IRubyObject begin(IRubyObject index) {
+        int i = RubyNumeric.num2int(index);
+        
+        if(i < 0 || regs.num_regs <= i) {
+            throw getRuntime().newIndexError("index " + i + " out of matches");
+        }
+        if(regs.beg[i] < 0) {
+            return getRuntime().getNil();
+        }
+        return getRuntime().newFixnum(regs.beg[i]);
+    }
+
+    /** match_end
+     *
+     */
+    public IRubyObject end(IRubyObject index) {
+        int i = RubyNumeric.num2int(index);
+        
+        if(i < 0 || regs.num_regs <= i) {
+            throw getRuntime().newIndexError("index " + i + " out of matches");
+        }
+        if(regs.end[i] < 0) {
+            return getRuntime().getNil();
+        }
+        return getRuntime().newFixnum(regs.end[i]);
     }
 
     /** match_offset
@@ -130,5 +208,29 @@ public class RubyMatchData extends RubyObject {
             str_.taint();
         }
         return str_;
+    }
+
+    /** match_to_s
+     *
+     */
+    public IRubyObject to_s() {
+        IRubyObject ss = RubyRegexp.last_match(this);
+        if(ss.isNil()) {
+            ss = getRuntime().newString("");
+        }
+        if(isTaint()) {
+            ss.taint();
+        }
+        return ss;
+    }
+
+    /** match_string
+     *
+     */
+    public IRubyObject string() {
+        if(_str == null) {
+            _str = RubyString.newString(getRuntime(),ByteList.plain(str));
+        }
+        return _str;
     }
 }

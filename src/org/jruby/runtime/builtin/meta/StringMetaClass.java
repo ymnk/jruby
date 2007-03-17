@@ -75,7 +75,6 @@ public class StringMetaClass extends ObjectMetaClass {
 	        defineFastMethod("[]", Arity.optional(), "aref");
 	        defineFastMethod("[]=", Arity.optional(), "aset");
 	        defineFastMethod("=~", Arity.singleArgument(), "match");
-	        defineFastMethod("~", Arity.noArguments(), "match2");
 	        defineFastMethod("capitalize", Arity.noArguments());
 	        defineFastMethod("capitalize!", Arity.noArguments(), "capitalize_bang");
 	        defineFastMethod("casecmp", Arity.singleArgument());
@@ -108,7 +107,7 @@ public class StringMetaClass extends ObjectMetaClass {
 	        defineFastMethod("ljust", Arity.optional());
 	        defineFastMethod("lstrip", Arity.noArguments());
 	        defineFastMethod("lstrip!", Arity.noArguments(), "lstrip_bang");
-	        defineFastMethod("match", Arity.singleArgument(), "match3");
+	        defineFastMethod("match", Arity.singleArgument(), "match_m");
 	        defineFastMethod("oct", Arity.noArguments());
 	        defineFastMethod("replace", Arity.singleArgument());
 	        defineFastMethod("reverse", Arity.noArguments());
