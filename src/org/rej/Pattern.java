@@ -3237,6 +3237,278 @@ public class Pattern {
             d++;
             return 0;
         }
+
+        public final int charset() {
+            boolean not;	    /* Nonzero for charset_not.  */
+            boolean part = false;	    /* true if matched part of mbc */
+            int dsave = d + 1;
+            int cc;
+                    
+            if(d == dend) {return 1;}
+                        
+            c = string[d++];
+            if(ismbchar(c,ctx)) {
+                if(d + mbclen(c,ctx) - 1 <= dend) {
+                    cc = c;
+                    c = self.MBC2WC(c, string, d);
+                    not = is_in_list_mbc(c, p, pix);
+                    if(!not) {
+                        part = not = is_in_list_sbc(cc, p, pix);
+                    }
+                } else {
+                    not = is_in_list(c, p, pix);
+                }
+            } else {
+                if(TRANSLATE_P()) {
+                    c = ctx.translate[c];
+                }
+                not = is_in_list(c, p, pix);
+            }
+            if(p[pix-1] == charset_not) {
+                not = !not;
+            }
+            
+            if(!not) {return 1;}
+            
+            pix += 1 + p[pix] + 2 + EXTRACT_UNSIGNED(p, pix + 1 + p[pix])*8;
+            SET_REGS_MATCHED();
+                    
+            if(part) {
+                d = dsave;
+            }
+            return 0;
+        }
+
+        public final void anychar_repeat() {
+            for (;;) {
+                PUSH_FAILURE_POINT(pix,d);
+                if(d == dend) {return;}
+                if(ismbchar(string[d],ctx)) {
+                    if(d + mbclen(string[d],ctx) > dend) {
+                        return;
+                    }
+                    SET_REGS_MATCHED();
+                    d += mbclen(string[d],ctx);
+                    continue;
+                }
+                if((optz&RE_OPTION_MULTILINE)==0 &&
+                   (TRANSLATE_P() ? ctx.translate[string[d]] : string[d]) == '\n') {
+                    return;
+                }
+                SET_REGS_MATCHED();
+                d++;
+            }
+        }
+
+        public final int maybe_finalize_jump() {
+            mcnt = EXTRACT_NUMBER(p,pix);
+            pix+=2;
+            p1 = pix;
+
+            /* Compare the beginning of the repeat with what in the
+               pattern follows its end. If we can establish that there
+               is nothing that they would both match, i.e., that we
+               would have to backtrack because of (as in, e.g., `a*a')
+               then we can change to finalize_jump, because we'll
+               never have to backtrack.
+
+               This is not true in the case of alternatives: in
+               `(a|ab)*' we do need to backtrack to the `ab' alternative
+               (e.g., if the string was `ab').  But instead of trying to
+               detect that here, the alternative has put on a dummy
+               failure point which is what we will end up popping.  */
+
+            /* Skip over open/close-group commands.  */
+            while(p1 + 2 < pend) {
+                if(p[p1] == stop_memory ||
+                   p[p1] == start_memory) {
+                    p1 += 3;	/* Skip over args, too.  */
+                } else if(p[p1] == stop_paren) {
+                    p1 += 1;
+                } else {
+                    break;
+                }
+            }
+            if(p1 == pend) {
+                p[pix-3] = finalize_jump;
+            } else if(p[p1] == exactn || p[p1] == endline) {
+                c = p[p1] == endline ? '\n' : p[p1+2];
+                int p2 = pix+mcnt;
+                /* p2[0] ... p2[2] are an on_failure_jump.
+                   Examine what follows that.  */
+                if(p[p2+3] == exactn && p[p2+5] != c) {
+                    p[pix-3] = finalize_jump;
+                } else if(p[p2+3] == charset ||
+                          p[p2+3] == charset_not) {
+                    boolean not;
+                    if(ismbchar(c,ctx)) {
+                        int pp = p1+3;
+                        c = self.MBC2WC(c, p, pp);
+                    }
+                    /* `is_in_list()' is TRUE if c would match */
+                    /* That means it is not safe to finalize.  */
+                    not = is_in_list(c, p, p2 + 4);
+                    if(p[p2+3] == charset_not) {
+                        not = !not;
+                    }
+                    if(!not) {
+                        p[pix-3] = finalize_jump;
+                    }
+                }
+            }
+            pix -= 2;		/* Point at relative address again.  */
+            if(p[pix-1] != finalize_jump) {
+                p[pix-1] = jump;	
+                mcnt = EXTRACT_NUMBER(p, pix);
+                pix += 2;
+                if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                    return 1;
+                }
+                pix += mcnt;
+                return 2;
+            } 
+            return 0;
+        }
+
+        public final void push_dummy_failure() {
+            /* See comments just above at `dummy_failure_jump' about the
+               two zeroes.  */
+            p1 = pix;
+            /* Skip over open/close-group commands.  */
+            while(p1 + 2 < pend) {
+                if(p[p1] == stop_memory ||
+                   p[p1] == start_memory) {
+                    p1 += 3;	/* Skip over args, too.  */
+                } else if(p[p1] == stop_paren) {
+                    p1 += 1;
+                } else {
+                    break;
+                }
+            }
+            if(p1 < pend && p[p1] == jump) {
+                p[pix-1] = unused;
+            } else {
+                PUSH_FAILURE_POINT(-1,0);
+            }
+        }
+
+        public final void succeed_n() {
+            mcnt = EXTRACT_NUMBER(p, pix + 2);
+            /* Originally, this is how many times we HAVE to succeed.  */
+            if(mcnt != 0) {
+                mcnt--;
+                pix += 2;
+
+                c = (char)EXTRACT_NUMBER(p, pix);
+                if(stacke - stackp <= NUM_COUNT_ITEMS) {
+                    int[] stackx;
+                    int xlen = stacke;
+                    stackx = new int[2*xlen];
+                    System.arraycopy(stackb,0,stackx,0,xlen);
+                    stackb = stackx;
+                    stacke = 2*xlen;
+                }
+                stackb[stackp++] = c;
+                stackb[stackp++] = pix;
+                num_failure_counts++;
+                
+                STORE_NUMBER(p, pix, mcnt);
+                pix+=2;
+                
+                PUSH_FAILURE_POINT(-1,0);
+            } else  {
+                mcnt = EXTRACT_NUMBER(p, pix);
+                pix+=2;
+                PUSH_FAILURE_POINT(pix+mcnt,d);
+            }
+        }
+
+        public final int jump_n() {
+            mcnt = EXTRACT_NUMBER(p, pix + 2);
+            /* Originally, this is how many times we CAN jump.  */
+            if(mcnt!=0) {
+                mcnt--;
+
+                c = (char)EXTRACT_NUMBER(p, pix+2);
+                if(stacke - stackp <= NUM_COUNT_ITEMS) {
+                    int[] stackx;
+                    int xlen = stacke;
+                    stackx = new int[2*xlen];
+                    System.arraycopy(stackb,0,stackx,0,xlen);
+                    stackb = stackx;
+                    stacke = 2*xlen;
+                }
+                stackb[stackp++] = c;
+                stackb[stackp++] = pix+2;
+                num_failure_counts++;
+                STORE_NUMBER(p, pix + 2, mcnt);
+                mcnt = EXTRACT_NUMBER(p, pix);
+                pix += 2;
+                if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                    return 1;
+                }
+                pix += mcnt;
+                return 0;
+            }
+            /* If don't have to jump any more, skip over the rest of command.  */
+            else {
+                pix += 4;
+            }
+            return 0;
+        }
+
+        public final int exactn() {
+            /* Match the next few pattern characters exactly.
+               mcnt is how many characters to match.  */
+            mcnt = p[pix++];
+            /* This is written out as an if-else so we don't waste time
+               testing `translate' inside the loop.  */
+            if(TRANSLATE_P()) {
+                do {
+                    if(d == dend) {return 1;}
+                    if(p[pix] == 0xff) {
+                        pix++;  
+                        if(--mcnt==0
+                           || d == dend
+                           || string[d++] != p[pix++]) {
+                            return 1;
+                        }
+                        continue;
+                    }
+                    c = string[d++];
+                    if(ismbchar(c,ctx)) {
+                        int n;
+                        if(c != p[pix++]) {
+                            return 1;
+                        }
+                        for(n = mbclen(c,ctx) - 1; n > 0; n--) {
+                            if(--mcnt==0
+                               || d == dend
+                               || string[d++] != p[pix++]) {
+                                return 1;
+                            }
+                        }
+                        continue;
+                    }
+                    /* compiled code translation needed for ruby */
+                    if(ctx.translate[c] != ctx.translate[p[pix++]]) {
+                        return 1;
+                    }
+                } while(--mcnt > 0);
+            } else {
+                do {
+                    if(d == dend) {return 1;}
+                    if(p[pix] == 0xff) {
+                        pix++; mcnt--;
+                    }
+                    if(string[d++] != p[pix++]) {
+                        return 1;
+                    }
+                } while(--mcnt > 0);
+            }
+            SET_REGS_MATCHED();
+            return 0;
+        }
     }
 
     /**
@@ -3352,66 +3624,15 @@ public class Pattern {
                         }
                         break;
                     case anychar_repeat:
-                        for (;;) {
-                            w.PUSH_FAILURE_POINT(w.pix,w.d);
-                            if(w.d == w.dend) {break fail1;}
-                            if(ismbchar(w.string[w.d],w.ctx)) {
-                                if(w.d + mbclen(w.string[w.d],w.ctx) > w.dend) {
-                                    break fail1;
-                                }
-                                w.SET_REGS_MATCHED();
-                                w.d += mbclen(w.string[w.d],w.ctx);
-                                continue;
-                            }
-                            if((w.optz&RE_OPTION_MULTILINE)==0 &&
-                               (w.TRANSLATE_P() ? w.ctx.translate[w.string[w.d]] : w.string[w.d]) == '\n') {
-                                break fail1;
-                            }
-                            w.SET_REGS_MATCHED();
-                            w.d++;
-                        }
-
+                        w.anychar_repeat();
+                        break fail1;
                     case charset:
-                    case charset_not: {
-                        boolean not;	    /* Nonzero for charset_not.  */
-                        boolean part = false;	    /* true if matched part of mbc */
-                        int dsave = w.d + 1;
-                        int cc;
-                    
-                        if(w.d == w.dend) {break fail1;}
-
-                        w.c = w.string[w.d++];
-                        if(ismbchar(w.c,w.ctx)) {
-                            if(w.d + mbclen(w.c,w.ctx) - 1 <= w.dend) {
-                                cc = w.c;
-                                w.c = MBC2WC(w.c, w.string, w.d);
-                                not = w.is_in_list_mbc(w.c, w.p, w.pix);
-                                if(!not) {
-                                    part = not = w.is_in_list_sbc(cc, w.p, w.pix);
-                                }
-                            } else {
-                                not = w.is_in_list(w.c, w.p, w.pix);
-                            }
-                        } else {
-                            if(w.TRANSLATE_P()) {
-                                w.c = w.ctx.translate[w.c];
-                            }
-                            not = w.is_in_list(w.c, w.p, w.pix);
-                        }
-                        if(w.p[w.pix-1] == charset_not) {
-                            not = !not;
-                        }
-
-                        if(!not) {break fail1;}
-                    
-                        w.pix += 1 + w.p[w.pix] + 2 + EXTRACT_UNSIGNED(w.p, w.pix + 1 + w.p[w.pix])*8;
-                        w.SET_REGS_MATCHED();
-                    
-                        if(part) {
-                            w.d = dsave;
+                    case charset_not: 
+                        if(w.charset() == 1) {
+                            break fail1;
                         }
                         continue mainLoop;
-                    }
+
 
                     case begline:
                         if(size == 0 || w.d == 0) {
@@ -3483,72 +3704,13 @@ public class Pattern {
                         /* The end of a smart repeat has a maybe_finalize_jump back.
                            Change it either to a finalize_jump or an ordinary jump.  */
                     case maybe_finalize_jump:
-                        w.mcnt = EXTRACT_NUMBER(w.p,w.pix);
-                        w.pix+=2;
-                        w.p1 = w.pix;
-
-                        /* Compare the beginning of the repeat with what in the
-                           pattern follows its end. If we can establish that there
-                           is nothing that they would both match, i.e., that we
-                           would have to backtrack because of (as in, e.g., `a*a')
-                           then we can change to finalize_jump, because we'll
-                           never have to backtrack.
-
-                           This is not true in the case of alternatives: in
-                           `(a|ab)*' we do need to backtrack to the `ab' alternative
-                           (e.g., if the string was `ab').  But instead of trying to
-                           detect that here, the alternative has put on a dummy
-                           failure point which is what we will end up popping.  */
-
-                        /* Skip over open/close-group commands.  */
-                        while(w.p1 + 2 < w.pend) {
-                            if(w.p[w.p1] == stop_memory ||
-                               w.p[w.p1] == start_memory) {
-                                w.p1 += 3;	/* Skip over args, too.  */
-                            } else if(w.p[w.p1] == stop_paren) {
-                                w.p1 += 1;
-                            } else {
-                                break;
-                            }
-                        }
-                        if(w.p1 == w.pend) {
-                            w.p[w.pix-3] = finalize_jump;
-                        } else if(w.p[w.p1] == exactn || w.p[w.p1] == endline) {
-                            w.c = w.p[w.p1] == endline ? '\n' : w.p[w.p1+2];
-                            int p2 = w.pix+w.mcnt;
-                            /* p2[0] ... p2[2] are an on_failure_jump.
-                               Examine what follows that.  */
-                            if(w.p[p2+3] == exactn && w.p[p2+5] != w.c) {
-                                w.p[w.pix-3] = finalize_jump;
-                            } else if(w.p[p2+3] == charset ||
-                                      w.p[p2+3] == charset_not) {
-                                boolean not;
-                                if(ismbchar(w.c,w.ctx)) {
-                                    int pp = w.p1+3;
-                                    w.c = MBC2WC(w.c, w.p, pp);
-                                }
-                                /* `is_in_list()' is TRUE if c would match */
-                                /* That means it is not safe to finalize.  */
-                                not = w.is_in_list(w.c, w.p, p2 + 4);
-                                if(w.p[p2+3] == charset_not) {
-                                    not = !not;
-                                }
-                                if(!not) {
-                                    w.p[w.pix-3] = finalize_jump;
-                                }
-                            }
-                        }
-                        w.pix -= 2;		/* Point at relative address again.  */
-                        if(w.p[w.pix-1] != finalize_jump) {
-                            w.p[w.pix-1] = jump;	
-                            w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                            w.pix += 2;
-                            if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
-                                break fail1;
-                            }
-                            w.pix += w.mcnt;
+                        switch(w.maybe_finalize_jump()) {
+                        case 1:
+                            break fail1;
+                        case 2:
                             continue mainLoop;
                         }
+
                         /* Note fall through.  */
 
                         /* The end of a stupid repeat has a finalize_jump back to the
@@ -3603,91 +3765,18 @@ public class Pattern {
                            popped.  For example, matching `(a|ab)*' against `aab'
                            requires that we match the `ab' alternative.  */
                     case push_dummy_failure:
-                        /* See comments just above at `dummy_failure_jump' about the
-                           two zeroes.  */
-                        w.p1 = w.pix;
-                        /* Skip over open/close-group commands.  */
-                        while(w.p1 + 2 < w.pend) {
-                            if(w.p[w.p1] == stop_memory ||
-                               w.p[w.p1] == start_memory) {
-                                w.p1 += 3;	/* Skip over args, too.  */
-                            } else if(w.p[w.p1] == stop_paren) {
-                                w.p1 += 1;
-                            } else {
-                                break;
-                            }
-                        }
-                        if(w.p1 < w.pend && w.p[w.p1] == jump) {
-                            w.p[w.pix-1] = unused;
-                        } else {
-                            w.PUSH_FAILURE_POINT(-1,0);
-                        }
+                        w.push_dummy_failure();
                         continue mainLoop;
 
                         /* Have to succeed matching what follows at least n times.  Then
                            just handle like an on_failure_jump.  */
                     case succeed_n: 
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix + 2);
-                        /* Originally, this is how many times we HAVE to succeed.  */
-                        if(w.mcnt != 0) {
-                            w.mcnt--;
-                            w.pix += 2;
-
-                            w.c = (char)EXTRACT_NUMBER(w.p, w.pix);
-                            if(w.stacke - w.stackp <= NUM_COUNT_ITEMS) {
-                                int[] stackx;
-                                int xlen = w.stacke;
-                                stackx = new int[2*xlen];
-                                System.arraycopy(w.stackb,0,stackx,0,xlen);
-                                w.stackb = stackx;
-                                w.stacke = 2*xlen;
-                            }
-                            w.stackb[w.stackp++] = w.c;
-                            w.stackb[w.stackp++] = w.pix;
-                            w.num_failure_counts++;
-
-                            STORE_NUMBER(w.p, w.pix, w.mcnt);
-                            w.pix+=2;
-
-                            w.PUSH_FAILURE_POINT(-1,0);
-                        } else  {
-                            w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                            w.pix+=2;
-                            w.PUSH_FAILURE_POINT(w.pix+w.mcnt,w.d);
-                        }
+                        w.succeed_n();
                         continue mainLoop;
 
                     case jump_n:
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix + 2);
-                        /* Originally, this is how many times we CAN jump.  */
-                        if(w.mcnt!=0) {
-                            w.mcnt--;
-
-                            w.c = (char)EXTRACT_NUMBER(w.p, w.pix+2);
-                            if(w.stacke - w.stackp <= NUM_COUNT_ITEMS) {
-                                int[] stackx;
-                                int xlen = w.stacke;
-                                stackx = new int[2*xlen];
-                                System.arraycopy(w.stackb,0,stackx,0,xlen);
-                                w.stackb = stackx;
-                                w.stacke = 2*xlen;
-                            }
-                            w.stackb[w.stackp++] = w.c;
-                            w.stackb[w.stackp++] = w.pix+2;
-                            w.num_failure_counts++;
-                            STORE_NUMBER(w.p, w.pix + 2, w.mcnt);
-                            w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                            //                            System.err.println("jump_n ix: " + mcnt);
-                            w.pix += 2;
-                            if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
-                                break fail1;
-                            }
-                            w.pix += w.mcnt;
-                            continue mainLoop;
-                        }
-                        /* If don't have to jump any more, skip over the rest of command.  */
-                        else {
-                            w.pix += 4;
+                        if(w.jump_n() == 1) {
+                            break fail1;
                         }
                         continue mainLoop;
                     case set_number_at:
@@ -3833,55 +3922,9 @@ public class Pattern {
                         w.SET_REGS_MATCHED();
                         continue mainLoop;
                     case exactn:
-                        /* Match the next few pattern characters exactly.
-                           mcnt is how many characters to match.  */
-                        w.mcnt = w.p[w.pix++];
-                        /* This is written out as an if-else so we don't waste time
-                           testing `translate' inside the loop.  */
-                        if(w.TRANSLATE_P()) {
-                            do {
-                                if(w.d == w.dend) {break fail1;}
-                                if(w.p[w.pix] == 0xff) {
-                                    w.pix++;  
-                                    if(--w.mcnt==0
-                                       || w.d == w.dend
-                                       || w.string[w.d++] != w.p[w.pix++]) {
-                                        break fail1;
-                                    }
-                                    continue;
-                                }
-                                w.c = w.string[w.d++];
-                                if(ismbchar(w.c,w.ctx)) {
-                                    int n;
-                                    if(w.c != w.p[w.pix++]) {
-                                        break fail1;
-                                    }
-                                    for(n = mbclen(w.c,w.ctx) - 1; n > 0; n--) {
-                                        if(--w.mcnt==0
-                                           || w.d == w.dend
-                                           || w.string[w.d++] != w.p[w.pix++]) {
-                                            break fail1;
-                                        }
-                                    }
-                                    continue;
-                                }
-                                /* compiled code translation needed for ruby */
-                                if(w.ctx.translate[w.c] != w.ctx.translate[w.p[w.pix++]]) {
-                                    break fail1;
-                                }
-                            } while(--w.mcnt > 0);
-                        } else {
-                            do {
-                                if(w.d == w.dend) {break fail1;}
-                                if(w.p[w.pix] == 0xff) {
-                                    w.pix++; w.mcnt--;
-                                }
-                                if(w.string[w.d++] != w.p[w.pix++]) {
-                                    break fail1;
-                                }
-                            } while(--w.mcnt > 0);
+                        if(w.exactn() == 1) {
+                            break fail1;
                         }
-                        w.SET_REGS_MATCHED();
                         continue mainLoop;
                     }
 
