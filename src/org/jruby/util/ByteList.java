@@ -146,7 +146,7 @@ public class ByteList implements Comparable, CharSequence, Serializable {
 
     public void insert(byte[] moreBytes, int start, int len, int at) {
         grow(len);
-        System.arraycopy(bytes,at,bytes,at+len,Math.min(len,realSize-at));
+        System.arraycopy(bytes,at,bytes,at+len,realSize-at);
         System.arraycopy(moreBytes,start,bytes,at,len);
         realSize += len;
     }

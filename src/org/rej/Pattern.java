@@ -2630,13 +2630,13 @@ public class Pattern {
                 }
                 pend = size;
                 if((options&RE_OPTIMIZE_NO_BM) != 0) {
-                    //                                                            System.err.println("doing slow_search");
+                    //System.err.println("doing slow_search");
                     pos = slow_search(buffer, must+1, len, string, pbeg, pend-pbeg, MAY_TRANSLATE()?ctx.translate:null);
-                    //                                        System.err.println("slow_search=" + pos);
+                    //System.err.println("slow_search=" + pos);
                 } else {
-                    //                                        System.err.println("doing bm_search (" + (must+1) + "," + len + "," + pbeg + "," +(pend-pbeg));
+                    //System.err.println("doing bm_search (" + (must+1) + "," + len + "," + pbeg + "," +(pend-pbeg));
                     pos = bm_search(buffer, must+1, len, string, pbeg, pend-pbeg, must_skip, MAY_TRANSLATE()?ctx.translate:null);
-                    //                                        System.err.println("bm_search=" + pos);
+                    //System.err.println("bm_search=" + pos);
                 }
                 if(pos == -1) {
                     return -1;
@@ -2701,7 +2701,6 @@ public class Pattern {
                     if((anchor!=0 || can_be_null==0) && range > 0 && size > 0 && startpos == size) {
                         return -1;
                     }
-
                     val = match_exec(string, size, startpos, initpos, regs);
                     if(val >= 0) {
                         return startpos;
@@ -3061,6 +3060,7 @@ public class Pattern {
     public int match_exec(char[] string_arg, int size, int pos, int beg, Registers regs) {
         MatchEnvironment w = new MatchEnvironment();
         w.p = buffer;
+        w.pix = 0;
         w.p1=-1;
         w.pend = used;
         w.num_regs = re_nsub;
@@ -4021,7 +4021,7 @@ public class Pattern {
         fastmap_accurate = 1;
         can_be_null = 0;
 
-        while(p[pix] != 0) {
+        while(pix != -1) {
             is_a_succeed_n = 0;
             if(pix == pend) {
                 can_be_null = 1;

@@ -1666,8 +1666,8 @@ public class RubyString extends RubyObject {
             }
         }
         if (args[0] instanceof RubyRegexp) {
-            pos = ((RubyRegexp)args[0]).adjust_startpos(this, pos, false);
-            pos = ((RubyRegexp)args[0]).search(this,pos,false);
+            pos = ((RubyRegexp)args[0]).adjust_startpos(this, pos, reverse);
+            pos = ((RubyRegexp)args[0]).search(this,pos,reverse);
         } else if (args[0] instanceof RubyString) {
             String sub = ((RubyString) args[0]).toString();
             StringBuffer sb = new StringBuffer(toString());
@@ -2110,11 +2110,19 @@ public class RubyString extends RubyObject {
             while((end = ((RubyRegexp)spat).search(this, start, false)) >= 0) {
                 regs = ((RubyMatchData)getRuntime().getCurrentContext().getBackref()).regs;
                 if(start == end && regs.beg[0] == regs.end[0]) {
-                    if(last_null) {
+                    if(value.realSize == 0) {
+                        result.add(getRuntime().newString(""));
+                        break;
+                    } else if(last_null) {
                         result.add(substr(beg, Pattern.mbclen(((char)(value.bytes[beg]&0xFF)),((RubyRegexp)spat).getKCode().getContext())));
                         beg = start;
                     } else {
-                        start += Pattern.mbclen(((char)(value.bytes[start]&0xFF)),((RubyRegexp)spat).getKCode().getContext());
+                        if(start < value.realSize) {
+                            start += Pattern.mbclen(((char)(value.bytes[start]&0xFF)),((RubyRegexp)spat).getKCode().getContext());
+                        } else {
+                            start++;
+                        }
+
                         last_null = true;
                         continue;
                     }
@@ -2239,7 +2247,7 @@ public class RubyString extends RubyObject {
                 return RubyRegexp.nth_match(0,match);
             }
             List ary = new ArrayList();
-            for(i=0;i<regs.num_regs;i++) {
+            for(i=1;i<regs.num_regs;i++) {
                 ary.add(RubyRegexp.nth_match(i,match));
             }
             return getRuntime().newArray(ary);
