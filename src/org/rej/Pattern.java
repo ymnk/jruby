@@ -3054,6 +3054,189 @@ public class Pattern {
         public final boolean is_in_list(int cx, char[] b, int bix) {
             return is_in_list_sbc(cx, b, bix) || (ctx.current_mbctype!=0 ? is_in_list_mbc(cx, b, bix) : false);
         }
+
+        public final int handle_fail() {
+            /* A restart point is known.  Restart there and pop it. */
+            int last_used_reg, this_reg;
+
+            /* If this failure point is from a dummy_failure_point, just
+               skip it.  */
+            if(stackb[stackp-4] == -1 || (best_regs_set && stackb[stackp-1] == NON_GREEDY)) {
+                POP_FAILURE_POINT();
+                return 0;
+            }
+            stackp--;		/* discard greedy flag */
+            optz = stackb[--stackp];
+            d = stackb[--stackp];
+            pix = stackb[--stackp];
+            /* Restore register info.  */
+            last_used_reg = stackb[--stackp];
+
+            /* Make the ones that weren't saved -1 or 0 again. */
+            for(this_reg = num_regs - 1; this_reg > last_used_reg; this_reg--) {
+                self.regend[this_reg] = REG_UNSET_VALUE;
+                self.regstart[this_reg] = REG_UNSET_VALUE;
+                self.reg_info[this_reg].is_active = false;
+                self.reg_info[this_reg].matched_something = false;
+            }
+
+            /* And restore the rest from the stack.  */
+            for( ; this_reg > 0; this_reg--) {
+                self.reg_info[this_reg].word = (char)stackb[--stackp];
+                self.regend[this_reg] = stackb[--stackp];
+                self.regstart[this_reg] = stackb[--stackp];
+            }
+            mcnt = stackb[--stackp];
+            while(mcnt-->0) {
+                int ptr = stackb[--stackp];
+                int count = stackb[--stackp];
+                STORE_NUMBER(p, ptr, count);
+            }
+            if(pix < pend) {
+                int is_a_jump_n = 0;
+                int failed_paren = 0;
+
+                p1 = pix;
+                /* If failed to a backwards jump that's part of a repetition
+                   loop, need to pop this failure point and use the next one.  */
+                switch(p[p1]) {
+                case jump_n:
+                case finalize_push_n:
+                    is_a_jump_n = 1;
+                case maybe_finalize_jump:
+                case finalize_jump:
+                case finalize_push:
+                case jump:
+                    p1++;
+                    mcnt = EXTRACT_NUMBER(p,p1);
+                    p1+=2;
+                    if(mcnt >= 0) {
+                        break;	/* should be backward jump */
+                    }
+                    p1 += mcnt;
+                    if((is_a_jump_n!=0 && p[p1] == succeed_n) ||
+                       (is_a_jump_n==0 && p[p1] == on_failure_jump)) {
+                        if(failed_paren!=0) {
+                            p1++;
+                            mcnt = EXTRACT_NUMBER(p, p1);
+                            p1+=2;
+
+                            PUSH_FAILURE_POINT(p1+mcnt,d);
+                            stackb[stackp-1] = NON_GREEDY;
+                        }
+                        return 0;
+                    }
+                default:
+                    /* do nothing */;
+                    return 1;
+                }
+            }
+            return 1;
+        }
+
+        private final void fix_regs() {
+            for(mcnt = 0; mcnt < num_regs; mcnt++) {
+                self.regstart[mcnt] = self.best_regstart[mcnt];
+                self.regend[mcnt] = self.best_regend[mcnt];
+            }
+        }
+
+        private final void fix_best_regs() {
+            for(mcnt = 1; mcnt < num_regs; mcnt++) {
+                self.best_regstart[mcnt] = self.regstart[mcnt];
+                self.best_regend[mcnt] = self.regend[mcnt];
+            }
+        }
+
+        public final int restore_best_regs() {
+            /* If not end of string, try backtracking.  Otherwise done.  */
+            if((self.options&RE_OPTION_LONGEST)!=0 && d != dend) {
+                if(best_regs_set) {/* non-greedy, no need to backtrack */
+                    /* Restore best match.  */
+                    d = self.best_regend[0];
+                    fix_regs();
+                    return 0;
+                }
+                while(stackp != 0 && stackb[stackp-1] == NON_GREEDY) {
+                    if(best_regs_set) {/* non-greedy, no need to backtrack */
+                        d = self.best_regend[0];
+                        fix_regs();
+                        return 0;
+                    }
+                    POP_FAILURE_POINT();
+                }
+                if(stackp != 0) {
+                    /* More failure points to try.  */
+
+                    /* If exceeds best match so far, save it.  */
+                    if(!best_regs_set || (d > self.best_regend[0])) {
+                        best_regs_set = true;
+                        self.best_regend[0] = d;	/* Never use regstart[0].  */
+                        fix_best_regs();
+                    }
+                    return 1;
+                } /* If no failure points, don't restore garbage.  */
+                else if(best_regs_set) {
+                    /* Restore best match.  */
+                    d = self.best_regend[0];
+                    fix_regs();
+                }
+            }
+            return 0;
+        }
+
+        public final void convert_regs(Registers regs) {
+            /* If caller wants register contents data back, convert it 
+               to indices.  */
+            if(regs != null) {
+                regs.beg[0] = pos;
+                regs.end[0] = d;
+                for(mcnt = 1; mcnt < num_regs; mcnt++) {
+                    if(self.regend[mcnt] == REG_UNSET_VALUE) {
+                        regs.beg[mcnt] = -1;
+                        regs.end[mcnt] = -1;
+                        continue;
+                    }
+                    regs.beg[mcnt] = self.regstart[mcnt];
+                    regs.end[mcnt] = self.regend[mcnt];
+                }
+            }
+        }
+        
+        public final void start_memory() {
+            self.old_regstart[p[pix]] = self.regstart[p[pix]];
+            self.regstart[p[pix]] = d;
+            self.reg_info[p[pix]].is_active = true;
+            self.reg_info[p[pix]].matched_something = false;
+            pix += 2;
+        }
+
+        public final void stop_memory() {
+            self.old_regend[p[pix]] = self.regend[p[pix]];
+            self.regend[p[pix]] = d;
+            self.reg_info[p[pix]].is_active = false;
+            pix += 2;
+        }
+
+        public final int anychar() {
+            if(d == dend) {return 1;}
+
+            if(ismbchar(string[d],ctx)) {
+                if(d + mbclen(string[d],ctx) > dend) {
+                    return 1;
+                }
+                SET_REGS_MATCHED();
+                d += mbclen(string[d],ctx);
+                return 0;
+            }
+            if((optz&RE_OPTION_MULTILINE)==0
+               && (TRANSLATE_P() ? ctx.translate[string[d]] : string[d]) == '\n') {
+                return 1;
+            }
+            SET_REGS_MATCHED();
+            d++;
+            return 0;
+        }
     }
 
     /**
@@ -3102,76 +3285,15 @@ public class Pattern {
                     /* End of pattern means we might have succeeded.  */
                     if(w.pix == w.pend || gotoRestoreBestRegs) {
                         if(!gotoRestoreBestRegs) {
-                            restore_best_regs: do {
-                                /* If not end of string, try backtracking.  Otherwise done.  */
-                                if((options&RE_OPTION_LONGEST)!=0 && w.d != w.dend) {
-                                    if(w.best_regs_set) {/* non-greedy, no need to backtrack */
-                                        /* Restore best match.  */
-                                        w.d = best_regend[0];
-
-                                        for(w.mcnt = 0; w.mcnt < w.num_regs; w.mcnt++) {
-                                            regstart[w.mcnt] = best_regstart[w.mcnt];
-                                            regend[w.mcnt] = best_regend[w.mcnt];
-                                        }
-                                        break restore_best_regs;
-                                    }
-                                    while(w.stackp != 0 && w.stackb[w.stackp-1] == NON_GREEDY) {
-                                        if(w.best_regs_set) {/* non-greedy, no need to backtrack */
-                                            w.d = best_regend[0];
-
-                                            for(w.mcnt = 0; w.mcnt < w.num_regs; w.mcnt++) {
-                                                regstart[w.mcnt] = best_regstart[w.mcnt];
-                                                regend[w.mcnt] = best_regend[w.mcnt];
-                                            }
-                                            break restore_best_regs;
-                                        }
-                                        w.POP_FAILURE_POINT();
-                                    }
-                                    if(w.stackp != 0) {
-                                        /* More failure points to try.  */
-
-                                        /* If exceeds best match so far, save it.  */
-                                        if(!w.best_regs_set || (w.d > best_regend[0])) {
-                                            w.best_regs_set = true;
-                                            best_regend[0] = w.d;	/* Never use regstart[0].  */
-
-                                            for(w.mcnt = 1; w.mcnt < w.num_regs; w.mcnt++) {
-                                                best_regstart[w.mcnt] = regstart[w.mcnt];
-                                                best_regend[w.mcnt] = regend[w.mcnt];
-                                            }
-                                        }
-                                        break fail1;	       
-                                    } /* If no failure points, don't restore garbage.  */
-                                    else if(w.best_regs_set) {
-                                        /* Restore best match.  */
-                                        w.d = best_regend[0];
-
-                                        for(w.mcnt = 0; w.mcnt < w.num_regs; w.mcnt++) {
-                                            regstart[w.mcnt] = best_regstart[w.mcnt];
-                                            regend[w.mcnt] = best_regend[w.mcnt];
-                                        }
-                                    }
-                                }
-                            } while(false);
+                            if(w.restore_best_regs()==1) {
+                                break;
+                            }
                         } else {
                             gotoRestoreBestRegs = false;
                         }
 
-                        /* If caller wants register contents data back, convert it 
-                           to indices.  */
-                        if(regs != null) {
-                            regs.beg[0] = pos;
-                            regs.end[0] = w.d;
-                            for(w.mcnt = 1; w.mcnt < w.num_regs; w.mcnt++) {
-                                if(regend[w.mcnt] == REG_UNSET_VALUE) {
-                                    regs.beg[w.mcnt] = -1;
-                                    regs.end[w.mcnt] = -1;
-                                    continue;
-                                }
-                                regs.beg[w.mcnt] = regstart[w.mcnt];
-                                regs.end[w.mcnt] = regend[w.mcnt];
-                            }
-                        }
+                        w.convert_regs(regs);
+
                         return w.d - w.pos;
                     }
 
@@ -3182,17 +3304,10 @@ public class Pattern {
                            a register number in the next byte.  The text matched
                            within the ( and ) is recorded under that number.  */
                     case start_memory:
-                        old_regstart[w.p[w.pix]] = regstart[w.p[w.pix]];
-                        regstart[w.p[w.pix]] = w.d;
-                        reg_info[w.p[w.pix]].is_active = true;
-                        reg_info[w.p[w.pix]].matched_something = false;
-                        w.pix += 2;
+                        w.start_memory();
                         continue mainLoop;
                     case stop_memory:
-                        old_regend[w.p[w.pix]] = regend[w.p[w.pix]];
-                        regend[w.p[w.pix]] = w.d;
-                        reg_info[w.p[w.pix]].is_active = false;
-                        w.pix += 2;
+                        w.stop_memory();
                         continue mainLoop;
                     case start_paren:
                     case stop_paren:
@@ -3232,22 +3347,9 @@ public class Pattern {
                         w.POP_FAILURE_POINT();
                         break fail1;
                     case anychar:
-                        if(w.d == w.dend) {break fail1;}
-
-                        if(ismbchar(w.string[w.d],w.ctx)) {
-                            if(w.d + mbclen(w.string[w.d],w.ctx) > w.dend) {
-                                break fail1;
-                            }
-                            w.SET_REGS_MATCHED();
-                            w.d += mbclen(w.string[w.d],w.ctx);
-                            break;
-                        }
-                        if((w.optz&RE_OPTION_MULTILINE)==0
-                           && (w.TRANSLATE_P() ? w.ctx.translate[w.string[w.d]] : w.string[w.d]) == '\n') {
+                        if(w.anychar() == 1) {
                             break fail1;
                         }
-                        w.SET_REGS_MATCHED();
-                        w.d++;
                         break;
                     case anychar_repeat:
                         for (;;) {
@@ -3788,83 +3890,12 @@ public class Pattern {
                 //fail:
                 fail2: do {
                     if(w.stackp != 0) {
-                        /* A restart point is known.  Restart there and pop it. */
-                        int last_used_reg, this_reg;
-
-                        /* If this failure point is from a dummy_failure_point, just
-                           skip it.  */
-                        if(w.stackb[w.stackp-4] == -1 || (w.best_regs_set && w.stackb[w.stackp-1] == NON_GREEDY)) {
-                            w.POP_FAILURE_POINT();
+                        switch(w.handle_fail()) {
+                        case 0:
                             continue fail2;
+                        case 1:
+                            continue mainLoop;
                         }
-                        w.stackp--;		/* discard greedy flag */
-                        w.optz = w.stackb[--w.stackp];
-                        w.d = w.stackb[--w.stackp];
-                        w.pix = w.stackb[--w.stackp];
-                        /* Restore register info.  */
-                        last_used_reg = w.stackb[--w.stackp];
-
-                        /* Make the ones that weren't saved -1 or 0 again. */
-                        for(this_reg = w.num_regs - 1; this_reg > last_used_reg; this_reg--) {
-                            regend[this_reg] = REG_UNSET_VALUE;
-                            regstart[this_reg] = REG_UNSET_VALUE;
-                            reg_info[this_reg].is_active = false;
-                            reg_info[this_reg].matched_something = false;
-                        }
-
-                        /* And restore the rest from the stack.  */
-                        for( ; this_reg > 0; this_reg--) {
-                            reg_info[this_reg].word = (char)w.stackb[--w.stackp];
-                            regend[this_reg] = w.stackb[--w.stackp];
-                            regstart[this_reg] = w.stackb[--w.stackp];
-                        }
-                        w.mcnt = w.stackb[--w.stackp];
-                        while(w.mcnt-->0) {
-                            int ptr = w.stackb[--w.stackp];
-                            int count = w.stackb[--w.stackp];
-                            STORE_NUMBER(w.p, ptr, count);
-                        }
-                        if(w.pix < w.pend) {
-                            int is_a_jump_n = 0;
-                            int failed_paren = 0;
-
-                            w.p1 = w.pix;
-                            /* If failed to a backwards jump that's part of a repetition
-                               loop, need to pop this failure point and use the next one.  */
-                            switch(w.p[w.p1]) {
-                            case jump_n:
-                            case finalize_push_n:
-                                is_a_jump_n = 1;
-                            case maybe_finalize_jump:
-                            case finalize_jump:
-                            case finalize_push:
-                            case jump:
-                                w.p1++;
-                                w.mcnt = EXTRACT_NUMBER(w.p,w.p1);
-                                w.p1+=2;
-                                if(w.mcnt >= 0) {
-                                    break;	/* should be backward jump */
-                                }
-                                w.p1 += w.mcnt;
-                                if((is_a_jump_n!=0 && w.p[w.p1] == succeed_n) ||
-                                   (is_a_jump_n==0 && w.p[w.p1] == on_failure_jump)) {
-                                    if(failed_paren!=0) {
-                                        w.p1++;
-                                        w.mcnt = EXTRACT_NUMBER(w.p, w.p1);
-                                        w.p1+=2;
-
-                                        w.PUSH_FAILURE_POINT(w.p1+w.mcnt,w.d);
-                                        w.stackb[w.stackp-1] = NON_GREEDY;
-                                    }
-                                    continue fail2;
-                                }
-                                continue mainLoop;
-                            default:
-                                /* do nothing */;
-                                continue mainLoop;
-                            }
-                        }
-                        continue mainLoop;
                     } else {
                         break mainLoop;   /* Matching at this starting point really fails.  */
                     }
@@ -4470,7 +4501,7 @@ public class Pattern {
         Pattern.compile(args[0]);
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void tmain2(String[] args) throws Exception {
         System.err.println("Speed test");
         java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(args[0]));
         java.util.List strings = new java.util.ArrayList();
@@ -4501,6 +4532,31 @@ public class Pattern {
 
         System.out.println("Compiling " + (times*sss.length) + " regexps took java.util.regex: " + ((a1-b1)) + "ms");
         System.out.println("Compiling " + (times*sss.length) + " regexps took REJ: " + ((a2-b2)) + "ms");
+    }
+
+    public static void main(String[] args) throws Exception {
+        System.err.println("Speed test");
+
+        java.util.regex.Pattern p1 = java.util.regex.Pattern.compile(args[0]);
+
+        long b1 = System.currentTimeMillis();
+        int times = 1000000;
+        for(int j=0;j<times;j++) {
+            p1.matcher(args[1]).find();
+        }
+        long a1 = System.currentTimeMillis();
+
+        long b2 = System.currentTimeMillis();
+        Pattern p2 = Pattern.compile(args[0]);
+        char[] ss = args[1].toCharArray();
+        Registers rgs = new Registers();
+        for(int j=0;j<times;j++) {
+            p2.search(ss,ss.length,0,ss.length,rgs);
+        }
+        long a2 = System.currentTimeMillis();
+
+        System.out.println("Searching " + (times) + " regexps took java.util.regex: " + ((a1-b1)) + "ms");
+        System.out.println("Searching " + (times) + " regexps took REJ: " + ((a2-b2)) + "ms");
     }
 
     public static void tmain3(String[] args) throws Exception {
