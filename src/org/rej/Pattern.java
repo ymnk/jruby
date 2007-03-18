@@ -2758,19 +2758,6 @@ public class Pattern {
         return -1;
     }
 
-    private final boolean IS_A_LETTER(char[] d, int dix, int dend) {
-        return re_syntax_table[d[dix]] == Sword ||
-            (ctx.current_mbctype != 0 ? 
-             (ctx.re_mbctab[d[dix]] != 0 && d[dix+mbclen(d[dix],ctx)]<=dend):
-             re_syntax_table[d[dix]] == Sword2);
-    }
-
-    private final boolean PREV_IS_A_LETTER(char[] d, int dix, int dend) {
-        return ((ctx.current_mbctype == MBCTYPE_SJIS)?
-                IS_A_LETTER(d,dix-(((dix-1)!=0&&ismbchar(d[dix-2],ctx))?2:1),dend):
-                ((ctx.current_mbctype!=0 && (d[dix-1] >= 0x80)) ||
-                 IS_A_LETTER(d,dix-1,dend)));
-    }
 
     public final static int memcmp(byte[] s, int s1, byte[] ss, int s2, int len) {
         while(len > 0) {
@@ -2854,6 +2841,8 @@ public class Pattern {
         public int d;
         public int dend;
         public int pos;
+        public int beg;
+        public int size;
 
         public CompileContext ctx;
 
@@ -3509,56 +3498,504 @@ public class Pattern {
             SET_REGS_MATCHED();
             return 0;
         }
+
+        public final int main_switch() {
+            //System.err.println("--executing " + (int)p[pix] + " at " + pix);
+            switch(p[pix++]) {
+                /* ( [or `(', as appropriate] is represented by start_memory,
+                   ) by stop_memory.  Both of those commands are followed by
+                   a register number in the next byte.  The text matched
+                   within the ( and ) is recorded under that number.  */
+            case start_memory:
+                start_memory();
+                return CONTINUE_MAINLOOP;
+            case stop_memory:
+                stop_memory();
+                return CONTINUE_MAINLOOP;
+            case start_paren:
+            case stop_paren:
+                return BREAK_NORMAL;
+                /* \<digit> has been turned into a `duplicate' command which is
+                   followed by the numeric value of <digit> as the register number.  */
+            case duplicate:
+                if(duplicate()) {
+                    return BREAK_FAIL1;
+                }
+                return BREAK_NORMAL;
+            case start_nowidth:
+                PUSH_FAILURE_POINT(-1,d);
+                if(stackp > RE_DUP_MAX) {
+                    return RETURN_M2;
+                }
+                mcnt = EXTRACT_NUMBER(p, pix);
+                pix+=2;
+                STORE_NUMBER(p, pix+mcnt, stackp);
+                return CONTINUE_MAINLOOP;
+            case stop_nowidth:
+                mcnt = EXTRACT_NUMBER(p, pix);
+                pix+=2;
+                stackp = mcnt;
+                d = stackb[stackp-3];
+                POP_FAILURE_POINT();
+                return CONTINUE_MAINLOOP;
+            case stop_backtrack:
+                mcnt = EXTRACT_NUMBER(p, pix);
+                pix+=2;
+                stackp = mcnt;
+                POP_FAILURE_POINT();
+                return CONTINUE_MAINLOOP;
+            case pop_and_fail:
+                mcnt = EXTRACT_NUMBER(p, pix+1);
+                stackp = mcnt;
+                POP_FAILURE_POINT();
+                return BREAK_FAIL1;
+            case anychar:
+                if(anychar() == 1) {
+                    return BREAK_FAIL1;
+                }
+                return BREAK_NORMAL;
+            case anychar_repeat:
+                anychar_repeat();
+                return BREAK_FAIL1;
+            case charset:
+            case charset_not: 
+                if(charset() == 1) {
+                    return BREAK_FAIL1;
+                }
+                return CONTINUE_MAINLOOP;
+
+
+            case begline:
+                if(size == 0 || d == 0) {
+                    return CONTINUE_MAINLOOP;
+                }
+                if(string[d-1] == '\n' && d != dend) {
+                    return CONTINUE_MAINLOOP;
+                }
+                return BREAK_FAIL1;
+            case endline:
+                if(d == dend) {
+                    return CONTINUE_MAINLOOP;
+                } else if(string[d] == '\n') {
+                    return CONTINUE_MAINLOOP;
+                }
+                return BREAK_FAIL1;
+                /* Match at the very beginning of the string. */
+            case begbuf:
+                if(d==0) {
+                    return CONTINUE_MAINLOOP;
+                }
+                return BREAK_FAIL1;
+                /* Match at the very end of the data. */
+            case endbuf:
+                if(d == dend) {
+                    return CONTINUE_MAINLOOP;
+                }
+                return BREAK_FAIL1;
+                /* Match at the very end of the data. */
+            case endbuf2:
+                if(d == dend) {
+                    return CONTINUE_MAINLOOP;
+                }
+                /* .. or newline just before the end of the data. */
+                if(string[d] == '\n' && d+1 == dend) {
+                    return CONTINUE_MAINLOOP;
+                }
+                return BREAK_FAIL1;
+                /* `or' constructs are handled by starting each alternative with
+                   an on_failure_jump that points to the start of the next
+                   alternative.  Each alternative except the last ends with a
+                   jump to the joining point.  (Actually, each jump except for
+                   the last one really jumps to the following jump, because
+                   tensioning the jumps is a hassle.)  */
+                    
+                /* The start of a stupid repeat has an on_failure_jump that points
+                   past the end of the repeat text. This makes a failure point so 
+                   that on failure to match a repetition, matching restarts past
+                   as many repetitions have been found with no way to fail and
+                   look for another one.  */
+                    
+                /* A smart repeat is similar but loops back to the on_failure_jump
+                   so that each repetition makes another failure point.  */
+                    
+                /* Match at the starting position. */
+            case begpos:
+                if(d == beg) {
+                    return CONTINUE_MAINLOOP;
+                }
+                return BREAK_FAIL1;
+
+            case on_failure_jump:
+                //                on_failure:
+                mcnt = EXTRACT_NUMBER(p, pix);
+                pix+=2;
+                PUSH_FAILURE_POINT(pix+mcnt,d);
+                return CONTINUE_MAINLOOP;
+
+                /* The end of a smart repeat has a maybe_finalize_jump back.
+                   Change it either to a finalize_jump or an ordinary jump.  */
+            case maybe_finalize_jump:
+                switch(maybe_finalize_jump()) {
+                case 1:
+                    return BREAK_FAIL1;
+                case 2:
+                    return CONTINUE_MAINLOOP;
+                }
+
+                /* Note fall through.  */
+
+                /* The end of a stupid repeat has a finalize_jump back to the
+                   start, where another failure point will be made which will
+                   point to after all the repetitions found so far.  */
+                    
+                /* Take off failure points put on by matching on_failure_jump 
+                   because didn't fail.  Also remove the register information
+                   put on by the on_failure_jump.  */
+
+            case finalize_jump:
+                if(stackp > 2 && stackb[stackp-3] == d) {
+                    pix = stackb[stackp-4];
+                    POP_FAILURE_POINT();
+                    return CONTINUE_MAINLOOP;
+                }
+                POP_FAILURE_POINT();
+                /* Note fall through.  */
+
+                /* We need this opcode so we can detect where alternatives end
+                   in `group_match_null_string_p' et al.  */
+            case jump_past_alt:
+                /* fall through */
+                /* Jump without taking off any failure points.  */
+            case jump:
+                //      nofinalize:
+                return jump();
+            case dummy_failure_jump:
+                /* Normally, the on_failure_jump pushes a failure point, which
+                   then gets popped at finalize_jump.  We will end up at
+                   finalize_jump, also, and with a pattern of, say, `a+', we
+                   are skipping over the on_failure_jump, so we have to push
+                   something meaningless for finalize_jump to pop.  */
+                return dummy_failure_jump();
+
+                /* At the end of an alternative, we need to push a dummy failure
+                   point in case we are followed by a `finalize_jump', because
+                   we don't want the failure point for the alternative to be
+                   popped.  For example, matching `(a|ab)*' against `aab'
+                   requires that we match the `ab' alternative.  */
+            case push_dummy_failure:
+                push_dummy_failure();
+                return CONTINUE_MAINLOOP;
+
+                /* Have to succeed matching what follows at least n times.  Then
+                   just handle like an on_failure_jump.  */
+            case succeed_n: 
+                succeed_n();
+                return CONTINUE_MAINLOOP;
+
+            case jump_n:
+                if(jump_n() == 1) {
+                    return BREAK_FAIL1;
+                }
+                return CONTINUE_MAINLOOP;
+            case set_number_at:
+                return set_number_at();
+
+            case try_next:
+                return try_next();
+            case finalize_push:
+                return finalize_push();
+            case finalize_push_n:
+                return finalize_push_n();
+                /* Ignore these.  Used to ignore the n of succeed_n's which
+                   currently have n == 0.  */
+            case unused:
+                return CONTINUE_MAINLOOP;
+            case casefold_on:
+                optz |= RE_OPTION_IGNORECASE;
+                return CONTINUE_MAINLOOP;
+            case casefold_off:
+                optz &= ~RE_OPTION_IGNORECASE;
+                return CONTINUE_MAINLOOP;
+            case option_set:
+                optz = p[pix++];
+                return CONTINUE_MAINLOOP;
+            case wordbound:
+                return wordbound();
+            case notwordbound:
+                return notwordbound();
+            case wordbeg:
+                return wordbeg();
+            case wordend:
+                return wordend();
+            case wordchar:
+                return wordchar();
+            case notwordchar:
+                return notwordchar();
+            case exactn:
+                if(exactn() == 1) {
+                    return BREAK_FAIL1;
+                }
+                return CONTINUE_MAINLOOP;
+            }
+            return BREAK_NORMAL;
+        }
+
+        private final int jump() {
+            mcnt = EXTRACT_NUMBER(p, pix);
+            pix += 2;
+            if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                return BREAK_FAIL1;
+            }
+            pix += mcnt;
+            return CONTINUE_MAINLOOP;
+        }
+
+        private final int dummy_failure_jump() {
+            PUSH_FAILURE_POINT(-1,0);
+            mcnt = EXTRACT_NUMBER(p, pix);
+            pix += 2;
+            if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                return BREAK_FAIL1;
+            }
+            pix += mcnt;
+            return CONTINUE_MAINLOOP;
+        }
+
+        private final int try_next() {
+            mcnt = EXTRACT_NUMBER(p, pix);
+            pix += 2;
+            if(pix + mcnt < pend) {
+                PUSH_FAILURE_POINT(pix,d);
+                stackb[stackp-1] = NON_GREEDY;
+            }
+            pix += mcnt;
+            return CONTINUE_MAINLOOP;
+        }
+
+        private final int set_number_at() {
+            mcnt = EXTRACT_NUMBER(p, pix);
+            pix+=2;
+            p1 = pix + mcnt;
+            mcnt = EXTRACT_NUMBER(p, pix);
+            pix+=2;
+            STORE_NUMBER(p, p1, mcnt);
+            return CONTINUE_MAINLOOP;
+        }
+
+        private final int finalize_push() {
+            POP_FAILURE_POINT();
+            mcnt = EXTRACT_NUMBER(p, pix);
+            pix+=2;
+            if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) { /* avoid infinite loop */
+                return BREAK_FAIL1;
+            }
+            PUSH_FAILURE_POINT(pix+mcnt,d);
+            stackb[stackp-1] = NON_GREEDY;
+            return CONTINUE_MAINLOOP;
+        }
+
+        private final int finalize_push_n() {
+            mcnt = EXTRACT_NUMBER(p, pix + 2); 
+            /* Originally, this is how many times we CAN jump.  */
+            if(mcnt>0) {
+                int posx, i;
+                mcnt--;
+                STORE_NUMBER(p, pix + 2, mcnt);
+                posx = EXTRACT_NUMBER(p, pix);
+                i = EXTRACT_NUMBER(p,pix+posx+5);
+                if(i > 0) {
+                    mcnt = EXTRACT_NUMBER(p, pix);
+                    pix += 2;
+                    if(mcnt < 0 && stackp > 2 && stackb[stackp-3] == d) {/* avoid infinite loop */
+                        return BREAK_FAIL1;
+                    }
+                    pix += mcnt;
+                    return CONTINUE_MAINLOOP;
+                }
+                POP_FAILURE_POINT();
+                mcnt = EXTRACT_NUMBER(p,pix);
+                pix+=2;
+                PUSH_FAILURE_POINT(pix+mcnt,d);
+                stackb[stackp-1] = NON_GREEDY;
+                pix += 2;		/* skip n */
+            }
+            /* If don't have to push any more, skip over the rest of command.  */
+            else {
+                pix += 4;
+            }
+            return CONTINUE_MAINLOOP;
+        }
+
+        private final int wordbound() {
+            if(d == 0) {
+                if(d == dend) {return BREAK_FAIL1;}
+                if(IS_A_LETTER(string,d,dend)) {
+                    return CONTINUE_MAINLOOP;
+                } else {
+                    return BREAK_FAIL1;
+                }
+            }
+            if(d == dend) {
+                if(PREV_IS_A_LETTER(string,d,dend)) {
+                    return CONTINUE_MAINLOOP;
+                } else {
+                    return BREAK_FAIL1;
+                }
+            }
+            if(PREV_IS_A_LETTER(string,d,dend) != IS_A_LETTER(string,d,dend)) {
+                return CONTINUE_MAINLOOP;
+            }
+            return BREAK_FAIL1;
+        }
+
+        private final int notwordbound() {
+            if(d==0) {
+                if(IS_A_LETTER(string, d, dend)) {
+                    return BREAK_FAIL1;
+                } else {
+                    return CONTINUE_MAINLOOP;
+                }
+            }
+            if(d == dend) {
+                if(PREV_IS_A_LETTER(string, d, dend)) {
+                    return BREAK_FAIL1;
+                } else {
+                    return CONTINUE_MAINLOOP;
+                }
+            }
+            if(PREV_IS_A_LETTER(string, d, dend) != IS_A_LETTER(string, d, dend)) {
+                return BREAK_FAIL1;
+            }
+            return CONTINUE_MAINLOOP;
+        }
+
+        private final int wordbeg() {
+            if(IS_A_LETTER(string, d, dend) && (d==0 || !PREV_IS_A_LETTER(string,d,dend))) {
+                return CONTINUE_MAINLOOP;
+            }
+            return BREAK_FAIL1;
+        }
+
+        private final int wordend() {
+            if(d!=0 && PREV_IS_A_LETTER(string, d, dend)
+               && (!IS_A_LETTER(string, d, dend) || d == dend)) {
+                return CONTINUE_MAINLOOP;
+            }
+            return BREAK_FAIL1;
+        }
+
+        private final int wordchar() {
+            if(d == dend) {return BREAK_FAIL1;}
+            if(!IS_A_LETTER(string,d,dend)) {
+                return BREAK_FAIL1;
+            }
+            if(ismbchar(string[d],ctx) && d + mbclen(string[d],ctx) - 1 < dend) {
+                d += mbclen(string[d],ctx) - 1;
+            }
+            d++;
+            SET_REGS_MATCHED();
+            return CONTINUE_MAINLOOP;
+        }
+        
+        private final int notwordchar() {
+            if(d == dend) {return BREAK_FAIL1;}
+            if(IS_A_LETTER(string, d, dend)) {
+                return BREAK_FAIL1;
+            }
+            if(ismbchar(string[d],ctx) && d + mbclen(string[d],ctx) - 1 < dend) {
+                d += mbclen(string[d],ctx) - 1;
+            }
+            d++;
+            SET_REGS_MATCHED();
+            return CONTINUE_MAINLOOP;
+        }
+
+        private final boolean IS_A_LETTER(char[] d, int dix, int dend) {
+            return re_syntax_table[d[dix]] == Sword ||
+                (ctx.current_mbctype != 0 ? 
+                 (ctx.re_mbctab[d[dix]] != 0 && d[dix+mbclen(d[dix],ctx)]<=dend):
+                 re_syntax_table[d[dix]] == Sword2);
+        }
+
+        private final boolean PREV_IS_A_LETTER(char[] d, int dix, int dend) {
+            return ((ctx.current_mbctype == MBCTYPE_SJIS)?
+                    IS_A_LETTER(d,dix-(((dix-1)!=0&&ismbchar(d[dix-2],ctx))?2:1),dend):
+                    ((ctx.current_mbctype!=0 && (d[dix-1] >= 0x80)) ||
+                     IS_A_LETTER(d,dix-1,dend)));
+        }
+
+        public MatchEnvironment(Pattern p, char[] string_arg, int size, int pos, int beg, Registers regs) {
+            this.size = size;
+            this.beg = beg;
+            this.p = p.buffer;
+            this.pix = 0;
+            this.p1=-1;
+            this.pend = p.used;
+            this.num_regs = p.re_nsub;
+            this.string = string_arg;
+            this.optz = (int)p.options;
+            this.self = p;
+            this.ctx = p.ctx;
+            this.pos = pos;
+
+            if(regs != null) {
+                regs.init_regs(num_regs);
+            }
+
+            init_stack();
+            init_registers();
+
+
+            /* Set up pointers to ends of strings.
+               Don't allow the second string to be empty unless both are empty.  */
+
+            /* `p' scans through the pattern as `d' scans through the data. `dend'
+               is the end of the input string that `d' points within. `d' is
+               advanced into the following input string whenever necessary, but
+               this happens before fetching; therefore, at the beginning of the
+               loop, `d' can be pointing at the end of a string, but it cannot
+               equal string2.  */
+
+            d = pos; dend = size;
+        }
+
+        public final int fail() {
+            //fail:
+            do {
+                if(stackp != 0) {
+                    if(handle_fail() == 1) {
+                        return 0;
+                    }
+                } else {
+                    return -1; /* Matching at this starting point really fails.  */
+                }
+            } while(true);
+        }
     }
+
+    final static int BREAK_NORMAL = 0;
+    final static int BREAK_FAIL1 = 1;
+    final static int CONTINUE_MAINLOOP = 2;
+    final static int RETURN_M2 = 3;
 
     /**
      * @mri re_match_exec
      */
     public int match_exec(char[] string_arg, int size, int pos, int beg, Registers regs) {
-        MatchEnvironment w = new MatchEnvironment();
-        w.p = buffer;
-        w.pix = 0;
-        w.p1=-1;
-        w.pend = used;
-        w.num_regs = re_nsub;
-        w.string = string_arg;
-        w.optz = (int)options;
-        w.self = this;
-        w.ctx = this.ctx;
-        w.pos = pos;
-
-        if(regs != null) {
-            regs.init_regs(w.num_regs);
-        }
-
-        w.init_stack();
-        w.init_registers();
-
-
-        /* Set up pointers to ends of strings.
-           Don't allow the second string to be empty unless both are empty.  */
-
-        /* `p' scans through the pattern as `d' scans through the data. `dend'
-           is the end of the input string that `d' points within. `d' is
-           advanced into the following input string whenever necessary, but
-           this happens before fetching; therefore, at the beginning of the
-           loop, `d' can be pointing at the end of a string, but it cannot
-           equal string2.  */
-
-        w.d = pos; w.dend = size;
+        MatchEnvironment w = new MatchEnvironment(this,string_arg,size,pos,beg,regs);
 
         /* This loops over pattern commands.  It exits by returning from the
            function if match is complete, or it drops through if match fails
            at this starting point in the input data.  */
         boolean gotoRestoreBestRegs = false;
-        restore_best_regs2: do {
+        do {
             mainLoop: for(;;) {
                 fail1: do {
                     /* End of pattern means we might have succeeded.  */
                     if(w.pix == w.pend || gotoRestoreBestRegs) {
                         if(!gotoRestoreBestRegs) {
                             if(w.restore_best_regs()==1) {
-                                break;
+                                break fail1;
                             }
                         } else {
                             gotoRestoreBestRegs = false;
@@ -3569,393 +4006,30 @@ public class Pattern {
                         return w.d - w.pos;
                     }
 
-                    //System.err.println("--executing " + (int)w.p[w.pix] + " at " + w.pix);
-                    switch(w.p[w.pix++]) {
-                        /* ( [or `(', as appropriate] is represented by start_memory,
-                           ) by stop_memory.  Both of those commands are followed by
-                           a register number in the next byte.  The text matched
-                           within the ( and ) is recorded under that number.  */
-                    case start_memory:
-                        w.start_memory();
+                    switch(w.main_switch()) {
+                    case CONTINUE_MAINLOOP:
                         continue mainLoop;
-                    case stop_memory:
-                        w.stop_memory();
-                        continue mainLoop;
-                    case start_paren:
-                    case stop_paren:
-                        break;
-                        /* \<digit> has been turned into a `duplicate' command which is
-                           followed by the numeric value of <digit> as the register number.  */
-                    case duplicate:
-                        if(w.duplicate()) {
-                            break fail1;
-                        }
-                        break;
-                    case start_nowidth:
-                        w.PUSH_FAILURE_POINT(-1,w.d);
-                        if(w.stackp > RE_DUP_MAX) {
-                            return -2;
-                        }
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix+=2;
-                        STORE_NUMBER(w.p, w.pix+w.mcnt, w.stackp);
-                        continue mainLoop;
-                    case stop_nowidth:
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix+=2;
-                        w.stackp = w.mcnt;
-                        w.d = w.stackb[w.stackp-3];
-                        w.POP_FAILURE_POINT();
-                        continue mainLoop;
-                    case stop_backtrack:
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix+=2;
-                        w.stackp = w.mcnt;
-                        w.POP_FAILURE_POINT();
-                        continue mainLoop;
-                    case pop_and_fail:
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix+1);
-                        w.stackp = w.mcnt;
-                        w.POP_FAILURE_POINT();
+                    case BREAK_FAIL1:
                         break fail1;
-                    case anychar:
-                        if(w.anychar() == 1) {
-                            break fail1;
-                        }
-                        break;
-                    case anychar_repeat:
-                        w.anychar_repeat();
-                        break fail1;
-                    case charset:
-                    case charset_not: 
-                        if(w.charset() == 1) {
-                            break fail1;
-                        }
-                        continue mainLoop;
-
-
-                    case begline:
-                        if(size == 0 || w.d == 0) {
-                            continue mainLoop;
-                        }
-                        if(w.string[w.d-1] == '\n' && w.d != w.dend) {
-                            continue mainLoop;
-                        }
-                        break fail1;
-                    case endline:
-                        if(w.d == w.dend) {
-                            continue mainLoop;
-                        } else if(w.string[w.d] == '\n') {
-                            continue mainLoop;
-                        }
-                        break fail1;
-                        /* Match at the very beginning of the string. */
-                    case begbuf:
-                        if(w.d==0) {
-                            continue mainLoop;
-                        }
-                        break fail1;
-                        /* Match at the very end of the data. */
-                    case endbuf:
-                        if(w.d == w.dend) {
-                            continue mainLoop;
-                        }
-                        break fail1;
-                        /* Match at the very end of the data. */
-                    case endbuf2:
-                        if(w.d == w.dend) {
-                            continue mainLoop;
-                        }
-                        /* .. or newline just before the end of the data. */
-                        if(w.string[w.d] == '\n' && w.d+1 == w.dend) {
-                            continue mainLoop;
-                        }
-                        break fail1;
-                        /* `or' constructs are handled by starting each alternative with
-                           an on_failure_jump that points to the start of the next
-                           alternative.  Each alternative except the last ends with a
-                           jump to the joining point.  (Actually, each jump except for
-                           the last one really jumps to the following jump, because
-                           tensioning the jumps is a hassle.)  */
-                    
-                        /* The start of a stupid repeat has an on_failure_jump that points
-                           past the end of the repeat text. This makes a failure point so 
-                           that on failure to match a repetition, matching restarts past
-                           as many repetitions have been found with no way to fail and
-                           look for another one.  */
-                    
-                        /* A smart repeat is similar but loops back to the on_failure_jump
-                           so that each repetition makes another failure point.  */
-                    
-                        /* Match at the starting position. */
-                    case begpos:
-                        if(w.d == beg) {
-                            continue mainLoop;
-                        }
-                        break fail1;
-
-                    case on_failure_jump:
-                        //                on_failure:
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix+=2;
-                        w.PUSH_FAILURE_POINT(w.pix+w.mcnt,w.d);
-                        continue mainLoop;
-
-                        /* The end of a smart repeat has a maybe_finalize_jump back.
-                           Change it either to a finalize_jump or an ordinary jump.  */
-                    case maybe_finalize_jump:
-                        switch(w.maybe_finalize_jump()) {
-                        case 1:
-                            break fail1;
-                        case 2:
-                            continue mainLoop;
-                        }
-
-                        /* Note fall through.  */
-
-                        /* The end of a stupid repeat has a finalize_jump back to the
-                           start, where another failure point will be made which will
-                           point to after all the repetitions found so far.  */
-                    
-                        /* Take off failure points put on by matching on_failure_jump 
-                           because didn't fail.  Also remove the register information
-                           put on by the on_failure_jump.  */
-
-                    case finalize_jump:
-                        if(w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {
-                            w.pix = w.stackb[w.stackp-4];
-                            w.POP_FAILURE_POINT();
-                            continue mainLoop;
-                        }
-                        w.POP_FAILURE_POINT();
-                        /* Note fall through.  */
-
-                        /* We need this opcode so we can detect where alternatives end
-                           in `group_match_null_string_p' et al.  */
-                    case jump_past_alt:
-                        /* fall through */
-                        /* Jump without taking off any failure points.  */
-                    case jump:
-                        //      nofinalize:
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix += 2;
-                        if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
-                            break fail1;
-                        }
-                        w.pix += w.mcnt;
-                        continue mainLoop;
-                    case dummy_failure_jump:
-                        /* Normally, the on_failure_jump pushes a failure point, which
-                           then gets popped at finalize_jump.  We will end up at
-                           finalize_jump, also, and with a pattern of, say, `a+', we
-                           are skipping over the on_failure_jump, so we have to push
-                           something meaningless for finalize_jump to pop.  */
-                        w.PUSH_FAILURE_POINT(-1,0);
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix += 2;
-                        if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
-                            break fail1;
-                        }
-                        w.pix += w.mcnt;
-                        continue mainLoop;
-
-                        /* At the end of an alternative, we need to push a dummy failure
-                           point in case we are followed by a `finalize_jump', because
-                           we don't want the failure point for the alternative to be
-                           popped.  For example, matching `(a|ab)*' against `aab'
-                           requires that we match the `ab' alternative.  */
-                    case push_dummy_failure:
-                        w.push_dummy_failure();
-                        continue mainLoop;
-
-                        /* Have to succeed matching what follows at least n times.  Then
-                           just handle like an on_failure_jump.  */
-                    case succeed_n: 
-                        w.succeed_n();
-                        continue mainLoop;
-
-                    case jump_n:
-                        if(w.jump_n() == 1) {
-                            break fail1;
-                        }
-                        continue mainLoop;
-                    case set_number_at:
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix+=2;
-                        w.p1 = w.pix + w.mcnt;
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix+=2;
-                        STORE_NUMBER(w.p, w.p1, w.mcnt);
-                        continue mainLoop;
-                    case try_next:
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix += 2;
-                        if(w.pix + w.mcnt < w.pend) {
-                            w.PUSH_FAILURE_POINT(w.pix,w.d);
-                            w.stackb[w.stackp-1] = NON_GREEDY;
-                        }
-                        w.pix += w.mcnt;
-                        continue mainLoop;
-                    case finalize_push:
-                        w.POP_FAILURE_POINT();
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                        w.pix+=2;
-                        if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) { /* avoid infinite loop */
-                            break fail1;
-                        }
-                        w.PUSH_FAILURE_POINT(w.pix+w.mcnt,w.d);
-                        w.stackb[w.stackp-1] = NON_GREEDY;
-                        continue mainLoop;
-                    case finalize_push_n:
-                        w.mcnt = EXTRACT_NUMBER(w.p, w.pix + 2); 
-                        /* Originally, this is how many times we CAN jump.  */
-                        if(w.mcnt>0) {
-                            int posx, i;
-                            w.mcnt--;
-                            STORE_NUMBER(w.p, w.pix + 2, w.mcnt);
-                            posx = EXTRACT_NUMBER(w.p, w.pix);
-                            i = EXTRACT_NUMBER(w.p,w.pix+posx+5);
-                            if(i > 0) {
-                                w.mcnt = EXTRACT_NUMBER(w.p, w.pix);
-                                w.pix += 2;
-                                if(w.mcnt < 0 && w.stackp > 2 && w.stackb[w.stackp-3] == w.d) {/* avoid infinite loop */
-                                    break fail1;
-                                }
-                                w.pix += w.mcnt;
-                                continue mainLoop;
-                            }
-                            w.POP_FAILURE_POINT();
-                            w.mcnt = EXTRACT_NUMBER(w.p,w.pix);
-                            w.pix+=2;
-                            w.PUSH_FAILURE_POINT(w.pix+w.mcnt,w.d);
-                            w.stackb[w.stackp-1] = NON_GREEDY;
-                            w.pix += 2;		/* skip n */
-                        }
-                        /* If don't have to push any more, skip over the rest of command.  */
-                        else {
-                            w.pix += 4;
-                        }
-                        continue mainLoop;
-                        /* Ignore these.  Used to ignore the n of succeed_n's which
-                           currently have n == 0.  */
-                    case unused:
-                        continue mainLoop;
-                    case casefold_on:
-                        w.optz |= RE_OPTION_IGNORECASE;
-                        continue mainLoop;
-                    case casefold_off:
-                        w.optz &= ~RE_OPTION_IGNORECASE;
-                        continue mainLoop;
-                    case option_set:
-                        w.optz = w.p[w.pix++];
-                        continue mainLoop;
-                    case wordbound:
-                        if(w.d == 0) {
-                            if(w.d == w.dend) {break fail1;}
-                            if(IS_A_LETTER(w.string,w.d,w.dend)) {
-                                continue mainLoop;
-                            } else {
-                                break fail1;
-                            }
-                        }
-                        if(w.d == w.dend) {
-                            if(PREV_IS_A_LETTER(w.string,w.d,w.dend)) {
-                                continue mainLoop;
-                            } else {
-                                break fail1;
-                            }
-                        }
-                        if(PREV_IS_A_LETTER(w.string,w.d,w.dend) != IS_A_LETTER(w.string,w.d,w.dend)) {
-                            continue mainLoop;
-                        }
-                        break fail1;
-                    case notwordbound:
-                        if(w.d==0) {
-                            if(IS_A_LETTER(w.string, w.d, w.dend)) {
-                                break fail1;
-                            } else {
-                                continue mainLoop;
-                            }
-                        }
-                        if(w.d == w.dend) {
-                            if(PREV_IS_A_LETTER(w.string, w.d, w.dend)) {
-                                break fail1;
-                            } else {
-                                continue mainLoop;
-                            }
-                        }
-                        if(PREV_IS_A_LETTER(w.string, w.d, w.dend) != IS_A_LETTER(w.string, w.d, w.dend)) {
-                            break fail1;
-                        }
-                        continue mainLoop;
-                    case wordbeg:
-                        if(IS_A_LETTER(w.string, w.d, w.dend) && (w.d==0 || !PREV_IS_A_LETTER(w.string,w.d,w.dend))) {
-                            continue mainLoop;
-                        }
-                        break fail1;
-                    case wordend:
-                        if(w.d!=0 && PREV_IS_A_LETTER(w.string, w.d, w.dend)
-                           && (!IS_A_LETTER(w.string, w.d, w.dend) || w.d == w.dend)) {
-                            continue mainLoop;
-                        }
-                        break fail1;
-                    case wordchar:
-                        if(w.d == w.dend) {break fail1;}
-                        if(!IS_A_LETTER(w.string,w.d,w.dend)) {
-                            break fail1;
-                        }
-                        if(ismbchar(w.string[w.d],w.ctx) && w.d + mbclen(w.string[w.d],w.ctx) - 1 < w.dend) {
-                            w.d += mbclen(w.string[w.d],w.ctx) - 1;
-                        }
-                        w.d++;
-                        w.SET_REGS_MATCHED();
-                        continue mainLoop;
-                    case notwordchar:
-                        if(w.d == w.dend) {break fail1;}
-                        if(IS_A_LETTER(w.string, w.d, w.dend)) {
-                            break fail1;
-                        }
-                        if(ismbchar(w.string[w.d],w.ctx) && w.d + mbclen(w.string[w.d],w.ctx) - 1 < w.dend) {
-                            w.d += mbclen(w.string[w.d],w.ctx) - 1;
-                        }
-                        w.d++;
-                        w.SET_REGS_MATCHED();
-                        continue mainLoop;
-                    case exactn:
-                        if(w.exactn() == 1) {
-                            break fail1;
-                        }
-                        continue mainLoop;
+                    case RETURN_M2:
+                        return -2;
                     }
-
                     continue mainLoop;
                 } while(false);
-                //fail:
-                fail2: do {
-                    if(w.stackp != 0) {
-                        switch(w.handle_fail()) {
-                        case 0:
-                            continue fail2;
-                        case 1:
-                            continue mainLoop;
-                        }
-                    } else {
-                        break mainLoop;   /* Matching at this starting point really fails.  */
-                    }
-                } while(true);
+
+                if(w.fail() == -1) {
+                    break mainLoop;
+                } else {
+                    continue mainLoop;
+                }
             }        
 
             if(w.best_regs_set) {
                 gotoRestoreBestRegs=true;
                 w.d = best_regend[0];
-
-                for(w.mcnt = 0; w.mcnt < w.num_regs; w.mcnt++) {
-                    regstart[w.mcnt] = best_regstart[w.mcnt];
-                    regend[w.mcnt] = best_regend[w.mcnt];
-                }
-                continue restore_best_regs2;
+                w.fix_regs();
             }
-        } while(false);
+        } while(gotoRestoreBestRegs);
 
         return -1;
     }
@@ -4580,13 +4654,15 @@ public class Pattern {
     public static void main(String[] args) throws Exception {
         System.err.println("Speed test");
 
-        java.util.regex.Pattern p1 = java.util.regex.Pattern.compile(args[0]);
+        //        java.util.regex.Pattern p1 = java.util.regex.Pattern.compile(args[0]);
 
         long b1 = System.currentTimeMillis();
-        int times = 1000000;
+        int times = 100000;
+        /*
         for(int j=0;j<times;j++) {
             p1.matcher(args[1]).find();
         }
+        */
         long a1 = System.currentTimeMillis();
 
         long b2 = System.currentTimeMillis();
@@ -4598,7 +4674,7 @@ public class Pattern {
         }
         long a2 = System.currentTimeMillis();
 
-        System.out.println("Searching " + (times) + " regexps took java.util.regex: " + ((a1-b1)) + "ms");
+        //        System.out.println("Searching " + (times) + " regexps took java.util.regex: " + ((a1-b1)) + "ms");
         System.out.println("Searching " + (times) + " regexps took REJ: " + ((a2-b2)) + "ms");
     }
 
