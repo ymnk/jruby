@@ -56,10 +56,10 @@ public class Pattern {
     public final static int MBCTYPE_SJIS=2;
     public final static int MBCTYPE_UTF8=3;
     
-    private static final char Sword = 1;
-    private static final char Sword2 = 2;
+    private static final byte Sword = 1;
+    private static final byte Sword2 = 2;
 
-    private static final char[] re_syntax_table = new char[256];
+    private static final byte[] re_syntax_table = new byte[256];
 
     static {
         char c;
@@ -81,22 +81,22 @@ public class Pattern {
        argument bytes.  A command code can specify any interpretation
        whatsoever for its arguments.  Zero-bytes may appear in the compiled
        regular expression.*/
-    private final static char unused = 0;
-    private final static char exactn = 1; /* Followed by one byte giving n, then by n literal bytes.  */
-    private final static char begline = 2;  /* Fail unless at beginning of line.  */
-    private final static char endline = 3;  /* Fail unless at end of line.  */
-    private final static char begbuf = 4;   /* Succeeds if at beginning of buffer (if emacs) or at beginning
+    private final static byte unused = 0;
+    private final static byte exactn = 1; /* Followed by one byte giving n, then by n literal bytes.  */
+    private final static byte begline = 2;  /* Fail unless at beginning of line.  */
+    private final static byte endline = 3;  /* Fail unless at end of line.  */
+    private final static byte begbuf = 4;   /* Succeeds if at beginning of buffer (if emacs) or at beginning
                                                of string to be matched (if not).  */
-    private final static char endbuf = 5;   /* Analogously, for end of buffer/string.  */
-    private final static char endbuf2 = 6;  /* End of buffer/string, or newline just before it.  */
-    private final static char begpos = 7;   /* Matches where last scan//gsub left off.  */
-    private final static char jump = 8;     /* Followed by two bytes giving relative address to jump to.  */
-    private final static char jump_past_alt = 9;/* Same as jump, but marks the end of an alternative.  */
-    private final static char on_failure_jump = 10;	 /* Followed by two bytes giving relative address of 
+    private final static byte endbuf = 5;   /* Analogously, for end of buffer/string.  */
+    private final static byte endbuf2 = 6;  /* End of buffer/string, or newline just before it.  */
+    private final static byte begpos = 7;   /* Matches where last scan//gsub left off.  */
+    private final static byte jump = 8;     /* Followed by two bytes giving relative address to jump to.  */
+    private final static byte jump_past_alt = 9;/* Same as jump, but marks the end of an alternative.  */
+    private final static byte on_failure_jump = 10;	 /* Followed by two bytes giving relative address of 
                                                         place to resume at in case of failure.  */
-    private final static char finalize_jump = 11;	 /* Throw away latest failure point and then jump to 
+    private final static byte finalize_jump = 11;	 /* Throw away latest failure point and then jump to 
                                                         address.  */
-    private final static char maybe_finalize_jump = 12; /* Like jump but finalize if safe to do so.
+    private final static byte maybe_finalize_jump = 12; /* Like jump but finalize if safe to do so.
                                                            This is used to jump back to the beginning
                                                            of a repeat.  If the command that follows
                                                            this jump is clearly incompatible with the
@@ -104,65 +104,65 @@ public class Pattern {
                                                            we can be sure that there is no use backtracking
                                                            out of repetitions already completed,
                                                            then we finalize.  */
-    private final static char dummy_failure_jump = 13;  /* Jump, and push a dummy failure point. This 
+    private final static byte dummy_failure_jump = 13;  /* Jump, and push a dummy failure point. This 
                                                            failure point will be thrown away if an attempt 
                                                            is made to use it for a failure. A + construct 
                                                            makes this before the first repeat.  Also
                                                            use it as an intermediary kind of jump when
                                                            compiling an or construct.  */
-    private final static char push_dummy_failure = 14; /* Push a dummy failure point and continue.  Used at the end of
+    private final static byte push_dummy_failure = 14; /* Push a dummy failure point and continue.  Used at the end of
                                                           alternatives.  */
-    private final static char succeed_n = 15;	 /* Used like on_failure_jump except has to succeed n times;
+    private final static byte succeed_n = 15;	 /* Used like on_failure_jump except has to succeed n times;
                                                     then gets turned into an on_failure_jump. The relative
                                                     address following it is useless until then.  The
                                                     address is followed by two bytes containing n.  */
-    private final static char jump_n = 16;	 /* Similar to jump, but jump n times only; also the relative
+    private final static byte jump_n = 16;	 /* Similar to jump, but jump n times only; also the relative
                                                 address following is in turn followed by yet two more bytes
                                                 containing n.  */
-    private final static char try_next = 17;    /* Jump to next pattern for the first time,
+    private final static byte try_next = 17;    /* Jump to next pattern for the first time,
                                                    leaving this pattern on the failure stack. */
-    private final static char finalize_push = 18;	/* Finalize stack and push the beginning of the pattern
+    private final static byte finalize_push = 18;	/* Finalize stack and push the beginning of the pattern
                                                        on the stack to retry (used for non-greedy match) */
-    private final static char finalize_push_n = 19;	/* Similar to finalize_push, buf finalize n time only */
-    private final static char set_number_at = 20;	/* Set the following relative location to the
+    private final static byte finalize_push_n = 19;	/* Similar to finalize_push, buf finalize n time only */
+    private final static byte set_number_at = 20;	/* Set the following relative location to the
                                                        subsequent number.  */
-    private final static char anychar = 21;	 /* Matches any (more or less) one character excluding newlines.  */
-    private final static char anychar_repeat = 22;	 /* Matches sequence of characters excluding newlines.  */
-    private final static char charset = 23;     /* Matches any one char belonging to specified set.
+    private final static byte anychar = 21;	 /* Matches any (more or less) one character excluding newlines.  */
+    private final static byte anychar_repeat = 22;	 /* Matches sequence of characters excluding newlines.  */
+    private final static byte charset = 23;     /* Matches any one char belonging to specified set.
                                                    First following byte is number of bitmap bytes.
                                                    Then come bytes for a bitmap saying which chars are in.
                                                    Bits in each byte are ordered low-bit-first.
                                                    A character is in the set if its bit is 1.
                                                    A character too large to have a bit in the map
                                                    is automatically not in the set.  */
-    private final static char charset_not = 24; /* Same parameters as charset, but match any character
+    private final static byte charset_not = 24; /* Same parameters as charset, but match any character
                                                    that is not one of those specified.  */
-    private final static char start_memory = 25; /* Start remembering the text that is matched, for
+    private final static byte start_memory = 25; /* Start remembering the text that is matched, for
                                                     storing in a memory register.  Followed by one
                                                     byte containing the register number.  Register numbers
                                                     must be in the range 0 through RE_NREGS.  */
-    private final static char stop_memory = 26; /* Stop remembering the text that is matched
+    private final static byte stop_memory = 26; /* Stop remembering the text that is matched
                                                    and store it in a memory register.  Followed by
                                                    one byte containing the register number. Register
                                                    numbers must be in the range 0 through RE_NREGS.  */
-    private final static char start_paren = 27;    /* Place holder at the start of (?:..). */
-    private final static char stop_paren = 28;    /* Place holder at the end of (?:..). */
-    private final static char casefold_on = 29;   /* Turn on casefold flag. */
-    private final static char casefold_off = 30;  /* Turn off casefold flag. */
-    private final static char option_set = 31;	   /* Turn on multi line match (match with newlines). */
-    private final static char start_nowidth = 32; /* Save string point to the stack. */
-    private final static char stop_nowidth = 33;  /* Restore string place at the point start_nowidth. */
-    private final static char pop_and_fail = 34;  /* Fail after popping nowidth entry from stack. */
-    private final static char stop_backtrack = 35;  /* Restore backtrack stack at the point start_nowidth. */
-    private final static char duplicate = 36;   /* Match a duplicate of something remembered.
+    private final static byte start_paren = 27;    /* Place holder at the start of (?:..). */
+    private final static byte stop_paren = 28;    /* Place holder at the end of (?:..). */
+    private final static byte casefold_on = 29;   /* Turn on casefold flag. */
+    private final static byte casefold_off = 30;  /* Turn off casefold flag. */
+    private final static byte option_set = 31;	   /* Turn on multi line match (match with newlines). */
+    private final static byte start_nowidth = 32; /* Save string point to the stack. */
+    private final static byte stop_nowidth = 33;  /* Restore string place at the point start_nowidth. */
+    private final static byte pop_and_fail = 34;  /* Fail after popping nowidth entry from stack. */
+    private final static byte stop_backtrack = 35;  /* Restore backtrack stack at the point start_nowidth. */
+    private final static byte duplicate = 36;   /* Match a duplicate of something remembered.
                                                    Followed by one byte containing the index of the memory 
                                                    register.  */
-    private final static char wordchar = 37;    /* Matches any word-constituent character.  */
-    private final static char notwordchar = 38; /* Matches any char that is not a word-constituent.  */
-    private final static char wordbeg = 39;	 /* Succeeds if at word beginning.  */
-    private final static char wordend = 40;	 /* Succeeds if at word end.  */
-    private final static char wordbound = 41;   /* Succeeds if at a word boundary.  */
-    private final static char notwordbound = 42; /* Succeeds if not at a word boundary.  */
+    private final static byte wordchar = 37;    /* Matches any word-constituent character.  */
+    private final static byte notwordchar = 38; /* Matches any char that is not a word-constituent.  */
+    private final static byte wordbeg = 39;	 /* Succeeds if at word beginning.  */
+    private final static byte wordend = 40;	 /* Succeeds if at word end.  */
+    private final static byte wordbound = 41;   /* Succeeds if at a word boundary.  */
+    private final static byte notwordbound = 42; /* Succeeds if not at a word boundary.  */
 
     /**
      * @mri re_compile_pattern
@@ -210,55 +210,65 @@ public class Pattern {
      * @mri re_compile_pattern
      */
     public static Pattern compile(String pattern, int start, int length, Pattern bufp) throws PatternSyntaxException {
-        return compile(pattern.toCharArray(),start,length,bufp,ASCII);
+        try {
+            return compile(pattern.getBytes("ISO-8859-1"),start,length,bufp,ASCII);
+        } catch(java.io.UnsupportedEncodingException e) {
+            //CAN'T HAPPEN
+            return null;
+        }
     }
 
     /**
      * @mri re_compile_pattern
      */
     public static Pattern compile(String pattern, int start, int length, Pattern bufp, CompileContext ctx) throws PatternSyntaxException {
-        return compile(pattern.toCharArray(),start,length,bufp,ctx);
+        try {
+            return compile(pattern.getBytes("ISO-8859-1"),start,length,bufp,ctx);
+        } catch(java.io.UnsupportedEncodingException e) {
+            //CAN'T HAPPEN
+            return null;
+        }
     }
 
     /**
      * @mri re_compile_pattern
      */
-    public static Pattern compile(char[] pattern) throws PatternSyntaxException {
+    public static Pattern compile(byte[] pattern) throws PatternSyntaxException {
         return compile(pattern,0,pattern.length,emptyPattern(0),ASCII);
     }
 
     /**
      * @mri re_compile_pattern
      */
-    public static Pattern compile(char[] pattern, CompileContext ctx) throws PatternSyntaxException {
+    public static Pattern compile(byte[] pattern, CompileContext ctx) throws PatternSyntaxException {
         return compile(pattern,0,pattern.length,emptyPattern(0),ctx);
     }
 
     /**
      * @mri re_compile_pattern
      */
-    public static Pattern compile(char[] pattern, int flags) throws PatternSyntaxException {
+    public static Pattern compile(byte[] pattern, int flags) throws PatternSyntaxException {
         return compile(pattern,0,pattern.length,emptyPattern(flags),ASCII);
     }
 
     /**
      * @mri re_compile_pattern
      */
-    public static Pattern compile(char[] pattern, int flags, CompileContext ctx) throws PatternSyntaxException {
+    public static Pattern compile(byte[] pattern, int flags, CompileContext ctx) throws PatternSyntaxException {
         return compile(pattern,0,pattern.length,emptyPattern(flags),ctx);
     }
 
     /**
      * @mri re_compile_pattern
      */
-    public static Pattern compile(char[] pattern, Pattern bufp) throws PatternSyntaxException {
+    public static Pattern compile(byte[] pattern, Pattern bufp) throws PatternSyntaxException {
         return compile(pattern,0,pattern.length,bufp,ASCII);
     }
 
     /**
      * @mri re_compile_pattern
      */
-    public static Pattern compile(char[] pattern, Pattern bufp, CompileContext ctx) throws PatternSyntaxException {
+    public static Pattern compile(byte[] pattern, Pattern bufp, CompileContext ctx) throws PatternSyntaxException {
         return compile(pattern,0,pattern.length,bufp,ctx);
     }
 
@@ -312,14 +322,14 @@ public class Pattern {
     public final static class CompileContext {
         public final char[] translate;
         public final int current_mbctype;
-        public final char[] re_mbctab;
+        public final byte[] re_mbctab;
         public CompileContext() {
             this(null,MBCTYPE_ASCII,mbctab_ascii);
         }
         public CompileContext(char[] t) {
             this(t,MBCTYPE_ASCII,mbctab_ascii);
         }
-        public CompileContext(char[] t, int mbc, char[] mbctab) {
+        public CompileContext(char[] t, int mbc, byte[] mbctab) {
             this.translate = t;
             this.current_mbctype = mbc;
             this.re_mbctab = mbctab;
@@ -330,9 +340,9 @@ public class Pattern {
 
     private static class CompilationEnvironment {
         public CompileContext ctx;
-        public char[] b;
+        public byte[] b;
         public int bix;
-        public char[] p;
+        public byte[] p;
         public int pix;
         public int pend;
         public char c, c1;
@@ -417,7 +427,7 @@ public class Pattern {
             if(pix == pend) {
                 err("premature end of regular expression");
             }
-            c = p[pix++];
+            c = (char)(p[pix++]&0xFF);
             if(TRANSLATE_P()) {
                 c = ctx.translate[c];
             }
@@ -432,6 +442,10 @@ public class Pattern {
         }
 
         public final void BUFPUSH(char ch) {
+            BUFPUSH((byte)ch);
+        }
+
+        public final void BUFPUSH(byte ch) {
             GET_BUFFER_SPACE(1);
             b[bix++] = ch;
         }
@@ -440,14 +454,14 @@ public class Pattern {
             if(pix == pend) {
                 err("premature end of regular expression");
             }
-            c = p[pix++];
+            c = (char)(p[pix++]&0xFF);
         }
 
         public final void PATFETCH_RAW_c1() {
             if(pix == pend) {
                 err("premature end of regular expression");
             }
-            c1 = p[pix++];
+            c1 = (char)(p[pix++]&0xFF);
         }
 
         public final void dollar() {
@@ -569,8 +583,8 @@ public class Pattern {
             }
             p0 = pix;
             
-            BUFPUSH((char)32);
-            Arrays.fill(b,bix,bix + 32 + 2,(char)0);
+            BUFPUSH((byte)32);
+            Arrays.fill(b,bix,bix + 32 + 2,(byte)0);
                     
             had_mbchar = 0;
             had_num_literal = 0;
@@ -742,8 +756,7 @@ public class Pattern {
             if(had_mbchar == 0) {
                 if((optz & RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null) {
                     for (;last<=c;last++) {
-                        char cx = ctx.translate[last];
-                        SET_LIST_BIT(cx);
+                        SET_LIST_BIT((char)(ctx.translate[last]&0xFF));
                     }
                 } else {
                     for(;last<=c;last++) {
@@ -948,7 +961,7 @@ public class Pattern {
                 err("premature end of regular expression");
             }
                         
-            c = p[pix++];
+            c = (char)(p[pix++]&0xFF);
 
             switch (c) {
             case 'x': case 'm': case 'i': case '-':
@@ -1001,7 +1014,7 @@ public class Pattern {
                     if(pix == pend) {
                         err("premature end of regular expression");
                     }
-                    c = p[pix++];
+                    c = (char)(p[pix++]&0xFF);
                 }
                 break;
 
@@ -1010,7 +1023,7 @@ public class Pattern {
                     if(pix == pend) {
                         err("premature end of regular expression");
                     }
-                    c = p[pix++];
+                    c = (char)(p[pix++]&0xFF);
                     if((optz & RE_OPTION_IGNORECASE)!=0 && ctx.translate!=null) {
                         c = ctx.translate[c];
                     }
@@ -1068,10 +1081,10 @@ public class Pattern {
             switch(c) {
             case '(':
                 BUFPUSH(start_memory);
-                BUFPUSH((char)regnum);
+                BUFPUSH((byte)regnum);
                 stackb[stackp++] = regnum++;
                 stackb[stackp++] = bix;
-                BUFPUSH((char)0);
+                BUFPUSH((byte)0);
                 /* too many ()'s to fit in a byte. (max 254) */
                 if(regnum >= 255) {
                     err("regular expression too big");
@@ -1082,15 +1095,15 @@ public class Pattern {
             case '>':
                 BUFPUSH(start_nowidth);
                 stackb[stackp++] = bix;
-                BUFPUSH((char)0);
-                BUFPUSH((char)0);
+                BUFPUSH((byte)0);
+                BUFPUSH((byte)0);
                 if(c != '!') {
                     break;
                 }
                 BUFPUSH(on_failure_jump);
                 stackb[stackp++] = bix;
-                BUFPUSH((char)0);
-                BUFPUSH((char)0);
+                BUFPUSH((byte)0);
+                BUFPUSH((byte)0);
                 break;
             case ':':
                 BUFPUSH(start_paren);
@@ -1100,7 +1113,7 @@ public class Pattern {
             }
             if(push_option != 0) {
                 BUFPUSH(option_set);
-                BUFPUSH((char)optz);
+                BUFPUSH((byte)optz);
             }
             if(casefold != 0) {
                 if((optz & RE_OPTION_IGNORECASE)!=0) {
@@ -1139,19 +1152,19 @@ public class Pattern {
                 }
                 if ((optz ^ stackb[stackp-1]) != RE_OPTION_IGNORECASE) {
                     BUFPUSH(option_set);
-                    BUFPUSH((char)stackb[stackp-1]);
+                    BUFPUSH((byte)stackb[stackp-1]);
                 }
             }
             p0 = bix;
             optz = stackb[--stackp];
-            switch(c = (char)stackb[--stackp]) {
+            switch(c = (char)(((byte)stackb[--stackp])&0xFF)) {
             case '(': {
                 int v1 = stackb[--stackp];
-                self.buffer[v1] = (char)(regnum - stackb[stackp-1]);
+                self.buffer[v1] = (byte)(regnum - stackb[stackp-1]);
                 GET_BUFFER_SPACE(3);
                 b[bix++] = stop_memory;
-                b[bix++] = (char)stackb[stackp-1];
-                b[bix++] = (char)(regnum - stackb[stackp-1]);
+                b[bix++] = (byte)stackb[stackp-1];
+                b[bix++] = (byte)(regnum - stackb[stackp-1]);
                 stackp--;
             }
                 break;
@@ -1167,16 +1180,16 @@ public class Pattern {
                 BUFPUSH(stop_nowidth);
                 /* tell stack-pos place to start_nowidth */
                 STORE_NUMBER(self.buffer,stackb[stackp-1], bix - stackb[stackp-1] - 2);
-                BUFPUSH((char)0); /* space to hold stack pos */
-                BUFPUSH((char)0);
+                BUFPUSH((byte)0); /* space to hold stack pos */
+                BUFPUSH((byte)0);
                 stackp--;
                 break;
             case '>':
                 BUFPUSH(stop_backtrack);
                 /* tell stack-pos place to start_nowidth */
                 STORE_NUMBER(self.buffer,stackb[stackp-1], bix - stackb[stackp-1] - 2);
-                BUFPUSH((char)0); /* space to hold stack pos */
-                BUFPUSH((char)0);
+                BUFPUSH((byte)0); /* space to hold stack pos */
+                BUFPUSH((byte)0);
                 stackp--;
                 break;
             case ':':
@@ -1357,7 +1370,7 @@ public class Pattern {
                 if (b[laststart] == exactn && b[laststart+1]+2 == bix - laststart && b[laststart+1]*lower_bound < 256) {
                     mcnt = b[laststart+1];
                     GET_BUFFER_SPACE((lower_bound-1)*mcnt);
-                    b[laststart+1] = (char)(lower_bound*mcnt);
+                    b[laststart+1] = (byte)(lower_bound*mcnt);
                     while(--lower_bound > 0) {
                         System.arraycopy(b,laststart+2,b,bix,mcnt);
                         bix+=mcnt;
@@ -1467,7 +1480,7 @@ public class Pattern {
             /* Do not translate the character after the \, so that we can
                distinguish, e.g., \B from \b, even if we normally would
                translate, e.g., B to b.  */
-            c = p[pix++];
+            c = (char)(p[pix++]&0xFF);
             switch (c) {
             case 's':
             case 'S':
@@ -1484,7 +1497,7 @@ public class Pattern {
                     b[bix++] = charset_not;
                 }
                 b[bix++] = 32;
-                Arrays.fill(b,bix,bix+34,(char)0);
+                Arrays.fill(b,bix,bix+34,(byte)0);
                 if(c == 's' || c == 'S') {
                     SET_LIST_BIT(' ');
                     SET_LIST_BIT('\t');
@@ -1611,7 +1624,7 @@ public class Pattern {
 
                 laststart = bix;
                 BUFPUSH(duplicate);
-                BUFPUSH((char)c1);
+                BUFPUSH((byte)c1);
                 break;
 
             case 'M':
@@ -1654,10 +1667,10 @@ public class Pattern {
                     laststart = bix;
                     BUFPUSH(exactn);
                     pending_exact = bix;
-                    BUFPUSH((char)0);
+                    BUFPUSH((byte)0);
                 }
                 if(had_num_literal!=0 || c == 0xff) {
-                    BUFPUSH((char)0xFF);
+                    BUFPUSH((byte)0xFF);
                     b[pending_exact]++;
                     had_num_literal = 0;
                 }
@@ -1669,7 +1682,7 @@ public class Pattern {
                         if(pix == pend) {
                             err("premature end of regular expression");
                         }
-                        c = p[pix++];
+                        c = (char)(p[pix++]&0xFF);
                         BUFPUSH(c);
                         b[pending_exact]++;
                     }
@@ -1768,9 +1781,9 @@ public class Pattern {
         }
 
         private final void EXTEND_BUFFER() {
-            char[] old_buffer = self.buffer;
+            byte[] old_buffer = self.buffer;
             self.allocated *= 2;
-            self.buffer = new char[self.allocated];
+            self.buffer = new byte[self.allocated];
             b = self.buffer;
             System.arraycopy(old_buffer,0,self.buffer,0,old_buffer.length);
         }
@@ -1799,26 +1812,26 @@ public class Pattern {
         return c;
     }
 
-    private final static int read_special(char[] p, int pix, int pend, int[] pp) {
+    private final static int read_special(byte[] p, int pix, int pend, int[] pp) {
         int c;
         if(pix == pend) {
             pp[0] = pix;
             return ~0;
         }
-        c = p[pix++];
+        c = p[pix++]&0xFF;
         switch(c) {
         case 'M':
             if(pix == pend) {
                 return ~0;
             }
-            c = p[pix++];
+            c = p[pix++]&0xFF;
             if(c != '-') {
                 return -1;
             }
             if(pix == pend) {
                 return ~0;
             }
-            c = p[pix++];
+            c = p[pix++]&0xFF;
             pp[0] = pix;
             if(c == '\\') {
                 return read_special(p, --pix, pend, pp) | 0x80;
@@ -1831,7 +1844,7 @@ public class Pattern {
             if(pix == pend) {
                 return ~0;
             }
-            c = p[pix++];
+            c = p[pix++]&0xFF;
             if(c != '-') {
                 return -1;
             }
@@ -1839,7 +1852,7 @@ public class Pattern {
             if(pix == pend) {
                 return ~0;
             }
-            c = p[pix++];
+            c = p[pix++]&0xFF;
             pp[0] = pix;
             if(c == '\\') {
                 c = read_special(p, --pix, pend, pp);
@@ -1856,7 +1869,7 @@ public class Pattern {
     }
 
     private final static String HEXDIGIT = "0123456789abcdef0123456789ABCDEF";
-    private final static long scan_hex(char[] p, int start, int len, int[] retlen) {
+    private final static long scan_hex(byte[] p, int start, int len, int[] retlen) {
         int s = start;
         long retval = 0;
         int tmp;
@@ -1869,7 +1882,7 @@ public class Pattern {
         return retval;
     }
 
-    private final static long scan_oct(char[] p, int start, int len, int[] retlen) {
+    private final static long scan_oct(byte[] p, int start, int len, int[] retlen) {
         int s = start;
         long retval = 0;
 
@@ -1891,7 +1904,7 @@ public class Pattern {
         }
     }
 
-    private void compile(char[] pattern, int start, int length, CompileContext ctx) throws PatternSyntaxException {
+    private void compile(byte[] pattern, int start, int length, CompileContext ctx) throws PatternSyntaxException {
         this.ctx = ctx;
         CompilationEnvironment w = new CompilationEnvironment();
         w.ctx = ctx;
@@ -1911,7 +1924,7 @@ public class Pattern {
         if(allocated == 0) {
             allocated = INIT_BUF_SIZE;
             /* EXTEND_BUFFER loses when allocated is 0.  */
-            buffer = new char[INIT_BUF_SIZE];
+            buffer = new byte[INIT_BUF_SIZE];
             w.b = buffer;
         }
 
@@ -1970,7 +1983,7 @@ public class Pattern {
                     if(w.c == '#') {
                         if(w.push_option!=0) {
                             w.BUFPUSH(option_set);
-                            w.BUFPUSH((char)w.optz);
+                            w.BUFPUSH((byte)w.optz);
                         }
                         if(w.casefold!=0) {
                             if((w.optz & RE_OPTION_IGNORECASE) != 0) {
@@ -2054,26 +2067,26 @@ public class Pattern {
     /**
      * @mri re_compile_pattern
      */
-    public static Pattern compile(char[] pattern, int start, int length, Pattern bufp) throws PatternSyntaxException {
+    public static Pattern compile(byte[] pattern, int start, int length, Pattern bufp) throws PatternSyntaxException {
         return compile(pattern,start,length,bufp,ASCII);
     }
 
     /**
      * @mri re_compile_pattern
      */
-    public static Pattern compile_s(char[] pattern, int start, int length, CompileContext ctx) throws PatternSyntaxException {
+    public static Pattern compile_s(byte[] pattern, int start, int length, CompileContext ctx) throws PatternSyntaxException {
         return compile(pattern,start,length,emptyPattern(0),ctx);
     }
 
     /**
      * @mri re_compile_pattern
      */
-    public static Pattern compile(char[] pattern, int start, int length, Pattern bufp, CompileContext ctx) throws PatternSyntaxException {
+    public static Pattern compile(byte[] pattern, int start, int length, Pattern bufp, CompileContext ctx) throws PatternSyntaxException {
         bufp.compile(pattern,start,length,ctx);
         return bufp;
     }
 
-    private final static void bm_init_skip(int[] skip, char[] patb, int patix, int m, char[] trans) {
+    private final static void bm_init_skip(int[] skip, byte[] patb, int patix, int m, char[] trans) {
         int j, c;
         
         for(c=0; c<256; c++) {
@@ -2081,16 +2094,16 @@ public class Pattern {
         }
         if(trans != null) {
             for (j=0; j<m-1; j++) {
-                skip[trans[patb[patix+j]]] = m-1-j;
+                skip[trans[patb[patix+j]&0xFF]] = m-1-j;
             }
         } else {
             for(j=0; j<m-1; j++) {
-                skip[patb[patix+j]] = m-1-j;
+                skip[patb[patix+j]&0xFF] = m-1-j;
             }
         }
     }
 
-    private final static int calculate_must_string(char[] start, int end) {
+    private final static int calculate_must_string(byte[] start, int end) {
         int mcnt;
         int max = 0;
         int p = 0;
@@ -2101,11 +2114,11 @@ public class Pattern {
         }
 
         while(p<pend) {
-            switch(start[p++]) {
+            switch(start[p++]&0xFF) {
             case unused:
                 break;
             case exactn:
-                mcnt = start[p];
+                mcnt = start[p]&0xFF;
                 if(mcnt > max) {
                     must = p;
                     max = mcnt;
@@ -2144,7 +2157,7 @@ public class Pattern {
                 break;
             case charset:
             case charset_not:
-                mcnt = start[p++];
+                mcnt = start[p++]&0xFF;
                 p += mcnt;
                 mcnt = EXTRACT_UNSIGNED(start, p);
                 p+=2;
@@ -2199,7 +2212,7 @@ public class Pattern {
     }
 
 
-    private final static void insert_op_2(char op, char[] b, int there, int current_end, int num_1, int num_2) {
+    private final static void insert_op_2(byte op, byte[] b, int there, int current_end, int num_1, int num_2) {
         int pfrom = current_end;
         int pto = current_end+5;
 
@@ -2210,18 +2223,18 @@ public class Pattern {
         STORE_NUMBER(b, there + 3, num_2);
     }
 
-    private final static void store_jump_n(char[] b, int from, char opcode, int to, int n) {
+    private final static void store_jump_n(byte[] b, int from, byte opcode, int to, int n) {
         b[from] = opcode;
         STORE_NUMBER(b, from + 1, to - (from + 3));
         STORE_NUMBER(b, from + 3, n);
     }
 
-    private final static void store_jump(char[] b, int from, char opcode, int to) {
+    private final static void store_jump(byte[] b, int from, byte opcode, int to) {
         b[from] = opcode;
         STORE_NUMBER(b, from+1, to-(from+3));
     }
 
-    private final static void insert_jump_n(char op, char[] b, int from, int to, int current_end, int n) {
+    private final static void insert_jump_n(byte op, byte[] b, int from, int to, int current_end, int n) {
         int pfrom = current_end;
         int pto = current_end+5;
 
@@ -2230,17 +2243,17 @@ public class Pattern {
     }
 
 
-    private final static void insert_jump(char op, char[] b, int from, int to, int current_end) {
+    private final static void insert_jump(byte op, byte[] b, int from, int to, int current_end) {
         int pfrom = current_end;
         int pto = current_end+3;
         System.arraycopy(b,from,b,from+3,pfrom-from);
         store_jump(b, from, op, to);
     }
 
-    private final static void STORE_NUMBER(char[] d, int dix, int number) {
-        d[dix] = (char)(number&0xFF);
-        d[dix+1] = (char)((number >> 8)&0xFF);
-        int vv = ((d[dix] & 0377) + (d[dix+1] << 8));
+    private final static void STORE_NUMBER(byte[] d, int dix, int number) {
+        d[dix] = (byte)(number&0xFF);
+        d[dix+1] = (byte)((number >> 8)&0xFF);
+        int vv = ((d[dix] & 0377) + ((d[dix+1]&0xFF) << 8));
         if((vv & 0x8000) != 0) {
             vv |= 0xFFFF0000;
         }
@@ -2255,42 +2268,42 @@ public class Pattern {
         }
     }
 
-    private final static void STORE_MBC(char[] d, int dix, long c) {
-        d[dix  ] = (char)(((c)>>>24) & 0xff);
-        d[dix+1] = (char)(((c)>>>16) & 0xff);
-        d[dix+2] = (char)(((c)>>> 8) & 0xff);
-        d[dix+3] = (char)(((c)>>> 0) & 0xff);
+    private final static void STORE_MBC(byte[] d, int dix, long c) {
+        d[dix  ] = (byte)(((c)>>>24) & 0xff);
+        d[dix+1] = (byte)(((c)>>>16) & 0xff);
+        d[dix+2] = (byte)(((c)>>> 8) & 0xff);
+        d[dix+3] = (byte)(((c)>>> 0) & 0xff);
     }
 
-    private final static int EXTRACT_MBC(char[] p, int pix) {
-        return p[pix]<<24 |
-            p[pix+1] <<16 |
-            p[pix+2] <<8 |
-            p[pix+3];
+    private final static int EXTRACT_MBC(byte[] p, int pix) {
+        return (p[pix]&0xFF)<<24 |
+            (p[pix+1]&0xFF) <<16 |
+            (p[pix+2]&0xFF) <<8 |
+            (p[pix+3]&0xFF);
     }
 
-    private final static int EXTRACT_NUMBER(char[] b, int p) {
-        int vv = (b[p] & 0377) | (b[p+1] << 8);
+    private final static int EXTRACT_NUMBER(byte[] b, int p) {
+        int vv = (b[p] & 0xFF) | ((b[p+1]&0xFF) << 8);
         if((vv & 0x8000) != 0) {
             vv |= 0xFFFF0000;
         }
         return vv;
     }
 
-    private final static int EXTRACT_UNSIGNED(char[] b, int p) {
-        return (b[p] & 0377) | (b[p+1] << 8);
+    private final static int EXTRACT_UNSIGNED(byte[] b, int p) {
+        return (b[p] & 0377) | ((b[p+1]&0xFF) << 8);
     }
 
-    private final char MBC2WC(char c, char[] p, int pix) {
+    private final char MBC2WC(char c, byte[] p, int pix) {
         if(ctx.current_mbctype == MBCTYPE_UTF8) {
             int n = mbclen(c,ctx) - 1;
             c &= (1<<(6-n)) - 1;
             while(n-- > 0) {
-                c = (char)(c << 6 | (p[pix++] & ((1<<6)-1)));
+                c = (char)(c << 6 | ((p[pix++]&0xFF) & ((1<<6)-1)));
             }
         } else {
             c <<= 8;
-            c |= p[pix];
+            c |= (char)(p[pix]&0xFF);
         }
         return c;
     }
@@ -2305,18 +2318,24 @@ public class Pattern {
         return 0xfe;
     }
     
-
+    public final static boolean ismbchar(byte c, CompileContext ctx) {
+        return ctx.re_mbctab[c&0xFF] != 0;
+    }
 
     public final static boolean ismbchar(int c, CompileContext ctx) {
         return ctx.re_mbctab[c] != 0;
+    }
+
+    public final static int mbclen(byte c, CompileContext ctx) {
+        return ctx.re_mbctab[c&0xFF] + 1;
     }
 
     public final static int mbclen(char c, CompileContext ctx) {
         return ctx.re_mbctab[c] + 1;
     }
 
-    private final static void set_list_bits(long c1, long c2, char[] b, int bix) {
-        char sbc_size = b[bix-1];
+    private final static void set_list_bits(long c1, long c2, byte[] b, int bix) {
+        char sbc_size = (char)(b[bix-1]&0xFF);
         int mbc_size = EXTRACT_UNSIGNED(b,bix+sbc_size);
         int beg,end,upb;
         if(c1 > c2) {
@@ -2371,29 +2390,29 @@ public class Pattern {
     }
     
     private static interface StartPos {
-        int startpos(char[] string, int pos);
+        int startpos(byte[] string, int pos);
     }
 
     private static class ASC_StartPos implements StartPos {
-        public int startpos(char[] string, int pos) {
+        public int startpos(byte[] string, int pos) {
             return pos;
         }
     }
 
     private static class SJIS_StartPos implements StartPos {
-        private boolean isfirst(char c) {
-            return mbctab_sjis[c] == 0;
+        private boolean isfirst(byte c) {
+            return mbctab_sjis[c&0xFF] == 0;
         }
 
-        private boolean istrail(char c) {
-            return mbctab_sjis_trail[c] != 0;
+        private boolean istrail(byte c) {
+            return mbctab_sjis_trail[c&0xFF] != 0;
         }
 
-        private int mbclen(char c) {
-            return mbctab_sjis[c] + 1;
+        private int mbclen(byte c) {
+            return mbctab_sjis[c&0xFF] + 1;
         }
 
-        public int startpos(char[] string, int pos) {
+        public int startpos(byte[] string, int pos) {
             int i = pos, w;
             if(i > 0 && istrail(string[i])) {
                 do {
@@ -2412,15 +2431,15 @@ public class Pattern {
     }
 
     private static class EUC_StartPos implements StartPos {
-        private boolean islead(char c) {
-            return ((c) - 0xA1) > 0xFE - 0xa1;
+        private boolean islead(byte c) {
+            return ((c&0xFF) - 0xA1) > 0xFE - 0xa1;
         }
 
-        private int mbclen(char c) {
-            return mbctab_euc[c] + 1;
+        private int mbclen(byte c) {
+            return mbctab_euc[c&0xFF] + 1;
         }
 
-        public int startpos(char[] string, int pos) {
+        public int startpos(byte[] string, int pos) {
             int i = pos, w;
             while(i > 0 && !islead(string[i])) {
                 --i;
@@ -2434,15 +2453,15 @@ public class Pattern {
     }
 
     private static class UTF8_StartPos implements StartPos {
-        private boolean islead(char c) {
+        private boolean islead(byte c) {
             return (c & 0xC0) != 0x80;
         }
 
-        private int mbclen(char c) {
-            return mbctab_utf8[c] + 1;
+        private int mbclen(byte c) {
+            return mbctab_utf8[c&0xFF] + 1;
         }
 
-        public int startpos(char[] string, int pos) {
+        public int startpos(byte[] string, int pos) {
             int i = pos, w;
 
             while(i > 0 && !islead(string[i])) {
@@ -2461,11 +2480,11 @@ public class Pattern {
         new SJIS_StartPos(),
         new UTF8_StartPos()};
 
-    public final static int mbc_startpos(char[] string, int startpos, CompileContext ctx) {
+    public final static int mbc_startpos(byte[] string, int startpos, CompileContext ctx) {
         return startpositions[ctx.current_mbctype].startpos(string,startpos);
     }
     
-    public int adjust_startpos(char[] string, int size, int startpos, int range) {
+    public int adjust_startpos(byte[] string, int size, int startpos, int range) {
         /* Update the fastmap now if not correct already.  */
         if(fastmap_accurate==0) {
             compile_fastmap();
@@ -2503,17 +2522,17 @@ public class Pattern {
     }
 
     private Pattern() {}
-    public Pattern(char[] b, int all, char[] fmap, int flags) {
+    public Pattern(byte[] b, int all, byte[] fmap, int flags) {
         buffer = b;
         allocated = all;
         fastmap = fmap;
         options = flags;
     }
 
-    private char[] buffer;	  /* Space holding the compiled pattern commands.  */
+    private byte[] buffer;	  /* Space holding the compiled pattern commands.  */
     private int allocated;	  /* Size of space that `buffer' points to. */
     private int used;		  /* Length of portion of buffer actually occupied  */
-    private char[] fastmap;	  /* Pointer to fastmap, if any, or nul if none.  */
+    private byte[] fastmap;	  /* Pointer to fastmap, if any, or nul if none.  */
                               /* re_search uses the fastmap, if there is one,
                                  to skip over totally implausible characters.  */
     private int must;         /* Pointer to exact pattern which strings should have
@@ -2521,10 +2540,10 @@ public class Pattern {
     private int[] must_skip;  /* Pointer to exact pattern skip table for bm_search */
     public  long options;  	  /* Flags for options such as extended_pattern. */
     private int re_nsub;	  /* Number of subexpressions found by the compiler. */
-    private char fastmap_accurate;
+    private byte fastmap_accurate;
 			                  /* Set to zero when a new pattern is stored,
 			                     set to one when the fastmap is updated from it.  */
-    private char can_be_null; /* Set to one by compiling fastmap
+    private byte can_be_null; /* Set to one by compiling fastmap
 			                     if this pattern might match the null string.
 			                     It does not necessarily match the null string
                                  in that case, but if this is zero, it cannot.
@@ -2556,7 +2575,7 @@ public class Pattern {
     /**
      * @mri re_search
      */
-    public int search(char[] string, int size, int startpos, int range, Registers regs) {
+    public int search(byte[] string, int size, int startpos, int range, Registers regs) {
         int val=-1, anchor = 0, initpos = startpos;
         boolean doBegbuf = false;
         int pix;
@@ -2663,7 +2682,7 @@ public class Pattern {
                             pix = startpos;
 
                             startpos_adjust: while(range > 0) {
-                                c = string[pix++];
+                                c = (char)(string[pix++]&0xFF);
                                 if(ismbchar(c,ctx)) {
                                     int len;
                                     if(fastmap[c] != 0) {
@@ -2671,7 +2690,7 @@ public class Pattern {
                                     }
                                     len = mbclen(c,ctx) - 1;
                                     while(len-- > 0) {
-                                        c = string[pix++];
+                                        c = (char)(string[pix++]&0xFF);
                                         range--;
                                         if(fastmap[c] == 2) {
                                             break startpos_adjust;
@@ -2686,7 +2705,7 @@ public class Pattern {
                             }
                             startpos += irange - range;
                         } else { /* Searching backwards.  */
-                            c = string[startpos];
+                            c = (char)(string[startpos]&0xFF);
                             c &= 0xff;
                             if(MAY_TRANSLATE() ? fastmap[ctx.translate[c]]==0 : fastmap[c]==0) {
                                 break advance;
@@ -2813,11 +2832,37 @@ public class Pattern {
         return 0;
     }
 
+    private final int memcmp_translate(byte[] s, int s1, int s2, int len) {
+        int p1 = s1;
+        int p2 = s2;
+        char cc;
+        while(len>0) {
+            cc = (char)(s[p1++]&0xFF);
+            if(ismbchar(cc,ctx)) {
+                int n;
+                if(cc != s[p2++]) {
+                    return 1;
+                }
+                for(n=mbclen(cc,ctx)-1; n>0; n--) {
+                    if(--len == 0 || s[p1++] != s[p2++]) {
+                        return 1;
+                    }
+                }
+            } else {
+                if(ctx.translate[cc] != ctx.translate[(char)(s[p2++]&0xFF)]) {
+                    return 1;
+                }
+            }
+            len--;
+        }
+        return 0;
+    }
+
 
     /**
      * @mri re_match
      */
-    public int match(char[] string_arg, int size, int pos, Registers regs) {
+    public int match(byte[] string_arg, int size, int pos, Registers regs) {
         return match_exec(string_arg, size, pos, pos, regs);
     }
 
@@ -2829,14 +2874,14 @@ public class Pattern {
     private final static int NUM_COUNT_ITEMS = 2;
 
     private static class MatchEnvironment {
-        public char[] p;
+        public byte[] p;
         public char c;
         public int p1;
         public int pix;
         public int pend;
         public int optz;
         public int num_regs;
-        public char[] string;
+        public byte[] string;
         public int mcnt;
         public int d;
         public int dend;
@@ -3016,13 +3061,13 @@ public class Pattern {
             return false;
         }
 
-        public final boolean is_in_list_sbc(int cx, char[] b, int bix) {
-            int size = b[bix++];
-            return cx/8 < size && (b[bix + cx/8]&(1<<cx%8)) != 0;
+        public final boolean is_in_list_sbc(int cx, byte[] b, int bix) {
+            int size = b[bix++]&0xFF;
+            return cx/8 < size && ((b[bix + cx/8]&0xFF)&(1<<cx%8)) != 0;
         }
   
-        public final boolean is_in_list_mbc(int cx, char[] b, int bix) {
-            int size = b[bix++];
+        public final boolean is_in_list_mbc(int cx, byte[] b, int bix) {
+            int size = b[bix++]&0xFF;
             bix+=size+2;
             size = EXTRACT_UNSIGNED(b,bix-2);
             if(size == 0) {
@@ -3040,7 +3085,7 @@ public class Pattern {
             return i<size && EXTRACT_MBC(b,bix+i*8) <= cx;
         }        
 
-        public final boolean is_in_list(int cx, char[] b, int bix) {
+        public final boolean is_in_list(int cx, byte[] b, int bix) {
             return is_in_list_sbc(cx, b, bix) || (ctx.current_mbctype!=0 ? is_in_list_mbc(cx, b, bix) : false);
         }
 
@@ -3235,7 +3280,7 @@ public class Pattern {
                     
             if(d == dend) {return 1;}
                         
-            c = string[d++];
+            c = (char)(string[d++]&0xFF);
             if(ismbchar(c,ctx)) {
                 if(d + mbclen(c,ctx) - 1 <= dend) {
                     cc = c;
@@ -3259,7 +3304,7 @@ public class Pattern {
             
             if(!not) {return 1;}
             
-            pix += 1 + p[pix] + 2 + EXTRACT_UNSIGNED(p, pix + 1 + p[pix])*8;
+            pix += 1 + (char)(p[pix]&0xFF) + 2 + EXTRACT_UNSIGNED(p, pix + 1 + (char)(p[pix]&0xFF))*8;
             SET_REGS_MATCHED();
                     
             if(part) {
@@ -3321,11 +3366,11 @@ public class Pattern {
             if(p1 == pend) {
                 p[pix-3] = finalize_jump;
             } else if(p[p1] == exactn || p[p1] == endline) {
-                c = p[p1] == endline ? '\n' : p[p1+2];
+                c = p[p1] == endline ? '\n' : (char)(p[p1+2]&0xFF);
                 int p2 = pix+mcnt;
                 /* p2[0] ... p2[2] are an on_failure_jump.
                    Examine what follows that.  */
-                if(p[p2+3] == exactn && p[p2+5] != c) {
+                if(p[p2+3] == exactn && (p[p2+5]&0xFF) != c) {
                     p[pix-3] = finalize_jump;
                 } else if(p[p2+3] == charset ||
                           p[p2+3] == charset_not) {
@@ -3464,10 +3509,10 @@ public class Pattern {
                         }
                         continue;
                     }
-                    c = string[d++];
+                    c = (char)(string[d++]&0xFF);
                     if(ismbchar(c,ctx)) {
                         int n;
-                        if(c != p[pix++]) {
+                        if(c != (char)(p[pix++]&0xFF)) {
                             return 1;
                         }
                         for(n = mbclen(c,ctx) - 1; n > 0; n--) {
@@ -3480,14 +3525,14 @@ public class Pattern {
                         continue;
                     }
                     /* compiled code translation needed for ruby */
-                    if(ctx.translate[c] != ctx.translate[p[pix++]]) {
+                    if(ctx.translate[c] != ctx.translate[p[pix++]&0xFF]) {
                         return 1;
                     }
                 } while(--mcnt > 0);
             } else {
                 do {
                     if(d == dend) {return 1;}
-                    if(p[pix] == 0xff) {
+                    if((p[pix]&0xFF) == 0xff) {
                         pix++; mcnt--;
                     }
                     if(string[d++] != p[pix++]) {
@@ -3910,21 +3955,21 @@ public class Pattern {
             return CONTINUE_MAINLOOP;
         }
 
-        private final boolean IS_A_LETTER(char[] d, int dix, int dend) {
-            return re_syntax_table[d[dix]] == Sword ||
+        private final boolean IS_A_LETTER(byte[] d, int dix, int dend) {
+            return re_syntax_table[d[dix]&0xFF] == Sword ||
                 (ctx.current_mbctype != 0 ? 
-                 (ctx.re_mbctab[d[dix]] != 0 && d[dix+mbclen(d[dix],ctx)]<=dend):
-                 re_syntax_table[d[dix]] == Sword2);
+                 (ctx.re_mbctab[d[dix]&0xFF] != 0 && (d[dix+mbclen(d[dix],ctx)]&0xFF)<=dend):
+                 re_syntax_table[d[dix]&0xFF] == Sword2);
         }
 
-        private final boolean PREV_IS_A_LETTER(char[] d, int dix, int dend) {
+        private final boolean PREV_IS_A_LETTER(byte[] d, int dix, int dend) {
             return ((ctx.current_mbctype == MBCTYPE_SJIS)?
                     IS_A_LETTER(d,dix-(((dix-1)!=0&&ismbchar(d[dix-2],ctx))?2:1),dend):
-                    ((ctx.current_mbctype!=0 && (d[dix-1] >= 0x80)) ||
+                    ((ctx.current_mbctype!=0 && ((d[dix-1]&0xFF) >= 0x80)) ||
                      IS_A_LETTER(d,dix-1,dend)));
         }
 
-        public MatchEnvironment(Pattern p, char[] string_arg, int size, int pos, int beg, Registers regs) {
+        public MatchEnvironment(Pattern p, byte[] string_arg, int size, int pos, int beg, Registers regs) {
             this.size = size;
             this.beg = beg;
             this.p = p.buffer;
@@ -3981,7 +4026,7 @@ public class Pattern {
     /**
      * @mri re_match_exec
      */
-    public int match_exec(char[] string_arg, int size, int pos, int beg, Registers regs) {
+    public int match_exec(byte[] string_arg, int size, int pos, int beg, Registers regs) {
         MatchEnvironment w = new MatchEnvironment(this,string_arg,size,pos,beg,regs);
 
         /* This loops over pattern commands.  It exits by returning from the
@@ -4038,13 +4083,13 @@ public class Pattern {
     /**
      * @mri slow_match
      */
-    public boolean slow_match(char[] little, int littleix, int lend, char[] big, int bigix, int bend, char[] translate) {
+    public boolean slow_match(byte[] little, int littleix, int lend, byte[] big, int bigix, int bend, char[] translate) {
         while(littleix < lend && bigix < bend) {
-            char c = little[littleix++];
+            char c = (char)(little[littleix++]&0xFF);
             if(c == 0xff) {
-                c = little[littleix++];
+                c = (char)(little[littleix++]&0xFF);
             }
-            if(!(translate != null ? translate[big[bigix++]]==translate[c] : big[bigix++]==c)) { 
+            if(!(translate != null ? translate[big[bigix++]]==translate[c] : (char)(big[bigix++]&0xFF)==c)) { 
                 break;
             }
         }
@@ -4054,15 +4099,15 @@ public class Pattern {
     /**
      * @mri slow_search
      */
-    public int slow_search(char[] little, int littleix, int llen, char[] big, int bigix, int blen, char[] translate) {
+    public int slow_search(byte[] little, int littleix, int llen, byte[] big, int bigix, int blen, char[] translate) {
         int bsave = bigix;
         int bend = bigix+blen;
         boolean fescape = false;
 
-        char c = little[littleix];
+        char c = (char)(little[littleix]&0xFF);
 
         if(c == 0xff) {
-            c = little[littleix+1];
+            c = (char)(little[littleix+1]&0xFF);
             fescape = true;
         } else if(translate!=null && !ismbchar(c,ctx)) {
             c = translate[c];
@@ -4112,7 +4157,7 @@ public class Pattern {
     /**
      * @mri bm_search
      */
-    public int bm_search(char[] little, int littleix, int llen, char[] big, int bigix, int blen, int[] skip, char[] translate) {
+    public int bm_search(byte[] little, int littleix, int llen, byte[] big, int bigix, int blen, int[] skip, char[] translate) {
         int i, j, k;
         i = llen-1;
         if(translate != null) {
@@ -4154,7 +4199,7 @@ public class Pattern {
      */
     private final void compile_fastmap() {
         int size = used;
-        char[] p = buffer;
+        byte[] p = buffer;
         int pix = 0;
         int pend = size;
         int j,k;
@@ -4166,7 +4211,7 @@ public class Pattern {
         int stacke = 160;
         long optz = options;
 
-        Arrays.fill(fastmap, 0, 256, (char)0);
+        Arrays.fill(fastmap, 0, 256, (byte)0);
 
         fastmap_accurate = 1;
         can_be_null = 0;
@@ -4510,7 +4555,7 @@ public class Pattern {
     /* Functions for multi-byte support.
        Created for grep multi-byte extension Jul., 1993 by t^2 (Takahiro Tanimoto)
        Last change: Jul. 9, 1993 by t^2  */
-    private static final char[] mbctab_ascii = {
+    private static final byte[] mbctab_ascii = {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4529,7 +4574,7 @@ public class Pattern {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     };
 
-    private static final char[] mbctab_euc = { /* 0xA1-0xFE */
+    private static final byte[] mbctab_euc = { /* 0xA1-0xFE */
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4548,7 +4593,7 @@ public class Pattern {
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
     };
 
-    private static final char[] mbctab_sjis = { /* 0x81-0x9F,0xE0-0xFC */
+    private static final byte[] mbctab_sjis = { /* 0x81-0x9F,0xE0-0xFC */
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4567,7 +4612,7 @@ public class Pattern {
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0
     };
 
-    private static final char[] mbctab_sjis_trail = { /* 0x40-0x7E,0x80-0xFC */
+    private static final byte[] mbctab_sjis_trail = { /* 0x40-0x7E,0x80-0xFC */
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4586,7 +4631,7 @@ public class Pattern {
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0
     };
 
-    private static final char[] mbctab_utf8 = {
+    private static final byte[] mbctab_utf8 = {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4606,7 +4651,7 @@ public class Pattern {
     };
 
     public static void tmain4(String[] args) throws Exception {
-        char[] ccc = args[1].toCharArray();
+        byte[] ccc = args[1].getBytes("ISO-8859-1");
         Registers reg = new Registers();
         System.out.println(Pattern.compile(args[0]).search(ccc,ccc.length,0,ccc.length,reg));
         for(int i=0;i<reg.num_regs;i++) {
@@ -4667,7 +4712,7 @@ public class Pattern {
 
         long b2 = System.currentTimeMillis();
         Pattern p2 = Pattern.compile(args[0]);
-        char[] ss = args[1].toCharArray();
+        byte[] ss = args[1].getBytes("ISO-8859-1");
         Registers rgs = new Registers();
         for(int j=0;j<times;j++) {
             p2.search(ss,ss.length,0,ss.length,rgs);

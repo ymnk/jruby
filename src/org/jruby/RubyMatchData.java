@@ -50,7 +50,8 @@ import org.rej.Registers;
  * @author  amoore
  */
 public class RubyMatchData extends RubyObject {
-    char[] str;
+    byte[] str;
+    int len;
     Registers regs;
     private RubyString _str;
     
@@ -93,7 +94,7 @@ public class RubyMatchData extends RubyObject {
             if(regs.beg[i] == -1) {
                 ary.add(getRuntime().getNil());
             } else {
-                IRubyObject _s = RubyString.newString(getRuntime(),ByteList.plain(str),regs.beg[i],regs.end[i]-regs.beg[i]);
+                IRubyObject _s = RubyString.newString(getRuntime(),new ByteList(str,regs.beg[i],regs.end[i]-regs.beg[i]));
                 if(taint) {
                     _s.taint();
                 }
@@ -193,7 +194,7 @@ public class RubyMatchData extends RubyObject {
         if(regs.beg[0] == -1) {
             return getRuntime().getNil();
         }
-        RubyString str_ = RubyString.newString(getRuntime(),new String(str,0,regs.beg[0]));
+        RubyString str_ = RubyString.newString(getRuntime(),new ByteList(str,0,regs.beg[0]));
         if(isTaint()) {
             str_.taint();
         }
@@ -207,7 +208,7 @@ public class RubyMatchData extends RubyObject {
         if(regs.beg[0] == -1) {
             return getRuntime().getNil();
         }
-        RubyString str_ = RubyString.newString(getRuntime(),new String(str,regs.end[0],str.length-regs.end[0]));
+        RubyString str_ = RubyString.newString(getRuntime(),new ByteList(str,regs.end[0],str.length-regs.end[0]));
         if(isTaint()) {
             str_.taint();
         }
@@ -233,7 +234,7 @@ public class RubyMatchData extends RubyObject {
      */
     public IRubyObject string() {
         if(_str == null) {
-            _str = RubyString.newString(getRuntime(),ByteList.plain(str));
+            _str = RubyString.newString(getRuntime(),new ByteList(str,0,len,false));
             _str.setFrozen(true);
         }
         return _str;

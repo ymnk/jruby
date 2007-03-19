@@ -329,6 +329,24 @@ public class ByteList implements Comparable, CharSequence, Serializable {
         return new ByteList(plain(s),false);
     }
 
+    public static String createString(byte[] s, int start, int len) {
+        try {
+            return new String(s,start,len, "ISO-8859-1");
+        } catch(Exception e) {
+            //CAN'T HAPPEN
+            return null;
+        }
+    }
+
+    public static byte[] plain(String s) {
+        try {
+            return s.getBytes("ISO-8859-1");
+        } catch(Exception e) {
+            //CAN'T HAPPEN
+            return null;
+        }
+    }
+
     public static byte[] plain(CharSequence s) {
         byte[] bytes = new byte[s.length()];
         for (int i = 0; i < bytes.length; i++) {

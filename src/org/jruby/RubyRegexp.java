@@ -64,7 +64,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
     private boolean kcode_default = true;
     private KCode kcode;
     private Pattern ptr;
-    private char[] str;
+    private byte[] str;
     private int len;
     private boolean literal;
 
@@ -123,16 +123,24 @@ public class RubyRegexp extends RubyObject implements ReOptions {
     }
 
     public static RubyRegexp newRegexp(Ruby runtime, String pattern, int options, String kcode) {
-        return newRegexp(runtime, pattern.toCharArray(), options, kcode);
+        return newRegexp(runtime, ByteList.plain(pattern), options, kcode);
     }
 
     public static RubyRegexp newRegexp(IRubyObject ptr, int options, String kcode) {
-        return newRegexp(ptr.getRuntime(), ptr.convertToString().getByteList().toCharArray(), options, kcode);
+        return newRegexp(ptr.getRuntime(), ptr.convertToString().getByteList(), options, kcode);
     }
 
-    public static RubyRegexp newRegexp(Ruby runtime, char[] pattern, int options, String kcode) {
+    public static RubyRegexp newRegexp(Ruby runtime, ByteList pattern, int options, String kcode) {
+        return newRegexp(runtime, pattern.bytes, pattern.realSize, options, kcode);
+    }
+
+    public static RubyRegexp newRegexp(Ruby runtime, byte[] pattern, int options, String kcode) {
+        return newRegexp(runtime, pattern, pattern.length, options, kcode);
+    }
+
+    public static RubyRegexp newRegexp(Ruby runtime, byte[] pattern, int len, int options, String kcode) {
         RubyRegexp rr = new RubyRegexp(runtime);
-        rr.initialize(pattern,pattern.length,options);
+        rr.initialize(pattern,len,options);
         return rr;
     }
 
@@ -163,7 +171,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         return getRuntime().newFixnum(hashval);
     }
     
-    private final static boolean memcmp(char[] s1, char[] s2, int len) {
+    private final static boolean memcmp(byte[] s1, byte[] s2, int len) {
         int x = 0;
         while(len-->0) {
             if(s1[x] != s2[x]) {
@@ -233,7 +241,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
     
     /** rb_reg_initialize
      */
-    private void initialize(char[] s, int len, int options) {
+    private void initialize(byte[] s, int len, int options) {
         if(isTaint() && getRuntime().getSafeLevel() >= 4) {
             throw getRuntime().newSecurityError("Insecure: can't modify regexp");
         }
@@ -263,13 +271,13 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             break;
         }
         ptr = make_regexp(s, len, options & 0xf, kcode.getContext());
-        str = new char[len];
+        str = new byte[len];
         System.arraycopy(s,0,str,0,len);
         this.len = len;
     }
 
-    private final Pattern make_regexp(char[] s, int len, int flags, Pattern.CompileContext ctx) {
-        Pattern rp = new Pattern(new char[16],16,new char[256],flags);
+    private final Pattern make_regexp(byte[] s, int len, int flags, Pattern.CompileContext ctx) {
+        Pattern rp = new Pattern(new byte[16],16,new byte[256],flags);
         try {
             Pattern.compile(s,0,len,rp,ctx);
         } catch(PatternSyntaxException e) {
@@ -282,14 +290,14 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         return rp;
     }
 
-    private final StringBuffer rb_reg_desc(char[] s, int len) {
+    private final StringBuffer rb_reg_desc(byte[] s, int len) {
         StringBuffer sb = new StringBuffer("/");
         rb_reg_expr_str(sb, s, len);
         sb.append("/");
         return sb;
     }
 
-    private final void rb_reg_expr_str(StringBuffer sb, char[] s, int len) {
+    private final void rb_reg_expr_str(StringBuffer sb, byte[] s, int len) {
         int p,pend;
         boolean need_escape = false;
         p = 0;
@@ -305,36 +313,36 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             p += Pattern.mbclen(s[p],ctx);
         }
         if(!need_escape) {
-            sb.append(s,0,len);
+            sb.append(ByteList.createString(s,0,len));
         } else {
             p = 0;
             while(p < pend) {
                 if(s[p] == '\\') {
                     int n = Pattern.mbclen(s[p+1],ctx) + 1;
-                    sb.append(s,p,n);
+                    sb.append(ByteList.createString(s,p,n));
                     p += n;
                     continue;
                 } else if(s[p] == '/') {
                     sb.append("\\/");
                 } else if(Pattern.ismbchar(s[p],ctx)) {
-                    sb.append(s,p,Pattern.mbclen(s[p],ctx));
+                    sb.append(ByteList.createString(s,p,Pattern.mbclen(s[p],ctx)));
                     p += Pattern.mbclen(s[p],ctx);
                     continue;
                 } else if((' ' == s[p] || (!Character.isWhitespace(s[p]) && 
                                            !Character.isISOControl(s[p])))) {
-                    sb.append(s[p]);
-                } else if(!Character.isSpace(s[p])) {
+                    sb.append((char)(s[p]&0xFF));
+                } else if(!Character.isSpace((char)(s[p]&0xFF))) {
                     sb.append('\\');
                     sb.append(Integer.toString((int)(s[p]&0377),8));
                 } else {
-                    sb.append(s[p]);
+                    sb.append((char)(s[p]&0xFF));
                 }
                 p++;
             }
         }
     }    
 
-    private final void rb_reg_raise(char[] s, int len, String err) {
+    private final void rb_reg_raise(byte[] s, int len, String err) {
         throw getRuntime().newRegexpError(err + ": " + rb_reg_desc(s,len));
     }
 
@@ -383,7 +391,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
     /** rb_reg_initialize_m
      */
     public IRubyObject initialize_m(IRubyObject[] args) {
-        char[] s;
+        byte[] s;
         int len;
         int flags = 0;
 
@@ -439,8 +447,9 @@ public class RubyRegexp extends RubyObject implements ReOptions {
                     break;
                 }
             }
-            s = args[0].convertToString().getByteList().toCharArray();
-            len = s.length;
+            ByteList bl = args[0].convertToString().getByteList();
+            s = bl.bytes;
+            len = bl.realSize;
         }
         initialize(s, len, flags);
         return this;
@@ -465,8 +474,9 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         } else {
             range = str.getByteList().length() - pos;
         }
-        char[] cstr = str.getByteList().toCharArray();
-        result = ptr.search(cstr,cstr.length,pos,range,regs);
+        ByteList bl = str.getByteList();
+        byte[] cstr = bl.bytes;
+        result = ptr.search(cstr,bl.realSize,pos,range,regs);
 
         if(result == -2) {
             rb_reg_raise(cstr,len,"Stack overflow in regexp matcher");
@@ -487,7 +497,8 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         }
 
         ((RubyMatchData)match).regs = regs.copy();
-        ((RubyMatchData)match).str = (char[])cstr.clone();
+        ((RubyMatchData)match).str = (byte[])cstr.clone();
+        ((RubyMatchData)match).len = bl.realSize;
         getRuntime().getCurrentContext().setBackref(match);
             
         match.infectBy(this);
@@ -616,7 +627,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             range = ((RubyString)str).getByteList().length() - pos;
         }
 
-        return ptr.adjust_startpos(ByteList.plain(((RubyString)str).getByteList().bytes), ((RubyString)str).getByteList().length(), pos, range);
+        return ptr.adjust_startpos(((RubyString)str).getByteList().bytes, ((RubyString)str).getByteList().realSize, pos, range);
     }
 
     public IRubyObject casefold_p() {
@@ -723,6 +734,10 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             ss.infectBy(this);
             return ss;
         } while(true);
+    }
+
+    private final boolean ISPRINT(byte c) {
+        return ISPRINT((char)(c&0xFF));
     }
 
     private final boolean ISPRINT(char c) {
@@ -910,7 +925,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             return nil;
         }
         end = m.regs.end[nth];
-        RubyString str = RubyString.newString(match.getRuntime(), new ByteList(ByteList.plain(m.str),start,end-start,false));
+        RubyString str = RubyString.newString(match.getRuntime(), new ByteList(m.str,start,end-start,false));
         str.infectBy(match);
         return str;
     }
@@ -944,7 +959,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         if(m.regs.beg[0] == -1) {
             return nil;
         }
-        RubyString str = RubyString.newString(match.getRuntime(), new ByteList(ByteList.plain(m.str),0,m.regs.beg[0],false));
+        RubyString str = RubyString.newString(match.getRuntime(), new ByteList(m.str,0,m.regs.beg[0]));
         str.infectBy(match);
         return str;
     }
@@ -961,7 +976,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         if(m.regs.beg[0] == -1) {
             return nil;
         }
-        RubyString str = RubyString.newString(match.getRuntime(), new ByteList(ByteList.plain(m.str),m.regs.end[0],m.str.length-m.regs.end[0],false));
+        RubyString str = RubyString.newString(match.getRuntime(), new ByteList(m.str,m.regs.end[0],m.str.length-m.regs.end[0]));
         str.infectBy(match);
         return str;
     }

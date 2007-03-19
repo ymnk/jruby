@@ -161,7 +161,7 @@ public class StringScanner {
             if(regs == null) {
                 regs = new Registers();
             }
-            char[] ccc = string.toCharArray();
+            byte[] ccc = ByteList.plain(string);
             if(pattern.search(ccc,ccc.length,pos,ccc.length,regs) == pos) {
                 matchStart = pos;
                 matchEnd = regs.end[0];
@@ -178,7 +178,7 @@ public class StringScanner {
             if(regs == null) {
                 regs = new Registers();
             }
-            char[] ccc = string.toCharArray();
+            byte[] ccc = ByteList.plain(string);
             if(pattern.search(ccc,ccc.length,pos,ccc.length,regs) >= pos) {
                 lastPos = pos;
                 matchStart = regs.beg[0];
@@ -199,7 +199,7 @@ public class StringScanner {
             if(regs == null) {
                 regs = new Registers();
             }
-            char[] ccc = string.toCharArray();
+            byte[] ccc = ByteList.plain(string);
             if(pattern.search(ccc,ccc.length,pos,ccc.length,regs) == pos) {
                 lastPos = pos;
                 matchStart = pos;
@@ -220,7 +220,7 @@ public class StringScanner {
             if(regs == null) {
                 regs = new Registers();
             }
-            char[] ccc = string.toCharArray();
+            byte[] ccc = ByteList.plain(string);
             if(pattern.search(ccc,ccc.length,pos,ccc.length,regs) == pos) {
                 matchStart = pos;
                 matchEnd = regs.end[0];
@@ -238,7 +238,7 @@ public class StringScanner {
             if(regs == null) {
                 regs = new Registers();
             }
-            char[] ccc = string.toCharArray();
+            byte[] ccc = ByteList.plain(string);
             if(pattern.search(ccc,ccc.length,pos,ccc.length,regs) >= pos) {
                 matchStart = regs.beg[0];
                 matchEnd = regs.end[0];
@@ -256,7 +256,7 @@ public class StringScanner {
             if(regs == null) {
                 regs = new Registers();
             }
-            char[] ccc = string.toCharArray();
+            byte[] ccc = ByteList.plain(string);
             if(pattern.search(ccc,ccc.length,pos,ccc.length,regs) == pos) {
                 lastPos = pos;
                 matchStart = pos;
@@ -276,7 +276,7 @@ public class StringScanner {
             if(regs == null) {
                 regs = new Registers();
             }
-            char[] ccc = string.toCharArray();
+            byte[] ccc = ByteList.plain(string);
             if(pattern.search(ccc,ccc.length,pos,ccc.length,regs) >= pos) {
                 lastPos = pos;
                 pos = regs.end[0];
@@ -296,7 +296,7 @@ public class StringScanner {
             if(regs == null) {
                 regs = new Registers();
             }
-            char[] ccc = string.toCharArray();
+            byte[] ccc = ByteList.plain(string);
             if(pattern.search(ccc,ccc.length,pos,ccc.length,regs) >= pos) {
                 matchStart = regs.beg[0];
                 matchEnd = regs.end[0];

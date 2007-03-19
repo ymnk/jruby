@@ -1612,7 +1612,7 @@ public class EvaluationState {
         }
         RubyRegexp p = iVisited.getPattern();
         if(p == null) {
-            p = RubyRegexp.newRegexp(runtime, iVisited.getValue().toCharArray(), iVisited.getFlags(), lang);
+            p = RubyRegexp.newRegexp(runtime, iVisited.getValue(), iVisited.getFlags(), lang);
             iVisited.setPattern(p);
         }
         return p;
