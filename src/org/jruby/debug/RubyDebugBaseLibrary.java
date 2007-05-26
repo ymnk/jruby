@@ -67,8 +67,8 @@ public class RubyDebugBaseLibrary implements Library {
             debugger.defineModuleFunction("debug_load", callbackFactory.getOptSingletonMethod("debug_load"));
             debugger.defineModuleFunction("skip", callbackFactory.getSingletonMethod("skip"));
             debugger.defineModuleFunction("debug_at_exit", callbackFactory.getSingletonMethod("debug_at_exit"));
-            debugger.defineModuleFunction("port_mortem?", callbackFactory.getSingletonMethod("post_mortem_p"));
-            debugger.defineModuleFunction("port_mortem=", callbackFactory.getSingletonMethod("post_mortem_set", IRubyObject.class));
+            debugger.defineModuleFunction("post_mortem?", callbackFactory.getSingletonMethod("post_mortem_p"));
+            debugger.defineModuleFunction("post_mortem=", callbackFactory.getSingletonMethod("post_mortem_set", IRubyObject.class));
             debugger.defineModuleFunction("keep_frame_binding?", callbackFactory.getSingletonMethod("keep_frame_binding_p"));
             debugger.defineModuleFunction("keep_frame_binding=", callbackFactory.getSingletonMethod("keep_frame_binding_p", IRubyObject.class));
             debugger.defineModuleFunction("debug", callbackFactory.getSingletonMethod("debug"));
