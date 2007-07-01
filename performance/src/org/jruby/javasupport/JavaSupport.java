@@ -85,6 +85,11 @@ public class JavaSupport {
         }
     }
 
+    // temporary method for monitoring instance cache usage
+    public int getInstanceCacheSize() {
+        return instanceCache.size();
+    }
+    
     public JavaClass getJavaClassFromCache(Class clazz) {
         WeakReference ref = (WeakReference) instanceCache.get(clazz);
         
