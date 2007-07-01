@@ -506,7 +506,11 @@ public class Java {
         int alen = ((RubyArray)args).getLength();
         IRubyObject[] aargs = ((RubyArray)args).toJavaArrayMaybeUnsafe();
         for(int i=0;i<alen;i++) {
-            arg_types.add(((JavaClass)((JavaObject)aargs[i]).java_class()).getValue());
+            if (aargs[i] instanceof JavaObject) {
+                arg_types.add(((JavaClass)((JavaObject)aargs[i]).java_class()).getValue());
+            } else {
+                arg_types.add(aargs[i].getClass());
+            }
         }
 
         Map ms = (Map)matchCache.get(methods);
@@ -545,10 +549,9 @@ public class Java {
 
                     boolean match = true;
                     for(int j=0; j<types.size(); j++) {
-                        if(!(
-                             JavaClass.assignable((Class)types.get(j),(Class)arg_types.get(j)) &&
-                             (i > 0 || primitive_match(types.get(j),arg_types.get(j)))
-                             )) {
+                        if(!(JavaClass.assignable((Class)types.get(j),(Class)arg_types.get(j)) &&
+                             (i > 0 || primitive_match(types.get(j),arg_types.get(j))))
+                           && !JavaUtil.isDuckTypeConvertable((Class)arg_types.get(j), (Class)types.get(j))) {
                             match = false;
                             break;
                         }
@@ -577,7 +580,11 @@ public class Java {
         int aend = start+len;
 
         for(int i=start;i<aend;i++) {
-            arg_types.add(((JavaClass)((JavaObject)args[i]).java_class()).getValue());
+            if (args[i] instanceof JavaObject) {
+                arg_types.add(((JavaClass)((JavaObject)args[i]).java_class()).getValue());
+            } else {
+                arg_types.add(args[i].getClass());
+            }
         }
 
         Map ms = (Map)matchCache.get(methods);
@@ -645,7 +652,8 @@ public class Java {
             // Compatible (by inheritance)
             if(len == types.length) {
                 for(int j=0,m=len; j<m; j++) {
-                    if(!JavaClass.assignable(types[j],(Class)arg_types.get(j))) {
+                    if(!JavaClass.assignable(types[j],(Class)arg_types.get(j)) 
+                        && !JavaUtil.isDuckTypeConvertable((Class)arg_types.get(j), types[j])) {
                         continue mfor;
                     }
                 }
