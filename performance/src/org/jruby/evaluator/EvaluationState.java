@@ -1670,7 +1670,7 @@ public class EvaluationState {
     }
     
     private static IRubyObject symbolNode(Ruby runtime, Node node) {
-        return runtime.newSymbol(((SymbolNode) node).getName());
+        return runtime.newSymbolNoIntern(((SymbolNode) node).getName());
     }
     
     private static IRubyObject toAryNode(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block aBlock) {

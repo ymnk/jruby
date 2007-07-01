@@ -129,7 +129,7 @@ public final class Ruby {
     private ObjectSpace objectSpace = new ObjectSpace();
 
     private final RubyFixnum[] fixnumCache = new RubyFixnum[256];
-    private final RubySymbol.SymbolTable symbolTable = new RubySymbol.SymbolTable();
+    private final RubySymbol.SymbolTable symbolTable = new RubySymbol.SymbolTable(this);
     private Hashtable ioHandlers = new Hashtable();
     private long randomSeed = 0;
     private long randomSeedSequence = 0;
@@ -157,6 +157,7 @@ public final class Ruby {
     private RubyBoolean falseObject;
     private RubyClass objectClass;
     private RubyClass stringClass;
+    private RubyClass symbolClass;    
     private RubyModule enumerableModule;
     private RubyClass systemCallError = null;
     private RubyModule errnoModule = null;
@@ -433,7 +434,11 @@ public final class Ruby {
     
     public RubyClass getArray() {
         return arrayClass;
-    }    
+    }
+    
+    public RubyClass getSymbol() {
+        return symbolClass;
+    }
 
     public IRubyObject getTmsStruct() {
         return tmsStruct;
@@ -771,7 +776,7 @@ public final class Ruby {
         RubyComparable.createComparable(this);
         enumerableModule = RubyEnumerable.createEnumerableModule(this);
         stringClass = RubyString.createStringClass(this);
-        RubySymbol.createSymbolClass(this);
+        symbolClass = RubySymbol.createSymbolClass(this);
         
         if (profile.allowClass("ThreadGroup")) RubyThreadGroup.createThreadGroupClass(this);
         if (profile.allowClass("Thread")) RubyThread.createThreadClass(this);
@@ -1569,7 +1574,15 @@ public final class Ruby {
     }    
 
     public RubySymbol newSymbol(String string) {
-        return RubySymbol.newSymbol(this, string);
+        return symbolTable.newSymbol(string);
+    }
+
+    public RubySymbol newSymbol(RubyString string) {
+        return symbolTable.newSymbol(string);
+    }
+
+    public RubySymbol newSymbolNoIntern(String string) {
+        return symbolTable.newSymbolNoIntern(string);
     }
 
     public RubyTime newTime(long milliseconds) {

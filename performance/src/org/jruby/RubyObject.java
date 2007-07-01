@@ -258,15 +258,11 @@ public class RubyObject implements Cloneable, IRubyObject {
         }
     }
 
-    public Map getInstanceVariables() {
-    	// TODO: double checking may or may not be safe enough here
-    	if (instanceVariables == null) {
-	    	synchronized (this) {
-	    		if (instanceVariables == null) {
-                            instanceVariables = Collections.synchronizedMap(new HashMap());
-	    		}
-	    	}
-    	}
+    // synchronized method per JRUBY-1173 (unsafe Double-Checked Locking)
+    public synchronized Map getInstanceVariables() {
+        if (instanceVariables == null) {
+            instanceVariables = Collections.synchronizedMap(new HashMap());
+        }
         return instanceVariables;
     }
 

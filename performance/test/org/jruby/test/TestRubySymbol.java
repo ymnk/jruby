@@ -49,7 +49,7 @@ public class TestRubySymbol extends TestCase {
     }
 
     public void testSymbolTable() throws Exception {
-        RubySymbol.SymbolTable st = new RubySymbol.SymbolTable();
+        RubySymbol.SymbolTable st = new RubySymbol.SymbolTable(runtime);
 
         assertNull(st.lookup("somename"));
         RubySymbol symbol = RubySymbol.newSymbol(runtime, "somename");

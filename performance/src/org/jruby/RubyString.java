@@ -618,7 +618,7 @@ public class RubyString extends RubyObject {
      *
      */
     public String asSymbol() {
-        return toString();
+        return toString().intern();
     }
 
 
@@ -3305,7 +3305,7 @@ public class RubyString extends RubyObject {
         if (s.indexOf('\0') >= 0) {
             throw getRuntime().newArgumentError("symbol string may not contain '\\0'");
         }
-        return RubySymbol.newSymbol(getRuntime(), toString());
+        return RubySymbol.newSymbol(getRuntime(), s);
     }
 
     public RubySymbol to_sym() {

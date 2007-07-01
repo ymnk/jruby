@@ -34,9 +34,8 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.Block;
@@ -46,6 +45,7 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.UnmarshalStream;
+import org.jruby.util.collections.NamedIRubyObjectMap;
 
 /**
  *
@@ -56,7 +56,7 @@ public class RubySymbol extends RubyObject {
     private final int id;
     
     private RubySymbol(Ruby runtime, String symbol) {
-        super(runtime, runtime.getClass("Symbol"));
+        super(runtime, runtime.getSymbol());
         this.symbol = symbol;
 
         runtime.symbolLastId++;
@@ -154,11 +154,7 @@ public class RubySymbol extends RubyObject {
     }
     
     public static String getSymbol(Ruby runtime, long id) {
-        RubySymbol result = runtime.getSymbolTable().lookup(id);
-        if (result != null) {
-            return result.symbol;
-        }
-        return null;
+        return runtime.getSymbolTable().getSymbol(id);
     }
 
     /* Symbol class methods.
@@ -166,18 +162,23 @@ public class RubySymbol extends RubyObject {
      */
 
     public static RubySymbol newSymbol(Ruby runtime, String name) {
-        RubySymbol result;
-        synchronized (RubySymbol.class) {
-            // Locked to prevent the creation of multiple instances of
-            // the same symbol. Most code depends on them being unique.
+        return runtime.getSymbolTable().newSymbol(name);
+    }
+    
+    public static RubySymbol newSymbol(RubyString name) {
+        return name.getRuntime().getSymbolTable().newSymbol(name);
+    }
 
-            result = runtime.getSymbolTable().lookup(name);
-            if (result == null) {
-                result = new RubySymbol(runtime, name);
-                runtime.getSymbolTable().store(result);
-            }
-        }
-        return result;
+    /**
+     * Call this <i>only</i> if you are certain the name has already been intern-ed.
+     * Be very, <i>very</i> certain.
+     * 
+     * @param runtime
+     * @param name - the intern-ed name
+     * @return
+     */
+    public static RubySymbol newSymbolNoIntern(Ruby runtime, String name) {
+        return runtime.getSymbolTable().newSymbolNoIntern(name);
     }
 
     public IRubyObject equal(IRubyObject other) {
@@ -281,11 +282,10 @@ public class RubySymbol extends RubyObject {
     }
     
     private static boolean isSymbolName(String s) {
-        if (s == null || s.length() < 1) {
+        int length;
+        if (s == null || (length = s.length()) == 0) {
             return false;
         }
-
-        int length = s.length();
 
         char c = s.charAt(0);
         switch (c) {
@@ -345,7 +345,7 @@ public class RubySymbol extends RubyObject {
     }
     
     public static IRubyObject all_symbols(IRubyObject recv) {
-        return recv.getRuntime().newArrayNoCopy(recv.getRuntime().getSymbolTable().all_symbols());
+        return recv.getRuntime().getSymbolTable().allSymbols();
     }
 
     public static RubySymbol unmarshalFrom(UnmarshalStream input) throws java.io.IOException {
@@ -354,38 +354,122 @@ public class RubySymbol extends RubyObject {
         return result;
     }
 
-    public static class SymbolTable {
-       
-        private Map table = new HashMap();
-        
-        public IRubyObject[] all_symbols() {
-            int length = table.size();
-            IRubyObject[] array = new IRubyObject[length];
-            System.arraycopy(table.values().toArray(), 0, array, 0, length);
-            return array;
+    public static class SymbolTable extends NamedIRubyObjectMap {
+        private static final int INITIAL_SYMBOL_TABLE_SIZE = 1024;
+
+        private Ruby runtime;
+
+        public SymbolTable(Ruby runtime) {
+            super(INITIAL_SYMBOL_TABLE_SIZE);
+            this.runtime = runtime;
         }
         
-        public RubySymbol lookup(long symbolId) {
-            Iterator iter = table.values().iterator();
-            while (iter.hasNext()) {
-                RubySymbol symbol = (RubySymbol) iter.next();
-                if (symbol != null) {
-                    if (symbol.id == symbolId) {
-                        return symbol;
-                    }
-                }
+        public SymbolTable(Ruby runtime, int initialTableSize) {
+            super(initialTableSize);
+            this.runtime = runtime;
+        }
+        
+        public synchronized RubySymbol newSymbol(String name) {
+            RubySymbol symbol;
+            Entry entry = getOrAddEntry(name = name.intern());
+            if ((symbol = (RubySymbol)entry.getObject()) == null) {
+                entry.setObject(symbol = new RubySymbol(runtime, name));
+            }
+            return symbol;
+        }
+        
+        public RubySymbol newSymbol(RubyString name) {
+            return newSymbolNoIntern(name.asSymbol());
+        }
+        
+        /**
+         * Call this <i>only</i> if you are certain the name has already been intern-ed.
+         * @param name
+         * @return
+         */
+        public synchronized RubySymbol newSymbolNoIntern(String name) {
+            RubySymbol symbol;
+            Entry entry = getOrAddEntry(name);
+            if ((symbol = (RubySymbol)entry.getObject()) == null) {
+                entry.setObject(symbol = new RubySymbol(runtime, name));
+            }
+            return symbol;
+        }
+        
+        public synchronized void store(RubySymbol symbol) {
+            Entry entry = getOrAddEntry(symbol.asSymbol());
+            if (entry.getObject() == null) {
+                entry.setObject(symbol);
+            }
+        }
+        
+        public synchronized RubySymbol lookup(String name) {
+            Entry entry;
+            if ((entry = getEntry(name.intern())) != null) {
+                return (RubySymbol)entry.getValue();
             }
             return null;
         }
         
-        public RubySymbol lookup(String name) {
-            return (RubySymbol) table.get(name);
+        public String getSymbol(long id) {
+            // getValueArray is synchronized
+            final IRubyObject[] symbols = getValueArray();
+            for (int i = symbols.length; --i >= 0; ) {
+                if (id == ((RubySymbol)symbols[i]).id) {
+                    return ((RubySymbol)symbols[i]).symbol;
+                }
+            }
+            return null;
+        }
+
+        public RubySymbol lookup(long id) {
+            // getValueArray is synchronized
+            final IRubyObject[] symbols = getValueArray();
+            for (int i = symbols.length; --i >= 0; ) {
+                if (id == ((RubySymbol)symbols[i]).id) {
+                    return (RubySymbol)symbols[i];
+                }
+            }
+            return null;
+        }
+
+        public IRubyObject allSymbols() {
+            // getValueArray is synchronized
+            return runtime.newArrayNoCopy(getValueArray());            
+        }
+
+        public IRubyObject[] all_symbols() {
+            // getValueArray is synchronized
+            return getValueArray();
         }
         
-        public void store(RubySymbol symbol) {
-            table.put(symbol.asSymbol(), symbol);
+
+        // disable the following NIROM methods:
+        // TODO: stripped-down version (superclass?) of NIROM?
+        public Set entrySet() {
+            throw new UnsupportedOperationException();
         }
-        
+        public IRubyObject put(String name, IRubyObject value) {
+            throw new UnsupportedOperationException();
+        }
+        public IRubyObject putNoIntern(String name, IRubyObject value) {
+            throw new UnsupportedOperationException();
+        }
+        public synchronized void putAll(final Map map) {
+            throw new UnsupportedOperationException();
+        }
+        public synchronized void putAll(final NamedIRubyObjectMap map) {
+            throw new UnsupportedOperationException();
+        }
+        public void clear() {
+            throw new UnsupportedOperationException();
+        }
+        protected Entry removeMapping(final Object o) {
+            throw new UnsupportedOperationException();
+        }
+        protected Entry removeEntryForKey(final String key) {
+            throw new UnsupportedOperationException();
+        }
     }
     
 }
