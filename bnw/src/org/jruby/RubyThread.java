@@ -683,7 +683,7 @@ public class RubyThread extends RubyObject {
             //getRuntime().getRuntime().printError(exception.getException());
         	// TODO: Doesn't SystemExit have its own method to make this less wordy..
             RubyException re = RubyException.newException(getRuntime(), getRuntime().getClass("SystemExit"), exception.getMessage());
-            re.setInstanceVariable("status", getRuntime().newFixnum(1));
+            re.fastSetAttribute("status", getRuntime().newFixnum(1));
             threadService.getMainThread().raise(new IRubyObject[]{re}, Block.NULL_BLOCK);
         } else {
             exitingException = exception;

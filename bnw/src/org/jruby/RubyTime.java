@@ -512,7 +512,8 @@ public class RubyTime extends RubyObject {
         }
         
         RubyString str = (RubyString) mdump(new IRubyObject[] { this });
-        str.setInstanceVariables(this.getInstanceVariables());
+        //str.setInstanceVariables(this.getInstanceVariablesSnapshot());
+        getRegistry().syncAttributes(str, this);
         return str;
     }    
 

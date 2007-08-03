@@ -96,7 +96,8 @@ public class RubyRange extends RubyObject {
             
             // FIXME: This is a pretty inefficient way to do this, but we need child class
             // ivars and begin/end together
-            Map iVars = new HashMap(range.getInstanceVariables());
+            Map iVars = range.getAttributesSnapshot();
+            //Map iVars = new HashMap(range.getInstanceVariables());
             
             // add our "begin" and "end" instance vars to the collection
             iVars.put("begin", range.begin);
@@ -114,9 +115,9 @@ public class RubyRange extends RubyObject {
 
             unmarshalStream.defaultInstanceVarsUnmarshal(range);
             
-            range.begin = range.getInstanceVariable("begin");
-            range.end = range.getInstanceVariable("end");
-            range.isExclusive = range.getInstanceVariable("excl").isTrue();
+            range.begin = (IRubyObject)range.fastGetAttribute("begin");
+            range.end = (IRubyObject)range.fastGetAttribute("end");
+            range.isExclusive = ((IRubyObject)range.fastGetAttribute("excl")).isTrue();
 
             return range;
         }

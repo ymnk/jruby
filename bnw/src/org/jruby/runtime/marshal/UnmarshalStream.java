@@ -270,7 +270,8 @@ public class UnmarshalStream extends BufferedInputStream {
     	for (int i = 0; i < count; i++) {
             String name = unmarshalObject().asSymbol();
             IRubyObject value = unmarshalObject();
-            object.setInstanceVariable(name, value);
+            // TODO: break out setXxx by attribute type
+            object.fastSetAttribute(name, value);
     	}
     }
     

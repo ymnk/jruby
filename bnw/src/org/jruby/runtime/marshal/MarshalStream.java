@@ -131,11 +131,11 @@ public class MarshalStream extends FilterOutputStream {
     private Map getInstanceVariables(IRubyObject value) throws IOException {
         Map instanceVariables = null;
         if(value.getNativeTypeIndex() != ClassIndex.OBJECT) {
-            if (!value.isImmediate() && value.safeHasInstanceVariables() && value.getNativeTypeIndex() != ClassIndex.CLASS) {
+            if (!value.isImmediate() && value.hasInstanceVariables() && value.getNativeTypeIndex() != ClassIndex.CLASS) {
                 // object has instance vars and isn't a class, get a snapshot to be marshalled
                 // and output the ivar header here
 
-                instanceVariables = value.safeGetInstanceVariables();
+                instanceVariables = value.getAttributesSnapshotOrNull();
 
                 // write `I' instance var signet if class is NOT a direct subclass of Object
                 write(TYPE_IVAR);
@@ -277,7 +277,7 @@ public class MarshalStream extends FilterOutputStream {
     private void userMarshal(IRubyObject value) throws IOException {
         RubyString marshaled = (RubyString) value.callMethod(runtime.getCurrentContext(), "_dump", runtime.newFixnum(depthLimit)); 
 
-        Map instanceVariables = marshaled.safeGetInstanceVariables();
+        Map instanceVariables = marshaled.getAttributesSnapshotOrNull();
         if(instanceVariables != null) {
             write(TYPE_IVAR);
         }
@@ -308,6 +308,11 @@ public class MarshalStream extends FilterOutputStream {
     	dumpObject(runtime.newSymbol(type.getName()));
     }
     
+    /**
+     * 
+     * @param instanceVars
+     * @throws IOException
+     */
     public void dumpInstanceVars(Map instanceVars) throws IOException {
         writeInt(instanceVars.size());
         for (Iterator iter = instanceVars.keySet().iterator(); iter.hasNext();) {
@@ -335,7 +340,8 @@ public class MarshalStream extends FilterOutputStream {
      */
     private RubyClass dumpExtended(RubyClass type) throws IOException {
         if(type.isSingleton()) {
-            if(hasSingletonMethods(type) || type.getInstanceVariables().size() > 1) {
+            if(hasSingletonMethods(type) || type.hasAttributes()) {
+            //if(hasSingletonMethods(type) || type.safeHasInstanceVariables()) {
                 throw type.getRuntime().newTypeError("singleton can't be dumped");
             }
             type = type.getSuperClass();

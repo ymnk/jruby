@@ -6,7 +6,7 @@ import org.jruby.RubyFixnum;
 import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.RubyString;
-import org.jruby.MetaClass;
+import org.jruby.SingletonClass;
 import org.jruby.parser.StaticScope;
 import org.jruby.parser.LocalStaticScope;
 import org.jruby.runtime.CallAdapter;
@@ -283,7 +283,7 @@ public class YARVMachine {
                 context.getCurrentScope().setValue((int) bytecodes[ip].l_op0, pop(), 0);
                 break;
             case YARVInstructions.GETINSTANCEVARIABLE:
-                push(self.getInstanceVariable(bytecodes[ip].s_op0));
+                push(self.fastGetInstanceVariable(bytecodes[ip].s_op0));
                 break;
             case YARVInstructions.SETINSTANCEVARIABLE:
                 self.setInstanceVariable(bytecodes[ip].s_op0, pop());
@@ -297,7 +297,7 @@ public class YARVMachine {
                 } else if (!rubyClass.isSingleton()) {
                     push(rubyClass.getClassVar(name));
                 } else {
-                    RubyModule module = (RubyModule) rubyClass.getInstanceVariable("__attached__");
+                    RubyModule module = (RubyModule) ((SingletonClass)rubyClass).getAttachedObject();
     
                     if (module != null) {
                         push(module.getClassVar(name));
@@ -313,7 +313,7 @@ public class YARVMachine {
                 if (rubyClass == null) {
                     rubyClass = self.getMetaClass();
                 } else if (rubyClass.isSingleton()) {
-                    rubyClass = (RubyModule) rubyClass.getInstanceVariable("__attached__");
+                    rubyClass = (RubyModule) ((SingletonClass)rubyClass).getAttachedObject();
                 }
     
                 rubyClass.setClassVar(bytecodes[ip].s_op0, pop());
@@ -415,7 +415,7 @@ public class YARVMachine {
                 }
                 
                 if (containingClass.isSingleton()) {
-                    IRubyObject attachedObject = ((MetaClass) containingClass).getAttachedObject();
+                    IRubyObject attachedObject = ((SingletonClass) containingClass).getAttachedObject();
                     
                     if (attachedObject.getMetaClass() == runtime.getFixnum() || attachedObject.getMetaClass() == runtime.getClass("Symbol")) {
                         throw runtime.newTypeError("can't define singleton method \"" + 
@@ -437,7 +437,7 @@ public class YARVMachine {
     
                 // 'class << state.self' and 'class << obj' uses defn as opposed to defs
                 if (containingClass.isSingleton()) {
-                    ((MetaClass) containingClass).getAttachedObject().callMethod(context, 
+                    ((SingletonClass) containingClass).getAttachedObject().callMethod(context, 
                             "singleton_method_added", runtime.newSymbol(mname));
                 } else {
                     containingClass.callMethod(context, "method_added", runtime.newSymbol(mname));

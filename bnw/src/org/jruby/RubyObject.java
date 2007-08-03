@@ -59,6 +59,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.jruby.ast.Node;
+import org.jruby.bnw.Registry;
+import org.jruby.bnw.util.AttributesMap;
+import org.jruby.bnw.util.AttributesMap.Entry;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.MethodIndex;
 
@@ -76,9 +79,9 @@ public class RubyObject implements Cloneable, IRubyObject {
     protected RubyClass metaClass;
 
     // The instance variables of this object.
-    protected Map instanceVariables;
+    //protected Map instanceVariables;
 
-    private transient Object dataStruct;
+    //private transient Object dataStruct;
 
     protected int flags; // zeroed by jvm
     public static final int ALL_F = -1;
@@ -180,10 +183,6 @@ public class RubyObject implements Cloneable, IRubyObject {
         }
     };
 
-    public void attachToObjectSpace() {
-        getRuntime().getObjectSpace().add(this);
-    }
-    
     /**
      * This is overridden in the other concrete Java builtins to provide a fast way
      * to determine what type they are.
@@ -205,10 +204,10 @@ public class RubyObject implements Cloneable, IRubyObject {
      * @since Ruby 1.6.7
      */
     public RubyClass makeMetaClass(RubyClass superClass, RubyModule parent) {
-        RubyClass klass = new MetaClass(getRuntime(), superClass, getMetaClass().getAllocator(), parent);
+        SingletonClass klass = new SingletonClass(getRuntime(), superClass, getMetaClass().getAllocator(), parent);
         setMetaClass(klass);
 		
-        klass.setInstanceVariable("__attached__", this);
+        klass.setAttachedObject(this);
 
         if (this instanceof RubyClass && isSingleton()) { // could be pulled down to RubyClass in future
             klass.setMetaClass(klass);
@@ -256,42 +255,97 @@ public class RubyObject implements Cloneable, IRubyObject {
         return metaClass.getRuntime();
     }
     
-    public boolean safeHasInstanceVariables() {
-        return instanceVariables != null && instanceVariables.size() > 0;
+    public Registry getRegistry() {
+        return metaClass.getRegistry();
     }
     
-    public Map safeGetInstanceVariables() {
-        return instanceVariables == null ? null : getInstanceVariablesSnapshot();
+    public boolean hasAttributes() {
+        return getRegistry().hasAttributes(this);
     }
-
-    public IRubyObject removeInstanceVariable(String name) {
-        return (IRubyObject) getInstanceVariables().remove(name);
+    
+    public Object getAttribute(final String name) {
+        return getRegistry().getAttribute(this, name);
+    }
+    
+    public Object fastGetAttribute(final String name) {
+        return getRegistry().fastGetAttribute(this, name);
+    }
+    
+    public void setAttribute(final String name, final Object value) {
+        getRegistry().setAttribute(this, name, value);
+    }
+    
+    public void fastSetAttribute(final String name, final Object value) {
+        getRegistry().fastSetAttribute(this, name, value);
+    }
+    
+    public boolean hasInstanceVariables() {
+        return getRegistry().hasInstanceVariables(this);
+    }
+    
+    public Map getAttributesSnapshot() {
+        return getRegistry().getAttributesSnapshot(this);
+    }
+    
+    public Map getAttributesSnapshotOrNull() {
+        return getRegistry().getAttributesSnapshotOrNull(this);
+    }
+    
+    public Object removeAttribute(final String name) {
+        return getRegistry().removeAttribute(this, name);
+    }
+    
+    /**
+     * @deprecated
+     */
+    public boolean safeHasInstanceVariables() {
+        throw new UnsupportedOperationException();
+//        return instanceVariables != null && instanceVariables.size() > 0;
+    }
+    
+    /**
+     * @deprecated
+     */
+    public Map safeGetInstanceVariables() {
+        throw new UnsupportedOperationException();
+//        return instanceVariables == null ? null : getInstanceVariablesSnapshot();
     }
 
     /**
      * Returns an unmodifiable snapshot of the current state of instance variables.
      * This method synchronizes access to avoid deadlocks.
+     * @deprecated
      */
     public Map getInstanceVariablesSnapshot() {
-        synchronized(getInstanceVariables()) {
-            return Collections.unmodifiableMap(new HashMap(getInstanceVariables()));
-        }
+        throw new UnsupportedOperationException();
+//        synchronized(getInstanceVariables()) {
+//            return Collections.unmodifiableMap(new HashMap(getInstanceVariables()));
+//        }
     }
 
+    /**
+     * @deprecated
+     */
     public Map getInstanceVariables() {
-    	// TODO: double checking may or may not be safe enough here
-    	if (instanceVariables == null) {
-	    	synchronized (this) {
-	    		if (instanceVariables == null) {
-                            instanceVariables = Collections.synchronizedMap(new HashMap());
-	    		}
-	    	}
-    	}
-        return instanceVariables;
+        throw new UnsupportedOperationException();
+//    	// TODO: double checking may or may not be safe enough here
+//        // NOTE: nope, not enough....
+//    	if (instanceVariables == null) {
+//	    	synchronized (this) {
+//	    		if (instanceVariables == null) {
+//                            instanceVariables = Collections.synchronizedMap(new HashMap());
+//	    		}
+//	    	}
+//    	}
+//        return instanceVariables;
     }
 
+    /**
+     * @deprecated
+     */
     public void setInstanceVariables(Map instanceVariables) {
-        this.instanceVariables = Collections.synchronizedMap(instanceVariables);
+        throw new UnsupportedOperationException();
+//        this.instanceVariables = Collections.synchronizedMap(instanceVariables);
     }
 
     /**
@@ -329,14 +383,17 @@ public class RubyObject implements Cloneable, IRubyObject {
     /** rb_frozen_class_p
     *
     */
-   protected void testFrozen(String message) {
+   protected void testFrozen(String objectType) {
        if (isFrozen()) {
-           throw getRuntime().newFrozenError(message + getMetaClass().getName());
+           if (objectType == null || objectType.trim().length() == 0) {
+               objectType = getMetaClass().getName();
+           }
+           throw getRuntime().newFrozenError(objectType);
        }
    }
 
    protected void checkFrozen() {
-       testFrozen("can't modify frozen ");
+       testFrozen(null);
    }
 
     /**
@@ -389,7 +446,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public RubyClass getSingletonClass() {
         RubyClass klass;
         
-        if (getMetaClass().isSingleton() && getMetaClass().getInstanceVariable("__attached__") == this) {
+        if (getMetaClass().isSingleton() && ((SingletonClass)getMetaClass()).getAttachedObject() == this) {
             klass = getMetaClass();            
         } else {
             klass = makeMetaClass(getMetaClass(), getMetaClass());
@@ -411,7 +468,7 @@ public class RubyObject implements Cloneable, IRubyObject {
            return klass;
 		}
        
-       MetaClass clone = new MetaClass(getRuntime(), klass.getSuperClass(), getMetaClass().getAllocator(), getMetaClass());
+       SingletonClass clone = new SingletonClass(getRuntime(), klass.getSuperClass(), getMetaClass().getAllocator(), getMetaClass());
        clone.setFrozen(klass.isFrozen());
        clone.setTaint(klass.isTaint());
 
@@ -421,13 +478,16 @@ public class RubyObject implements Cloneable, IRubyObject {
            clone.setMetaClass(klass.getSingletonClassClone());
        }
        
-       if (klass.safeHasInstanceVariables()) {
-           clone.setInstanceVariables(new HashMap(klass.getInstanceVariables()));
-       }
+       // copy klass's instance/class vars, constants, etc. to clone
+       getRegistry().syncAttributes(clone, klass);
+
+//       if (klass.safeHasInstanceVariables()) {
+//           clone.setInstanceVariables(new HashMap(klass.getInstanceVariables()));
+//       }
 
        klass.cloneMethods(clone);
 
-       clone.getMetaClass().setInstanceVariable("__attached__", clone);
+       ((SingletonClass)clone.getMetaClass()).setAttachedObject(clone);
 
        return clone;
     }
@@ -439,9 +499,11 @@ public class RubyObject implements Cloneable, IRubyObject {
         assert original != null;
         assert !clone.isFrozen() : "frozen object (" + clone.getMetaClass().getName() + ") allocated";
 
-        if (original.safeHasInstanceVariables()) {
-            clone.setInstanceVariables(new HashMap(original.getInstanceVariables()));
-        }
+        original.getRegistry().syncAttributes(clone, original);
+        
+//        if (original.safeHasInstanceVariables()) {
+//            clone.setInstanceVariables(new HashMap(original.getInstanceVariables()));
+//        }
         
         /* FIXME: finalizer should be dupped here */
         clone.callMethod(clone.getRuntime().getCurrentContext(), "initialize_copy", original);
@@ -591,41 +653,49 @@ public class RubyObject implements Cloneable, IRubyObject {
         return receiver.callMethod(context, "method_missing", newArgs, block);
     }
 
-    public IRubyObject instance_variable_get(IRubyObject var) {
-    	String varName = var.asSymbol();
+    public IRubyObject instance_variable_get(final IRubyObject var) {
+    	final String varName = var.asSymbol();
 
     	if (!IdUtil.isInstanceVariable(varName)) {
     		throw getRuntime().newNameError("`" + varName + "' is not allowable as an instance variable name", varName);
     	}
 
-    	IRubyObject variable = getInstanceVariable(varName);
+    	final IRubyObject variable = fastGetInstanceVariable(varName);
 
     	// Pickaxe v2 says no var should show NameError, but ruby only sends back nil..
     	return variable == null ? getRuntime().getNil() : variable;
     }
 
-    public IRubyObject getInstanceVariable(String name) {
-        return (IRubyObject) getInstanceVariables().get(name);
+    public IRubyObject getInstanceVariable(final String name) {
+        return (IRubyObject) getRegistry().getInstanceVariable(this, name);
+        //return (IRubyObject) getInstanceVariables().get(name);
     }
 
-    public IRubyObject instance_variable_set(IRubyObject var, IRubyObject value) {
+    public IRubyObject fastGetInstanceVariable(final String name) {
+        return (IRubyObject) getRegistry().fastGetInstanceVariable(this, name);
+    }
+
+    public IRubyObject instance_variable_set(final IRubyObject var, final IRubyObject value) {
     	String varName = var.asSymbol();
 
     	if (!IdUtil.isInstanceVariable(varName)) {
     		throw getRuntime().newNameError("`" + varName + "' is not allowable as an instance variable name", varName);
     	}
 
-    	return setInstanceVariable(var.asSymbol(), value);
+        // FIXME: call no-intern version here
+        
+        return setInstanceVariable(varName, value);
     }
 
-    public IRubyObject setInstanceVariable(String name, IRubyObject value,
-            String taintError, String freezeError) {
-        if (isTaint() && getRuntime().getSafeLevel() >= 4) {
-            throw getRuntime().newSecurityError(taintError);
-        }
-        testFrozen(freezeError);
-
-        getInstanceVariables().put(name, value);
+    public IRubyObject setInstanceVariable(final String name, final IRubyObject value,
+            final String taintError, final String freezeObjectType) {
+//        if (isTaint() && getRuntime().getSafeLevel() >= 4) {
+//            throw getRuntime().newSecurityError(taintError);
+//        }
+//        testFrozen(freezeObjectType);
+//
+        getRegistry().setInstanceVariable(this, name, value, taintError, freezeObjectType);
+        //getInstanceVariables().put(name, value);
 
         return value;
     }
@@ -633,13 +703,21 @@ public class RubyObject implements Cloneable, IRubyObject {
     /** rb_iv_set / rb_ivar_set
      *
      */
-    public IRubyObject setInstanceVariable(String name, IRubyObject value) {
-        return setInstanceVariable(name, value,
-                "Insecure: can't modify instance variable", "");
+    public IRubyObject setInstanceVariable(final String name, final IRubyObject value) {
+
+        getRegistry().setInstanceVariable(this, name, value);
+        
+        return value;
+//        return setInstanceVariable(name, value,
+//                "Insecure: can't modify instance variable", "");
     }
 
+    /**
+     * @deprecated
+     */
     public Iterator instanceVariableNames() {
-        return getInstanceVariables().keySet().iterator();
+        throw new UnsupportedOperationException();
+//        return getInstanceVariables().keySet().iterator();
     }
 
     public void callInit(IRubyObject[] args, Block block) {
@@ -1145,7 +1223,8 @@ public class RubyObject implements Cloneable, IRubyObject {
                 this != getRuntime().getObject() &&
                 this != getRuntime().getClass("Module") &&
                 !(this instanceof RubyModule) &&
-                safeHasInstanceVariables()) {
+                hasInstanceVariables()) {
+                //safeHasInstanceVariables(this)) {
 
             StringBuffer part = new StringBuffer();
             String cname = getMetaClass().getRealClass().getName();
@@ -1158,18 +1237,29 @@ public class RubyObject implements Cloneable, IRubyObject {
             }
             try {
                 String sep = "";
-                Map iVars = getInstanceVariablesSnapshot();
-                for (Iterator iter = iVars.keySet().iterator(); iter.hasNext();) {
-                    String name = (String) iter.next();
-                    if(IdUtil.isInstanceVariable(name)) {
-                        part.append(sep);
-                        part.append(" ");
-                        part.append(name);
-                        part.append("=");
-                        part.append(((IRubyObject)(iVars.get(name))).callMethod(getRuntime().getCurrentContext(), "inspect"));
-                        sep = ",";
-                    }
+                ArrayList vars = getRegistry().getInstanceVariableEntryList(this);
+                ThreadContext tc = getRuntime().getCurrentContext();
+                for (Iterator iter = vars.iterator(); iter.hasNext(); ) {
+                    Map.Entry entry = (Map.Entry)iter.next();
+                    part.append(sep);
+                    part.append(" ");
+                    part.append(entry.getKey());
+                    part.append("=");
+                    part.append(((IRubyObject)(entry.getValue())).callMethod(tc, "inspect"));
+                    sep = ",";
                 }
+//                Map iVars = getInstanceVariablesSnapshot();
+//                for (Iterator iter = iVars.keySet().iterator(); iter.hasNext();) {
+//                    String name = (String) iter.next();
+//                    if(IdUtil.isInstanceVariable(name)) {
+//                        part.append(sep);
+//                        part.append(" ");
+//                        part.append(name);
+//                        part.append("=");
+//                        part.append(((IRubyObject)(iVars.get(name))).callMethod(getRuntime().getCurrentContext(), "inspect"));
+//                        sep = ",";
+//                    }
+//                }
                 part.append(">");
                 return getRuntime().newString(part.toString());
             } finally {
@@ -1190,15 +1280,20 @@ public class RubyObject implements Cloneable, IRubyObject {
 
 
     public RubyArray instance_variables() {
-        ArrayList names = new ArrayList();
-        for(Iterator iter = getInstanceVariablesSnapshot().keySet().iterator();iter.hasNext();) {
-            String name = (String) iter.next();
-
-            // Do not include constants which also get stored in instance var list in classes.
-            if (IdUtil.isInstanceVariable(name)) {
-                names.add(getRuntime().newString(name));
-            }
+        Ruby runtime = getRuntime();
+        ArrayList names = getRegistry().getInstanceVariableNameList(this);
+        for (int i = names.size(); --i >= 0; ) {
+            names.set(i, runtime.newString((String)names.get(i)));
         }
+//        ArrayList names = new ArrayList();
+//        for(Iterator iter = getInstanceVariablesSnapshot().keySet().iterator();iter.hasNext();) {
+//            String name = (String) iter.next();
+//
+//            // Do not include constants which also get stored in instance var list in classes.
+//            if (IdUtil.isInstanceVariable(name)) {
+//                names.add(getRuntime().newString(name));
+//            }
+//        }
         return getRuntime().newArray(names);
     }
 
@@ -1276,7 +1371,7 @@ public class RubyObject implements Cloneable, IRubyObject {
 
         RubyArray result = getRuntime().newArray();
 
-        for (RubyClass type = getMetaClass(); type != null && ((type instanceof MetaClass) || (all && type.isIncluded()));
+        for (RubyClass type = getMetaClass(); type != null && ((type instanceof SingletonClass) || (all && type.isIncluded()));
              type = type.getSuperClass()) {
         	for (Iterator iter = type.getMethods().entrySet().iterator(); iter.hasNext(); ) {
                 Map.Entry entry = (Map.Entry) iter.next();
@@ -1402,9 +1497,10 @@ public class RubyObject implements Cloneable, IRubyObject {
        }
        testFrozen("class/module");
 
-       IRubyObject variable = removeInstanceVariable(id); 
+       Object variable = getRegistry().removeInstanceVariable(this, id); 
+       //IRubyObject variable = removeInstanceVariable(id); 
        if (variable != null) {
-           return variable;
+           return (IRubyObject)variable;
        }
 
        throw getRuntime().newNameError("instance variable " + id + " not defined", id);
@@ -1421,14 +1517,14 @@ public class RubyObject implements Cloneable, IRubyObject {
      * @see org.jruby.runtime.builtin.IRubyObject#dataWrapStruct()
      */
     public synchronized void dataWrapStruct(Object obj) {
-        this.dataStruct = obj;
+        getRegistry().setDataStruct(this, obj);
     }
 
     /**
      * @see org.jruby.runtime.builtin.IRubyObject#dataGetStruct()
      */
     public synchronized Object dataGetStruct() {
-        return dataStruct;
+        return getRegistry().getDataStruct(this);
     }
  
     public void addFinalizer(RubyProc finalizer) {

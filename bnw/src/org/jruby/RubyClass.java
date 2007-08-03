@@ -32,6 +32,8 @@ package org.jruby;
 
 import java.io.IOException;
 import java.util.Map;
+import org.jruby.bnw.CommonMetaClass;
+import org.jruby.bnw.Registry;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ClassIndex;
@@ -46,9 +48,10 @@ import org.jruby.runtime.marshal.UnmarshalStream;
  *
  * @author  jpetersen
  */
-public class RubyClass extends RubyModule {
+public class RubyClass extends RubyModule implements CommonMetaClass {
 	
     private final Ruby runtime;
+    private final Registry registry;
     
     // the default allocator
     private final ObjectAllocator allocator;
@@ -60,7 +63,8 @@ public class RubyClass extends RubyModule {
                               MarshalStream marshalStream) throws IOException {
             IRubyObject object = (IRubyObject)obj;
             
-            Map iVars = object.getInstanceVariablesSnapshot();
+            Map iVars = object.getAttributesSnapshot();
+            //Map iVars = object.getInstanceVariablesSnapshot();
             
             marshalStream.dumpInstanceVars(iVars);
         }
@@ -118,6 +122,7 @@ public class RubyClass extends RubyModule {
         super(runtime, metaClass, superClass, parent, name, useObjectSpace);
         this.allocator = allocator;
         this.runtime = runtime;
+        this.registry = runtime.getRegistry();
         
         // use parent's marshal, or default object marshal by default
         if (superClass != null) {
@@ -191,9 +196,13 @@ public class RubyClass extends RubyModule {
     /* (non-Javadoc)
 	 * @see org.jruby.RubyObject#getRuntime()
 	 */
-	public Ruby getRuntime() {
+	public final Ruby getRuntime() {
 		return runtime;
 	}
+    
+    public final Registry getRegistry() {
+        return registry;
+    }
 
     public boolean isModule() {
         return false;
@@ -350,18 +359,18 @@ public class RubyClass extends RubyModule {
         return (RubyClass) RubyModule.unmarshalFrom(output);
     }
 
-    public RubyClass newSubClass(String name, ObjectAllocator allocator,
-            RubyModule parent, boolean invokeInherited, boolean warnOnRedefinition) {
-        RubyClass classClass = runtime.getClass("Class");
+    public RubyClass newSubClass(final String name, final ObjectAllocator allocator,
+            final RubyModule parent, final boolean invokeInherited, final boolean warnOnRedefinition) {
+        final RubyClass classClass = runtime.getClassClass();
         
         // Cannot subclass 'Class' or metaclasses
         if (this == classClass) {
             throw runtime.newTypeError("can't make subclass of Class");
-        } else if (this instanceof MetaClass) {
+        } else if (this instanceof SingletonClass) {
             throw runtime.newTypeError("can't make subclass of virtual class");
         }
 
-        RubyClass newClass = new RubyClass(runtime, classClass, this, allocator, parent, name);
+        final RubyClass newClass = new RubyClass(runtime, classClass, this, allocator, parent, name);
 
         newClass.makeMetaClass(getMetaClass(), newClass);
         
@@ -373,14 +382,15 @@ public class RubyClass extends RubyModule {
             if (warnOnRedefinition) {
                 parent.setConstant(name, newClass);
             } else {
-                parent.setInstanceVariable(name, newClass);
+                registry.setConstant(parent, name, newClass);
+                //parent.setInstanceVariable(name, newClass);
             }
         }
 
         return newClass;
     }
-    public RubyClass newSubClass(String name, ObjectAllocator allocator, 
-            RubyModule parent, boolean warnOnRedefinition) {
+    public RubyClass newSubClass(final String name, final ObjectAllocator allocator, 
+            final RubyModule parent, final boolean warnOnRedefinition) {
         return newSubClass(name, allocator, parent, true, warnOnRedefinition);
     }
     

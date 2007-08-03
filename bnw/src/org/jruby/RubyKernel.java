@@ -223,18 +223,20 @@ public class RubyKernel {
         return recv.getRuntime().newString(autoloadMethod.file());
     }
 
-    public static IRubyObject autoload(final IRubyObject recv, IRubyObject symbol, final IRubyObject file) {
-        Ruby runtime = recv.getRuntime(); 
+    public static IRubyObject autoload(final IRubyObject recv, final IRubyObject symbol, final IRubyObject file) {
+        final Ruby runtime = recv.getRuntime(); 
         final LoadService loadService = runtime.getLoadService();
         final String baseName = symbol.asSymbol();
         final RubyModule module = recv instanceof RubyModule ? (RubyModule) recv : runtime.getObject();
-        String nm = module.getName() + "::" + baseName;
+        final String nm = module.getName() + "::" + baseName;
         
-        IRubyObject undef = runtime.getUndef();
-        IRubyObject existingValue = module.getInstanceVariable(baseName); 
+        final IRubyObject undef = runtime.getUndef();
+        final Object existingValue = runtime.getRegistry().fastGetConstant(module, baseName); 
         if (existingValue != null && existingValue != undef) return runtime.getNil();
         
-        module.setInstanceVariable(baseName, undef);
+        // bypass setConstant logic
+        runtime.getRegistry().setConstant(module, baseName, undef);
+        //module.setInstanceVariable(baseName, undef);
         
         loadService.addAutoload(nm, new IAutoloadMethod() {
             public String file() {

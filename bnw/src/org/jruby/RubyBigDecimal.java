@@ -80,7 +80,7 @@ public class RubyBigDecimal extends RubyNumeric {
         result.getMetaClass().defineFastMethod("ver", callbackFactory.getFastSingletonMethod("ver"));
         result.getMetaClass().defineMethod("_load", callbackFactory.getSingletonMethod("_load",RubyKernel.IRUBY_OBJECT));
         result.getMetaClass().defineFastMethod("double_fig", callbackFactory.getFastSingletonMethod("double_fig"));
-        result.getMetaClass().defineFastMethod("limit", callbackFactory.getFastSingletonMethod("limit", RubyKernel.IRUBY_OBJECT));
+        result.getMetaClass().defineFastMethod("limit", callbackFactory.getOptSingletonMethod("limit"));
         result.getMetaClass().defineFastMethod("mode", callbackFactory.getFastSingletonMethod("mode", RubyKernel.IRUBY_OBJECT, RubyKernel.IRUBY_OBJECT));
 
         result.defineMethod("initialize", callbackFactory.getOptMethod("initialize"));
@@ -132,7 +132,8 @@ public class RubyBigDecimal extends RubyNumeric {
         result.defineFastMethod("truncate", callbackFactory.getFastOptMethod("truncate"));
         result.defineFastMethod("zero?", callbackFactory.getFastMethod("zero_p"));
 
-        result.setClassVar("VpPrecLimit", RubyFixnum.zero(runtime));
+        result.setModuleAttribute("vpPrecLimit", RubyFixnum.zero(runtime));
+//        result.setClassVar("VpPrecLimit", RubyFixnum.zero(runtime));
         
         result.dispatcher = callbackFactory.createDispatcher(result);
 
@@ -177,15 +178,25 @@ public class RubyBigDecimal extends RubyNumeric {
         return recv.getRuntime().newFixnum(20);
     }
     
-    public static IRubyObject limit(IRubyObject recv, IRubyObject arg1) {
-        RubyModule c = (RubyModule)recv;
-        IRubyObject nCur = c.getClassVar("VpPrecLimit");
+    public static IRubyObject limit(final IRubyObject recv, final IRubyObject[] args, Block unusedBlock) {
+        final Ruby runtime = recv.getRuntime();
+        Arity.checkArgumentCount(runtime, args, 0, 1);
+        final RubyModule c = (RubyModule)recv;
+        final IRubyObject nCur = c.getModuleAttribute("vpPrecLimit");
 
-        if (arg1.isNil()) {
-            return nCur;
+        if (args.length > 0) {
+            final IRubyObject arg = args[0];
+            if (!arg.isNil()) {
+                if (!(arg instanceof RubyFixnum)) {
+                    throw runtime.newTypeError(arg, runtime.getFixnum());
+                }
+                if (0 > ((RubyFixnum)arg).getLongValue()) {
+                    throw runtime.newArgumentError("argument must be positive");
+                }
+                c.setModuleAttribute("vpPrecLimit", arg);
+//                c.setClassVar("VpPrecLimit",arg1);
+            }
         }
-
-        c.setClassVar("VpPrecLimit",arg1);
 
         return nCur;
     }
@@ -226,7 +237,7 @@ public class RubyBigDecimal extends RubyNumeric {
     }
 
     private RubyBigDecimal setResult(int scale) {
-        int prec = RubyFixnum.fix2int(getRuntime().getClass("BigDecimal").getClassVar("VpPrecLimit"));
+        int prec = RubyFixnum.fix2int(getRuntime().getClass("BigDecimal").getModuleAttribute("vpPrecLimit"));
         int prec2 = Math.max(scale,prec);
         if(prec2 > 0 && this.value.scale() > (prec2-exp())) {
             this.value = this.value.setScale(prec2-exp(),BigDecimal.ROUND_HALF_UP);

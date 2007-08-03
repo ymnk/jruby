@@ -95,9 +95,9 @@ public class RubyUnboundMethod extends RubyMethod {
         RubyClass receiverClass = aReceiver.getMetaClass();
         
         if (!aReceiver.isKindOf(originModule)) {
-            if (originModule instanceof MetaClass) {
+            if (originModule instanceof SingletonClass) {
                 throw getRuntime().newTypeError("singleton method called for a different object");
-            } else if (receiverClass instanceof MetaClass && receiverClass.getMethods().containsKey(originName)) {
+            } else if (receiverClass instanceof SingletonClass && receiverClass.getMethods().containsKey(originName)) {
                 throw getRuntime().newTypeError("method `" + originName + "' overridden");
             } else if (
                 !(originModule.isModule() ? aReceiver.isKindOf(originModule) : aReceiver.getType() == originModule)) {

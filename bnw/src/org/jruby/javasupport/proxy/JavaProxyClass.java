@@ -52,6 +52,8 @@ import org.jruby.RubyModule;
 import org.jruby.RubyObject;
 import org.jruby.RubyNil;
 import org.jruby.RubyString;
+import org.jruby.bnw.Registry;
+import org.jruby.bnw.util.AttributesMap;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.javasupport.JavaClass;
 import org.jruby.javasupport.JavaObject;
@@ -524,6 +526,7 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
 
     public static RubyObject get_with_class(IRubyObject recv, RubyClass clazz) {
         Ruby runtime = recv.getRuntime();
+        Registry registry = runtime.getRegistry();
         
         // Let's only generate methods for those the user may actually 
         // intend to override.  That includes any defined in the current
@@ -543,17 +546,17 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
             RubyModule ancestor = (RubyModule)iter.next();
             if (ancestor instanceof RubyClass) {
                 if (skipRemainingClasses) continue;
-                Map vars = ancestor.getInstanceVariables();
+                AttributesMap attrs = registry.getAttributesSnapshot(ancestor);
                 // we only collect methods and interfaces for 
                 // user-defined proxy classes.
-                if (!vars.containsKey("@java_proxy_class")) {
+                if (!attrs.containsKey("@java_proxy_class")) {
                     skipRemainingClasses = true;
                     continue;
                 }
 
                 // get JavaClass if this is the new proxy class; verify it
                 // matches if this is a superclass proxy.
-                IRubyObject var = (IRubyObject)vars.get("@java_class");
+                IRubyObject var = (IRubyObject)attrs.get("@java_class");
                 if (var == null) {
                     throw runtime.newTypeError(
                             "no java_class defined for proxy (or ancestor): " + ancestor);
@@ -571,7 +574,7 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
                             " (" + var + ")");
                 }
                 // get any included interfaces
-                var = (IRubyObject)vars.get("@java_interfaces");
+                var = (IRubyObject)attrs.get("@java_interfaces");
                 if (var != null && !(var instanceof RubyNil)) {
                     if (!(var instanceof RubyArray)) {
                         throw runtime.newTypeError(
@@ -601,7 +604,7 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
                 // set this class's method names in var @__java_ovrd_methods if this
                 // is the new class; otherwise, get method names from there if this is
                 // a proxy superclass.
-                var = (IRubyObject)vars.get("@__java_ovrd_methods");
+                var = (IRubyObject)attrs.get("@__java_ovrd_methods");
                 if (var == null) {
                     // lock in the overridden methods for the new class, and any as-yet
                     // uninstantiated ancestor class.

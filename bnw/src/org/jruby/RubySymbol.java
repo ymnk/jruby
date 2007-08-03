@@ -53,17 +53,17 @@ public class RubySymbol extends RubyObject {
     private final int id;
     
     private RubySymbol(Ruby runtime, String symbol) {
-        super(runtime, runtime.getClass("Symbol"), false);
-        this.symbol = symbol;
+        super(runtime, runtime.getSymbol(), false);
+        this.symbol = symbol.intern();
 
         runtime.symbolLastId++;
         this.id = runtime.symbolLastId;
     }
     
-    public static RubyClass createSymbolClass(Ruby runtime) {
-        RubyClass symbolClass = runtime.defineClass("Symbol", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
-        CallbackFactory callbackFactory = runtime.callbackFactory(RubySymbol.class);   
-        RubyClass symbolMetaClass = symbolClass.getMetaClass();
+    public static RubyClass createSymbolClass(final Ruby runtime) {
+        final RubyClass symbolClass = runtime.defineClass("Symbol", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        final CallbackFactory callbackFactory = runtime.callbackFactory(RubySymbol.class);   
+        final RubyClass symbolMetaClass = symbolClass.getMetaClass();
         symbolClass.index = ClassIndex.SYMBOL;
 
         
@@ -124,6 +124,10 @@ public class RubySymbol extends RubyObject {
 
     public static RubySymbol newSymbol(Ruby runtime, String name) {
         RubySymbol result;
+        
+        // temp until new symbol code moved to bnw branch
+        name = name.intern();
+        
         synchronized (RubySymbol.class) {
             // Locked to prevent the creation of multiple instances of
             // the same symbol. Most code depends on them being unique.

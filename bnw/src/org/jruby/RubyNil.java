@@ -99,8 +99,12 @@ public class RubyNil extends RubyObject {
         return true;
     }
     
+    /**
+     * @deprecated
+     */
     public boolean safeHasInstanceVariables() {
-        return false;
+        throw new UnsupportedOperationException();
+        //return false;
     }
     
     // Methods of the Nil Class (nil_*):

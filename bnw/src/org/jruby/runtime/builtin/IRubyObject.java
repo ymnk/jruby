@@ -17,6 +17,7 @@
  * Copyright (C) 2004 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Ola Bini <ola.bini@ki.se>
+ * Copyright (C) 2007 William N Dortch <bill.dortch@gmail.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -45,6 +46,9 @@ import org.jruby.RubyModule;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyProc;
 import org.jruby.RubyString;
+import org.jruby.bnw.Freezable;
+import org.jruby.bnw.Registry;
+import org.jruby.bnw.Taintable;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.ThreadContext;
@@ -54,7 +58,7 @@ import org.jruby.runtime.ThreadContext;
  *
  * @author  jpetersen
  */
-public interface IRubyObject {
+public interface IRubyObject extends Freezable, Taintable {
     /**
      *
      */
@@ -77,6 +81,7 @@ public interface IRubyObject {
      * "safe" in that it doesn't cause the instance var map to be created.
      *
      * @return A snapshot of the instance vars, or null if none.
+     * @deprecated
      */
     Map safeGetInstanceVariables();
     
@@ -85,15 +90,54 @@ public interface IRubyObject {
      * "safe" in that it doesn't cause the instance var map to be created.
      *
      * @return true if the object has instance variables, false otherwise.
+     * @deprecated 
      */
     boolean safeHasInstanceVariables();
+
+    // don't need "safe" anymore
+    // this really means instance variables; call hasAttributes to check for
+    // instance vars, class vars, constants, and special attributes collectively
+    boolean hasInstanceVariables();
     
+    /**
+     * Returns true if object has any attributes, defined as:
+     * <ul>
+     * <li> instance variables
+     * <li> class variables
+     * <li> constants
+     * <li> special attributes, such as those used when marshaling Ranges and Exceptions
+     * </ul>
+     * @return
+     */
+    boolean hasAttributes();
+    
+    Object getAttribute(String name);
+ 
+    Object fastGetAttribute(final String name);
+    
+    void setAttribute(final String name, final Object value);
+    
+    void fastSetAttribute(final String name, final Object value);
+    
+    Map getAttributesSnapshot();
+    
+    Map getAttributesSnapshotOrNull();
+    
+    Object removeAttribute(final String name);
+   
     /**
      * RubyMethod getInstanceVar.
      * @param string
      * @return RubyObject
      */
-    IRubyObject getInstanceVariable(String string);
+    IRubyObject getInstanceVariable(String name);
+    
+    /**
+     * Use only if <code>name</code> has been interned.
+     * @param name
+     * @return
+     */
+    IRubyObject fastGetInstanceVariable(final String name);
     
     /**
      * RubyMethod setInstanceVar.
@@ -106,6 +150,7 @@ public interface IRubyObject {
     /**
      *
      * @return
+     * @deprecated
      */
     Map getInstanceVariables();
     
@@ -113,12 +158,14 @@ public interface IRubyObject {
      *
      * 
      * @param instanceVariables 
+     * @deprecated
      */
     void setInstanceVariables(Map instanceVariables);
     
     /**
      *
      * @return
+     * @deprecated
      */
     Map getInstanceVariablesSnapshot();
     
@@ -233,6 +280,13 @@ public interface IRubyObject {
      * @return
      */
     Ruby getRuntime();
+    
+    /**
+     * Transitional. Maybe.
+     * 
+     * @return
+     */
+    Registry getRegistry();
     
     /**
      * RubyMethod getJavaClass.
@@ -376,6 +430,7 @@ public interface IRubyObject {
     /**
      *
      * @return
+     * @deprecated
      */
     Iterator instanceVariableNames();
     
@@ -417,4 +472,5 @@ public interface IRubyObject {
     public void addFinalizer(RubyProc finalizer);
 
     public void removeFinalizers();
+    
 }

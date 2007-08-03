@@ -39,6 +39,8 @@ import org.jruby.RubyClass;
 import org.jruby.RubyMatchData;
 import org.jruby.RubyModule;
 import org.jruby.RubyThread;
+import org.jruby.bnw.CommonMetaClass;
+import org.jruby.bnw.Registry;
 import org.jruby.internal.runtime.JumpTarget;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.BlockStaticScope;
@@ -59,6 +61,8 @@ public final class ThreadContext {
     private final static int INITIAL_SIZE = 50;
     
     private final Ruby runtime;
+    
+    private final Registry registry;
     
     // Is this thread currently with in a function trace?
     private boolean isWithinTrace;
@@ -103,6 +107,8 @@ public final class ThreadContext {
     private ThreadContext(Ruby runtime) {
         this.runtime = runtime;
         
+        this.registry = runtime.getRegistry();
+        
         // init errorInfo to nil
         errorInfo = runtime.getNil();
         
@@ -123,6 +129,10 @@ public final class ThreadContext {
     
     public Ruby getRuntime() {
         return runtime;
+    }
+    
+    public Registry getRegistry() {
+        return registry;
     }
     
     public IRubyObject getErrorInfo() {
@@ -442,16 +452,21 @@ public final class ThreadContext {
         return parentModule.getNonIncludedClass();
     }
     
-    public boolean getConstantDefined(String name) {
-        IRubyObject result = null;
-        IRubyObject undef = runtime.getUndef();
+    public boolean getConstantDefined(final String name) {
+        // TODO: do we know if the incoming name has been interned?
+        // if so, can make faster call to getConstantNoIntern below 
+        
+        final IRubyObject undef = runtime.getUndef();
+        Object result = null;
         
         // flipped from while to do to search current class first
         for (StaticScope scope = getCurrentScope().getStaticScope(); scope != null; scope = scope.getPreviousCRefScope()) {
             RubyModule module = scope.getModule();
-            result = module.getInstanceVariable(name);
+            result = registry.getConstant(module, name);
+            //result = module.getInstanceVariable(name);
             if (result == undef) {
-                module.removeInstanceVariable(name);
+                registry.removeConstant(module, name);
+                //module.removeInstanceVariable(name);
                 return runtime.getLoadService().autoload(module.getName() + "::" + name) != null;
             }
             if (result != null) return true;
@@ -463,11 +478,15 @@ public final class ThreadContext {
     /**
      * Used by the evaluator and the compiler to look up a constant by name
      */
-    public IRubyObject getConstant(String name) {
+    public IRubyObject getConstant(final String name) {
+        // TODO: do we know if the incoming name has been interned?
+        // if so, can make faster call to getConstantNoIntern below 
+        
+        final CommonMetaClass object = runtime.getObject();
+        final IRubyObject undef = runtime.getUndef();
+ 
         StaticScope scope = getCurrentScope().getStaticScope();
-        RubyClass object = runtime.getObject();
-        IRubyObject result = null;
-        IRubyObject undef = runtime.getUndef();
+        Object result = null;
         
         // flipped from while to do to search current class first
         do {
@@ -475,13 +494,23 @@ public final class ThreadContext {
             
             // Not sure how this can happen
             //if (NIL_P(klass)) return rb_const_get(CLASS_OF(self), id);
-            result = klass.getInstanceVariable(name);
+            try {
+            result = registry.getConstant(klass, name);
+            } catch (NullPointerException e) {
+                System.out.println("NPE in TC#getConstant");
+                System.out.println("const name = " + name);
+                System.out.println("registry = " + registry);
+                System.out.println("metaclass = " + klass);
+                throw e;
+            }
+            //result = klass.getInstanceVariable(name);
             if (result == undef) {
-                klass.removeInstanceVariable(name);
+                registry.removeConstant(klass, name);
+                //klass.removeInstanceVariable(name);
                 if (runtime.getLoadService().autoload(klass.getName() + "::" + name) == null) break;
                 continue;
             } else if (result != null) {
-                return result;
+                return (IRubyObject)result;
             }
             scope = scope.getPreviousCRefScope();
         } while (scope != null && scope.getModule() != object);

@@ -27,7 +27,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast.executable;
 
-import org.jruby.MetaClass;
+import org.jruby.SingletonClass;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyFixnum;
@@ -123,7 +123,7 @@ public class RubiniusMachine {
                 }
     
                 if (clzz.isSingleton()) {
-                    ((MetaClass) clzz).getAttachedObject().callMethod(
+                    ((SingletonClass) clzz).getAttachedObject().callMethod(
                             context, "singleton_method_added", literals[val]);
                 } else {
                     clzz.callMethod(context, "method_added", literals[val]);

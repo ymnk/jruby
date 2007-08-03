@@ -87,7 +87,7 @@ public class RubyDigest {
         RubyModule mDigest = runtime.getModule("Digest");
         RubyClass cDigestBase = mDigest.getClass("Base");
         RubyClass cDigest_MD5 = mDigest.defineClassUnder("MD5",cDigestBase,cDigestBase.getAllocator());
-        cDigest_MD5.setClassVar("metadata",runtime.newString("MD5"));
+        cDigest_MD5.setModuleAttribute("metadata",runtime.newString("MD5"));
     }
 
     public static void createDigestRMD160(Ruby runtime) {
@@ -99,7 +99,7 @@ public class RubyDigest {
         RubyModule mDigest = runtime.getModule("Digest");
         RubyClass cDigestBase = mDigest.getClass("Base");
         RubyClass cDigest_RMD160 = mDigest.defineClassUnder("RMD160",cDigestBase,cDigestBase.getAllocator());
-        cDigest_RMD160.setClassVar("metadata",runtime.newString("RIPEMD160"));
+        cDigest_RMD160.setModuleAttribute("metadata",runtime.newString("RIPEMD160"));
     }
 
     public static void createDigestSHA1(Ruby runtime) {
@@ -107,7 +107,7 @@ public class RubyDigest {
         RubyModule mDigest = runtime.getModule("Digest");
         RubyClass cDigestBase = mDigest.getClass("Base");
         RubyClass cDigest_SHA1 = mDigest.defineClassUnder("SHA1",cDigestBase,cDigestBase.getAllocator());
-        cDigest_SHA1.setClassVar("metadata",runtime.newString("SHA1"));
+        cDigest_SHA1.setModuleAttribute("metadata",runtime.newString("SHA1"));
     }
 
     public static void createDigestSHA2(Ruby runtime) {
@@ -121,11 +121,11 @@ public class RubyDigest {
         RubyModule mDigest = runtime.getModule("Digest");
         RubyClass cDigestBase = mDigest.getClass("Base");
         RubyClass cDigest_SHA2_256 = mDigest.defineClassUnder("SHA256",cDigestBase,cDigestBase.getAllocator());
-        cDigest_SHA2_256.setClassVar("metadata",runtime.newString("SHA-256"));
+        cDigest_SHA2_256.setModuleAttribute("metadata",runtime.newString("SHA-256"));
         RubyClass cDigest_SHA2_384 = mDigest.defineClassUnder("SHA384",cDigestBase,cDigestBase.getAllocator());
-        cDigest_SHA2_384.setClassVar("metadata",runtime.newString("SHA-384"));
+        cDigest_SHA2_384.setModuleAttribute("metadata",runtime.newString("SHA-384"));
         RubyClass cDigest_SHA2_512 = mDigest.defineClassUnder("SHA512",cDigestBase,cDigestBase.getAllocator());
-        cDigest_SHA2_512.setClassVar("metadata",runtime.newString("SHA-512"));
+        cDigest_SHA2_512.setModuleAttribute("metadata",runtime.newString("SHA-512"));
     }
 
     public static class Base extends RubyObject {

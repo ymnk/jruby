@@ -3,12 +3,48 @@ package org.jruby;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.jruby.bnw.Registry;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
+import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RubyUndef implements IRubyObject {
+
+    public boolean hasAttributes() {
+        return false;
+    }
+    public void setAttribute(String name, Object value) {
+    }
+
+    public Object getAttribute(String name) {
+        return null;
+    }
+    public Object fastGetAttribute(String name) {
+        return null;
+    }
+    public Object removeAttribute(String name) {
+        return null;
+    }
+    public Map getAttributesSnapshot() {
+        return null;
+    }
+
+    public Map getAttributesSnapshotOrNull() {
+        return null;
+    }
+    
+    public boolean hasInstanceVariables() {
+        return false;
+    }
+    
+    public IRubyObject fastGetInstanceVariable(String name) {
+        return null;
+    }
+    
+    public void fastSetAttribute(String name, Object value) {
+    }
 
     public void addFinalizer(RubyProc finalizer) {
     }
@@ -183,10 +219,16 @@ public class RubyUndef implements IRubyObject {
         return null;
     }
 
+    /**
+     * @deprecated
+     */
     public Map getInstanceVariables() {
         return null;
     }
 
+    /**
+     * @deprecated
+     */
     public Map getInstanceVariablesSnapshot() {
         return null;
     }
@@ -200,11 +242,15 @@ public class RubyUndef implements IRubyObject {
     }
 
     public int getNativeTypeIndex() {
-        return 0;
+        return ClassIndex.NO_INDEX;
     }
 
     public Ruby getRuntime() {
         return null;
+    }
+    
+    public Registry getRegistry() {
+        throw new UnsupportedOperationException();
     }
 
     public RubyClass getSingletonClass() {
@@ -227,6 +273,9 @@ public class RubyUndef implements IRubyObject {
         return null;
     }
 
+    /**
+     * @deprecated
+     */
     public Iterator instanceVariableNames() {
         return null;
     }
@@ -270,10 +319,16 @@ public class RubyUndef implements IRubyObject {
         return false;
     }
 
+    /**
+     * @deprecated
+     */
     public Map safeGetInstanceVariables() {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
+    /**
+     * @deprecated
+     */
     public boolean safeHasInstanceVariables() {
         return false;
     }
@@ -285,6 +340,9 @@ public class RubyUndef implements IRubyObject {
         return null;
     }
 
+    /**
+     * @deprecated
+     */
     public void setInstanceVariables(Map instanceVariables) {
     }
 

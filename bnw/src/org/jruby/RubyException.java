@@ -92,7 +92,8 @@ public class RubyException extends RubyObject {
                               MarshalStream marshalStream) throws IOException {
             RubyException exc = (RubyException)obj;
             
-            Map iVars = new HashMap(exc.getInstanceVariables());
+            Map iVars = exc.getAttributesSnapshot();
+            //Map iVars = new HashMap(exc.getInstanceVariables());
             
             iVars.put("mesg", exc.message == null ? runtime.getNil() : exc.message);
             iVars.put("bt", exc.getBacktrace());
@@ -107,8 +108,10 @@ public class RubyException extends RubyObject {
             unmarshalStream.registerLinkTarget(exc);
             unmarshalStream.defaultInstanceVarsUnmarshal(exc);
             
-            exc.message = exc.removeInstanceVariable("mesg");
-            exc.set_backtrace(exc.removeInstanceVariable("bt"));
+            exc.message = (IRubyObject)exc.removeAttribute("mesg");
+            exc.set_backtrace((IRubyObject)exc.removeAttribute("bt"));
+            //exc.message = exc.removeInstanceVariable("mesg");
+            //exc.set_backtrace(exc.removeInstanceVariable("bt"));
             
             return exc;
         }

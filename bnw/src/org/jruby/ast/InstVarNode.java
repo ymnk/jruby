@@ -87,7 +87,9 @@ public class InstVarNode extends Node implements IArityNode, INameNode {
     }
     
     public void setName(String name){
-    		this.name = name;
+        // doesn't actually appear to be called, but
+        // should be interned unless we know the source
+        this.name = name.intern();
     }
 
 }

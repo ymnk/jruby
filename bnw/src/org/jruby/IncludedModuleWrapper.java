@@ -31,6 +31,7 @@
 package org.jruby;
 
 import java.util.Map;
+import org.jruby.bnw.ObjectWrapper;
 
 /**
  * This class is used to provide an intermediate superclass for modules and classes that include
@@ -44,7 +45,7 @@ import java.util.Map;
  * 
  * @see org.jruby.RubyModule
  */
-public final class IncludedModuleWrapper extends RubyClass {
+public final class IncludedModuleWrapper extends RubyClass implements ObjectWrapper {
     private RubyModule delegate;
 
     public IncludedModuleWrapper(Ruby runtime, RubyClass superClass, RubyModule delegate) {
@@ -103,10 +104,17 @@ public final class IncludedModuleWrapper extends RubyClass {
         throw new UnsupportedOperationException("An included class is only a wrapper for a module");
     }
 
+    /**
+     * @deprecated
+     */
     public Map getInstanceVariables() {
-        return delegate.getInstanceVariables();
+        throw new UnsupportedOperationException();
+//        return delegate.getInstanceVariables();
     }
 
+    /**
+     * @deprecated
+     */
     public void setInstanceVariables(Map newMethods) {
         throw new UnsupportedOperationException("An included class is only a wrapper for a module");
     }
@@ -116,6 +124,11 @@ public final class IncludedModuleWrapper extends RubyClass {
     }
 
     public RubyModule getNonIncludedClass() {
+        return delegate;
+    }
+    
+    // ObjectWrapper implementation
+    public Object getObject() {
         return delegate;
     }
     

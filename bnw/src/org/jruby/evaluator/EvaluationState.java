@@ -31,7 +31,7 @@
 package org.jruby.evaluator;
 
 import org.jruby.Ruby;
-import org.jruby.MetaClass;
+import org.jruby.SingletonClass;
 import org.jruby.RubyArray;
 import org.jruby.RubyBignum;
 import org.jruby.RubyClass;
@@ -805,7 +805,7 @@ public class EvaluationState {
    
         // 'class << state.self' and 'class << obj' uses defn as opposed to defs
         if (containingClass.isSingleton()) {
-            ((MetaClass) containingClass).getAttachedObject().callMethod(
+            ((SingletonClass) containingClass).getAttachedObject().callMethod(
                     context, "singleton_method_added", runtime.newSymbol(iVisited.getName()));
         } else {
             containingClass.callMethod(context, "method_added", runtime.newSymbol(name));
@@ -1170,11 +1170,12 @@ public class EvaluationState {
         return result;
     }
 
-    private static IRubyObject instVarNode(Ruby runtime, Node node, IRubyObject self) {
-        InstVarNode iVisited = (InstVarNode) node;
-        IRubyObject variable = self.getInstanceVariable(iVisited.getName());
+    private static IRubyObject instVarNode(final Ruby runtime, final Node node, final IRubyObject self) {
+        final InstVarNode iVisited = (InstVarNode) node;
+        final Object variable = runtime.getRegistry().fastGetInstanceVariable(self, iVisited.getName());
+        //IRubyObject variable = self.getInstanceVariable(iVisited.getName());
    
-        return variable == null ? runtime.getNil() : variable;
+        return variable == null ? runtime.getNil() : (IRubyObject)variable;
     }
 
     private static IRubyObject localAsgnNode(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block aBlock) {
@@ -1913,7 +1914,7 @@ public class EvaluationState {
         }
     }
 
-    private static String getDefinitionInner(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block aBlock) {
+    private static String getDefinitionInner(final Ruby runtime, final ThreadContext context, final Node node, final IRubyObject self, final Block aBlock) {
         if (node == null) return "expression";
         
         switch(node.nodeId) {
@@ -1979,10 +1980,12 @@ public class EvaluationState {
                 return "class_variable";
             } 
             
-            IRubyObject attached =  module.getInstanceVariable("__attached__");
-            if (attached instanceof RubyModule) {
-                module = (RubyModule)attached;
-                if (module.isClassVarDefined(iVisited.getName())) return "class_variable"; 
+            if (module.isSingleton()) {
+                IRubyObject attached = ((SingletonClass)module).getAttachedObject();
+                if (attached instanceof RubyModule &&
+                        ((RubyModule)attached).isClassVarDefined(iVisited.getName())) {
+                    return "class_variable"; 
+                }
             }
 
             return null;
@@ -2030,7 +2033,8 @@ public class EvaluationState {
             }
             return null;
         case NodeTypes.INSTVARNODE:
-            if (self.getInstanceVariable(((InstVarNode) node).getName()) != null) {
+            if (runtime.getRegistry().fastHasInstanceVariable(self, ((InstVarNode) node).getName())) {
+            //if (self.getInstanceVariable(((InstVarNode) node).getName()) != null) {
                 return "instance-variable";
             }
             return null;

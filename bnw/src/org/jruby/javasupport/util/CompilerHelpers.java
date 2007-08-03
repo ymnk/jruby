@@ -3,7 +3,7 @@ package org.jruby.javasupport.util;
 import org.jruby.regexp.RegexpFactory;
 import org.jruby.regexp.RegexpPattern;
 import org.jruby.regexp.PatternSyntaxException;
-import org.jruby.MetaClass;
+import org.jruby.SingletonClass;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyClass;
@@ -88,7 +88,7 @@ public class CompilerHelpers {
         
         // 'class << state.self' and 'class << obj' uses defn as opposed to defs
         if (containingClass.isSingleton()) {
-            ((MetaClass) containingClass).getAttachedObject().callMethod(
+            ((SingletonClass) containingClass).getAttachedObject().callMethod(
                     context, "singleton_method_added", runtime.newSymbol(name));
         } else {
             containingClass.callMethod(context, "method_added", runtime.newSymbol(name));

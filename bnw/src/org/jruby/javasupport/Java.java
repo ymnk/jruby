@@ -123,7 +123,7 @@ public class Java {
             if (superClazz != null) {
                 return null;
             }
-            IRubyObject packageName = pkg.getInstanceVariable("@package_name");
+            IRubyObject packageName = pkg.fastGetInstanceVariable("@package_name");
             // again, shouldn't happen. TODO: might want to throw exception instead.
             if (packageName == null) return null;
 
@@ -145,7 +145,7 @@ public class Java {
 
     // If the proxy class itself is passed as a parameter this will be called by Java#ruby_to_java    
     public static IRubyObject to_java_object(IRubyObject recv) {
-        return recv.getInstanceVariable("@java_class");
+        return recv.fastGetInstanceVariable("@java_class");
     }
 
     private final static class ProxyData {
@@ -794,7 +794,7 @@ public class Java {
      */
     public static IRubyObject ruby_to_java(final IRubyObject recv, IRubyObject object, Block unusedBlock) {
     	if(object.respondsTo("to_java_object")) {
-            IRubyObject result = object.getInstanceVariable("@java_object");
+            IRubyObject result = object.fastGetInstanceVariable("@java_object");
             if(result == null) {
                 result = object.callMethod(recv.getRuntime().getCurrentContext(), "to_java_object");
             }

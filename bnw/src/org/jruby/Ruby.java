@@ -57,6 +57,7 @@ import org.jruby.ast.Node;
 import org.jruby.ast.RootNode;
 import org.jruby.ast.executable.Script;
 import org.jruby.ast.executable.YARVCompiledRunner;
+import org.jruby.bnw.Registry;
 import org.jruby.common.RubyWarnings;
 import org.jruby.compiler.ASTInspector;
 import org.jruby.compiler.NodeCompilerFactory;
@@ -91,7 +92,7 @@ import org.jruby.parser.Parser;
 import org.jruby.parser.ParserConfiguration;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Block;
-import org.jruby.runtime.CacheMap;
+//import org.jruby.runtime.CacheMap;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.EventHook;
@@ -119,14 +120,16 @@ import org.jruby.regexp.RegexpFactory;
 public final class Ruby {
     private static String[] BUILTIN_LIBRARIES = {"fcntl", "yaml", "yaml/syck", "jsignal" };
 
-    private CacheMap cacheMap = new CacheMap();
-    private MethodCache methodCache = new MethodCache();
-    private ThreadService threadService = new ThreadService(this);
+    // registry must be created before threadService
+    private final Registry registry = new Registry(this);
+    //private final CacheMap cacheMap = new CacheMap();
+    private final MethodCache methodCache = new MethodCache();
+    private final ThreadService threadService = new ThreadService(this);
     private Hashtable runtimeInformation;
 
     private int stackTraces = 0;
 
-    private ObjectSpace objectSpace = new ObjectSpace();
+    private final ObjectSpace objectSpace = new ObjectSpace();
 
     private final RubyFixnum[] fixnumCache = new RubyFixnum[256];
     private final RubySymbol.SymbolTable symbolTable = new RubySymbol.SymbolTable();
@@ -157,6 +160,7 @@ public final class Ruby {
     private RubyBoolean falseObject;
     private RubyClass objectClass;
     private RubyClass stringClass;
+    private RubyClass symbolClass;
     private RubyModule enumerableModule;
     private RubyClass systemCallError = null;
     private RubyModule errnoModule = null;
@@ -192,6 +196,10 @@ public final class Ruby {
     // the runtime environment exits.
     private Stack atExitBlocks = new Stack();
 
+    private RubyClass classClass;
+    
+    private RubyClass moduleClass;
+    
     private RubyModule kernelModule;
 
     private RubyClass nilClass;
@@ -449,6 +457,14 @@ public final class Ruby {
         return undef;
     }
 
+    public RubyClass getClassClass() {
+        return classClass;
+    }
+    
+    public RubyClass getModule() {
+        return moduleClass;
+    }
+    
     public RubyModule getKernel() {
         return kernelModule;
     }
@@ -456,10 +472,13 @@ public final class Ruby {
     public RubyModule getEnumerable() {
         return enumerableModule;
     }
-    
 
     public RubyClass getString() {
         return stringClass;
+    }
+
+    public RubyClass getSymbol() {
+        return symbolClass;
     }
 
     public RubyClass getFixnum() {
@@ -615,15 +634,25 @@ public final class Ruby {
         }
     }
 
+//    /**
+//     * Retrieve mappings of cached methods to where they have been cached.  When a cached
+//     * method needs to be invalidated this map can be used to remove all places it has been
+//     * cached.
+//     *
+//     * @return the mappings of where cached methods have been stored
+//     */
+//    public CacheMap getCacheMap() {
+//        return cacheMap;
+//    }
+    
+
     /**
-     * Retrieve mappings of cached methods to where they have been cached.  When a cached
-     * method needs to be invalidated this map can be used to remove all places it has been
-     * cached.
-     *
-     * @return the mappings of where cached methods have been stored
+     * Retrieve the Registry.
+     * 
+     * @return registry containing metaclasses, variables, data structs, etc.
      */
-    public CacheMap getCacheMap() {
-        return cacheMap;
+    public Registry getRegistry() {
+        return registry;
     }
     
     /**
@@ -767,15 +796,15 @@ public final class Ruby {
 
     private void initCoreClasses() {
         undef = new RubyUndef();
-
+ 
         RubyClass objectMetaClass = RubyClass.createBootstrapMetaClass(this, "Object", null, RubyObject.OBJECT_ALLOCATOR, null);
         RubyObject.createObjectClass(this, objectMetaClass);
 
         objectClass = objectMetaClass;
         objectClass.setConstant("Object", objectClass);
-        RubyClass moduleClass = RubyClass.createBootstrapMetaClass(this, "Module", objectClass, RubyModule.MODULE_ALLOCATOR, objectClass);
+        moduleClass = RubyClass.createBootstrapMetaClass(this, "Module", objectClass, RubyModule.MODULE_ALLOCATOR, objectClass);
         objectClass.setConstant("Module", moduleClass);
-        RubyClass classClass = RubyClass.newClassClass(this, moduleClass);
+        classClass = RubyClass.newClassClass(this, moduleClass);
         objectClass.setConstant("Class", classClass);
         
         classClass.setMetaClass(classClass);
@@ -786,7 +815,7 @@ public final class Ruby {
         RubyClass metaClass = objectClass.makeMetaClass(classClass, objectMetaClass);
         metaClass = moduleClass.makeMetaClass(metaClass, objectMetaClass);
         metaClass = classClass.makeMetaClass(metaClass, objectMetaClass);
-
+        
         RubyModule.createModuleClass(this, moduleClass);
 
         kernelModule = RubyKernel.createKernelModule(this);
@@ -807,7 +836,7 @@ public final class Ruby {
         RubyComparable.createComparable(this);
         enumerableModule = RubyEnumerable.createEnumerableModule(this);
         stringClass = RubyString.createStringClass(this);
-        RubySymbol.createSymbolClass(this);
+        symbolClass = RubySymbol.createSymbolClass(this);
         
         if (profile.allowClass("ThreadGroup")) RubyThreadGroup.createThreadGroupClass(this);
         if (profile.allowClass("Thread")) RubyThread.createThreadClass(this);
