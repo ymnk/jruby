@@ -251,7 +251,7 @@ public class RubyKernel {
                 // File to be loaded by autoload has already been or is being loaded.
                 if (!required) return null;
                 
-                return module.getConstant(baseName);
+                return module.fastGetConstant(baseName);
             }
         });
         return runtime.getNil();
@@ -327,9 +327,9 @@ public class RubyKernel {
             IRubyObject[]NMEArgs = new IRubyObject[args.length - 1];
             System.arraycopy(args, 1, NMEArgs, 0, NMEArgs.length);
             exArgs[2] = runtime.newArrayNoCopy(NMEArgs);
-            exc = runtime.getClass("NoMethodError");
+            exc = runtime.fastGetClass("NoMethodError");
         } else {
-            exc = runtime.getClass("NameError");
+            exc = runtime.fastGetClass("NameError");
         }
         
         throw new RaiseException((RubyException)exc.newInstance(exArgs, Block.NULL_BLOCK));
@@ -362,7 +362,7 @@ public class RubyKernel {
             }
         } 
 
-        return RubyFile.open(runtime.getClass("File"), args, block);
+        return RubyFile.open(runtime.fastGetClass("File"), args, block);
     }
 
     public static IRubyObject gets(IRubyObject recv, IRubyObject[] args) {
@@ -388,7 +388,7 @@ public class RubyKernel {
             
             // Strange that Ruby has custom code here and not convertToTypeWithCheck equivalent.
             value = object.callMethod(recv.getRuntime().getCurrentContext(), MethodIndex.TO_A, "to_a");
-            if (value.getMetaClass() != recv.getRuntime().getClass("Array")) {
+            if (value.getMetaClass() != recv.getRuntime().getArray()) {
                 throw recv.getRuntime().newTypeError("`to_a' did not return Array");
                
             }
@@ -424,8 +424,8 @@ public class RubyKernel {
         if (object instanceof RubyFloat) {
             double val = ((RubyFloat)object).getDoubleValue(); 
             if (val <= (double) RubyFixnum.MAX && val >= (double) RubyFixnum.MIN) {
-                IRubyObject tmp = ((RubyObject)object).convertToType(recv.getRuntime().getClass("Integer"), MethodIndex.TO_INT, "to_int", false);
-                if (tmp.isNil()) return ((RubyObject)object).convertToType(recv.getRuntime().getClass("Integer"), MethodIndex.TO_I, "to_i", true);
+                IRubyObject tmp = ((RubyObject)object).convertToType(recv.getRuntime().fastGetClass("Integer"), MethodIndex.TO_INT, "to_int", false);
+                if (tmp.isNil()) return ((RubyObject)object).convertToType(recv.getRuntime().fastGetClass("Integer"), MethodIndex.TO_I, "to_i", true);
                 return tmp;
             }
             return RubyNumeric.dbl2num(recv.getRuntime(),((RubyFloat)object).getDoubleValue());            
@@ -435,8 +435,8 @@ public class RubyKernel {
             return RubyNumeric.str2inum(recv.getRuntime(),(RubyString)object,0,true);
         }
         
-        IRubyObject tmp = ((RubyObject)object).convertToType(recv.getRuntime().getClass("Integer"), MethodIndex.TO_INT, "to_int", false);
-        if (tmp.isNil()) return ((RubyObject)object).convertToType(recv.getRuntime().getClass("Integer"), MethodIndex.TO_I, "to_i", true);
+        IRubyObject tmp = ((RubyObject)object).convertToType(recv.getRuntime().fastGetClass("Integer"), MethodIndex.TO_INT, "to_int", false);
+        if (tmp.isNil()) return ((RubyObject)object).convertToType(recv.getRuntime().fastGetClass("Integer"), MethodIndex.TO_I, "to_i", true);
         return tmp;
     }
 
@@ -718,7 +718,7 @@ public class RubyKernel {
         if (args.length == 0) {
             IRubyObject lastException = runtime.getGlobalVariables().get("$!");
             if (lastException.isNil()) {
-                throw new RaiseException(runtime, runtime.getClass("RuntimeError"), "", false);
+                throw new RaiseException(runtime, runtime.fastGetClass("RuntimeError"), "", false);
             } 
             throw new RaiseException((RubyException) lastException);
         }
@@ -728,7 +728,7 @@ public class RubyKernel {
         
         if (args.length == 1) {
             if (args[0] instanceof RubyString) {
-                throw new RaiseException((RubyException)runtime.getClass("RuntimeError").newInstance(args, block));
+                throw new RaiseException((RubyException)runtime.fastGetClass("RuntimeError").newInstance(args, block));
             }
             
             if (!args[0].respondsTo("exception")) {
@@ -743,7 +743,7 @@ public class RubyKernel {
             exception = args[0].callMethod(context, "exception", args[1]);
         }
         
-        if (!exception.isKindOf(runtime.getClass("Exception"))) {
+        if (!exception.isKindOf(runtime.fastGetClass("Exception"))) {
             throw runtime.newTypeError("exception object expected");
         }
         
@@ -808,7 +808,7 @@ public class RubyKernel {
     public static IRubyObject callcc(IRubyObject recv, IRubyObject[] args, Block block) {
         Ruby runtime = recv.getRuntime();
         runtime.getWarnings().warn("Kernel#callcc: Continuations are not implemented in JRuby and will not work");
-        IRubyObject cc = runtime.getClass("Continuation").callMethod(runtime.getCurrentContext(),"new");
+        IRubyObject cc = runtime.fastGetClass("Continuation").callMethod(runtime.getCurrentContext(),"new");
         cc.dataWrapStruct(block);
         return block.yield(runtime.getCurrentContext(),cc);
     }
@@ -865,8 +865,8 @@ public class RubyKernel {
     
     public static IRubyObject warn(IRubyObject recv, IRubyObject message) {
         Ruby runtime = recv.getRuntime();
-        IRubyObject out = runtime.getObject().getConstant("STDERR");
-        RubyIO io = (RubyIO) out.convertToType(runtime.getClass("IO"), 0, "to_io", true); 
+        IRubyObject out = runtime.getObject().fastGetConstant("STDERR");
+        RubyIO io = (RubyIO) out.convertToType(runtime.fastGetClass("IO"), 0, "to_io", true); 
 
         io.puts(new IRubyObject[] { message });
         return recv.getRuntime().getNil();
@@ -901,7 +901,7 @@ public class RubyKernel {
             proc = RubyProc.newProc(recv.getRuntime(), block, false);
         }
         if (args.length == 2) {
-            proc = (RubyProc)args[1].convertToType(recv.getRuntime().getClass("Proc"), 0, "to_proc", true);
+            proc = (RubyProc)args[1].convertToType(recv.getRuntime().getProc(), 0, "to_proc", true);
         }
         
         recv.getRuntime().getGlobalVariables().setTraceVar(var, proc);
@@ -1139,7 +1139,7 @@ public class RubyKernel {
 
         if (args.length > 0) {
             RubyInteger integerSeed = 
-                (RubyInteger) args[0].convertToType(runtime.getClass("Integer"), MethodIndex.TO_I, "to_i", true);
+                (RubyInteger) args[0].convertToType(runtime.fastGetClass("Integer"), MethodIndex.TO_I, "to_i", true);
             runtime.setRandomSeed(integerSeed.getLongValue());
         } else {
             // Not sure how well this works, but it works much better than
@@ -1166,7 +1166,7 @@ public class RubyKernel {
                 return new RubyBignum(runtime, new BigInteger(bytes).abs()); 
             }
              
-            RubyInteger integerCeil = (RubyInteger) args[0].convertToType(runtime.getClass("Integer"), MethodIndex.TO_I, "to_i", true);
+            RubyInteger integerCeil = (RubyInteger) args[0].convertToType(runtime.fastGetClass("Integer"), MethodIndex.TO_I, "to_i", true);
             ceil = Math.abs(integerCeil.getLongValue());
         } else {
             throw runtime.newArgumentError("wrong # of arguments(" + args.length + " for 1)");

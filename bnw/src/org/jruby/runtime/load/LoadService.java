@@ -152,7 +152,7 @@ public class LoadService {
         }
 
         // add $RUBYLIB paths
-       RubyHash env = (RubyHash) runtime.getObject().getConstant("ENV");
+       RubyHash env = (RubyHash) runtime.getObject().fastGetConstant("ENV");
        RubyString env_rubylib = runtime.newString("RUBYLIB");
        if (env.has_key(env_rubylib).isTrue()) {
            String rubylib = env.aref(env_rubylib).toString();

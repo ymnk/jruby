@@ -50,7 +50,7 @@ public class JavaArray extends JavaObject {
     public static RubyClass createJavaArrayClass(Ruby runtime, RubyModule javaModule) {
         // FIXME: NOT_ALLOCATABLE_ALLOCATOR is probably not right here, since we might
         // eventually want JavaArray to be marshallable. JRUBY-414
-        return javaModule.defineClassUnder("JavaArray", javaModule.getClass("JavaObject"), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        return javaModule.defineClassUnder("JavaArray", javaModule.fastGetClass("JavaObject"), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
     }
 
     public RubyFixnum length() {
@@ -63,7 +63,7 @@ public class JavaArray extends JavaObject {
 
     public IRubyObject aref(IRubyObject index) {
         if (! (index instanceof RubyInteger)) {
-            throw getRuntime().newTypeError(index, getRuntime().getClass("Integer"));
+            throw getRuntime().newTypeError(index, getRuntime().fastGetClass("Integer"));
         }
         int intIndex = (int) ((RubyInteger) index).getLongValue();
         if (intIndex < 0 || intIndex >= getLength()) {
@@ -80,7 +80,7 @@ public class JavaArray extends JavaObject {
 
     public IRubyObject aset(IRubyObject index, IRubyObject value) {
          if (! (index instanceof RubyInteger)) {
-            throw getRuntime().newTypeError(index, getRuntime().getClass("Integer"));
+            throw getRuntime().newTypeError(index, getRuntime().fastGetClass("Integer"));
         }
         int intIndex = (int) ((RubyInteger) index).getLongValue();
         if (! (value instanceof JavaObject)) {
@@ -103,11 +103,11 @@ public class JavaArray extends JavaObject {
 
     public IRubyObject afill(IRubyObject beginIndex, IRubyObject endIndex, IRubyObject value) {
         if (! (beginIndex instanceof RubyInteger)) {
-            throw getRuntime().newTypeError(beginIndex, getRuntime().getClass("Integer"));
+            throw getRuntime().newTypeError(beginIndex, getRuntime().fastGetClass("Integer"));
         }
         int intIndex = (int) ((RubyInteger) beginIndex).getLongValue();
         if (! (endIndex instanceof RubyInteger)) {
-            throw getRuntime().newTypeError(endIndex, getRuntime().getClass("Integer"));
+            throw getRuntime().newTypeError(endIndex, getRuntime().fastGetClass("Integer"));
         }
         int intEndIndex = (int) ((RubyInteger) endIndex).getLongValue();
         if (! (value instanceof JavaObject)) {

@@ -147,6 +147,7 @@ public interface IRubyObject extends Freezable, Taintable {
      */
     IRubyObject setInstanceVariable(String string, IRubyObject rubyObject);
     
+    IRubyObject fastSetInstanceVariable(String string, IRubyObject rubyObject);
     /**
      *
      * @return

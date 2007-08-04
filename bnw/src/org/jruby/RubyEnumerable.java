@@ -348,7 +348,7 @@ public class RubyEnumerable {
 
     public static IRubyObject each_with_index(IRubyObject self, Block block) {
         ThreadContext context = self.getRuntime().getCurrentContext();
-        self.callMethod(context, "each", new CallBlock(self, self.getRuntime().getModule("Enumerable"), 
+        self.callMethod(context, "each", new CallBlock(self, self.getRuntime().getEnumerable(), 
                 Arity.noArguments(), new EachWithIndex(context, block), context));
         
         return self;

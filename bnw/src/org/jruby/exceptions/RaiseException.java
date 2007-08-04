@@ -69,7 +69,7 @@ public class RaiseException extends JumpException {
     }
 
     public static RaiseException createNativeRaiseException(Ruby runtime, Throwable cause) {
-        NativeException nativeException = new NativeException(runtime, runtime.getClass(NativeException.CLASS_NAME), cause);
+        NativeException nativeException = new NativeException(runtime, runtime.fastGetClass(NativeException.CLASS_NAME), cause);
         return new RaiseException(cause, nativeException);
     }
 

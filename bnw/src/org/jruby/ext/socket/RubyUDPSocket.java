@@ -52,10 +52,10 @@ import org.jruby.util.ByteList;
  */
 public class RubyUDPSocket extends RubyIPSocket {
     static void createUDPSocket(Ruby runtime) {
-        RubyClass rb_cUDPSocket = runtime.defineClass("UDPSocket", runtime.getClass("IPSocket"), UDPSOCKET_ALLOCATOR);
+        RubyClass rb_cUDPSocket = runtime.defineClass("UDPSocket", runtime.fastGetClass("IPSocket"), UDPSOCKET_ALLOCATOR);
         CallbackFactory cfact = runtime.callbackFactory(RubyUDPSocket.class);
         try {
-        rb_cUDPSocket.includeModule(runtime.getClass("Socket").getConstant("Constants"));
+        rb_cUDPSocket.includeModule(runtime.fastGetClass("Socket").fastGetConstant("Constants"));
 
         rb_cUDPSocket.defineFastMethod("initialize", cfact.getFastMethod("initialize"));
         rb_cUDPSocket.defineFastMethod("bind", cfact.getFastMethod("bind",IRubyObject.class,IRubyObject.class));

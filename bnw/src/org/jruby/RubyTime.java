@@ -67,7 +67,7 @@ public class RubyTime extends RubyObject {
     public static TimeZone getLocalTimeZone(Ruby runtime) {
         // TODO: cache the RubyString "TZ" so it doesn't need to be recreated for each call?
         RubyString tzVar = runtime.newString("TZ");
-        RubyHash h = ((RubyHash)runtime.getObject().getConstant("ENV"));
+        RubyHash h = ((RubyHash)runtime.getObject().fastGetConstant("ENV"));
         IRubyObject tz = h.aref(tzVar);
         if (tz == null || ! (tz instanceof RubyString)) {
             return TimeZone.getDefault();
@@ -100,7 +100,7 @@ public class RubyTime extends RubyObject {
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyTime.class);
         RubyClass timeMetaClass = timeClass.getMetaClass();
         
-        timeClass.includeModule(runtime.getModule("Comparable"));
+        timeClass.includeModule(runtime.fastGetModule("Comparable"));
         
         timeMetaClass.defineAlias("now","new");
         timeMetaClass.defineFastMethod("at", callbackFactory.getFastOptSingletonMethod("new_at"));
@@ -185,7 +185,7 @@ public class RubyTime extends RubyObject {
     
     public static RubyTime newTime(Ruby runtime, long milliseconds) {
         Calendar cal = Calendar.getInstance(); 
-        RubyTime time = new RubyTime(runtime, runtime.getClass("Time"), cal);
+        RubyTime time = new RubyTime(runtime, runtime.fastGetClass("Time"), cal);
         
         cal.setTimeInMillis(milliseconds);
         
@@ -193,7 +193,7 @@ public class RubyTime extends RubyObject {
     }
     
     public static RubyTime newTime(Ruby runtime, Calendar cal) {
-        RubyTime time = new RubyTime(runtime, runtime.getClass("Time"), cal);
+        RubyTime time = new RubyTime(runtime, runtime.fastGetClass("Time"), cal);
         
         return time;
     }

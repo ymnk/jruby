@@ -139,7 +139,7 @@ public class Java {
     // JavaProxy
     public static IRubyObject new_instance_for(IRubyObject recv, IRubyObject java_object) {
         IRubyObject new_instance = ((RubyClass)recv).allocate();
-        new_instance.setInstanceVariable("@java_object",java_object);
+        new_instance.fastSetInstanceVariable("@java_object",java_object);
         return new_instance;
     }
 
@@ -206,7 +206,7 @@ public class Java {
         synchronized(javaClass) {
             if ((interfaceModule = (RubyModule)interfaces.get(class_id)) == null) {
                 interfaceModule = (RubyModule)runtime.getJavaSupport().getJavaInterfaceTemplate().dup();
-                interfaceModule.setInstanceVariable("@java_class",javaClass);
+                interfaceModule.fastSetInstanceVariable("@java_class",javaClass);
                 addToJavaPackageModule(interfaceModule,javaClass);
                 interfaces.put(class_id,interfaceModule);
                 javaClass.setupInterfaceModule(interfaceModule);
@@ -234,7 +234,7 @@ public class Java {
     // internal purposes, at least for now. But users should be discouraged
     // from calling this directly; eventually it will go away.
     public static IRubyObject get_deprecated_interface_proxy(IRubyObject recv, IRubyObject java_class_object) {
-        Ruby runtime = recv.getRuntime();
+        final Ruby runtime = recv.getRuntime();
         JavaClass java_class;
         if (java_class_object instanceof RubyString) {
             java_class = JavaClass.for_name(recv, java_class_object);
@@ -246,20 +246,20 @@ public class Java {
         if (!java_class.javaClass().isInterface()) {
             throw runtime.newArgumentError("expected Java interface class, got " + java_class_object);
         }
-        int class_id = RubyNumeric.fix2int(java_class.id());
-        ProxyData pdata = ((ProxyData)recv.dataGetStruct());
-        IntHashMap proxy_classes = pdata.classes;
+        final int class_id = RubyNumeric.fix2int(java_class.id());
+        final ProxyData pdata = ((ProxyData)recv.dataGetStruct());
+        final IntHashMap proxy_classes = pdata.classes;
         RubyClass proxy_class;
         synchronized(java_class) {
             if((proxy_class = (RubyClass)proxy_classes.get(class_id)) == null) {
                 RubyModule interfaceModule = (RubyModule)get_interface_module(recv,java_class);
-                proxy_class = createProxyClass(recv,runtime.getClass("InterfaceJavaProxy"),
+                proxy_class = createProxyClass(recv,runtime.fastGetClass("InterfaceJavaProxy"),
                         java_class,true,proxy_classes,class_id);
                 // including interface module so old-style interface "subclasses" will
                 // respond correctly to #kind_of?, etc.
                 proxy_class.includeModule(interfaceModule);
                 // add reference to interface module
-                if (proxy_class.getConstantAt("Includable") == null) {
+                if (proxy_class.fastGetConstantAt("Includable") == null) {
                     proxy_class.const_set(runtime.newSymbol("Includable"),interfaceModule);
                 }
 
@@ -272,8 +272,8 @@ public class Java {
         return proxy_class;
     }
 
-    public static IRubyObject get_proxy_class(IRubyObject recv, IRubyObject java_class_object) {
-        Ruby runtime = recv.getRuntime();
+    public static IRubyObject get_proxy_class(final IRubyObject recv, final IRubyObject java_class_object) {
+        final Ruby runtime = recv.getRuntime();
         JavaClass java_class;
         if (java_class_object instanceof RubyString) {
             java_class = JavaClass.for_name(recv, java_class_object);
@@ -286,24 +286,24 @@ public class Java {
         if ((c = java_class.javaClass()).isInterface() && !supportExtendableInterfaces()) {
             return get_interface_module(recv,java_class);
         }
-        int class_id = RubyNumeric.fix2int(java_class.id());
-        ProxyData pdata = ((ProxyData)recv.dataGetStruct());
-        IntHashMap proxy_classes = pdata.classes;
+        final int class_id = RubyNumeric.fix2int(java_class.id());
+        final ProxyData pdata = ((ProxyData)recv.dataGetStruct());
+        final IntHashMap proxy_classes = pdata.classes;
         RubyClass proxy_class;
         synchronized(java_class) {
             if((proxy_class = (RubyClass)proxy_classes.get(class_id)) == null) {
 
                 if(c.isInterface()) {
-                    RubyModule interfaceModule = (RubyModule)get_interface_module(recv,java_class);
+                    final RubyModule interfaceModule = (RubyModule)get_interface_module(recv,java_class);
                     // backwards compatibility mode
                     proxy_class = createProxyClass(recv,
-                            runtime.getClass("InterfaceJavaProxy"),
+                            runtime.fastGetClass("InterfaceJavaProxy"),
                             java_class, true, proxy_classes, class_id);
                     // including interface module so old-style interface "subclasses" will
                     // respond correctly to #kind_of?, etc.
                     proxy_class.includeModule(interfaceModule);
                     // add reference to interface module
-                    if (proxy_class.getConstantAt("Includable") == null) {
+                    if (proxy_class.fastGetConstantAt("Includable") == null) {
                         proxy_class.const_set(runtime.newSymbol("Includable"),interfaceModule);
                     }
                     
@@ -376,18 +376,18 @@ public class Java {
     
     // package scheme 2: separate module for each full package name, constructed 
     // from the camel-cased package segments: Java::JavaLang::Object, 
-    private static void addToJavaPackageModule(RubyModule proxyClass, JavaClass javaClass) {
-        Class clazz = javaClass.javaClass();
+    private static void addToJavaPackageModule(final RubyModule proxyClass, final JavaClass javaClass) {
+        final Class clazz = javaClass.javaClass();
         String fullName;
         if ((fullName = clazz.getName()) == null) return;
-        int endPackage = fullName.lastIndexOf('.');
+        final int endPackage = fullName.lastIndexOf('.');
         // we'll only map conventional class names to modules 
         if (fullName.indexOf('$') != -1 || !Character.isUpperCase(fullName.charAt(endPackage + 1))) {
             return;
         }
-        Ruby runtime = proxyClass.getRuntime();
-        String packageString = endPackage < 0 ? "" : fullName.substring(0,endPackage);
-        RubyModule packageModule = getJavaPackageModule(runtime, packageString);
+        final Ruby runtime = proxyClass.getRuntime();
+        final String packageString = endPackage < 0 ? "" : fullName.substring(0,endPackage);
+        final RubyModule packageModule = getJavaPackageModule(runtime, packageString);
         if (packageModule != null) {
             String className = fullName.substring(endPackage + 1);
             if (packageModule.getConstantAt(className) == null) {
@@ -396,9 +396,9 @@ public class Java {
         }
     }
     
-    private static RubyModule getJavaPackageModule(Ruby runtime, String packageString) {
+    private static RubyModule getJavaPackageModule(final Ruby runtime, final String packageString) {
         String packageName;
-        int length = packageString.length();
+        final int length = packageString.length();
         if (length == 0) {
             packageName = "Default";
         } else {
@@ -448,7 +448,7 @@ public class Java {
         Ruby runtime = parent.getRuntime();
         RubyModule packageModule = (RubyModule)runtime.getJavaSupport()
                 .getPackageModuleTemplate().dup();
-        packageModule.setInstanceVariable("@package_name",runtime.newString(
+        packageModule.fastSetInstanceVariable("@package_name",runtime.newString(
                 packageString.length() > 0 ? packageString + '.' : packageString));
 
         // this is where we'll get connected when classes are opened using
@@ -475,11 +475,11 @@ public class Java {
     
     private static final Pattern CAMEL_CASE_PACKAGE_SPLITTER = Pattern.compile("([a-z][0-9]*)([A-Z])");
 
-    public static IRubyObject get_package_module(IRubyObject recv, IRubyObject symObject) {
-        String sym = symObject.asSymbol();
-        RubyModule javaModule = recv.getRuntime().getJavaSupport().getJavaModule();
+    public static IRubyObject get_package_module(final IRubyObject recv, final IRubyObject symObject) {
+        final String sym = symObject.asSymbol();
+        final RubyModule javaModule = recv.getRuntime().getJavaSupport().getJavaModule();
         IRubyObject value;
-        if ((value = javaModule.getConstantAt(sym)) != null) {
+        if ((value = javaModule.fastGetConstantAt(sym)) != null) {
             return value;
         }
         String packageName;

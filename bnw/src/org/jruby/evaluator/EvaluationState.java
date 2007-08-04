@@ -453,7 +453,7 @@ public class EvaluationState {
             if (value.getMetaClass().searchMethod("to_a").getImplementationClass() != runtime
                     .getKernel()) {
                 newValue = value.convertToType(runtime.getArray(), MethodIndex.TO_A, "to_a", false);
-                if (newValue.getType() != runtime.getClass("Array")) {
+                if (newValue.getType() != runtime.getArray()) {
                     throw runtime.newTypeError("`to_a' did not return Array");
                 }
             } else {
@@ -676,7 +676,7 @@ public class EvaluationState {
    
         if (rubyClass == null) rubyClass = self.getMetaClass();
 
-        rubyClass.setClassVar(iVisited.getName(), result);
+        rubyClass.fastSetClassVar(iVisited.getName(), result);
    
         return result;
     }
@@ -690,18 +690,18 @@ public class EvaluationState {
         }
         
         IRubyObject result = evalInternal(runtime,context, iVisited.getValueNode(), self, aBlock);
-        rubyClass.setClassVar(iVisited.getName(), result);
+        rubyClass.fastSetClassVar(iVisited.getName(), result);
    
         return result;
     }
 
-    private static IRubyObject classVarNode(Ruby runtime, ThreadContext context, Node node, IRubyObject self) {
-        ClassVarNode iVisited = (ClassVarNode) node;
+    private static IRubyObject classVarNode(final Ruby runtime, final ThreadContext context, final Node node, final IRubyObject self) {
+        final ClassVarNode iVisited = (ClassVarNode) node;
         RubyModule rubyClass = getClassVariableBase(context, runtime);
    
         if (rubyClass == null) rubyClass = self.getMetaClass();
 
-        return rubyClass.getClassVar(iVisited.getName());
+        return rubyClass.fastGetClassVar(iVisited.getName());
     }
 
     private static IRubyObject colon2Node(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block aBlock) {
@@ -823,9 +823,9 @@ public class EvaluationState {
         if (receiver.isNil()) {
             rubyClass = runtime.getNilClass();
         } else if (receiver == runtime.getTrue()) {
-            rubyClass = runtime.getClass("TrueClass");
+            rubyClass = runtime.fastGetClass("TrueClass");
         } else if (receiver == runtime.getFalse()) {
-            rubyClass = runtime.getClass("FalseClass");
+            rubyClass = runtime.fastGetClass("FalseClass");
         } else {
             if (runtime.getSafeLevel() >= 4 && !receiver.isTaint()) {
                 throw runtime.newSecurityError("Insecure; can't define singleton method.");
@@ -833,7 +833,7 @@ public class EvaluationState {
             if (receiver.isFrozen()) {
                 throw runtime.newFrozenError("object");
             }
-            if (receiver.getMetaClass() == runtime.getFixnum() || receiver.getMetaClass() == runtime.getClass("Symbol")) {
+            if (receiver.getMetaClass() == runtime.getFixnum() || receiver.getMetaClass() == runtime.getSymbol()) {
                 throw runtime.newTypeError("can't define singleton method \"" + iVisited.getName()
                                            + "\" for " + receiver.getType());
             }
@@ -1165,7 +1165,7 @@ public class EvaluationState {
         InstAsgnNode iVisited = (InstAsgnNode) node;
    
         IRubyObject result = evalInternal(runtime,context, iVisited.getValueNode(), self, aBlock);
-        self.setInstanceVariable(iVisited.getName(), result);
+        self.fastSetInstanceVariable(iVisited.getName(), result);
    
         return result;
     }
@@ -1173,7 +1173,6 @@ public class EvaluationState {
     private static IRubyObject instVarNode(final Ruby runtime, final Node node, final IRubyObject self) {
         final InstVarNode iVisited = (InstVarNode) node;
         final Object variable = runtime.getRegistry().fastGetInstanceVariable(self, iVisited.getName());
-        //IRubyObject variable = self.getInstanceVariable(iVisited.getName());
    
         return variable == null ? runtime.getNil() : (IRubyObject)variable;
     }
@@ -1573,10 +1572,10 @@ public class EvaluationState {
         if (receiver.isNil()) {
             singletonClass = runtime.getNilClass();
         } else if (receiver == runtime.getTrue()) {
-            singletonClass = runtime.getClass("TrueClass");
+            singletonClass = runtime.fastGetClass("TrueClass");
         } else if (receiver == runtime.getFalse()) {
-            singletonClass = runtime.getClass("FalseClass");
-        } else if (receiver.getMetaClass() == runtime.getFixnum() || receiver.getMetaClass() == runtime.getClass("Symbol")) {
+            singletonClass = runtime.fastGetClass("FalseClass");
+        } else if (receiver.getMetaClass() == runtime.getFixnum() || receiver.getMetaClass() == runtime.getSymbol()) {
             throw runtime.newTypeError("no virtual class for " + receiver.getMetaClass().getBaseName());
         } else {
             if (runtime.getSafeLevel() >= 4 && !receiver.isTaint()) {
@@ -1711,7 +1710,7 @@ public class EvaluationState {
                     evalInternal(runtime,context, iVisited.getBodyNode(), self, aBlock);
                     break loop;
                 } catch (RaiseException re) {
-                    if (re.getException().isKindOf(runtime.getClass("LocalJumpError"))) {
+                    if (re.getException().isKindOf(runtime.fastGetClass("LocalJumpError"))) {
                         RubyLocalJumpError jumpError = (RubyLocalJumpError)re.getException();
                         
                         IRubyObject reason = jumpError.reason();
@@ -1867,7 +1866,7 @@ public class EvaluationState {
 
             // If not already a proc then we should try and make it one.
             if (!(proc instanceof RubyProc)) {
-                proc = proc.convertToType(runtime.getClass("Proc"), 0, "to_proc", false);
+                proc = proc.convertToType(runtime.getProc(), 0, "to_proc", false);
 
                 if (!(proc instanceof RubyProc)) {
                     throw runtime.newTypeError("wrong argument type "
@@ -1974,16 +1973,16 @@ public class EvaluationState {
             //RubyModule module = context.getRubyClass();
             RubyModule module = context.getCurrentScope().getStaticScope().getModule();
             
-            if (module == null && self.getMetaClass().isClassVarDefined(iVisited.getName())) {
+            if (module == null && self.getMetaClass().fastIsClassVarDefined(iVisited.getName())) {
                 return "class_variable";
-            } else if (!module.isSingleton() && module.isClassVarDefined(iVisited.getName())) {
+            } else if (!module.isSingleton() && module.fastIsClassVarDefined(iVisited.getName())) {
                 return "class_variable";
             } 
             
             if (module.isSingleton()) {
                 IRubyObject attached = ((SingletonClass)module).getAttachedObject();
                 if (attached instanceof RubyModule &&
-                        ((RubyModule)attached).isClassVarDefined(iVisited.getName())) {
+                        ((RubyModule)attached).fastIsClassVarDefined(iVisited.getName())) {
                     return "class_variable"; 
                 }
             }
@@ -2001,7 +2000,7 @@ public class EvaluationState {
                 }
 
                 if (left instanceof RubyModule &&
-                        ((RubyModule) left).getConstantAt(iVisited.getName()) != null) {
+                        ((RubyModule) left).fastGetConstantAt(iVisited.getName()) != null) {
                     return "constant";
                 } else if (left.getMetaClass().isMethodBound(iVisited.getName(), true)) {
                     return "method";
@@ -2034,7 +2033,6 @@ public class EvaluationState {
             return null;
         case NodeTypes.INSTVARNODE:
             if (runtime.getRegistry().fastHasInstanceVariable(self, ((InstVarNode) node).getName())) {
-            //if (self.getInstanceVariable(((InstVarNode) node).getName()) != null) {
                 return "instance-variable";
             }
             return null;
@@ -2111,13 +2109,13 @@ public class EvaluationState {
     private static boolean isRescueHandled(Ruby runtime, ThreadContext context, RubyException currentException, ListNode exceptionNodes,
             IRubyObject self) {
         if (exceptionNodes == null) {
-            return currentException.isKindOf(runtime.getClass("StandardError"));
+            return currentException.isKindOf(runtime.fastGetClass("StandardError"));
         }
 
         IRubyObject[] args = setupArgs(runtime, context, exceptionNodes, self);
 
         for (int i = 0; i < args.length; i++) {
-            if (!args[i].isKindOf(runtime.getClass("Module"))) {
+            if (!args[i].isKindOf(runtime.getModule())) {
                 throw runtime.newTypeError("class or module required for rescue clause");
             }
             if (args[i].callMethod(context, "===", currentException).isTrue()) return true;

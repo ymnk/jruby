@@ -47,7 +47,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 public abstract class RubyInteger extends RubyNumeric { 
 
     public static RubyClass createIntegerClass(Ruby runtime) {
-        RubyClass integer = runtime.defineClass("Integer", runtime.getClass("Numeric"),
+        RubyClass integer = runtime.defineClass("Integer", runtime.fastGetClass("Numeric"),
                 ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyInteger.class);
         integer.getSingletonClass().undefineMethod("allocate");
@@ -58,7 +58,7 @@ public abstract class RubyInteger extends RubyNumeric {
         integer.defineMethod("downto", callbackFactory.getMethod("downto", RubyKernel.IRUBY_OBJECT));
         integer.defineMethod("times", callbackFactory.getMethod("times"));
 
-        integer.includeModule(runtime.getModule("Precision"));
+        integer.includeModule(runtime.fastGetModule("Precision"));
 
         integer.defineFastMethod("succ", callbackFactory.getFastMethod("succ"));
         integer.defineFastMethod("next", callbackFactory.getFastMethod("succ"));

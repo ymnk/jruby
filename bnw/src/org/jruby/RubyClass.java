@@ -97,7 +97,7 @@ public class RubyClass extends RubyModule implements CommonMetaClass {
      * @mri rb_boot_class
      */
     protected RubyClass(RubyClass superClass, ObjectAllocator allocator) {
-        this(superClass.getRuntime(), superClass.getRuntime().getClass("Class"), superClass, allocator, null, null);
+        this(superClass.getRuntime(), superClass.getRuntime().getClassClass(), superClass, allocator, null, null);
 
         infectBy(superClass);
     }
@@ -261,7 +261,7 @@ public class RubyClass extends RubyModule implements CommonMetaClass {
     }
 
     public static RubyClass newClass(Ruby runtime, RubyClass superClass, RubyModule parent, String name) {
-        return new RubyClass(runtime, runtime.getClass("Class"), superClass, superClass.getAllocator(), parent, name);
+        return new RubyClass(runtime, runtime.getClassClass(), superClass, superClass.getAllocator(), parent, name);
     }
 
     public static RubyClass cloneClass(Ruby runtime, RubyClass metaClass, RubyClass superClass, ObjectAllocator allocator, RubyModule parent, String name) {
@@ -274,7 +274,7 @@ public class RubyClass extends RubyModule implements CommonMetaClass {
      * @mri rb_class_new
      */
     protected RubyClass subclass() {
-        if (this == getRuntime().getClass("Class")) {
+        if (this == getRuntime().getClassClass()) {
             throw getRuntime().newTypeError("can't make subclass of Class");
         }
         return new RubyClass(this, getAllocator());

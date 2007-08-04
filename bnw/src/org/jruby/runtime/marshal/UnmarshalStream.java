@@ -140,7 +140,7 @@ public class UnmarshalStream extends BufferedInputStream {
                 try {
                     tp = runtime.getClassFromPath(moduleName.asSymbol());
                 } catch (RaiseException e) {
-                    if (e.getException().isKindOf(runtime.getModule("NameError"))) {
+                    if (e.getException().isKindOf(runtime.fastGetModule("NameError"))) {
                         throw runtime.newArgumentError("undefined class/module " + moduleName.asSymbol());
                     } 
                     throw e;
@@ -250,7 +250,7 @@ public class UnmarshalStream extends BufferedInputStream {
         try {
             type = (RubyClass)runtime.getClassFromPath(className.asSymbol());
         } catch (RaiseException e) {
-            if (e.getException().isKindOf(runtime.getModule("NameError"))) {
+            if (e.getException().isKindOf(runtime.fastGetModule("NameError"))) {
                 throw runtime.newArgumentError("undefined class/module " + className.asSymbol());
             } 
                 
@@ -294,7 +294,7 @@ public class UnmarshalStream extends BufferedInputStream {
         try {
             classInstance = runtime.getClassFromPath(className);
         } catch (RaiseException e) {
-            if (e.getException().isKindOf(runtime.getModule("NameError"))) {
+            if (e.getException().isKindOf(runtime.fastGetModule("NameError"))) {
                 throw runtime.newArgumentError("undefined class/module " + className);
             } 
                 

@@ -206,9 +206,17 @@ public final class Ruby {
 
     private RubyClass fixnumClass;
     
+    private RubyClass floatClass;
+    
     private RubyClass arrayClass;
     
-    private RubyClass hashClass;    
+    private RubyClass hashClass; 
+    
+    private RubyClass regexpClass;
+    
+    private RubyClass matchDataClass;
+    
+    private RubyClass procClass;
 
     private IRubyObject tmsStruct;
     
@@ -484,6 +492,10 @@ public final class Ruby {
     public RubyClass getFixnum() {
         return fixnumClass;
     }
+    
+    public RubyClass getFloat() {
+        return floatClass;
+    }
 
     public RubyClass getHash() {
         return hashClass;
@@ -491,7 +503,19 @@ public final class Ruby {
     
     public RubyClass getArray() {
         return arrayClass;
-    }    
+    }
+    
+    public RubyClass getProc() {
+        return procClass;
+    }
+    
+    public RubyClass getRegexp() {
+        return regexpClass;
+    }
+    
+    public RubyClass getMatchData() {
+        return matchDataClass;
+    }
 
     public IRubyObject getTmsStruct() {
         return tmsStruct;
@@ -522,8 +546,17 @@ public final class Ruby {
         return nilClass;
     }
 
-    public RubyModule getModule(String name) {
+    public RubyModule getModule(final String name) {
         return (RubyModule) objectClass.getConstantAt(name);
+    }
+
+    /**
+     * Use only if <code>name</code> has been intern-ed.
+     * @param name
+     * @return
+     */
+    public RubyModule fastGetModule(final String name) {
+        return (RubyModule) objectClass.fastGetConstantAt(name);
     }
 
     /** Returns a class from the instance pool.
@@ -537,6 +570,10 @@ public final class Ruby {
         } catch (ClassCastException e) {
             throw newTypeError(name + " is not a Class");
         }
+    }
+
+    public RubyClass fastGetClass(final String name) {
+        return objectClass.fastGetClass(name);
     }
 
     /** Define a new class with name 'name' and super class 'superClass'.
@@ -772,9 +809,9 @@ public final class Ruby {
         registerBuiltin("thread.so", new ThreadLibrary());
         registerBuiltin("openssl.so", new Library() {
                 public void load(Ruby runtime) throws IOException {
-                    runtime.getModule("Kernel").callMethod(runtime.getCurrentContext(),"require",runtime.newString("rubygems"));
+                    runtime.getKernel().callMethod(runtime.getCurrentContext(),"require",runtime.newString("rubygems"));
                     runtime.getTopSelf().callMethod(runtime.getCurrentContext(),"gem",runtime.newString("jruby-openssl"));
-                    runtime.getModule("Kernel").callMethod(runtime.getCurrentContext(),"require",runtime.newString("openssl.rb"));
+                    runtime.getKernel().callMethod(runtime.getCurrentContext(),"require",runtime.newString("openssl.rb"));
                 }
             });
         registerBuiltin("digest.so", new DigestLibrary());
@@ -860,18 +897,18 @@ public final class Ruby {
                         newSymbol("cutime"), newSymbol("cstime")}, Block.NULL_BLOCK);
         }
 
-        if (profile.allowClass("Float")) RubyFloat.createFloatClass(this);
+        if (profile.allowClass("Float")) floatClass = RubyFloat.createFloatClass(this);
         if (profile.allowClass("Bignum")) RubyBignum.createBignumClass(this);
         if (profile.allowClass("Binding")) RubyBinding.createBindingClass(this);
         // Math depends on all numeric types
         if (profile.allowModule("Math")) RubyMath.createMathModule(this); 
-        if (profile.allowClass("Regexp")) RubyRegexp.createRegexpClass(this);
+        if (profile.allowClass("Regexp")) regexpClass = RubyRegexp.createRegexpClass(this);
         if (profile.allowClass("Range")) RubyRange.createRangeClass(this);
         if (profile.allowModule("ObjectSpace")) RubyObjectSpace.createObjectSpaceModule(this);
         if (profile.allowModule("GC")) RubyGC.createGCModule(this);
-        if (profile.allowClass("Proc")) RubyProc.createProcClass(this);
+        if (profile.allowClass("Proc")) procClass = RubyProc.createProcClass(this);
         if (profile.allowClass("Method")) RubyMethod.createMethodClass(this);
-        if (profile.allowClass("MatchData")) RubyMatchData.createMatchDataClass(this);
+        if (profile.allowClass("MatchData")) matchDataClass = RubyMatchData.createMatchDataClass(this);
         if (profile.allowModule("Marshal")) RubyMarshal.createMarshalModule(this);
         if (profile.allowClass("Dir")) RubyDir.createDirClass(this);
         if (profile.allowModule("FileTest")) RubyFileTest.createFileTestModule(this);
@@ -881,7 +918,7 @@ public final class Ruby {
         if (profile.allowClass("Time")) RubyTime.createTimeClass(this);
         if (profile.allowClass("UnboundMethod")) RubyUnboundMethod.defineUnboundMethodClass(this);
 
-        RubyClass exceptionClass = getClass("Exception");
+        RubyClass exceptionClass = fastGetClass("Exception");
         RubyClass standardError = null;
         RubyClass runtimeError = null;
         RubyClass ioError = null;
@@ -1227,7 +1264,7 @@ public final class Ruby {
         RubyClass type = excp.getMetaClass();
         String info = excp.toString();
 
-        if (type == getClass("RuntimeError") && (info == null || info.length() == 0)) {
+        if (type == fastGetClass("RuntimeError") && (info == null || info.length() == 0)) {
             errorStream.print(": unhandled exception\n");
         } else {
             String path = type.getName();
@@ -1501,7 +1538,7 @@ public final class Ruby {
     }
 
     public RubyFileStat newRubyFileStat(String file) {
-        return (RubyFileStat)getClass("File").getClass("Stat").callMethod(getCurrentContext(),"new",newString(file));
+        return (RubyFileStat)fastGetClass("File").fastGetClass("Stat").callMethod(getCurrentContext(),"new",newString(file));
     }
 
     public RubyFixnum newFixnum(long value) {
@@ -1559,163 +1596,163 @@ public final class Ruby {
     }
 
     public RaiseException newRuntimeError(String message) {
-        return newRaiseException(getClass("RuntimeError"), message);
+        return newRaiseException(fastGetClass("RuntimeError"), message);
     }    
     
     public RaiseException newArgumentError(String message) {
-        return newRaiseException(getClass("ArgumentError"), message);
+        return newRaiseException(fastGetClass("ArgumentError"), message);
     }
 
     public RaiseException newArgumentError(int got, int expected) {
-        return newRaiseException(getClass("ArgumentError"), "wrong # of arguments(" + got + " for " + expected + ")");
+        return newRaiseException(fastGetClass("ArgumentError"), "wrong # of arguments(" + got + " for " + expected + ")");
     }
 
     public RaiseException newErrnoEBADFError() {
-        return newRaiseException(getModule("Errno").getClass("EBADF"), "Bad file descriptor");
+        return newRaiseException(fastGetModule("Errno").fastGetClass("EBADF"), "Bad file descriptor");
     }
 
     public RaiseException newErrnoECONNREFUSEDError() {
-        return newRaiseException(getModule("Errno").getClass("ECONNREFUSED"), "Connection refused");
+        return newRaiseException(fastGetModule("Errno").fastGetClass("ECONNREFUSED"), "Connection refused");
     }
 
     public RaiseException newErrnoEADDRINUSEError() {
-        return newRaiseException(getModule("Errno").getClass("EADDRINUSE"), "Address in use");
+        return newRaiseException(fastGetModule("Errno").fastGetClass("EADDRINUSE"), "Address in use");
     }
 
     public RaiseException newErrnoEINVALError() {
-        return newRaiseException(getModule("Errno").getClass("EINVAL"), "Invalid file");
+        return newRaiseException(fastGetModule("Errno").fastGetClass("EINVAL"), "Invalid file");
     }
 
     public RaiseException newErrnoENOENTError() {
-        return newRaiseException(getModule("Errno").getClass("ENOENT"), "File not found");
+        return newRaiseException(fastGetModule("Errno").fastGetClass("ENOENT"), "File not found");
     }
 
     public RaiseException newErrnoESPIPEError() {
-        return newRaiseException(getModule("Errno").getClass("ESPIPE"), "Illegal seek");
+        return newRaiseException(fastGetModule("Errno").fastGetClass("ESPIPE"), "Illegal seek");
     }
 
     public RaiseException newErrnoEBADFError(String message) {
-        return newRaiseException(getModule("Errno").getClass("EBADF"), message);
+        return newRaiseException(fastGetModule("Errno").fastGetClass("EBADF"), message);
     }
 
     public RaiseException newErrnoEINVALError(String message) {
-        return newRaiseException(getModule("Errno").getClass("EINVAL"), message);
+        return newRaiseException(fastGetModule("Errno").fastGetClass("EINVAL"), message);
     }
 
     public RaiseException newErrnoENOENTError(String message) {
-        return newRaiseException(getModule("Errno").getClass("ENOENT"), message);
+        return newRaiseException(fastGetModule("Errno").fastGetClass("ENOENT"), message);
     }
 
     public RaiseException newErrnoESPIPEError(String message) {
-        return newRaiseException(getModule("Errno").getClass("ESPIPE"), message);
+        return newRaiseException(fastGetModule("Errno").fastGetClass("ESPIPE"), message);
     }
 
     public RaiseException newErrnoEEXISTError(String message) {
-        return newRaiseException(getModule("Errno").getClass("EEXIST"), message);
+        return newRaiseException(fastGetModule("Errno").fastGetClass("EEXIST"), message);
     }
     
     public RaiseException newErrnoEDOMError(String message) {
-        return newRaiseException(getModule("Errno").getClass("EDOM"), "Domain error - " + message);
+        return newRaiseException(fastGetModule("Errno").fastGetClass("EDOM"), "Domain error - " + message);
     }    
 
     public RaiseException newIndexError(String message) {
-        return newRaiseException(getClass("IndexError"), message);
+        return newRaiseException(fastGetClass("IndexError"), message);
     }
 
     public RaiseException newSecurityError(String message) {
-        return newRaiseException(getClass("SecurityError"), message);
+        return newRaiseException(fastGetClass("SecurityError"), message);
     }
 
     public RaiseException newSystemCallError(String message) {
-        return newRaiseException(getClass("SystemCallError"), message);
+        return newRaiseException(fastGetClass("SystemCallError"), message);
     }
 
     public RaiseException newTypeError(String message) {
-        return newRaiseException(getClass("TypeError"), message);
+        return newRaiseException(fastGetClass("TypeError"), message);
     }
 
     public RaiseException newThreadError(String message) {
-        return newRaiseException(getClass("ThreadError"), message);
+        return newRaiseException(fastGetClass("ThreadError"), message);
     }
 
     public RaiseException newSyntaxError(String message) {
-        return newRaiseException(getClass("SyntaxError"), message);
+        return newRaiseException(fastGetClass("SyntaxError"), message);
     }
 
     public RaiseException newRegexpError(String message) {
-        return newRaiseException(getClass("RegexpError"), message);
+        return newRaiseException(fastGetClass("RegexpError"), message);
     }
 
     public RaiseException newRangeError(String message) {
-        return newRaiseException(getClass("RangeError"), message);
+        return newRaiseException(fastGetClass("RangeError"), message);
     }
 
     public RaiseException newNotImplementedError(String message) {
-        return newRaiseException(getClass("NotImplementedError"), message);
+        return newRaiseException(fastGetClass("NotImplementedError"), message);
     }
     
     public RaiseException newInvalidEncoding(String message) {
-        return newRaiseException(getClass("Iconv").getClass("InvalidEncoding"), message);
+        return newRaiseException(fastGetClass("Iconv").fastGetClass("InvalidEncoding"), message);
     }
 
     public RaiseException newNoMethodError(String message, String name, IRubyObject args) {
-        return new RaiseException(new RubyNoMethodError(this, this.getClass("NoMethodError"), message, name, args), true);
+        return new RaiseException(new RubyNoMethodError(this, this.fastGetClass("NoMethodError"), message, name, args), true);
     }
 
     public RaiseException newNameError(String message, String name) {
-        return new RaiseException(new RubyNameError(this, this.getClass("NameError"), message, name), true);
+        return new RaiseException(new RubyNameError(this, this.fastGetClass("NameError"), message, name), true);
     }
 
     public RaiseException newLocalJumpError(String reason, IRubyObject exitValue, String message) {
-        return new RaiseException(new RubyLocalJumpError(this, getClass("LocalJumpError"), message, reason, exitValue), true);
+        return new RaiseException(new RubyLocalJumpError(this, fastGetClass("LocalJumpError"), message, reason, exitValue), true);
     }
 
     public RaiseException newLoadError(String message) {
-        return newRaiseException(getClass("LoadError"), message);
+        return newRaiseException(fastGetClass("LoadError"), message);
     }
 
     public RaiseException newFrozenError(String objectType) {
         // TODO: Should frozen error have its own distinct class?  If not should more share?
-        return newRaiseException(getClass("TypeError"), "can't modify frozen " + objectType);
+        return newRaiseException(fastGetClass("TypeError"), "can't modify frozen " + objectType);
     }
 
     public RaiseException newSystemStackError(String message) {
-        return newRaiseException(getClass("SystemStackError"), message);
+        return newRaiseException(fastGetClass("SystemStackError"), message);
     }
 
     public RaiseException newSystemExit(int status) {
-        RubyClass exc = getClass("SystemExit");
+        RubyClass exc = fastGetClass("SystemExit");
         IRubyObject[]exArgs = new IRubyObject[]{newFixnum(status), newString("exit")};
         return new RaiseException((RubyException)exc.newInstance(exArgs, Block.NULL_BLOCK));
     }
 
     public RaiseException newIOError(String message) {
-        return newRaiseException(getClass("IOError"), message);
+        return newRaiseException(fastGetClass("IOError"), message);
     }
 
     public RaiseException newStandardError(String message) {
-        return newRaiseException(getClass("StandardError"), message);
+        return newRaiseException(fastGetClass("StandardError"), message);
     }
 
     public RaiseException newIOErrorFromException(IOException ioe) {
-        return newRaiseException(getClass("IOError"), ioe.getMessage());
+        return newRaiseException(fastGetClass("IOError"), ioe.getMessage());
     }
 
     public RaiseException newTypeError(IRubyObject receivedObject, RubyClass expectedType) {
-        return newRaiseException(getClass("TypeError"), "wrong argument type " +
+        return newRaiseException(fastGetClass("TypeError"), "wrong argument type " +
                 receivedObject.getMetaClass() + " (expected " + expectedType + ")");
     }
 
     public RaiseException newEOFError() {
-        return newRaiseException(getClass("EOFError"), "End of file reached");
+        return newRaiseException(fastGetClass("EOFError"), "End of file reached");
     }
 
     public RaiseException newZeroDivisionError() {
-        return newRaiseException(getClass("ZeroDivisionError"), "divided by 0");
+        return newRaiseException(fastGetClass("ZeroDivisionError"), "divided by 0");
     }
 
     public RaiseException newFloatDomainError(String message){
-        return newRaiseException(getClass("FloatDomainError"), message);
+        return newRaiseException(fastGetClass("FloatDomainError"), message);
     }
 
     /**

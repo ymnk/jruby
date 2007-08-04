@@ -93,8 +93,8 @@ public class RubyString extends RubyObject {
         stringClass.index = ClassIndex.STRING;
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyString.class);
         
-        stringClass.includeModule(runtime.getModule("Comparable"));
-        stringClass.includeModule(runtime.getModule("Enumerable"));
+        stringClass.includeModule(runtime.fastGetModule("Comparable"));
+        stringClass.includeModule(runtime.getEnumerable());
         
         stringClass.defineFastMethod("<=>", callbackFactory.getFastMethod("op_cmp", RubyKernel.IRUBY_OBJECT));
         stringClass.defineFastMethod("==", callbackFactory.getFastMethod("equal", RubyKernel.IRUBY_OBJECT));

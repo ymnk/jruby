@@ -49,10 +49,10 @@ import org.jruby.runtime.builtin.IRubyObject;
  */
 public class RubyTCPSocket extends RubyIPSocket {
     static void createTCPSocket(Ruby runtime) {
-        RubyClass rb_cTCPSocket = runtime.defineClass("TCPSocket", runtime.getClass("IPSocket"), TCPSOCKET_ALLOCATOR);
+        RubyClass rb_cTCPSocket = runtime.defineClass("TCPSocket", runtime.fastGetClass("IPSocket"), TCPSOCKET_ALLOCATOR);
         CallbackFactory cfact = runtime.callbackFactory(RubyTCPSocket.class);
 
-        rb_cTCPSocket.includeModule(runtime.getClass("Socket").getConstant("Constants"));
+        rb_cTCPSocket.includeModule(runtime.fastGetClass("Socket").fastGetConstant("Constants"));
 
         rb_cTCPSocket.defineFastMethod("initialize", cfact.getFastMethod("initialize",IRubyObject.class, IRubyObject.class));
         rb_cTCPSocket.defineFastMethod("setsockopt", cfact.getFastOptMethod("setsockopt"));

@@ -54,7 +54,7 @@ import org.jruby.runtime.marshal.UnmarshalStream;
 public class RubyFloat extends RubyNumeric {
 
     public static RubyClass createFloatClass(Ruby runtime) {
-        RubyClass floatc = runtime.defineClass("Float", runtime.getClass("Numeric"),
+        RubyClass floatc = runtime.defineClass("Float", runtime.fastGetClass("Numeric"),
                 ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
         floatc.index = ClassIndex.FLOAT;
         
@@ -64,7 +64,7 @@ public class RubyFloat extends RubyNumeric {
 
         floatc.getMetaClass().defineFastMethod("induced_from", callbackFactory.getFastSingletonMethod(
                 "induced_from", RubyKernel.IRUBY_OBJECT));
-        floatc.includeModule(runtime.getModule("Precision"));
+        floatc.includeModule(runtime.fastGetModule("Precision"));
 
         // Java Doubles are 64 bit long:            
         floatc.defineConstant("ROUNDS", RubyFixnum.newFixnum(runtime, 1));
@@ -77,9 +77,9 @@ public class RubyFloat extends RubyNumeric {
         floatc.defineConstant("MAX_EXP", RubyFixnum.newFixnum(runtime, 1024));
         floatc.defineConstant("MIN_10_EXP", RubyFixnum.newFixnum(runtime, -307));
         floatc.defineConstant("MAX_10_EXP", RubyFixnum.newFixnum(runtime, -308));
-        floatc.defineConstant("MIN", RubyFloat.newFloat(runtime, Double.MIN_VALUE));
-        floatc.defineConstant("MAX", RubyFloat.newFloat(runtime, Double.MAX_VALUE));
-        floatc.defineConstant("EPSILON", RubyFloat.newFloat(runtime, 2.2204460492503131e-16));
+        floatc.defineConstant("MIN", new RubyFloat(runtime, floatc, Double.MIN_VALUE));
+        floatc.defineConstant("MAX", new RubyFloat(runtime, floatc, Double.MAX_VALUE));
+        floatc.defineConstant("EPSILON", new RubyFloat(runtime, floatc, 2.2204460492503131e-16));
 
         floatc.defineFastMethod("to_s", callbackFactory.getFastMethod("to_s"));
         floatc.defineFastMethod("coerce", callbackFactory.getFastMethod("coerce", RubyKernel.IRUBY_OBJECT));
@@ -131,7 +131,13 @@ public class RubyFloat extends RubyNumeric {
     }
 
     public RubyFloat(Ruby runtime, double value) {
-        super(runtime, runtime.getClass("Float"));
+        super(runtime, runtime.getFloat());
+        this.value = value;
+    }
+
+    // ctor for Floats defined in createFloatClass()
+    private RubyFloat(Ruby runtime, RubyClass metaClass, double value) {
+        super(runtime, metaClass);
         this.value = value;
     }
 
@@ -166,6 +172,7 @@ public class RubyFloat extends RubyNumeric {
     public static RubyFloat newFloat(Ruby runtime, double value) {
         return new RubyFloat(runtime, value);
     }
+
 
     /*  ================
      *  Instance Methods

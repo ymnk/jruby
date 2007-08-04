@@ -80,7 +80,7 @@ public class RubyZlib {
         
         CallbackFactory classCB = runtime.callbackFactory(RubyClass.class);
         RubyClass gzreader = result.defineClassUnder("GzipReader", gzfile, RubyGzipReader.GZIPREADER_ALLOCATOR);
-        gzreader.includeModule(runtime.getModule("Enumerable"));
+        gzreader.includeModule(runtime.getEnumerable());
         CallbackFactory callbackFactory2 = runtime.callbackFactory(RubyGzipReader.class);
         gzreader.getMetaClass().defineMethod("open", callbackFactory2.getSingletonMethod("open", RubyString.class));
         gzreader.getMetaClass().defineMethod("new", classCB.getOptMethod("newInstance"));
@@ -103,7 +103,7 @@ public class RubyZlib {
         gzreader.defineFastMethod("gets", callbackFactory2.getFastOptMethod("gets"));
         gzreader.defineFastMethod("tell", callbackFactory2.getFastMethod("tell"));
         
-        RubyClass standardError = runtime.getClass("StandardError");
+        RubyClass standardError = runtime.fastGetClass("StandardError");
         RubyClass zlibError = result.defineClassUnder("Error", standardError, standardError.getAllocator());
         gzreader.defineClassUnder("Error", zlibError, zlibError.getAllocator());
 
@@ -230,17 +230,17 @@ public class RubyZlib {
         defl.defineFastMethod("flush",deflcb.getFastOptMethod("flush"));
         defl.defineFastMethod("deflate",deflcb.getFastOptMethod("deflate"));
 
-        runtime.getModule("Kernel").callMethod(runtime.getCurrentContext(),"require",runtime.newString("stringio"));
+        runtime.getKernel().callMethod(runtime.getCurrentContext(),"require",runtime.newString("stringio"));
 
         return result;
     }
 
     public static IRubyObject zlib_version(IRubyObject recv) {
-        return ((RubyModule)recv).getConstant("ZLIB_VERSION");
+        return ((RubyModule)recv).fastGetConstant("ZLIB_VERSION");
     }
 
     public static IRubyObject version(IRubyObject recv) {
-        return ((RubyModule)recv).getConstant("VERSION");
+        return ((RubyModule)recv).fastGetConstant("VERSION");
     }
 
     public static IRubyObject crc32(IRubyObject recv, IRubyObject[] args) throws Exception {
@@ -341,7 +341,7 @@ public class RubyZlib {
         }
 
         public IRubyObject data_type() {
-            return getRuntime().getModule("Zlib").getConstant("UNKNOWN");
+            return getRuntime().fastGetModule("Zlib").fastGetConstant("UNKNOWN");
         }
 
         public IRubyObject closed_p() {
@@ -723,7 +723,7 @@ public class RubyZlib {
             IRubyObject proc = block.isGiven() ? runtime.newProc(false, block) : runtime.getNil();
             RubyGzipReader io = newInstance(
                     recv,
-                    new IRubyObject[]{ runtime.getClass("File").callMethod(
+                    new IRubyObject[]{ runtime.fastGetClass("File").callMethod(
                             runtime.getCurrentContext(),
                             "open",
                             new IRubyObject[]{filename, runtime.newString("rb")})},
@@ -745,7 +745,7 @@ public class RubyZlib {
                 this.io = new GZIPInputStream(new IOInputStream(io));
             } catch (IOException e) {
                 Ruby runtime = io.getRuntime();
-                RubyClass errorClass = runtime.getModule("Zlib").getClass("GzipReader").getClass("Error");
+                RubyClass errorClass = runtime.fastGetModule("Zlib").fastGetClass("GzipReader").fastGetClass("Error");
                 throw new RaiseException(RubyException.newException(runtime, errorClass, e.getMessage()));
             }
 
@@ -959,7 +959,7 @@ public class RubyZlib {
             IRubyObject proc = block.isGiven() ? runtime.newProc(false, block) : runtime.getNil();
             RubyGzipWriter io = newGzipWriter(
                     recv,
-                    new IRubyObject[]{ runtime.getClass("File").callMethod(
+                    new IRubyObject[]{ runtime.fastGetClass("File").callMethod(
                             runtime.getCurrentContext(),
                             "open",
                             new IRubyObject[]{args[0],runtime.newString("wb")}),level,strategy},block);
@@ -1031,7 +1031,7 @@ public class RubyZlib {
         }
         
         public IRubyObject puts(IRubyObject[] args) throws IOException {
-            RubyStringIO sio = (RubyStringIO)getRuntime().getClass("StringIO").newInstance(new IRubyObject[0], Block.NULL_BLOCK);
+            RubyStringIO sio = (RubyStringIO)getRuntime().fastGetClass("StringIO").newInstance(new IRubyObject[0], Block.NULL_BLOCK);
             sio.puts(args);
             write(sio.string());
             

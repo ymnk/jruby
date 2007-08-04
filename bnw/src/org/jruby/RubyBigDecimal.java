@@ -48,7 +48,7 @@ public class RubyBigDecimal extends RubyNumeric {
     };
     
     public static RubyClass createBigDecimal(Ruby runtime) {
-        RubyClass result = runtime.defineClass("BigDecimal",runtime.getClass("Numeric"), BIGDECIMAL_ALLOCATOR);
+        RubyClass result = runtime.defineClass("BigDecimal",runtime.fastGetClass("Numeric"), BIGDECIMAL_ALLOCATOR);
 
         result.setConstant("ROUND_DOWN",RubyNumeric.int2fix(runtime,BigDecimal.ROUND_DOWN));
         result.setConstant("SIGN_POSITIVE_INFINITE",RubyNumeric.int2fix(runtime,3));
@@ -75,7 +75,7 @@ public class RubyBigDecimal extends RubyNumeric {
 
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyBigDecimal.class);
 
-        runtime.getModule("Kernel").defineModuleFunction("BigDecimal",callbackFactory.getOptSingletonMethod("newBigDecimal"));
+        runtime.getKernel().defineModuleFunction("BigDecimal",callbackFactory.getOptSingletonMethod("newBigDecimal"));
         result.getMetaClass().defineMethod("new", callbackFactory.getOptSingletonMethod("newInstance"));
         result.getMetaClass().defineFastMethod("ver", callbackFactory.getFastSingletonMethod("ver"));
         result.getMetaClass().defineMethod("_load", callbackFactory.getSingletonMethod("_load",RubyKernel.IRUBY_OBJECT));
@@ -147,7 +147,7 @@ public class RubyBigDecimal extends RubyNumeric {
     }
 
     public RubyBigDecimal(Ruby runtime, BigDecimal value) {
-        super(runtime, runtime.getClass("BigDecimal"));
+        super(runtime, runtime.fastGetClass("BigDecimal"));
         this.value = value;
     }
 
@@ -162,7 +162,7 @@ public class RubyBigDecimal extends RubyNumeric {
     }
 
     public static RubyBigDecimal newBigDecimal(IRubyObject recv, IRubyObject[] args, Block unusedBlock) {
-        return newInstance(recv.getRuntime().getClass("BigDecimal"), args, Block.NULL_BLOCK);
+        return newInstance(recv.getRuntime().fastGetClass("BigDecimal"), args, Block.NULL_BLOCK);
     }
 
     public static IRubyObject ver(IRubyObject recv) {
@@ -212,7 +212,7 @@ public class RubyBigDecimal extends RubyNumeric {
             return (RubyBigDecimal)v;
         } else if(v instanceof RubyFixnum || v instanceof RubyBignum) {
             String s = v.toString();
-            return newInstance(getRuntime().getClass("BigDecimal"),new IRubyObject[]{getRuntime().newString(s)}, Block.NULL_BLOCK);
+            return newInstance(getRuntime().fastGetClass("BigDecimal"),new IRubyObject[]{getRuntime().newString(s)}, Block.NULL_BLOCK);
         }
         if(must) {
             throw getRuntime().newTypeError(trueFalseNil(v.getMetaClass().getName() + " can't be coerced into BigDecimal"));
@@ -237,7 +237,7 @@ public class RubyBigDecimal extends RubyNumeric {
     }
 
     private RubyBigDecimal setResult(int scale) {
-        int prec = RubyFixnum.fix2int(getRuntime().getClass("BigDecimal").getModuleAttribute("vpPrecLimit"));
+        int prec = RubyFixnum.fix2int(getRuntime().fastGetClass("BigDecimal").getModuleAttribute("vpPrecLimit"));
         int prec2 = Math.max(scale,prec);
         if(prec2 > 0 && this.value.scale() > (prec2-exp())) {
             this.value = this.value.setScale(prec2-exp(),BigDecimal.ROUND_HALF_UP);

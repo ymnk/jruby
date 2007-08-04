@@ -73,7 +73,7 @@ public class ThreadLibrary implements Library {
         }
 
         public static void setup(Ruby runtime) {
-            RubyClass cMutex = runtime.defineClass("Mutex", runtime.getClass("Object"), new ObjectAllocator() {
+            RubyClass cMutex = runtime.defineClass("Mutex", runtime.getObject(), new ObjectAllocator() {
                 public IRubyObject allocate(Ruby runtime, RubyClass klass) {
                     return new Mutex(runtime, klass);
                 }
@@ -156,7 +156,7 @@ public class ThreadLibrary implements Library {
         }
 
         public static void setup(Ruby runtime) {
-            RubyClass cConditionVariable = runtime.defineClass("ConditionVariable", runtime.getClass("Object"), new ObjectAllocator() {
+            RubyClass cConditionVariable = runtime.defineClass("ConditionVariable", runtime.getObject(), new ObjectAllocator() {
                 public IRubyObject allocate(Ruby runtime, RubyClass klass) {
                     return new ConditionVariable(runtime, klass);
                 }
@@ -214,7 +214,7 @@ public class ThreadLibrary implements Library {
         }
 
         public static void setup(Ruby runtime) {
-            RubyClass cQueue = runtime.defineClass("Queue", runtime.getClass("Object"), new ObjectAllocator() {
+            RubyClass cQueue = runtime.defineClass("Queue", runtime.getObject(), new ObjectAllocator() {
                 public IRubyObject allocate(Ruby runtime, RubyClass klass) {
                     return new Queue(runtime, klass);
                 }
@@ -257,7 +257,7 @@ public class ThreadLibrary implements Library {
                 should_block = args[0].isTrue();
             }
             if ( !should_block && entries.size() == 0 ) {
-                throw new RaiseException(getRuntime(), getRuntime().getClass("ThreadError"), "queue empty", false);
+                throw new RaiseException(getRuntime(), getRuntime().fastGetClass("ThreadError"), "queue empty", false);
             }
             while ( entries.size() == 0 ) {
                 try {
@@ -291,7 +291,7 @@ public class ThreadLibrary implements Library {
         }
 
         public static void setup(Ruby runtime) {
-            RubyClass cSizedQueue = runtime.defineClass("SizedQueue", runtime.getClass("Queue"), new ObjectAllocator() {
+            RubyClass cSizedQueue = runtime.defineClass("SizedQueue", runtime.fastGetClass("Queue"), new ObjectAllocator() {
                 public IRubyObject allocate(Ruby runtime, RubyClass klass) {
                     return new SizedQueue(runtime, klass);
                 }

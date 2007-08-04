@@ -100,6 +100,7 @@ public final class Registry {
     private static final String ERR_INSECURE_SET_CLASS_VAR = "Insecure: can't modify class variable";;
     private static final String ERR_INSECURE_SET_CONSTANT  = "Insecure: can't modify constant";
     private static final String ERR_FROZEN_CONST_TYPE = "class/module";
+    private static final String ERR_FROZEN_CVAR_TYPE = "class/module";
     
     private static final String[] EMPTY_NAME_ARRAY = new String[0];
     
@@ -646,7 +647,7 @@ public final class Registry {
     public void fastSetClassVariable(Object self, final String name, final Object value) {
         //System.out.println("cvar fset " + name);
         assert IdUtil.isClassVariable(name);
-        checkFrozen(self, null);
+        checkFrozen(self, ERR_FROZEN_CVAR_TYPE);
         checkTaint(self, ERR_INSECURE_SET_CLASS_VAR);
         Object attrs;
         self = unwrap(self);

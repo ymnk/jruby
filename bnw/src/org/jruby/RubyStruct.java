@@ -70,7 +70,7 @@ public class RubyStruct extends RubyObject {
         structClass.index = ClassIndex.STRUCT;
         
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyStruct.class);
-        structClass.includeModule(runtime.getModule("Enumerable"));
+        structClass.includeModule(runtime.getEnumerable());
 
         structClass.getMetaClass().defineMethod("new", callbackFactory.getOptSingletonMethod("newInstance"));
 
@@ -105,7 +105,7 @@ public class RubyStruct extends RubyObject {
     }
     
     private static IRubyObject getAttribute(RubyClass type, final String name) {
-        RubyClass structClass = type.getRuntime().getClass("Struct");
+        RubyClass structClass = type.getRuntime().fastGetClass("Struct");
 
         while (type != null && type != structClass) {
             Object variable = type.fastGetAttribute(name);
@@ -189,7 +189,7 @@ public class RubyStruct extends RubyObject {
 
         if (args.length > 0) {
             if (args[0] instanceof RubyString) {
-                name = args[0].toString();
+                name = args[0].asSymbol();
             } else if (args[0].isNil()) {
                 nilName = true;
             }
@@ -211,7 +211,7 @@ public class RubyStruct extends RubyObject {
                 throw runtime.newNameError("identifier " + name + " needs to be constant", name);
             }
 
-            IRubyObject type = superClass.getConstantAt(name);
+            IRubyObject type = superClass.fastGetConstantAt(name);
 
             if (type != null) {
                 runtime.getWarnings().warn(runtime.getCurrentContext().getFramePosition(), "redefining constant Struct::" + name);

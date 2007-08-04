@@ -130,7 +130,7 @@ public class RubyRange extends RubyObject {
         
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyRange.class);
         
-        result.includeModule(runtime.getModule("Enumerable"));
+        result.includeModule(runtime.getEnumerable());
 
         result.defineMethod("==", callbackFactory.getMethod("equal", RubyKernel.IRUBY_OBJECT));
         result.defineFastMethod("eql?", callbackFactory.getFastMethod("eql_p", RubyKernel.IRUBY_OBJECT));
@@ -265,7 +265,7 @@ public class RubyRange extends RubyObject {
     }    
 
     public static RubyRange newRange(Ruby runtime, IRubyObject begin, IRubyObject end, boolean isExclusive) {
-        RubyRange range = new RubyRange(runtime, runtime.getClass("Range"));
+        RubyRange range = new RubyRange(runtime, runtime.fastGetClass("Range"));
         range.init(begin, end, isExclusive ? runtime.getTrue() : runtime.getFalse());
         return range;
     }
@@ -391,7 +391,7 @@ public class RubyRange extends RubyObject {
             }
         } else if (begin instanceof RubyString) {
             ((RubyString) begin).upto(end, isExclusive, block);
-        } else if (begin.isKindOf(getRuntime().getClass("Numeric"))) {
+        } else if (begin.isKindOf(getRuntime().fastGetClass("Numeric"))) {
             if (!isExclusive) {
                 end = end.callMethod(context, MethodIndex.OP_PLUS, "+", RubyFixnum.one(getRuntime()));
             }

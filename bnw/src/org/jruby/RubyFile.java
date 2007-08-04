@@ -109,7 +109,7 @@ public class RubyFile extends RubyIO {
     }
     
     private RubyFile(Ruby runtime, String path, InputStream in) {
-        super(runtime, runtime.getClass("File"));
+        super(runtime, runtime.fastGetClass("File"));
         this.path = path;
         try {
             this.handler = new IOHandlerUnseekable(runtime, in, null);
@@ -131,7 +131,7 @@ public class RubyFile extends RubyIO {
     };
     
     public static RubyClass createFileClass(Ruby runtime) {
-        RubyClass fileClass = runtime.defineClass("File", runtime.getClass("IO"), FILE_ALLOCATOR);
+        RubyClass fileClass = runtime.defineClass("File", runtime.fastGetClass("IO"), FILE_ALLOCATOR);
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyFile.class);   
         RubyClass fileMetaClass = fileClass.getMetaClass();
         RubyString separator = runtime.newString("/");
@@ -212,7 +212,7 @@ public class RubyFile extends RubyIO {
         // TODO Singleton methods: pipe?, readlink, setgid?, setuid?, socket?,
         // TODO Singleton methods: stat, sticky?, symlink?, umask
         
-        runtime.getModule("FileTest").extend_object(fileClass);
+        runtime.fastGetModule("FileTest").extend_object(fileClass);
         
         fileMetaClass.defineFastMethod("basename", callbackFactory.getFastOptSingletonMethod("basename"));
         fileMetaClass.defineFastMethod("chmod", callbackFactory.getFastOptSingletonMethod("chmod"));

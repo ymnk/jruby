@@ -75,7 +75,7 @@ public class RubyDir extends RubyObject {
     public static RubyClass createDirClass(Ruby runtime) {
         RubyClass dirClass = runtime.defineClass("Dir", runtime.getObject(), DIR_ALLOCATOR);
 
-        dirClass.includeModule(runtime.getModule("Enumerable"));
+        dirClass.includeModule(runtime.getEnumerable());
 
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyDir.class);
 
@@ -274,7 +274,7 @@ public class RubyDir extends RubyObject {
         RubyString path = _path.convertToString();
         recv.getRuntime().checkSafeString(path);
 
-        RubyClass dirClass = recv.getRuntime().getClass("Dir");
+        RubyClass dirClass = recv.getRuntime().fastGetClass("Dir");
         RubyDir dir = (RubyDir) dirClass.newInstance(new IRubyObject[] { path }, block);
         
         dir.each(block);
@@ -318,7 +318,7 @@ public class RubyDir extends RubyObject {
      */
     public static IRubyObject open(IRubyObject recv, IRubyObject path, Block block) {
         RubyDir directory = 
-            (RubyDir) recv.getRuntime().getClass("Dir").newInstance(
+            (RubyDir) recv.getRuntime().fastGetClass("Dir").newInstance(
                     new IRubyObject[] { path }, Block.NULL_BLOCK);
 
         if (!block.isGiven()) return directory;
@@ -504,8 +504,8 @@ public class RubyDir extends RubyObject {
 	}
 	
 	public static RubyString getHomeDirectoryPath(IRubyObject recv) {
-        RubyHash systemHash = (RubyHash) recv.getRuntime().getObject().getConstant("ENV_JAVA");
-        RubyHash envHash = (RubyHash) recv.getRuntime().getObject().getConstant("ENV");
+        RubyHash systemHash = (RubyHash) recv.getRuntime().getObject().fastGetConstant("ENV_JAVA");
+        RubyHash envHash = (RubyHash) recv.getRuntime().getObject().fastGetConstant("ENV");
         IRubyObject  home = envHash.aref(recv.getRuntime().newString("HOME"));
 
         if (home == null || home.isNil()) {

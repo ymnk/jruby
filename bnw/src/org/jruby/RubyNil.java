@@ -149,7 +149,8 @@ public class RubyNil extends RubyObject {
      *
      */
     public static RubyClass type(IRubyObject recv) {
-        return recv.getRuntime().getClass("NilClass");
+        recv.getRuntime().getWarnings().warn("Object#type is deprecated; use Object#class");
+        return recv.getRuntime().getNilClass();
     }
     
     /** nil_and

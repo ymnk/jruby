@@ -56,7 +56,7 @@ public class RubyEnumerator extends RubyObject {
     };
 
     public static void defineEnumerator(Ruby runtime) {
-        RubyModule enumerableModule = runtime.getModule("Enumerable");
+        RubyModule enumerableModule = runtime.getEnumerable();
         RubyClass object = runtime.getObject();
         RubyClass enumeratorClass = enumerableModule.defineClassUnder("Enumerator", object, ENUMERATOR_ALLOCATOR);
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyEnumerator.class);
@@ -101,11 +101,11 @@ public class RubyEnumerator extends RubyObject {
         newArgs[0] = self;
         System.arraycopy(args, 0, newArgs, 1, args.length);
 
-        return self.getRuntime().getModule("Enumerable").getConstant("Enumerator").callMethod(self.getRuntime().getCurrentContext(), "new", newArgs);
+        return self.getRuntime().fastGetModule("Enumerable").fastGetConstant("Enumerator").callMethod(self.getRuntime().getCurrentContext(), "new", newArgs);
     }
 
     public static IRubyObject each_with_index(IRubyObject self, Block block) {
-        return self.getRuntime().getModule("Enumerable").getConstant("Enumerator").callMethod(self.getRuntime().getCurrentContext(), "new", 
+        return self.getRuntime().fastGetModule("Enumerable").fastGetConstant("Enumerator").callMethod(self.getRuntime().getCurrentContext(), "new", 
                                new IRubyObject[] { self, self.getRuntime().newSymbol("each_with_index") });
     }
 
@@ -141,12 +141,12 @@ public class RubyEnumerator extends RubyObject {
     }
 
     public static IRubyObject enum_slice(IRubyObject self, IRubyObject arg, Block block) {
-        return self.getRuntime().getModule("Enumerable").getConstant("Enumerator").callMethod(self.getRuntime().getCurrentContext(), "new", 
+        return self.getRuntime().fastGetModule("Enumerable").fastGetConstant("Enumerator").callMethod(self.getRuntime().getCurrentContext(), "new", 
                                      new IRubyObject[] { self, self.getRuntime().newSymbol("each_slice"), arg });
     }
 
     public static IRubyObject enum_cons(IRubyObject self, IRubyObject arg, Block block) {
-        return self.getRuntime().getModule("Enumerable").getConstant("Enumerator").callMethod(self.getRuntime().getCurrentContext(), "new", 
+        return self.getRuntime().fastGetModule("Enumerable").fastGetConstant("Enumerator").callMethod(self.getRuntime().getCurrentContext(), "new", 
                                new IRubyObject[] { self, self.getRuntime().newSymbol("each_cons"), arg });
     }
 

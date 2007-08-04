@@ -43,6 +43,9 @@ public class RubyUndef implements IRubyObject {
         return null;
     }
     
+    public IRubyObject fastSetInstanceVariable(String string, IRubyObject rubyObject) {
+        return null;
+    }
     public void fastSetAttribute(String name, Object value) {
     }
 

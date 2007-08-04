@@ -45,7 +45,7 @@ public class RubyBoolean extends RubyObject {
     private final Ruby runtime;
     
     public RubyBoolean(Ruby runtime, boolean value) {
-        super(runtime, (value ? runtime.getClass("TrueClass") : runtime.getClass("FalseClass")), // Don't initialize with class
+        super(runtime, (value ? runtime.fastGetClass("TrueClass") : runtime.fastGetClass("FalseClass")), // Don't initialize with class
                 false); // Don't put in object space
 
         if (!value) flags = FALSE_F;

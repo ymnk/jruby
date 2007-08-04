@@ -260,7 +260,7 @@ public class RubyThread extends RubyObject {
             // clear this so we don't keep re-throwing
             IRubyObject raiseException = receivedException;
             receivedException = null;
-            RubyModule kernelModule = getRuntime().getModule("Kernel");
+            RubyModule kernelModule = getRuntime().getKernel();
             if (DEBUG) System.out.println("thread " + Thread.currentThread() + " before propagating exception: " + killed);
             kernelModule.callMethod(getRuntime().getCurrentContext(), "raise", raiseException);
         }
@@ -270,7 +270,7 @@ public class RubyThread extends RubyObject {
         super(runtime, type);
         this.threadService = runtime.getThreadService();
         // set to default thread group
-        RubyThreadGroup defaultThreadGroup = (RubyThreadGroup)runtime.getClass("ThreadGroup").getConstant("Default");
+        RubyThreadGroup defaultThreadGroup = (RubyThreadGroup)runtime.fastGetClass("ThreadGroup").fastGetConstant("Default");
         defaultThreadGroup.add(this, Block.NULL_BLOCK);
         finalResult = runtime.getNil();
     }
@@ -555,7 +555,7 @@ public class RubyThread extends RubyObject {
         if(args.length == 0) {
             IRubyObject lastException = runtime.getGlobalVariables().get("$!");
             if(lastException.isNil()) {
-                return new RaiseException(runtime, runtime.getClass("RuntimeError"), "", false).getException();
+                return new RaiseException(runtime, runtime.fastGetClass("RuntimeError"), "", false).getException();
             } 
             return lastException;
         }
@@ -565,7 +565,7 @@ public class RubyThread extends RubyObject {
         
         if(args.length == 1) {
             if(args[0] instanceof RubyString) {
-                return runtime.getClass("RuntimeError").newInstance(args, block);
+                return runtime.fastGetClass("RuntimeError").newInstance(args, block);
             }
             
             if(!args[0].respondsTo("exception")) {
@@ -580,7 +580,7 @@ public class RubyThread extends RubyObject {
             exception = args[0].callMethod(context, "exception", args[1]);
         }
         
-        if (!exception.isKindOf(runtime.getClass("Exception"))) {
+        if (!exception.isKindOf(runtime.fastGetClass("Exception"))) {
             return runtime.newTypeError("exception object expected").getException();
         }
         
@@ -682,7 +682,7 @@ public class RubyThread extends RubyObject {
             // FIXME: printError explodes on some nullpointer
             //getRuntime().getRuntime().printError(exception.getException());
         	// TODO: Doesn't SystemExit have its own method to make this less wordy..
-            RubyException re = RubyException.newException(getRuntime(), getRuntime().getClass("SystemExit"), exception.getMessage());
+            RubyException re = RubyException.newException(getRuntime(), getRuntime().fastGetClass("SystemExit"), exception.getMessage());
             re.fastSetAttribute("status", getRuntime().newFixnum(1));
             threadService.getMainThread().raise(new IRubyObject[]{re}, Block.NULL_BLOCK);
         } else {

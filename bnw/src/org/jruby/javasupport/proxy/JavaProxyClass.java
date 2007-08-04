@@ -87,7 +87,7 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
     /* package scope */
     JavaProxyClass(Class proxyClass) {
         super(getThreadLocalRuntime(), 
-                (RubyClass) getThreadLocalRuntime().getModule("Java").getClass("JavaProxyClass"));
+                (RubyClass) getThreadLocalRuntime().getJavaSupport().getJavaModule().fastGetClass("JavaProxyClass"));
         
         this.proxyClass = proxyClass;
     }
@@ -200,8 +200,8 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
 
         public ProxyMethodImpl(Ruby runtime, JavaProxyClass clazz, Method m,
                 Method sm) {
-            super(runtime, runtime.getModule("Java")
-                    .getClass("JavaProxyMethod"));
+            super(runtime, runtime.getJavaSupport().getJavaModule()
+                    .fastGetClass("JavaProxyMethod"));
             this.m = m;
             this.parameterTypes = m.getParameterTypes();
             this.sm = sm;
@@ -621,7 +621,7 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
                         }
                     }
                     // TODO: OK to just do a put here?
-                    ancestor.setInstanceVariable("@__java_ovrd_methods",methodNames);
+                    ancestor.fastSetInstanceVariable("@__java_ovrd_methods",methodNames);
                 } else {
                     if (!(var instanceof RubyArray)) {
                         throw runtime.newTypeError(
@@ -697,7 +697,7 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
     public static void createJavaProxyModule(Ruby runtime) {
         // TODO Auto-generated method stub
 
-        RubyModule javaProxyModule = runtime.getModule("Java");
+        RubyModule javaProxyModule = runtime.fastGetModule("Java");
         JavaProxyClass.createJavaProxyClassClass(runtime, javaProxyModule);
         ProxyMethodImpl.createJavaProxyMethodClass(runtime, javaProxyModule);
         JavaProxyConstructor.createJavaProxyConstructorClass(runtime, javaProxyModule);

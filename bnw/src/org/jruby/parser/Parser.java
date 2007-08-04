@@ -71,7 +71,7 @@ public class Parser {
     
     public Node parse(String file, Reader content, DynamicScope blockScope,
             ParserConfiguration configuration) {
-        IRubyObject scriptLines = runtime.getObject().getConstantAt("SCRIPT_LINES__");
+        IRubyObject scriptLines = runtime.getObject().fastGetConstantAt("SCRIPT_LINES__");
         List list = null;
         
         if (!configuration.isEvalParse() && scriptLines != null) {

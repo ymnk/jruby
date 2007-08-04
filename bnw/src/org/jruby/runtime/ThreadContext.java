@@ -399,7 +399,7 @@ public final class ThreadContext {
     
     public void setBackref(IRubyObject backref) {
         if (!(backref instanceof RubyMatchData) && !backref.isNil()) {
-            throw runtime.newTypeError(backref, runtime.getClass("MatchData"));
+            throw runtime.newTypeError(backref, runtime.getMatchData());
         }
         getCurrentScope().setBackRef(backref);
     }
@@ -452,17 +452,19 @@ public final class ThreadContext {
         return parentModule.getNonIncludedClass();
     }
     
+    /**
+     * The <code>name</code> parameter must be intern-ed prior to calling this method. 
+     * @param name
+     * @return
+     */
     public boolean getConstantDefined(final String name) {
-        // TODO: do we know if the incoming name has been interned?
-        // if so, can make faster call to getConstantNoIntern below 
-        
         final IRubyObject undef = runtime.getUndef();
         Object result = null;
         
         // flipped from while to do to search current class first
         for (StaticScope scope = getCurrentScope().getStaticScope(); scope != null; scope = scope.getPreviousCRefScope()) {
             RubyModule module = scope.getModule();
-            result = registry.getConstant(module, name);
+            result = registry.fastGetConstant(module, name);
             //result = module.getInstanceVariable(name);
             if (result == undef) {
                 registry.removeConstant(module, name);
@@ -476,11 +478,10 @@ public final class ThreadContext {
     }
     
     /**
-     * Used by the evaluator and the compiler to look up a constant by name
+     * Used by the evaluator and the compiler to look up a constant by name.
+     * Note that name must be intern-ed prior to calling getConstant.
      */
     public IRubyObject getConstant(final String name) {
-        // TODO: do we know if the incoming name has been interned?
-        // if so, can make faster call to getConstantNoIntern below 
         
         final CommonMetaClass object = runtime.getObject();
         final IRubyObject undef = runtime.getUndef();
@@ -494,15 +495,7 @@ public final class ThreadContext {
             
             // Not sure how this can happen
             //if (NIL_P(klass)) return rb_const_get(CLASS_OF(self), id);
-            try {
-            result = registry.getConstant(klass, name);
-            } catch (NullPointerException e) {
-                System.out.println("NPE in TC#getConstant");
-                System.out.println("const name = " + name);
-                System.out.println("registry = " + registry);
-                System.out.println("metaclass = " + klass);
-                throw e;
-            }
+            result = registry.fastGetConstant(klass, name);
             //result = klass.getInstanceVariable(name);
             if (result == undef) {
                 registry.removeConstant(klass, name);
@@ -515,7 +508,7 @@ public final class ThreadContext {
             scope = scope.getPreviousCRefScope();
         } while (scope != null && scope.getModule() != object);
         
-        return getCurrentScope().getStaticScope().getModule().getConstant(name);
+        return getCurrentScope().getStaticScope().getModule().fastGetConstant(name);
     }
     
     /**

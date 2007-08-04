@@ -57,7 +57,7 @@ public class Generator {
 
     public static void createGenerator(Ruby runtime) throws IOException {
         RubyClass cGen = runtime.defineClass("Generator",runtime.getObject(), runtime.getObject().getAllocator());
-        cGen.includeModule(runtime.getModule("Enumerable"));
+        cGen.includeModule(runtime.getEnumerable());
 
         CallbackFactory callbackFactory = runtime.callbackFactory(Generator.class);
 
@@ -226,8 +226,8 @@ public class Generator {
         // Generator#initialize
         GeneratorData d = (GeneratorData)self.dataGetStruct();
         
-        self.setInstanceVariable("@queue",self.getRuntime().newArray());
-        self.setInstanceVariable("@index",self.getRuntime().newFixnum(0));
+        self.fastSetInstanceVariable("@queue",self.getRuntime().newArray());
+        self.fastSetInstanceVariable("@index",self.getRuntime().newFixnum(0));
         
         if(Arity.checkArgumentCount(self.getRuntime(), args,0,1) == 1) {
             d.setEnum(args[0]);
@@ -269,7 +269,7 @@ public class Generator {
             throw self.getRuntime().newEOFError();
         }
         d.generate();
-        self.setInstanceVariable("@index",self.fastGetInstanceVariable("@index").callMethod(self.getRuntime().getCurrentContext(),MethodIndex.OP_PLUS, "+",self.getRuntime().newFixnum(1)));
+        self.fastSetInstanceVariable("@index",self.fastGetInstanceVariable("@index").callMethod(self.getRuntime().getCurrentContext(),MethodIndex.OP_PLUS, "+",self.getRuntime().newFixnum(1)));
         return self.fastGetInstanceVariable("@queue").callMethod(self.getRuntime().getCurrentContext(),"shift");
     }
 
@@ -286,8 +286,8 @@ public class Generator {
         if(self.fastGetInstanceVariable("@index").callMethod(self.getRuntime().getCurrentContext(),"nonzero?").isTrue()) {
             GeneratorData d = (GeneratorData)self.dataGetStruct();
 
-            self.setInstanceVariable("@queue",self.getRuntime().newArray());
-            self.setInstanceVariable("@index",self.getRuntime().newFixnum(0));
+            self.fastSetInstanceVariable("@queue",self.getRuntime().newArray());
+            self.fastSetInstanceVariable("@index",self.getRuntime().newFixnum(0));
             
             d.start();
         }

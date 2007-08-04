@@ -79,7 +79,7 @@ public abstract class RubyMatchData extends RubyObject {
     public RegexpMatcher matcher;
 
     public RubyMatchData(Ruby runtime, RegexpMatcher matcher) {
-        super(runtime, runtime.getClass("MatchData"));
+        super(runtime, runtime.getMatchData());
         this.matcher = matcher;
     }
 

@@ -89,10 +89,10 @@ public class RubyProc extends RubyObject implements JumpTarget {
     // Proc class
 
     public static RubyProc newProc(Ruby runtime, boolean isLambda) {
-        return new RubyProc(runtime, runtime.getClass("Proc"), isLambda);
+        return new RubyProc(runtime, runtime.getProc(), isLambda);
     }
     public static RubyProc newProc(Ruby runtime, Block block, boolean isLambda) {
-        RubyProc proc = new RubyProc(runtime, runtime.getClass("Proc"), isLambda);
+        RubyProc proc = new RubyProc(runtime, runtime.getProc(), isLambda);
         proc.callInit(NULL_ARRAY, block);
         
         return proc;
@@ -116,7 +116,7 @@ public class RubyProc extends RubyObject implements JumpTarget {
     }
     
     protected IRubyObject doClone() {
-    	RubyProc newProc = new RubyProc(getRuntime(), getRuntime().getClass("Proc"), isLambda);
+    	RubyProc newProc = new RubyProc(getRuntime(), getRuntime().getProc(), isLambda);
     	
     	newProc.block = getBlock();
     	

@@ -86,7 +86,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
     }
 
     private RubyRegexp(Ruby runtime) {
-        super(runtime, runtime.getClass("Regexp"));
+        super(runtime, runtime.getRegexp());
     }
     
     private static ObjectAllocator REGEXP_ALLOCATOR = new ObjectAllocator() {
@@ -768,7 +768,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         }
         
         if (args.length == 1) {
-            IRubyObject arg = args[0].convertToType(runtime.getClass("Regexp"), 0, "to_regexp", false);
+            IRubyObject arg = args[0].convertToType(runtime.getRegexp(), 0, "to_regexp", false);
             if (!arg.isNil()) {
                 return arg;
             }
@@ -780,7 +780,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         	if (i > 0) {
         		buffer.append("|");
             }
-        	IRubyObject arg = args[i].convertToType(runtime.getClass("Regexp"), 0, "to_regexp", false);
+        	IRubyObject arg = args[i].convertToType(runtime.getRegexp(), 0, "to_regexp", false);
             if (arg.isNil()) {
                 arg = quote(recv, args[i].convertToString());
             }

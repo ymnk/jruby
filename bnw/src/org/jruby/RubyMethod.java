@@ -90,7 +90,7 @@ public class RubyMethod extends RubyObject {
         DynamicMethod method,
         IRubyObject receiver) {
         Ruby runtime = implementationModule.getRuntime();
-        RubyMethod newMethod = new RubyMethod(runtime, runtime.getClass("Method"));
+        RubyMethod newMethod = new RubyMethod(runtime, runtime.fastGetClass("Method"));
 
         newMethod.implementationModule = implementationModule;
         newMethod.methodName = methodName;

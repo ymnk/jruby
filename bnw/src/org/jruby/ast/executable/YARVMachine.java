@@ -286,21 +286,21 @@ public class YARVMachine {
                 push(self.fastGetInstanceVariable(bytecodes[ip].s_op0));
                 break;
             case YARVInstructions.SETINSTANCEVARIABLE:
-                self.setInstanceVariable(bytecodes[ip].s_op0, pop());
+                self.fastSetInstanceVariable(bytecodes[ip].s_op0, pop());
                 break;
             case YARVInstructions.GETCLASSVARIABLE: {
                 RubyModule rubyClass = context.getRubyClass();
                 String name = bytecodes[ip].s_op0;
     
                 if (rubyClass == null) {
-                    push(self.getMetaClass().getClassVar(name));
+                    push(self.getMetaClass().fastGetClassVar(name));
                 } else if (!rubyClass.isSingleton()) {
-                    push(rubyClass.getClassVar(name));
+                    push(rubyClass.fastGetClassVar(name));
                 } else {
                     RubyModule module = (RubyModule) ((SingletonClass)rubyClass).getAttachedObject();
     
                     if (module != null) {
-                        push(module.getClassVar(name));
+                        push(module.fastGetClassVar(name));
                     } else {
                         push(runtime.getNil());
                     }
@@ -316,7 +316,7 @@ public class YARVMachine {
                     rubyClass = (RubyModule) ((SingletonClass)rubyClass).getAttachedObject();
                 }
     
-                rubyClass.setClassVar(bytecodes[ip].s_op0, pop());
+                rubyClass.fastSetClassVar(bytecodes[ip].s_op0, pop());
                 break;
             }
             case YARVInstructions.GETCONSTANT:
@@ -417,7 +417,7 @@ public class YARVMachine {
                 if (containingClass.isSingleton()) {
                     IRubyObject attachedObject = ((SingletonClass) containingClass).getAttachedObject();
                     
-                    if (attachedObject.getMetaClass() == runtime.getFixnum() || attachedObject.getMetaClass() == runtime.getClass("Symbol")) {
+                    if (attachedObject.getMetaClass() == runtime.getFixnum() || attachedObject.getMetaClass() == runtime.getSymbol()) {
                         throw runtime.newTypeError("can't define singleton method \"" + 
                                 mname + "\" for " + attachedObject.getType());
                     }

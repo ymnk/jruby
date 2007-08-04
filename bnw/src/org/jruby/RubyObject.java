@@ -437,6 +437,10 @@ public class RubyObject implements Cloneable, IRubyObject {
     }
 
     public boolean isKindOf(RubyModule type) {
+        if (getMetaClass() == null) {
+            System.out.println("class " + getClass() + " has no metaclass");
+            System.out.println("  type arg is " + type);
+        }
         return getMetaClass().hasModuleInHierarchy(type);
     }
 
@@ -681,10 +685,8 @@ public class RubyObject implements Cloneable, IRubyObject {
     	if (!IdUtil.isInstanceVariable(varName)) {
     		throw getRuntime().newNameError("`" + varName + "' is not allowable as an instance variable name", varName);
     	}
-
-        // FIXME: call no-intern version here
         
-        return setInstanceVariable(varName, value);
+        return fastSetInstanceVariable(varName, value);
     }
 
     public IRubyObject setInstanceVariable(final String name, final IRubyObject value,
@@ -712,6 +714,20 @@ public class RubyObject implements Cloneable, IRubyObject {
 //                "Insecure: can't modify instance variable", "");
     }
 
+    /**
+     * Use only if <code>name</code> has been intern-ed.
+     * @param name
+     * @param value
+     * @return
+     */
+    public IRubyObject fastSetInstanceVariable(final String name, final IRubyObject value) {
+
+        getRegistry().fastSetInstanceVariable(this, name, value);
+        
+        return value;
+//        return setInstanceVariable(name, value,
+//                "Insecure: can't modify instance variable", "");
+    }
     /**
      * @deprecated
      */
@@ -755,11 +771,11 @@ public class RubyObject implements Cloneable, IRubyObject {
     }
     
     public RubyFloat convertToFloat() {
-        return (RubyFloat) convertToType(getRuntime().getClass("Float"), MethodIndex.TO_F, true);
+        return (RubyFloat) convertToType(getRuntime().getFloat(), MethodIndex.TO_F, true);
     }
 
     public RubyInteger convertToInteger() {
-        return (RubyInteger) convertToType(getRuntime().getClass("Integer"), MethodIndex.TO_INT, true);
+        return (RubyInteger) convertToType(getRuntime().fastGetClass("Integer"), MethodIndex.TO_INT, true);
     }
 
     public RubyString convertToString() {
@@ -1221,7 +1237,7 @@ public class RubyObject implements Cloneable, IRubyObject {
                 // TYPE(obj) == T_OBJECT
                 !(this instanceof RubyClass) &&
                 this != getRuntime().getObject() &&
-                this != getRuntime().getClass("Module") &&
+                this != getRuntime().getModule() &&
                 !(this instanceof RubyModule) &&
                 hasInstanceVariables()) {
                 //safeHasInstanceVariables(this)) {
@@ -1302,9 +1318,9 @@ public class RubyObject implements Cloneable, IRubyObject {
      */
     public RubyBoolean kind_of(IRubyObject type) {
         // TODO: Generalize this type-checking code into IRubyObject helper.
-        if (!type.isKindOf(getRuntime().getClass("Module"))) {
+        if (!type.isKindOf(getRuntime().getModule())) {
             // TODO: newTypeError does not offer enough for ruby error string...
-            throw getRuntime().newTypeError(type, getRuntime().getClass("Module"));
+            throw getRuntime().newTypeError(type, getRuntime().getModule());
         }
 
         return getRuntime().newBoolean(isKindOf((RubyModule)type));
@@ -1426,7 +1442,7 @@ public class RubyObject implements Cloneable, IRubyObject {
         for (int i = 0; i < args.length; i++) {
             IRubyObject obj;
             if (!(((obj = args[i]) instanceof RubyModule) && ((RubyModule)obj).isModule())){
-                throw getRuntime().newTypeError(obj,getRuntime().getClass("Module"));
+                throw getRuntime().newTypeError(obj,getRuntime().getModule());
             }
         }
 

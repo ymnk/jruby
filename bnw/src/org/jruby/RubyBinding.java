@@ -78,7 +78,7 @@ public class RubyBinding extends RubyObject {
     // Proc class
     
     public static RubyBinding newBinding(Ruby runtime, Block block) {
-        return new RubyBinding(runtime, runtime.getClass("Binding"), block);
+        return new RubyBinding(runtime, runtime.fastGetClass("Binding"), block);
     }
 
     public static RubyBinding newBinding(Ruby runtime) {
@@ -88,7 +88,7 @@ public class RubyBinding extends RubyObject {
         Frame frame = context.getCurrentFrame();
         Block bindingBlock = Block.createBinding(frame, context.getCurrentScope());
         
-        return new RubyBinding(runtime, runtime.getClass("Binding"), bindingBlock);
+        return new RubyBinding(runtime, runtime.fastGetClass("Binding"), bindingBlock);
     }
 
     /**
@@ -119,7 +119,7 @@ public class RubyBinding extends RubyObject {
         
         Block bindingBlock = Block.createBinding(previousFrame, context.getCurrentScope());
         
-        return new RubyBinding(runtime, runtime.getClass("Binding"), bindingBlock);
+        return new RubyBinding(runtime, runtime.fastGetClass("Binding"), bindingBlock);
     }
 
     public static RubyBinding newBindingOfCaller(Ruby runtime) {
@@ -129,7 +129,7 @@ public class RubyBinding extends RubyObject {
         Frame frame = context.getPreviousFrame();
         Block bindingBlock = Block.createBinding(frame, context.getPreviousScope());
         
-        return new RubyBinding(runtime, runtime.getClass("Binding"), bindingBlock);
+        return new RubyBinding(runtime, runtime.fastGetClass("Binding"), bindingBlock);
     }
     
     public static IRubyObject of_caller(IRubyObject recv, Block aBlock) {

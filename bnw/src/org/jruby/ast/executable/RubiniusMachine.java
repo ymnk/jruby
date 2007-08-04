@@ -323,7 +323,9 @@ public class RubiniusMachine {
                 int index = getInt(bytecodes, ip);
                 ip += 4;
                 
-                String name = literals[index].toString();
+                // FIXME: name may already be interned in some cases; track
+                // down the usages and intern more selectively.
+                String name = literals[index].toString().intern();
                 stack[++stackTop] = context.getConstant(name);
                 break;
             }

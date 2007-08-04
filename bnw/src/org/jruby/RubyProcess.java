@@ -126,7 +126,7 @@ public class RubyProcess {
         }
         
         public static RubyStatus newProcessStatus(Ruby runtime, long status) {
-            return new RubyStatus(runtime, runtime.getModule("Process").getClass("Status"), status);
+            return new RubyStatus(runtime, runtime.fastGetModule("Process").fastGetClass("Status"), status);
         }
         
         public IRubyObject exitstatus(Block block) {

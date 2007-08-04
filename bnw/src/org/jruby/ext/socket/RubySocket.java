@@ -52,7 +52,7 @@ import org.jruby.util.ByteList;
 public class RubySocket extends RubyBasicSocket {
     public static class Service implements Library {
         public void load(final Ruby runtime) throws IOException {
-            runtime.defineClass("SocketError",runtime.getClass("StandardError"), runtime.getClass("StandardError").getAllocator());
+            runtime.defineClass("SocketError",runtime.fastGetClass("StandardError"), runtime.fastGetClass("StandardError").getAllocator());
             RubyBasicSocket.createBasicSocket(runtime);
             RubySocket.createSocket(runtime);
             RubyIPSocket.createIPSocket(runtime);
@@ -69,7 +69,7 @@ public class RubySocket extends RubyBasicSocket {
     };
 
     static void createSocket(Ruby runtime) {
-        RubyClass rb_cSocket = runtime.defineClass("Socket", runtime.getClass("BasicSocket"), SOCKET_ALLOCATOR);
+        RubyClass rb_cSocket = runtime.defineClass("Socket", runtime.fastGetClass("BasicSocket"), SOCKET_ALLOCATOR);
         CallbackFactory cfact = runtime.callbackFactory(RubySocket.class);
         
         RubyModule rb_mConstants = rb_cSocket.defineModuleUnder("Constants");
@@ -127,7 +127,7 @@ public class RubySocket extends RubyBasicSocket {
     }
 
     private static RuntimeException sockerr(IRubyObject recv, String msg) {
-        return new RaiseException(recv.getRuntime(), recv.getRuntime().getClass("SocketError"), null, true);
+        return new RaiseException(recv.getRuntime(), recv.getRuntime().fastGetClass("SocketError"), null, true);
     }
 
     public static IRubyObject gethostname(IRubyObject recv) {

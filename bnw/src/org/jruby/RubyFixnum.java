@@ -51,12 +51,12 @@ import org.jruby.util.Convert;
 public class RubyFixnum extends RubyInteger {
     
     public static RubyClass createFixnumClass(Ruby runtime) {
-        RubyClass fixnum = runtime.defineClass("Fixnum", runtime.getClass("Integer"),
+        RubyClass fixnum = runtime.defineClass("Fixnum", runtime.fastGetClass("Integer"),
                 ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
         fixnum.index = ClassIndex.FIXNUM;
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyFixnum.class);
 
-        fixnum.includeModule(runtime.getModule("Precision"));
+        fixnum.includeModule(runtime.fastGetModule("Precision"));
         fixnum.getMetaClass().defineFastMethod("induced_from", callbackFactory.getFastSingletonMethod(
                 "induced_from", RubyKernel.IRUBY_OBJECT));
 

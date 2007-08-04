@@ -48,7 +48,7 @@ import org.jruby.compiler.impl.StandardASMCompiler;
  */
 public class RubyJRuby {
     public static RubyModule createJRuby(Ruby runtime) {
-        runtime.getModule("Kernel").callMethod(runtime.getCurrentContext(),"require", runtime.newString("java"));
+        runtime.getKernel().callMethod(runtime.getCurrentContext(),"require", runtime.newString("java"));
         RubyModule jrubyModule = runtime.defineModule("JRuby");
         
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyJRuby.class);
@@ -73,7 +73,7 @@ public class RubyJRuby {
     }
 
     public static RubyModule createJRubyExt(Ruby runtime) {
-        runtime.getModule("Kernel").callMethod(runtime.getCurrentContext(),"require", runtime.newString("java"));
+        runtime.getKernel().callMethod(runtime.getCurrentContext(),"require", runtime.newString("java"));
         RubyModule mJRubyExt = runtime.getOrCreateModule("JRuby").defineModuleUnder("Extensions");
         CallbackFactory cf = runtime.callbackFactory(RubyJRuby.class);
 
@@ -156,7 +156,7 @@ public class RubyJRuby {
         NodeCompilerFactory.compileRoot(node, compiler, inspector);
         byte[] bts = compiler.getClassByteArray();
 
-        IRubyObject compiledScript = ((RubyModule)recv).getConstant("CompiledScript").callMethod(recv.getRuntime().getCurrentContext(),"new");
+        IRubyObject compiledScript = ((RubyModule)recv).fastGetConstant("CompiledScript").callMethod(recv.getRuntime().getCurrentContext(),"new");
         compiledScript.callMethod(recv.getRuntime().getCurrentContext(), "name=", recv.getRuntime().newString(filename));
         compiledScript.callMethod(recv.getRuntime().getCurrentContext(), "class_name=", recv.getRuntime().newString(classname));
         compiledScript.callMethod(recv.getRuntime().getCurrentContext(), "original_script=", content);
@@ -212,6 +212,6 @@ public class RubyJRuby {
     }
 
     public static IRubyObject reference(IRubyObject recv, IRubyObject obj) {
-        return Java.wrap(recv.getRuntime().getModule("JavaUtilities"), JavaObject.wrap(recv.getRuntime(), obj));
+        return Java.wrap(recv.getRuntime().getJavaSupport().getJavaUtilitiesModule(), JavaObject.wrap(recv.getRuntime(), obj));
     }
 }

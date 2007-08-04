@@ -39,7 +39,7 @@ public class SingletonClass extends RubyClass {
     
     public SingletonClass(Ruby runtime, RubyClass superClass, ObjectAllocator allocator, 
             RubyModule parent) {
-        super(runtime, runtime.getClass("Class"), superClass, allocator, parent, null, false);
+        super(runtime, runtime.getClassClass(), superClass, allocator, parent, null, false);
         
         this.index = ClassIndex.CLASS;
     }

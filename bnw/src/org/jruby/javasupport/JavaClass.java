@@ -459,7 +459,7 @@ public class JavaClass extends JavaObject {
             this.field = field;
         }
         void install(RubyModule proxy) {
-            if (proxy.getConstantAt(field.getName()) == null) {
+            if (proxy.fastGetConstantAt(field.getName()) == null) {
                 JavaField javaField = new JavaField(proxy.getRuntime(),field);
                 RubyString name = javaField.name();
                 proxy.const_set(name,Java.java_to_ruby(proxy,javaField.static_value(),Block.NULL_BLOCK));
@@ -827,11 +827,11 @@ public class JavaClass extends JavaObject {
         // you be able to?
         // TODO: NOT_ALLOCATABLE_ALLOCATOR is probably ok here, since we don't intend for people to monkey with
         // this type and it can't be marshalled. Confirm. JRUBY-415
-        RubyClass result = javaModule.defineClassUnder("JavaClass", javaModule.getClass("JavaObject"), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR); 
+        RubyClass result = javaModule.defineClassUnder("JavaClass", javaModule.fastGetClass("JavaObject"), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR); 
 
     	CallbackFactory callbackFactory = runtime.callbackFactory(JavaClass.class);
         
-        result.includeModule(runtime.getModule("Comparable"));
+        result.includeModule(runtime.fastGetModule("Comparable"));
         
         JavaObject.registerRubyMethods(runtime, result);
 
@@ -1169,7 +1169,7 @@ public class JavaClass extends JavaObject {
                 IRubyObject dimensionLength = (IRubyObject)list.get(i);
                 if ( !(dimensionLength instanceof RubyInteger) ) {
                     throw getRuntime()
-                        .newTypeError(dimensionLength, getRuntime().getClass("Integer"));
+                        .newTypeError(dimensionLength, getRuntime().fastGetClass("Integer"));
                 }
                 dimensions[i] = (int) ((RubyInteger) dimensionLength).getLongValue();
             }

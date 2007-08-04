@@ -57,7 +57,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author jpetersen
  */
 public class AssignmentVisitor {
-    public static IRubyObject assign(Ruby runtime, ThreadContext context, IRubyObject self, Node node, IRubyObject value, Block block, boolean check) {
+    public static IRubyObject assign(final Ruby runtime, final ThreadContext context, final IRubyObject self, final Node node, final IRubyObject value, final Block block, final boolean check) {
         IRubyObject result = null;
         
         switch (node.nodeId) {
@@ -83,7 +83,7 @@ public class AssignmentVisitor {
             globalAsgnNode(runtime, node, value);
             break;
         case NodeTypes.INSTASGNNODE:
-            instAsgnNode(self, node, value);
+            instAsgnNode(runtime, self, node, value);
             break;
         case NodeTypes.LOCALASGNNODE:
             localAsgnNode(context, node, value);
@@ -131,7 +131,7 @@ public class AssignmentVisitor {
 
     private static void classVarAsgnNode(ThreadContext context, Node node, IRubyObject value) {
         ClassVarAsgnNode iVisited = (ClassVarAsgnNode)node;
-        context.getRubyClass().setClassVar(iVisited.getName(), value);
+        context.getRubyClass().fastSetClassVar(iVisited.getName(), value);
     }
 
     private static void classVarDeclNode(Ruby runtime, ThreadContext context, Node node, IRubyObject value) {
@@ -141,7 +141,7 @@ public class AssignmentVisitor {
             runtime.getWarnings().warn(iVisited.getPosition(),
                     "Declaring singleton class variable.");
         }
-        context.getRubyClass().setClassVar(iVisited.getName(), value);
+        context.getRubyClass().fastSetClassVar(iVisited.getName(), value);
     }
 
     private static void constDeclNode(Ruby runtime, ThreadContext context, IRubyObject self, Node node, IRubyObject value, Block block) {
@@ -176,9 +176,9 @@ public class AssignmentVisitor {
         runtime.getGlobalVariables().set(iVisited.getName(), value);
     }
 
-    private static void instAsgnNode(IRubyObject self, Node node, IRubyObject value) {
+    private static void instAsgnNode(final Ruby runtime, final IRubyObject self, final Node node, final IRubyObject value) {
         InstAsgnNode iVisited = (InstAsgnNode)node;
-        self.setInstanceVariable(iVisited.getName(), value);
+        runtime.getRegistry().fastSetInstanceVariable(self, iVisited.getName(), value);
     }
 
     private static void localAsgnNode(ThreadContext context, Node node, IRubyObject value) {
@@ -187,10 +187,10 @@ public class AssignmentVisitor {
         context.getCurrentScope().setValue(iVisited.getIndex(), value, iVisited.getDepth());
     }
 
-    public static IRubyObject multiAssign(Ruby runtime, ThreadContext context, IRubyObject self, MultipleAsgnNode node, RubyArray value, boolean callAsProc) {
+    public static IRubyObject multiAssign(final Ruby runtime, final ThreadContext context, final IRubyObject self, final MultipleAsgnNode node, final RubyArray value, final boolean callAsProc) {
         // Assign the values.
-        int valueLen = value.getLength();
-        int varLen = node.getHeadNode() == null ? 0 : node.getHeadNode().size();
+        final int valueLen = value.getLength();
+        final int varLen = node.getHeadNode() == null ? 0 : node.getHeadNode().size();
         
         int j = 0;
         for (; j < valueLen && j < varLen; j++) {
@@ -202,7 +202,7 @@ public class AssignmentVisitor {
             throw runtime.newArgumentError("Wrong # of arguments (" + valueLen + " for " + varLen + ")");
         }
 
-        Node argsNode = node.getArgsNode();
+        final Node argsNode = node.getArgsNode();
         if (argsNode != null) {
             if (argsNode instanceof StarNode) {
                 // no check for '*'

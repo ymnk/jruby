@@ -83,6 +83,8 @@ public class ConstNode extends Node implements INameNode {
     }
 
 	public void setName(String name) {
+        // doesn't actually appear to be called, but
+        // should be interned unless we know the source
 		this.name = name;
 	}
 

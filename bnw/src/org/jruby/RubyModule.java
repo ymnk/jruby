@@ -372,13 +372,13 @@ public class RubyModule extends RubyObject {
 
     /**
      * Search this and parent modules for the named variable.
+     * Assumes <code>name</code> has been intern-ed.
      * 
      * @param name The variable to search for
      * @return The module in which that variable is found, or null if not found
      */
-    private RubyModule getModuleWithClassVar(String name) {
+    private RubyModule getModuleWithClassVar(final String name) {
         final Registry registry = getRegistry();
-        name = name.intern();
         for (RubyModule p = this; p != null; p = p.getSuperClass()) {
             if (registry.fastHasClassVariable(p, name)) return p;
             
@@ -432,6 +432,32 @@ public class RubyModule extends RubyObject {
     }
 
     /**
+     * Searches this and parent modules for the specified attribute (<code>name</code>).
+     * Use only if <code>name</code> has been intern-ed.
+     * @param name
+     * @return
+     */
+    public IRubyObject fastGetModuleAttribute(final String name) {
+        final Registry registry = getRegistry();
+        RubyModule module;
+        if ((module = findModuleWithAttribute(name)) == null) module = this;
+        return (IRubyObject)registry.fastGetAttribute(module, name);
+    }
+    
+    public boolean hasModuleAttribute(final String name) {
+        return findModuleWithAttribute(name.intern()) != null;
+    }
+
+    /**
+     * Use only if <code>name</code> has been intern-ed.
+     * @param name
+     * @return
+     */
+    public boolean fastHasModuleAttribute(final String name) {
+        return findModuleWithAttribute(name) != null;
+    }
+
+    /**
      * Set the named class variable to the given value, provided taint and freeze allow setting it.
      * 
      * Ruby C equivalent = "rb_cvar_set"
@@ -439,18 +465,36 @@ public class RubyModule extends RubyObject {
      * @param name The variable name to set
      * @param value The value to set it to
      */
-    public IRubyObject setClassVar(final String name, final IRubyObject value) {
+    public IRubyObject setClassVar(String name, final IRubyObject value) {
+        name = name.intern();
         RubyModule module = getModuleWithClassVar(name);
 
         if (module == null) {
             module = this;
         }
 
-        getRegistry().setClassVariable(module, name, value, CVAR_TAINT_ERROR, CVAR_FREEZE_ERROR);
+        getRegistry().fastSetClassVariable(module, name, value);
         return value;
         //return module.setInstanceVariable(name, value, CVAR_TAINT_ERROR, CVAR_FREEZE_ERROR);
     }
 
+    /**
+     * Use only if <code>name</code> has been intern-ed.
+     * @param name
+     * @param value
+     * @return
+     */
+    public IRubyObject fastSetClassVar(final String name, final IRubyObject value) {
+        RubyModule module = getModuleWithClassVar(name);
+
+        if (module == null) {
+            module = this;
+        }
+
+        getRegistry().fastSetClassVariable(module, name, value);
+        return value;
+        //return module.setInstanceVariable(name, value, CVAR_TAINT_ERROR, CVAR_FREEZE_ERROR);
+    }
     /**
      * Retrieve the specified class variable, searching through this module, included modules, and supermodules.
      * 
@@ -460,10 +504,11 @@ public class RubyModule extends RubyObject {
      * @return The variable's value, or throws NameError if not found
      */
     public IRubyObject getClassVar(String name) {
+        name = name.intern();
         RubyModule module = getModuleWithClassVar(name);
 
         if (module != null) {
-            Object variable = getRegistry().getClassVariable(module, name);
+            Object variable = getRegistry().fastGetClassVariable(module, name);
 //            IRubyObject variable = module.getInstanceVariable(name);
 
             return variable == null ? getRuntime().getNil() : (IRubyObject)variable;
@@ -473,6 +518,23 @@ public class RubyModule extends RubyObject {
     }
 
     /**
+     * Use only if <code>name</code> has been intern-ed.
+     * @param name
+     * @return
+     */
+    public IRubyObject fastGetClassVar(final String name) {
+        RubyModule module = getModuleWithClassVar(name);
+
+        if (module != null) {
+            Object variable = getRegistry().fastGetClassVariable(module, name);
+//            IRubyObject variable = module.getInstanceVariable(name);
+
+            return variable == null ? getRuntime().getNil() : (IRubyObject)variable;
+        }
+
+        throw getRuntime().newNameError("uninitialized class variable " + name + " in " + getName(), name);
+    }
+    /**
      * Is class var defined?
      * 
      * Ruby C equivalent = "rb_cvar_defined"
@@ -481,9 +543,17 @@ public class RubyModule extends RubyObject {
      * @return true if true, false if false
      */
     public boolean isClassVarDefined(String name) {
-        return getModuleWithClassVar(name) != null;
+        return getModuleWithClassVar(name.intern()) != null;
     }
 
+    /**
+     * Use only if <code>name</code> has been intern-ed.
+     * @param name
+     * @return
+     */
+    public boolean fastIsClassVarDefined(final String name) {
+        return getModuleWithClassVar(name) != null;
+    }
     /**
      * Set the named constant on this module. Also, if the value provided is another Module and
      * that module has not yet been named, assign it the specified name.
@@ -529,8 +599,14 @@ public class RubyModule extends RubyObject {
      * @param name to be found in this module (or class)
      * @return the class or null if no such class
      */
-    public RubyClass getClass(String name) {
-        IRubyObject module = getConstantAt(name);
+    public RubyClass getClass(final String name) {
+        final IRubyObject module = getConstantAt(name);
+
+        return  (module instanceof RubyClass) ? (RubyClass) module : null;
+    }
+
+    public RubyClass fastGetClass(final String name) {
+        final IRubyObject module = fastGetConstantAt(name);
 
         return  (module instanceof RubyClass) ? (RubyClass) module : null;
     }
@@ -708,7 +784,7 @@ public class RubyModule extends RubyObject {
     
     public IRubyObject include_p(IRubyObject arg) {
         if (!((arg instanceof RubyModule) && ((RubyModule)arg).isModule())){
-            throw getRuntime().newTypeError(arg, getRuntime().getClass("Module"));
+            throw getRuntime().newTypeError(arg, getRuntime().getModule());
         }
         
         for (RubyModule p = this; p != null; p = p.getSuperClass()) {
@@ -880,7 +956,7 @@ public class RubyModule extends RubyObject {
         getSingletonClass().defineFastMethod(name, method);
     }
 
-    private IRubyObject getConstantInner(final String name, final boolean exclude) {
+    private IRubyObject getConstantInner(final String name, final boolean exclude, final boolean fast) {
         final IRubyObject objectClass = getRuntime().getObject();
         final IRubyObject undef = getRuntime().getUndef();
         final Registry registry = getRegistry();
@@ -889,7 +965,7 @@ public class RubyModule extends RubyObject {
 
         retry: while (true) {
             while (p != null) {
-                Object constant = registry.getConstant(p, name);
+                Object constant = fast ? registry.fastGetConstant(p, name) : registry.getConstant(p, name);
                 //IRubyObject constant = p.getInstanceVariable(name);
 
                 if (constant == undef) {
@@ -927,15 +1003,44 @@ public class RubyModule extends RubyObject {
      * @return The value for the constant, or null if not found
      */
     public IRubyObject getConstant(final String name) {
-        return getConstantInner(name, false);
+        return getConstantInner(name, false, false);
     }
 
+    /**
+     * Use only if <code>name</code> has been intern-ed.
+     * @param name
+     * @return
+     */
+    public IRubyObject fastGetConstant(final String name) {
+        return getConstantInner(name, false, true);
+    }
+
+    /**
+     * Assumes <code>name</code> has been intern-ed.
+     * @param name
+     * @return
+     */
     public IRubyObject getConstantFrom(final String name) {
-        return getConstantInner(name, true);
+        return getConstantInner(name, true, true);
     }
 
     public IRubyObject getConstantAt(final String name) {
         final Object constant = getRegistry().getConstant(this, name);
+
+        if (constant != getRuntime().getUndef()) return (IRubyObject)constant;
+        
+        removeConstant(name);
+        
+        return getRuntime().getLoadService().autoload(getName() + "::" + name);
+    }
+    
+    /**
+     * Use only if <code>name</code> has been intern-ed.
+     * @param name
+     * @return
+     */
+    public IRubyObject fastGetConstantAt(final String name) {
+        final Object constant = getRegistry().fastGetConstant(this, name);
 
         if (constant != getRuntime().getUndef()) return (IRubyObject)constant;
         
@@ -1041,7 +1146,7 @@ public class RubyModule extends RubyObject {
     public void defineConstant(String name, IRubyObject value) {
         assert value != null;
 
-        if (this == getRuntime().getClass("Class")) {
+        if (this == getRuntime().getClassClass()) {
             getRuntime().secure(4);
         }
 
@@ -1115,7 +1220,7 @@ public class RubyModule extends RubyObject {
                     // ENEBO: Can anyone get args to be anything but length 1?
                     Arity.checkArgumentCount(getRuntime(), args, 1, 1);
 
-                    return self.setInstanceVariable(variableName, args[0]);
+                    return self.fastSetInstanceVariable(variableName, args[0]);
                 }
 
                 public Arity getArity() {
@@ -1216,7 +1321,7 @@ public class RubyModule extends RubyObject {
 
         if (visibility.isModuleFunction()) visibility = Visibility.PRIVATE;
 
-        if (args.length == 1 || args[1].isKindOf(getRuntime().getClass("Proc"))) {
+        if (args.length == 1 || args[1].isKindOf(getRuntime().getProc())) {
             // double-testing args.length here, but it avoids duplicating the proc-setup code in two places
             RubyProc proc = (args.length == 1) ? getRuntime().newProc(false, block) : (RubyProc)args[1];
             body = proc;
@@ -1226,7 +1331,7 @@ public class RubyModule extends RubyObject {
             proc.getBlock().getFrame().setName(name);
 
             newMethod = new ProcMethod(this, proc, visibility);
-        } else if (args[1].isKindOf(getRuntime().getClass("Method"))) {
+        } else if (args[1].isKindOf(getRuntime().fastGetClass("Method"))) {
             RubyMethod method = (RubyMethod)args[1];
             body = method;
 
@@ -1269,7 +1374,7 @@ public class RubyModule extends RubyObject {
     // Methods of the Module Class (rb_mod_*):
 
     public static RubyModule newModule(Ruby runtime, String name) {
-        return newModule(runtime, runtime.getClass("Module"), name, null);
+        return newModule(runtime, runtime.getModule(), name, null);
     }
 
     public static RubyModule newModule(Ruby runtime, RubyClass type, String name) {
@@ -1277,7 +1382,7 @@ public class RubyModule extends RubyObject {
     }
 
     public static RubyModule newModule(Ruby runtime, String name, RubyModule parent) {
-        return newModule(runtime, runtime.getClass("Module"), name, parent);
+        return newModule(runtime, runtime.getModule(), name, parent);
     }
 
     public static RubyModule newModule(Ruby runtime, RubyClass type, String name, RubyModule parent) {
@@ -1330,7 +1435,7 @@ public class RubyModule extends RubyObject {
             throw getRuntime().newNameError("`" + varName + "' is not allowed as a class variable name", varName);
         }
 
-        return getClassVar(varName);
+        return fastGetClassVar(varName);
     }
 
     /** rb_mod_cvar_set
@@ -1343,7 +1448,7 @@ public class RubyModule extends RubyObject {
             throw getRuntime().newNameError("`" + varName + "' is not allowed as a class variable name", varName);
         }
 
-        return setClassVar(varName, value);
+        return fastSetClassVar(varName, value);
     }
 
     protected IRubyObject cloneMethods(RubyModule clone) {
@@ -1630,7 +1735,7 @@ public class RubyModule extends RubyObject {
             throw wrongConstantNameError(name);
         }
 
-        return getConstant(name);
+        return fastGetConstant(name);
     }
 
     /** rb_mod_const_set
@@ -1734,7 +1839,7 @@ public class RubyModule extends RubyObject {
         final RubyModule objectClass = runtime.getObject();
         final RubyArray constantNames = runtime.newArray();
         
-        if (this == objectClass || this == runtime.getClass("Module")) {
+        if (this == objectClass || this == runtime.getModule()) {
             ArrayList names = registry.getConstantNameList(objectClass);
             for (Iterator iter = names.iterator(); iter.hasNext(); ) {
                 constantNames.append(runtime.newString((String)iter.next()));
@@ -1774,7 +1879,7 @@ public class RubyModule extends RubyObject {
             return (IRubyObject)variable;
         }
 
-        if (isClassVarDefined(id)) {
+        if (fastIsClassVarDefined(id)) {
             throw cannotRemoveError(id);
         }
         throw getRuntime().newNameError("class variable " + id + " not defined for " + getName(), id);
@@ -1805,7 +1910,7 @@ public class RubyModule extends RubyObject {
             //return removeInstanceVariable(id);
         }
 
-        if (isClassVarDefined(id)) {
+        if (fastHasModuleAttribute(id)) {
             throw cannotRemoveError(id);
         }
         throw getRuntime().newNameError("constant " + id + " not defined for " + getName(), id);
@@ -1817,7 +1922,7 @@ public class RubyModule extends RubyObject {
     public RubyModule append_features(IRubyObject module) {
         if (!(module instanceof RubyModule)) {
             // MRI error message says Class, even though Module is ok 
-            throw getRuntime().newTypeError(module,getRuntime().getClass("Class"));
+            throw getRuntime().newTypeError(module,getRuntime().getClassClass());
         }
         ((RubyModule) module).includeModule(this);
         return this;
@@ -1840,7 +1945,7 @@ public class RubyModule extends RubyObject {
         for (int i = modules.length; --i >= 0; ) {
             IRubyObject obj;
             if (!(((obj = modules[i]) instanceof RubyModule) && ((RubyModule)obj).isModule())){
-                throw getRuntime().newTypeError(obj,getRuntime().getClass("Module"));
+                throw getRuntime().newTypeError(obj,getRuntime().getModule());
             }
         }
         for (int i = modules.length - 1; i >= 0; i--) {
