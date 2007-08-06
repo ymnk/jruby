@@ -437,10 +437,6 @@ public class RubyObject implements Cloneable, IRubyObject {
     }
 
     public boolean isKindOf(RubyModule type) {
-        if (getMetaClass() == null) {
-            System.out.println("class " + getClass() + " has no metaclass");
-            System.out.println("  type arg is " + type);
-        }
         return getMetaClass().hasModuleInHierarchy(type);
     }
 
