@@ -29,7 +29,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime.methods;
 
-import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
@@ -58,17 +57,20 @@ public abstract class DynamicMethod {
      * @param context is the thread-specific information that this method is being invoked on
      * @param receiver 
      */
-    public abstract IRubyObject call(ThreadContext context, Object self, RubyModule clazz, 
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, 
             String name, IRubyObject[] args, Block block);
     public abstract DynamicMethod dup();
 
-    public boolean isCallableFrom(Object callerObject, CallType callType) {
-        IRubyObject caller = (IRubyObject)callerObject;
-        if (visibility.isPublic()) {
+    public boolean isCallableFrom(IRubyObject caller, CallType callType) {
+        switch (visibility.value) {
+        case Visibility.PUBLIC_VALUE:
             return true;
-        } else if (visibility.isPrivate() && (callType == CallType.NORMAL)) {
-            return false;
-        } else if (visibility.isProtected()) {
+        case Visibility.PRIVATE_VALUE:
+            if (callType == CallType.NORMAL) {
+                return false;
+            }
+            break;
+        case Visibility.PROTECTED_VALUE:
             RubyModule defined = getImplementationClass();
             while (defined.isIncluded()) {
                 defined = defined.getMetaClass();

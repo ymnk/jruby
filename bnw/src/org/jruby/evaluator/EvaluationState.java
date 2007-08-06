@@ -120,6 +120,7 @@ import org.jruby.ast.RescueNode;
 import org.jruby.ast.ReturnNode;
 import org.jruby.ast.RootNode;
 import org.jruby.ast.SClassNode;
+import org.jruby.ast.ScopeNode;
 import org.jruby.ast.SValueNode;
 import org.jruby.ast.SplatNode;
 import org.jruby.ast.StrNode;
@@ -356,6 +357,8 @@ public class EvaluationState {
                 return rootNode(runtime, context, node, self, aBlock);
             case NodeTypes.SCLASSNODE:
                 return sClassNode(runtime, context, node, self, aBlock);
+            case NodeTypes.SCOPENODE:
+                return scopeNode(runtime, context, node, self, aBlock);
             case NodeTypes.SELFNODE:
                 return pollAndReturn(context, self);
             case NodeTypes.SPLATNODE:
@@ -1591,6 +1594,16 @@ public class EvaluationState {
         return evalClassDefinitionBody(runtime, context, scope, iVisited.getBodyNode(), singletonClass, self, aBlock);
     }
 
+    private static IRubyObject scopeNode(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block aBlock) {
+        ScopeNode iVisited = (ScopeNode) node;
+        context.preScopeNode(iVisited.getScope());
+        try {
+            return evalInternal(runtime, context, iVisited.getBodyNode(), self, aBlock);
+        } finally {
+            context.postScopeNode();
+        }
+    }
+
     private static IRubyObject splatNode(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block aBlock) {
         return splatValue(runtime, evalInternal(runtime,context, ((SplatNode) node).getValue(), self, aBlock));
     }
@@ -1763,12 +1776,7 @@ public class EvaluationState {
 
         Block block = context.getCurrentFrame().getBlock();
 
-        if (iVisited.getCheckState()) {
-            // unwrap rubyarray as direct arguments for passing to yield
-            return block.yield(context, ((RubyArray)result).toJavaArray(), null, null, true);
-        }
-        
-        return block.yield(context, new IRubyObject[] {result}, null, null, iVisited.getCheckState());
+        return block.yield(context, result, null, null, iVisited.getCheckState());
     }
 
     private static IRubyObject zArrayNode(Ruby runtime) {
@@ -1939,8 +1947,14 @@ public class EvaluationState {
 
             return null;
         }
-        case NodeTypes.BACKREFNODE:
-            return "$" + ((BackRefNode) node).getType();
+        case NodeTypes.BACKREFNODE: {
+            IRubyObject backref = context.getBackref();
+            if(backref instanceof RubyMatchData) {
+                return "$" + ((BackRefNode) node).getType();
+            } else {
+                return null;
+            }
+        }
         case NodeTypes.CALLNODE: {
             CallNode iVisited = (CallNode) node;
             
@@ -1972,18 +1986,16 @@ public class EvaluationState {
             ClassVarNode iVisited = (ClassVarNode) node;
             //RubyModule module = context.getRubyClass();
             RubyModule module = context.getCurrentScope().getStaticScope().getModule();
-            
             if (module == null && self.getMetaClass().fastIsClassVarDefined(iVisited.getName())) {
-                return "class_variable";
-            } else if (!module.isSingleton() && module.fastIsClassVarDefined(iVisited.getName())) {
-                return "class_variable";
+                return "class variable";
+            } else if (module.fastIsClassVarDefined(iVisited.getName())) {
+                return "class variable";
             } 
-            
             if (module.isSingleton()) {
                 IRubyObject attached = ((SingletonClass)module).getAttachedObject();
                 if (attached instanceof RubyModule &&
                         ((RubyModule)attached).fastIsClassVarDefined(iVisited.getName())) {
-                    return "class_variable"; 
+                    return "class variable"; 
                 }
             }
 
@@ -2042,10 +2054,18 @@ public class EvaluationState {
             return "method";
         case NodeTypes.NILNODE:
             return "nil";
-        case NodeTypes.NTHREFNODE:
-            return "$" + ((NthRefNode) node).getMatchNumber();
+        case NodeTypes.NTHREFNODE: {
+            IRubyObject backref = context.getBackref();
+            if(backref instanceof RubyMatchData) {
+                ((RubyMatchData)backref).use();
+                if(!((RubyMatchData)backref).group(((NthRefNode) node).getMatchNumber()).isNil()) {
+                    return "$" + ((NthRefNode) node).getMatchNumber();
+                }
+            }
+            return null;
+        }
         case NodeTypes.SELFNODE:
-            return "state.getSelf()";
+            return "self";
         case NodeTypes.SUPERNODE: {
             SuperNode iVisited = (SuperNode) node;
             String name = context.getFrameName();

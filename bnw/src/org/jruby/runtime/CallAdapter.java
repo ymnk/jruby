@@ -28,7 +28,11 @@
 
 package org.jruby.runtime;
 
+import org.jruby.RubyClass;
+import org.jruby.RubyObject;
+import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.MethodCache;
 
 /**
  *
@@ -46,71 +50,109 @@ public abstract class CallAdapter {
     }
     
     // no block
-    public abstract IRubyObject call(ThreadContext context, Object self);
-    public abstract IRubyObject call(ThreadContext context, Object self, IRubyObject arg1);
-    public abstract IRubyObject call(ThreadContext context, Object self, IRubyObject arg1, IRubyObject arg2);
-    public abstract IRubyObject call(ThreadContext context, Object self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3);
-    public abstract IRubyObject call(ThreadContext context, Object self, IRubyObject[] args);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject[] args);
     // with block
-    public abstract IRubyObject call(ThreadContext context, Object self, Block block);
-    public abstract IRubyObject call(ThreadContext context, Object self, IRubyObject arg1, Block block);
-    public abstract IRubyObject call(ThreadContext context, Object self, IRubyObject arg1, IRubyObject arg2, Block block);
-    public abstract IRubyObject call(ThreadContext context, Object self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, Block block);
-    public abstract IRubyObject call(ThreadContext context, Object self, IRubyObject[] args, Block block);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, Block block);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, Block block);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2, Block block);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, Block block);
+    public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject[] args, Block block);
     
     public static class DefaultCallAdapter extends CallAdapter {
+        byte[] cachedTable;
+        DynamicMethod cachedMethod;
+        RubyClass cachedType;
+        
         public DefaultCallAdapter(int methodID, String methodName, CallType callType) {
             super(methodID, methodName, callType);
         }
         
-        public IRubyObject call(ThreadContext context, Object selfObject) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, IRubyObject.NULL_ARRAY, callType, Block.NULL_BLOCK);
+        public IRubyObject call(ThreadContext context, IRubyObject self) {
+            IRubyObject[] args = IRubyObject.NULL_ARRAY;
+            Block block = Block.NULL_BLOCK;
+            
+            return call(context, self, args, block);
         }
 
-        public IRubyObject call(ThreadContext context, Object selfObject, IRubyObject arg1) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, new IRubyObject[] {arg1}, callType, Block.NULL_BLOCK);
+        public IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1) {
+            IRubyObject[] args = new IRubyObject[] {arg1};
+            Block block = Block.NULL_BLOCK;
+            
+            return call(context, self, args, block);
         }
 
-        public IRubyObject call(ThreadContext context, Object selfObject, IRubyObject arg1, IRubyObject arg2) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, new IRubyObject[] {arg1, arg2}, callType, Block.NULL_BLOCK);
+        public IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2) {
+            IRubyObject[] args = new IRubyObject[] {arg1,arg2};
+            Block block = Block.NULL_BLOCK;
+            
+            return call(context, self, args, block);
         }
 
-        public IRubyObject call(ThreadContext context, Object selfObject, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, new IRubyObject[] {arg1, arg2, arg3}, callType, Block.NULL_BLOCK);
+        public IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3) {
+            IRubyObject[] args = new IRubyObject[] {arg1,arg2,arg3};
+            Block block = Block.NULL_BLOCK;
+            
+            return call(context, self, args, block);
         }
 
-        public IRubyObject call(ThreadContext context, Object selfObject, IRubyObject[] args) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, args, callType, Block.NULL_BLOCK);
+        public IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject[] args) {
+            Block block = Block.NULL_BLOCK;
+            
+            return call(context, self, args, block);
         }
 
-        public IRubyObject call(ThreadContext context, Object selfObject, Block block) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, IRubyObject.NULL_ARRAY, callType, block);
+        public IRubyObject call(ThreadContext context, IRubyObject self, Block block) {
+            IRubyObject[] args = IRubyObject.NULL_ARRAY;
+            
+            return call(context, self, args, block);
         }
 
-        public IRubyObject call(ThreadContext context, Object selfObject, IRubyObject arg1, Block block) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, new IRubyObject[] {arg1}, callType, block);
+        public IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, Block block) {
+            IRubyObject[] args = new IRubyObject[] {arg1};
+            
+            return call(context, self, args, block);
         }
 
-        public IRubyObject call(ThreadContext context, Object selfObject, IRubyObject arg1, IRubyObject arg2, Block block) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, new IRubyObject[] {arg1, arg2}, callType, block);
+        public IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2, Block block) {
+            IRubyObject[] args = new IRubyObject[] {arg1,arg2};
+            
+            return call(context, self, args, block);
         }
 
-        public IRubyObject call(ThreadContext context, Object selfObject, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, Block block) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, new IRubyObject[] {arg1, arg2, arg3}, callType, block);
+        public IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, Block block) {
+            IRubyObject[] args = new IRubyObject[] {arg1,arg2,arg3};
+            
+            return call(context, self, args, block);
         }
 
-        public IRubyObject call(ThreadContext context, Object selfObject, IRubyObject[] args, Block block) {
-            IRubyObject self = (IRubyObject)selfObject;
-            return self.getMetaClass().getDispatcher().callMethod(context, self, self.getMetaClass(), methodID, methodName, args, callType, block);
+        public IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject[] args, Block block) {
+            try {
+                RubyClass selfType = self.getMetaClass();
+                byte[] table = selfType.getDispatcher().switchTable;
+                if (table.length > methodID && table[methodID] != 0) {
+                    return selfType.getDispatcher().callMethod(context, self, selfType, methodID, methodName, args, callType, block);
+                }
+                DynamicMethod method = null;
+                MethodCache cache = selfType.getRuntime().getMethodCache();
+                MethodCache.CacheEntry entry = cache.getMethod(selfType, methodName);
+                if (entry.klass == selfType && methodName.equals(entry.mid)) {
+                    method = entry.method;
+                } else {
+                    method = selfType.searchMethod(methodName);
+                }
+
+                if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
+                    return RubyObject.callMethodMissing(context, self, method, methodName, args, context.getFrameSelf(), callType, block);
+                }
+                
+                return method.call(context, self, selfType, methodName, args, block);
+            } catch (StackOverflowError soe) {
+                throw context.getRuntime().newSystemStackError("stack level too deep");
+            }
         }
     }
 }

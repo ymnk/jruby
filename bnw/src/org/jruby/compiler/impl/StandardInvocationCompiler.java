@@ -37,6 +37,14 @@ public class StandardInvocationCompiler implements InvocationCompiler {
         this.method = method;
     }
 
+    public SkinnyMethodAdapter getMethodAdapter() {
+        return this.method;
+    }
+
+    public void setMethodAdapter(SkinnyMethodAdapter sma) {
+        this.method = sma;
+    }
+
     public void invokeAttrAssign(String name) {
         // start with [recv, args]
         // get args[length - 1] and stuff it under the receiver
@@ -80,22 +88,22 @@ public class StandardInvocationCompiler implements InvocationCompiler {
             // block
             if (closureArg == null) {
                 // no args, no block
-                signature = cg.sig(IRubyObject.class, cg.params(ThreadContext.class, Object.class));
+                signature = cg.sig(IRubyObject.class, cg.params(ThreadContext.class, IRubyObject.class));
             } else {
                 // no args, with block
                 closureArg.compile(methodCompiler);
-                signature = cg.sig(IRubyObject.class, cg.params(ThreadContext.class, Object.class, Block.class));
+                signature = cg.sig(IRubyObject.class, cg.params(ThreadContext.class, IRubyObject.class, Block.class));
             }
         } else {
             argsCallback.compile(methodCompiler);
             // block
             if (closureArg == null) {
                 // with args, no block
-                signature = cg.sig(IRubyObject.class, cg.params(ThreadContext.class, Object.class, IRubyObject[].class));
+                signature = cg.sig(IRubyObject.class, cg.params(ThreadContext.class, IRubyObject.class, IRubyObject[].class));
             } else {
                 // with args, with block
                 closureArg.compile(methodCompiler);
-                signature = cg.sig(IRubyObject.class, cg.params(ThreadContext.class, Object.class, IRubyObject[].class, Block.class));
+                signature = cg.sig(IRubyObject.class, cg.params(ThreadContext.class, IRubyObject.class, IRubyObject[].class, Block.class));
             }
         }
         // adapter, tc, recv, args{0,1}, block{0,1}]
@@ -235,17 +243,17 @@ public class StandardInvocationCompiler implements InvocationCompiler {
             method.aconst_null();
         }
 
-        if (unwrap) {
-            method.checkcast(cg.p(RubyArray.class));
-            method.invokevirtual(cg.p(RubyArray.class), "toJavaArray", cg.sig(IRubyObject[].class));
-        } else {
-            methodCompiler.createObjectArray(1);
-        }
+//        if (unwrap) {
+//            method.checkcast(cg.p(RubyArray.class));
+//            method.invokevirtual(cg.p(RubyArray.class), "toJavaArray", cg.sig(IRubyObject[].class));
+//        } else {
+//            methodCompiler.createObjectArray(1);
+//        }
 
         method.aconst_null();
         method.aconst_null();
         method.ldc(new Boolean(unwrap));
 
-        method.invokevirtual(cg.p(Block.class), "yield", cg.sig(IRubyObject.class, cg.params(ThreadContext.class, IRubyObject[].class, IRubyObject.class, RubyModule.class, Boolean.TYPE)));
+        method.invokevirtual(cg.p(Block.class), "yield", cg.sig(IRubyObject.class, cg.params(ThreadContext.class, IRubyObject.class, IRubyObject.class, RubyModule.class, Boolean.TYPE)));
     }
 }

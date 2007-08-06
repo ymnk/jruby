@@ -73,8 +73,6 @@ import org.jruby.util.collections.IntHashMap;
 
 public class JavaClass extends JavaObject {
 
-    private static boolean DEBUG = false;
-
     private static class AssignedName {
         // to override an assigned name, the type must be less than
         // or equal to the assigned type. so a field name in a subclass
@@ -144,25 +142,25 @@ public class JavaClass extends JavaObject {
         boolean isProtected() {
             return visibility == Visibility.PROTECTED;
         }
-        void logMessage(IRubyObject self, IRubyObject[] args) {
-            if (!DEBUG) {
-                return;
-            }
-            String type;
-            switch (this.type) {
-            case STATIC_FIELD: type = "static field"; break;
-            case STATIC_METHOD: type = "static method"; break;
-            case INSTANCE_FIELD: type = "instance field"; break;
-            case INSTANCE_METHOD: type = "instance method"; break;
-            default: type = "?"; break;
-            }
-            StringBuffer b = new StringBuffer(type).append(" => '").append(name)
-                .append("'; args.length = ").append(args.length);
-            for (int i = 0; i < args.length; i++) {
-                b.append("\n   arg[").append(i).append("] = ").append(args[i]);
-            }
-            System.out.println(b);
-        }
+//        void logMessage(IRubyObject self, IRubyObject[] args) {
+//            if (!DEBUG) {
+//                return;
+//            }
+//            String type;
+//            switch (this.type) {
+//            case STATIC_FIELD: type = "static field"; break;
+//            case STATIC_METHOD: type = "static method"; break;
+//            case INSTANCE_FIELD: type = "instance field"; break;
+//            case INSTANCE_METHOD: type = "instance method"; break;
+//            default: type = "?"; break;
+//            }
+//            StringBuffer b = new StringBuffer(type).append(" => '").append(name)
+//                .append("'; args.length = ").append(args.length);
+//            for (int i = 0; i < args.length; i++) {
+//                b.append("\n   arg[").append(i).append("] = ").append(args[i]);
+//            }
+//            System.out.println(b);
+//        }
     }
 
     private static abstract class FieldCallback extends NamedCallback {
@@ -188,7 +186,7 @@ public class JavaClass extends JavaObject {
             proxy.getSingletonClass().defineFastMethod(this.name,this,this.visibility);
         }
         public IRubyObject execute(IRubyObject self, IRubyObject[] args, Block block) {
-            logMessage(self,args);
+            //logMessage(self,args);
             if (javaField == null) {
                 javaField = new JavaField(getRuntime(),field);
             }
@@ -208,7 +206,7 @@ public class JavaClass extends JavaObject {
             proxy.getSingletonClass().defineFastMethod(this.name,this,this.visibility);
         }
         public IRubyObject execute(IRubyObject self, IRubyObject[] args, Block block) {
-            logMessage(self,args);
+            //logMessage(self,args);
             if (javaField == null) {
                 javaField = new JavaField(getRuntime(),field);
             }
@@ -230,7 +228,7 @@ public class JavaClass extends JavaObject {
             proxy.defineFastMethod(this.name,this,this.visibility);
         }
         public IRubyObject execute(IRubyObject self, IRubyObject[] args, Block block) {
-            logMessage(self,args);
+            //logMessage(self,args);
             if (javaField == null) {
                 javaField = new JavaField(getRuntime(),field);
             }
@@ -252,7 +250,7 @@ public class JavaClass extends JavaObject {
             proxy.defineFastMethod(this.name,this,this.visibility);
         }
         public IRubyObject execute(IRubyObject self, IRubyObject[] args, Block block) {
-            logMessage(self,args);
+            //logMessage(self,args);
             if (javaField == null) {
                 javaField = new JavaField(getRuntime(),field);
             }
@@ -352,7 +350,7 @@ public class JavaClass extends JavaObject {
             }
         }
         public IRubyObject execute(IRubyObject self, IRubyObject[] args, Block block) {
-            logMessage(self,args);
+            //logMessage(self,args);
             if (javaMethod == null && javaMethods == null) {
                 createJavaMethods(self.getRuntime());
             }
@@ -403,7 +401,7 @@ public class JavaClass extends JavaObject {
             }
         }
         public IRubyObject execute(IRubyObject self, IRubyObject[] args, Block block) {
-            logMessage(self,args);
+            //logMessage(self,args);
             if (javaMethod == null && javaMethods == null) {
                 createJavaMethods(self.getRuntime());
             }
@@ -901,7 +899,7 @@ public class JavaClass extends JavaObject {
                 callbackFactory.getFastMethod("declared_classes"));
         result.defineFastMethod("declared_method", 
                 callbackFactory.getFastOptMethod("declared_method"));
-        
+
         result.getMetaClass().undefineMethod("new");
         result.getMetaClass().undefineMethod("allocate");
 
@@ -927,16 +925,10 @@ public class JavaClass extends JavaObject {
 
                 IRubyObject[] newArgs = new IRubyObject[args.length - 1];
                 System.arraycopy(args, 1, newArgs, 0, newArgs.length);
-                if (DEBUG)
-                    System.out.println("__jsend method => '" + name + "'; arity = " + v + ", args.length = " + newArgs.length);
-                
+
                 if(v < 0 || v == (newArgs.length)) {
-                    if (DEBUG)
-                        System.out.println("  calling self");
                     return self.callMethod(self.getRuntime().getCurrentContext(), name, newArgs, CallType.FUNCTIONAL, block);
                 } else {
-                    if (DEBUG)
-                        System.out.println("  calling super");
                     return self.callMethod(self.getRuntime().getCurrentContext(),self.getMetaClass().getSuperClass(), name, newArgs, CallType.SUPER, block);
                 }
             }
@@ -1082,28 +1074,33 @@ public class JavaClass extends JavaObject {
     }
     
     public RubyArray declared_classes() {
-       // TODO: should be able to partially work around this by calling
-       // javaClass().getClasses, which will return any public inner classes.
-       if (Ruby.isSecurityRestricted()) // Can't even get inner classes?
-           return getRuntime().newArray(0);
-        Class[] classes = javaClass().getDeclaredClasses();
-        List accessibleClasses = new ArrayList();
-        for (int i = 0; i < classes.length; i++) {
-            if (Modifier.isPublic(classes[i].getModifiers())) {
-                accessibleClasses.add(classes[i]);
+        Ruby runtime = getRuntime();
+        RubyArray result = runtime.newArray();
+        Class javaClass = javaClass();
+        try {
+            Class[] classes = javaClass.getDeclaredClasses();
+            for (int i = 0; i < classes.length; i++) {
+                if (Modifier.isPublic(classes[i].getModifiers())) {
+                    result.append(get(runtime, classes[i]));
+                }
             }
-        }
-        return buildClasses((Class[]) accessibleClasses.toArray(new Class[accessibleClasses.size()]));
-    }
-    
-    private RubyArray buildClasses(Class [] classes) {
-        RubyArray result = getRuntime().newArray(classes.length);
-        for (int i = 0; i < classes.length; i++) {
-            result.append(new JavaClass(getRuntime(), classes[i]));
+        } catch (SecurityException e) {
+            // restrictive security policy; no matter, we only want public
+            // classes anyway
+            try {
+                Class[] classes = javaClass.getClasses();
+                for (int i = 0; i < classes.length; i++) {
+                    if (javaClass == classes[i].getDeclaringClass()) {
+                        result.append(get(runtime, classes[i]));
+                    }
+                }
+            } catch (SecurityException e2) {
+                // very restrictive policy (disallows Member.PUBLIC)
+                // we'd never actually get this far in that case
+            }
         }
         return result;
     }
-    
 
     public RubyArray declared_constructors() {
         return buildConstructors(javaClass().getDeclaredConstructors());

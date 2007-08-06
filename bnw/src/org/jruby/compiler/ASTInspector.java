@@ -113,10 +113,11 @@ public class ASTInspector {
         hasRestArg = true;
     }
     
+    public static final boolean ENABLED = Boolean.getBoolean("jruby.astInspector.enabled");
+    
     public void inspect(Node node) {
         // TODO: This code effectively disables all inspection-based optimizations; none of them are 100% safe yet
-        boolean disabled = true;
-        if (disabled) disable();
+        if (!ENABLED) disable();
 
         if (node == null) return;
         
@@ -200,6 +201,9 @@ public class ASTInspector {
         case NodeTypes.DEFNNODE:
             hasDef = true;
             break;
+        case NodeTypes.DEFINEDNODE:
+            disable();
+            break;
         case NodeTypes.DOTNODE:
             DotNode dotNode = (DotNode)node;
             inspect(dotNode.getBeginNode());
@@ -275,6 +279,9 @@ public class ASTInspector {
             OpAsgnNode opAsgnNode = (OpAsgnNode)node;
             inspect(opAsgnNode.getReceiverNode());
             inspect(opAsgnNode.getValueNode());
+            break;
+        case NodeTypes.OPASGNORNODE:
+            disable(); // Depends on defined
             break;
         case NodeTypes.ORNODE:
             OrNode orNode = (OrNode)node;

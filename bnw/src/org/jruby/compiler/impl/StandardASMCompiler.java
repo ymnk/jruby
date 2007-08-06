@@ -45,6 +45,7 @@ import org.jruby.RubyClass;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyFloat;
 import org.jruby.RubyHash;
+import org.jruby.RubyMatchData;
 import org.jruby.RubyModule;
 import org.jruby.RubyRange;
 import org.jruby.RubyRegexp;
@@ -61,6 +62,7 @@ import org.jruby.compiler.ScriptCompiler;
 import org.jruby.compiler.NotCompilableException;
 import org.jruby.compiler.VariableCompiler;
 import org.jruby.evaluator.EvaluationState;
+import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.GlobalVariables;
 import org.jruby.internal.runtime.methods.CallConfiguration;
@@ -68,6 +70,7 @@ import org.jruby.javasupport.util.CompilerHelpers;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.ReOptions;
 import org.jruby.parser.StaticScope;
+import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallAdapter;
@@ -78,11 +81,13 @@ import org.jruby.runtime.CompiledBlockCallback;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.MethodIndex;
 import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 import org.jruby.util.CodegenUtils;
 import org.jruby.util.JRubyClassLoader;
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
@@ -130,7 +135,6 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
 
     public Class loadClass(JRubyClassLoader classLoader) throws ClassNotFoundException {
         classLoader.defineClass(cg.c(classname), classWriter.toByteArray());
-
         return classLoader.loadClass(cg.c(classname));
     }
 
@@ -171,7 +175,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
     }
 
     public void startScript() {
-        classWriter = new ClassWriter(true);
+        classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
         // Create the class with the appropriate class name and source file
         classWriter.visit(V1_4, ACC_PUBLIC + ACC_SUPER, classname, null, cg.p(Object.class), new String[]{cg.p(Script.class)});
@@ -828,6 +832,14 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.invokevirtual(cg.p(PrintStream.class), "println", cg.sig(Void.TYPE, cg.params(Object.class)));
         }
 
+        public void debug(String str) {
+            method.ldc(str);
+            method.getstatic(cg.p(System.class), "out", cg.ci(PrintStream.class));
+            method.swap();
+
+            method.invokevirtual(cg.p(PrintStream.class), "println", cg.sig(Void.TYPE, cg.params(Object.class)));
+        }
+
         public void defineAlias(String newName, String oldName) {
             getRubyClass();
             method.ldc(newName);
@@ -845,6 +857,13 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         public void loadTrue() {
             loadRuntime();
             invokeIRuby("getTrue", cg.sig(RubyBoolean.class));
+        }
+
+        public void loadCurrentModule() {
+            loadThreadContext();
+            invokeThreadContext("getCurrentScope", cg.sig(DynamicScope.class));
+            method.invokevirtual(cg.p(DynamicScope.class), "getStaticScope", cg.sig(StaticScope.class));
+            method.invokevirtual(cg.p(StaticScope.class), "getModule", cg.sig(RubyModule.class));
         }
 
         public void retrieveInstanceVariable(String name) {
@@ -989,8 +1008,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
 
         public void nthRef(int match) {
             method.ldc(new Integer(match));
-            loadThreadContext();
-            invokeThreadContext("getBackref", cg.sig(IRubyObject.class, cg.params()));
+            backref();
             method.invokestatic(cg.p(RubyRegexp.class), "nth_match", cg.sig(IRubyObject.class, cg.params(Integer.TYPE, IRubyObject.class)));
         }
 
@@ -1082,30 +1100,67 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.label(notNull);
         }
 
-        public void branchIfModule(ClosureCallback receiverCallback, BranchCallback moduleCallback, BranchCallback notModuleCallback) {
-            receiverCallback.compile(this);
-            method.instance_of(cg.p(RubyModule.class));
+        public void isInstanceOf(Class clazz, BranchCallback trueBranch, BranchCallback falseBranch) {
+            method.instance_of(cg.p(clazz));
 
             Label falseJmp = new Label();
             Label afterJmp = new Label();
 
             method.ifeq(falseJmp); // EQ == 0 (i.e. false)
-            moduleCallback.branch(this);
+            trueBranch.branch(this);
 
             method.go_to(afterJmp);
             method.label(falseJmp);
 
-            notModuleCallback.branch(this);
+            falseBranch.branch(this);
 
             method.label(afterJmp);
         }
 
+        public void isCaptured(final int number, final BranchCallback trueBranch, final BranchCallback falseBranch) {
+            backref();
+            method.dup();
+            isInstanceOf(RubyMatchData.class,
+                         new BranchCallback() {
+                public void branch(MethodCompiler context) {
+                    method.visitTypeInsn(CHECKCAST, cg.p(RubyMatchData.class));
+                    method.dup();
+                    method.invokevirtual(cg.p(RubyMatchData.class), "use", cg.sig(void.class));
+                    method.ldc(new Long(number));
+                    method.invokevirtual(cg.p(RubyMatchData.class), "group", cg.sig(IRubyObject.class, cg.params(long.class)));
+                    method.invokeinterface(cg.p(IRubyObject.class), "isNil", cg.sig(boolean.class));
+                    Label isNil = new Label();
+                    Label after = new Label();
+
+                    method.ifne(isNil);
+                    trueBranch.branch(context);
+                    method.go_to(after);
+
+                    method.label(isNil);
+                    falseBranch.branch(context);
+                    method.label(after);
+                }
+            },
+                         new BranchCallback() {
+                             public void branch(MethodCompiler context) {
+                                 method.pop();
+                                 falseBranch.branch(context);
+                             }
+                         });
+        }
+
+        public void branchIfModule(ClosureCallback receiverCallback, BranchCallback moduleCallback, BranchCallback notModuleCallback) {
+            receiverCallback.compile(this);
+            isInstanceOf(RubyModule.class, moduleCallback, notModuleCallback);
+        }
+
         public void backref() {
+            loadThreadContext();
             invokeThreadContext("getBackref", cg.sig(IRubyObject.class, cg.params()));
         }
 
         public void backrefMethod(String methodName) {
-            invokeThreadContext("getBackref", cg.sig(IRubyObject.class, cg.params()));
+            backref();
             method.invokestatic(cg.p(RubyRegexp.class), methodName, cg.sig(IRubyObject.class, cg.params(IRubyObject.class)));
         }
         
@@ -1129,6 +1184,425 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         public void issueLoopRedo() {
             // inside a loop, jump to body
             method.go_to(currentLoopLabels[1]);
+        }
+
+        private int ensureNumber = 1;
+
+        protected String getNewEnsureName() {
+            return "__ensure_" + (ensureNumber++);
+        }
+
+        public void protect(BranchCallback regularCode, BranchCallback protectedCode) {
+            String mname = getNewEnsureName();
+            SkinnyMethodAdapter mv = new SkinnyMethodAdapter(getClassVisitor().visitMethod(ACC_PUBLIC + ACC_STATIC, mname, METHOD_SIGNATURE, null, null));
+            SkinnyMethodAdapter old_method = null;
+            SkinnyMethodAdapter var_old_method = null;
+            SkinnyMethodAdapter inv_old_method = null;
+            try {
+                old_method = this.method;
+                var_old_method = getVariableCompiler().getMethodAdapter();;
+                inv_old_method = getInvocationCompiler().getMethodAdapter();;
+                this.method = mv;
+                getVariableCompiler().setMethodAdapter(mv);
+                getInvocationCompiler().setMethodAdapter(mv);
+
+                mv.visitCode();
+                // set up a local IRuby variable
+
+                mv.aload(THREADCONTEXT_INDEX);
+                mv.dup();
+                mv.invokevirtual(cg.p(ThreadContext.class), "getRuntime", cg.sig(Ruby.class));
+                mv.dup();
+                mv.astore(RUNTIME_INDEX);
+            
+                // grab nil for local variables
+                mv.invokevirtual(cg.p(Ruby.class), "getNil", cg.sig(IRubyObject.class));
+                mv.astore(NIL_INDEX);
+            
+                mv.invokevirtual(cg.p(ThreadContext.class), "getCurrentScope", cg.sig(DynamicScope.class));
+                mv.dup();
+                mv.astore(DYNAMIC_SCOPE_INDEX);
+                mv.invokevirtual(cg.p(DynamicScope.class), "getValues", cg.sig(IRubyObject[].class));
+                mv.astore(VARS_ARRAY_INDEX);
+
+                Label l0 = new Label();
+                Label l1 = new Label();
+                Label l2 = new Label();
+                method.visitTryCatchBlock(l0, l1, l2, null);
+                Label l3 = new Label();
+                method.visitTryCatchBlock(l2, l3, l2, null);
+                method.visitLabel(l0);
+
+                regularCode.branch(this);
+
+                method.visitLabel(l1);
+
+                protectedCode.branch(this);
+
+                Label l4 = new Label();
+                method.visitJumpInsn(GOTO, l4);
+                method.visitLabel(l2);
+                method.visitVarInsn(ASTORE, 1);
+                method.visitLabel(l3);
+
+                protectedCode.branch(this);
+
+                method.visitVarInsn(ALOAD, 1);
+                method.visitInsn(ATHROW);
+                method.visitLabel(l4);
+
+                mv.areturn();
+                mv.visitMaxs(1, 1);
+                mv.visitEnd();
+            } finally {
+                this.method = old_method;
+                getVariableCompiler().setMethodAdapter(var_old_method);
+                getInvocationCompiler().setMethodAdapter(inv_old_method);
+            }
+
+            loadThreadContext();
+            loadSelf();
+            method.aload(ARGS_INDEX);
+            if(this instanceof ASMClosureCompiler) {
+                pushNull();
+            } else {
+                loadBlock();
+            }
+            method.invokestatic(classname, mname, METHOD_SIGNATURE);
+        }
+
+        private int rescueNumber = 1;
+
+        protected String getNewRescueName() {
+            return "__rescue_" + (rescueNumber++);
+        }
+
+        public void rescue(BranchCallback regularCode, Class exception, BranchCallback catchCode) {
+            String mname = getNewRescueName();
+            SkinnyMethodAdapter mv = new SkinnyMethodAdapter(getClassVisitor().visitMethod(ACC_PUBLIC + ACC_STATIC, mname, METHOD_SIGNATURE, null, null));
+            SkinnyMethodAdapter old_method = null;
+            SkinnyMethodAdapter var_old_method = null;
+            SkinnyMethodAdapter inv_old_method = null;
+            try {
+                old_method = this.method;
+                var_old_method = getVariableCompiler().getMethodAdapter();;
+                inv_old_method = getInvocationCompiler().getMethodAdapter();;
+                this.method = mv;
+                getVariableCompiler().setMethodAdapter(mv);
+                getInvocationCompiler().setMethodAdapter(mv);
+
+                mv.visitCode();
+                // set up a local IRuby variable
+
+                mv.aload(THREADCONTEXT_INDEX);
+                mv.dup();
+                mv.invokevirtual(cg.p(ThreadContext.class), "getRuntime", cg.sig(Ruby.class));
+                mv.dup();
+                mv.astore(RUNTIME_INDEX);
+            
+                // grab nil for local variables
+                mv.invokevirtual(cg.p(Ruby.class), "getNil", cg.sig(IRubyObject.class));
+                mv.astore(NIL_INDEX);
+            
+                mv.invokevirtual(cg.p(ThreadContext.class), "getCurrentScope", cg.sig(DynamicScope.class));
+                mv.dup();
+                mv.astore(DYNAMIC_SCOPE_INDEX);
+                mv.invokevirtual(cg.p(DynamicScope.class), "getValues", cg.sig(IRubyObject[].class));
+                mv.astore(VARS_ARRAY_INDEX);
+
+                Label l0 = new Label();
+                Label l1 = new Label();
+                Label l2 = new Label();
+                mv.visitTryCatchBlock(l0, l1, l2, cg.p(exception));
+                mv.visitLabel(l0);
+
+                regularCode.branch(this);
+
+                mv.visitLabel(l1);
+                Label l3 = new Label();
+                mv.visitJumpInsn(GOTO, l3);
+                mv.visitLabel(l2);
+                mv.visitVarInsn(ASTORE, 1);
+
+                catchCode.branch(this);
+
+                mv.visitLabel(l3);
+                mv.areturn();
+                mv.visitMaxs(1, 1);
+                mv.visitEnd();
+            } finally {
+                this.method = old_method;
+                getVariableCompiler().setMethodAdapter(var_old_method);
+                getInvocationCompiler().setMethodAdapter(inv_old_method);
+            }
+            loadThreadContext();
+            loadSelf();
+            method.aload(ARGS_INDEX);
+            if(this instanceof ASMClosureCompiler) {
+                pushNull();
+            } else {
+                loadBlock();
+            }
+            method.invokestatic(classname, mname, METHOD_SIGNATURE);
+        }
+
+        public void inDefined() {
+            method.aload(THREADCONTEXT_INDEX);
+            method.iconst_1();
+            invokeThreadContext("setWithinDefined", cg.sig(void.class, cg.params(boolean.class)));
+        }
+
+        public void outDefined() {
+            method.aload(THREADCONTEXT_INDEX);
+            method.iconst_0();
+            invokeThreadContext("setWithinDefined", cg.sig(void.class, cg.params(boolean.class)));
+        }
+
+        public void stringOrNil() {
+            Label notNull = new Label();
+            Label haveNil = new Label();
+            method.dup();
+            method.ifnonnull(notNull);
+            method.pop();
+            method.aload(NIL_INDEX);
+            method.go_to(haveNil);
+            method.label(notNull);
+            loadRuntime();
+            invokeIRuby("newString", cg.sig(RubyString.class, cg.params(String.class)));
+            method.label(haveNil);
+        }
+
+        public void pushNull() {
+            method.aconst_null();
+        }
+
+        public void isMethodBound(String name, BranchCallback trueBranch, BranchCallback falseBranch) {
+            method.invokeinterface(cg.p(IRubyObject.class), "getMetaClass", cg.sig(RubyClass.class));
+            method.ldc(name);
+            method.iconst_0(); // push false
+            method.invokevirtual(cg.p(RubyClass.class), "isMethodBound", cg.sig(boolean.class, cg.params(String.class, boolean.class)));
+            Label falseLabel = new Label();
+            Label exitLabel = new Label();
+            method.ifeq(falseLabel); // EQ == 0 (i.e. false)
+            trueBranch.branch(this);
+            method.go_to(exitLabel);
+            method.label(falseLabel);
+            falseBranch.branch(this);
+            method.label(exitLabel);
+        }
+
+        public void hasBlock(BranchCallback trueBranch, BranchCallback falseBranch) {
+            loadBlock();
+            method.invokevirtual(cg.p(Block.class), "isGiven", cg.sig(boolean.class));
+            Label falseLabel = new Label();
+            Label exitLabel = new Label();
+            method.ifeq(falseLabel); // EQ == 0 (i.e. false)
+            trueBranch.branch(this);
+            method.go_to(exitLabel);
+            method.label(falseLabel);
+            falseBranch.branch(this);
+            method.label(exitLabel);
+        }
+        public void isGlobalDefined(String name, BranchCallback trueBranch, BranchCallback falseBranch) {
+            loadRuntime();
+            invokeIRuby("getGlobalVariables", cg.sig(GlobalVariables.class));
+            method.ldc(name);
+            method.invokevirtual(cg.p(GlobalVariables.class), "isDefined", cg.sig(boolean.class, cg.params(String.class)));
+            Label falseLabel = new Label();
+            Label exitLabel = new Label();
+            method.ifeq(falseLabel); // EQ == 0 (i.e. false)
+            trueBranch.branch(this);
+            method.go_to(exitLabel);
+            method.label(falseLabel);
+            falseBranch.branch(this);
+            method.label(exitLabel);
+        }
+        public void isConstantDefined(String name, BranchCallback trueBranch, BranchCallback falseBranch) {
+            loadThreadContext();
+            method.ldc(name);
+            invokeThreadContext("getConstantDefined", cg.sig(boolean.class, cg.params(String.class)));
+            Label falseLabel = new Label();
+            Label exitLabel = new Label();
+            method.ifeq(falseLabel); // EQ == 0 (i.e. false)
+            trueBranch.branch(this);
+            method.go_to(exitLabel);
+            method.label(falseLabel);
+            falseBranch.branch(this);
+            method.label(exitLabel);
+        }
+        public void isInstanceVariableDefined(String name, BranchCallback trueBranch, BranchCallback falseBranch) {
+            loadSelf();
+            method.ldc(name);
+            method.invokeinterface(cg.p(IRubyObject.class), "getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
+            Label trueLabel = new Label();
+            Label exitLabel = new Label();
+            method.ifnonnull(trueLabel);
+            falseBranch.branch(this);
+            method.go_to(exitLabel);
+            method.label(trueLabel);
+            trueBranch.branch(this);
+            method.label(exitLabel);
+        }
+        public void isClassVarDefined(String name, BranchCallback trueBranch, BranchCallback falseBranch){
+            method.ldc(name);
+            method.invokevirtual(cg.p(RubyModule.class), "isClassVarDefined", cg.sig(boolean.class, cg.params(String.class)));
+            Label trueLabel = new Label();
+            Label exitLabel = new Label();
+            method.ifne(trueLabel);
+            falseBranch.branch(this);
+            method.go_to(exitLabel);
+            method.label(trueLabel);
+            trueBranch.branch(this);
+            method.label(exitLabel);
+        }
+        public Object getNewEnding() {
+            return new Label();
+        }
+        public void isNil(BranchCallback trueBranch, BranchCallback falseBranch) {
+            method.invokeinterface(cg.p(IRubyObject.class), "isNil", cg.sig(boolean.class));
+            Label falseLabel = new Label();
+            Label exitLabel = new Label();
+            method.ifeq(falseLabel); // EQ == 0 (i.e. false)
+            trueBranch.branch(this);
+            method.go_to(exitLabel);
+            method.label(falseLabel);
+            falseBranch.branch(this);
+            method.label(exitLabel);
+        }
+        public void ifNull(Object gotoToken) {
+            method.ifnull((Label)gotoToken);
+        }
+        public void ifNotNull(Object gotoToken) {
+            method.ifnonnull((Label)gotoToken);
+        }
+        public void setEnding(Object endingToken){
+            method.label((Label)endingToken);
+        }
+        public void go(Object gotoToken) {
+            method.go_to((Label)gotoToken);
+        }
+        public void isConstantBranch(final BranchCallback setup, final BranchCallback isConstant, final BranchCallback isMethod, final BranchCallback none, final String name) {
+            rescue(new BranchCallback() {
+                    public void branch(MethodCompiler context) {
+                        setup.branch(AbstractMethodCompiler.this);
+                        method.dup(); //[C,C]
+                        method.instance_of(cg.p(RubyModule.class)); //[C, boolean]
+
+                        Label falseJmp = new Label();
+                        Label afterJmp = new Label();
+                        Label nextJmp = new Label();
+                        Label nextJmpPop = new Label();
+
+                        method.ifeq(nextJmp); // EQ == 0 (i.e. false)   //[C]
+                        method.visitTypeInsn(CHECKCAST, cg.p(RubyModule.class));
+                        method.dup(); //[C, C]
+                        method.ldc(name); //[C, C, String]
+                        method.invokevirtual(cg.p(RubyModule.class), "getConstantAt", cg.sig(IRubyObject.class, cg.params(String.class))); //[C, null|C]
+                        method.dup();
+                        method.ifnull(nextJmpPop);
+                        method.pop(); method.pop();
+
+                        isConstant.branch(AbstractMethodCompiler.this);
+
+                        method.go_to(afterJmp);
+                        
+                        method.label(nextJmpPop);
+                        method.pop();
+
+                        method.label(nextJmp); //[C]
+
+                        method.invokeinterface(cg.p(IRubyObject.class), "getMetaClass", cg.sig(RubyClass.class));
+                        method.ldc(name);
+                        method.iconst_1(); // push true
+                        method.invokevirtual(cg.p(RubyClass.class), "isMethodBound", cg.sig(boolean.class, cg.params(String.class, boolean.class)));
+                        method.ifeq(falseJmp); // EQ == 0 (i.e. false)
+                        
+                        isMethod.branch(AbstractMethodCompiler.this);
+                        method.go_to(afterJmp);
+
+                        method.label(falseJmp);
+                        none.branch(AbstractMethodCompiler.this);
+            
+                        method.label(afterJmp);
+                    }}, JumpException.class, none);
+        }
+        public void metaclass() {
+            invokeIRubyObject("getMetaClass", cg.sig(RubyClass.class));
+        }
+        public void getVisibilityFor(String name) {
+            method.ldc(name);
+            method.invokevirtual(cg.p(RubyClass.class), "searchMethod", cg.sig(DynamicMethod.class, cg.params(String.class)));
+            method.invokevirtual(cg.p(DynamicMethod.class), "getVisibility", cg.sig(Visibility.class));
+        }
+        public void isPrivate(Object gotoToken, int toConsume) {
+            method.invokevirtual(cg.p(Visibility.class), "isPrivate", cg.sig(boolean.class));
+            Label temp = new Label();
+            method.ifeq(temp); // EQ == 0 (i.e. false)
+            while((toConsume--) > 0) {
+                  method.pop();
+            }
+            method.go_to((Label)gotoToken);
+            method.label(temp);
+        }
+        public void isNotProtected(Object gotoToken, int toConsume) {
+            method.invokevirtual(cg.p(Visibility.class), "isProtected", cg.sig(boolean.class));
+            Label temp = new Label();
+            method.ifne(temp);
+            while((toConsume--) > 0) {
+                  method.pop();
+            }
+            method.go_to((Label)gotoToken);
+            method.label(temp);
+        }
+        public void selfIsKindOf(Object gotoToken) {
+            loadSelf();
+            method.swap();
+            method.invokevirtual(cg.p(RubyClass.class), "getRealClass", cg.sig(RubyClass.class));
+            method.invokeinterface(cg.p(IRubyObject.class), "isKindOf", cg.sig(boolean.class, cg.params(RubyModule.class)));
+            method.ifne((Label)gotoToken); // EQ != 0 (i.e. true)
+        }
+        public void notIsModuleAndClassVarDefined(String name, Object gotoToken) {
+            method.dup(); //[?, ?]
+            method.instance_of(cg.p(RubyModule.class)); //[?, boolean]
+            Label falsePopJmp = new Label();
+            Label successJmp = new Label();
+            method.ifeq(falsePopJmp);
+
+            method.visitTypeInsn(CHECKCAST, cg.p(RubyModule.class)); //[RubyModule]
+            method.ldc(name); //[RubyModule, String]
+            
+            method.invokevirtual(cg.p(RubyModule.class), "isClassVarDefined", cg.sig(boolean.class, cg.params(String.class))); //[boolean]
+            method.ifeq((Label)gotoToken);
+            method.go_to(successJmp);
+            method.label(falsePopJmp);
+            method.pop();
+            method.go_to((Label)gotoToken);
+            method.label(successJmp);
+        }
+        public void ifSingleton(Object gotoToken) {
+            method.invokevirtual(cg.p(RubyModule.class), "isSingleton", cg.sig(boolean.class));
+            method.ifne((Label)gotoToken); // EQ == 0 (i.e. false)
+        }
+        public void getInstanceVariable(String name) {
+            method.ldc(name);
+            method.invokeinterface(cg.p(IRubyObject.class), "getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
+        }
+        public void getFrameName() {
+            loadThreadContext();
+            invokeThreadContext("getFrameName", cg.sig(String.class));
+        }
+        public void getFrameKlazz() {
+            loadThreadContext();
+            invokeThreadContext("getFrameKlazz", cg.sig(RubyModule.class));
+        }
+        public void superClass() {
+            method.invokevirtual(cg.p(RubyModule.class), "getSuperClass", cg.sig(RubyClass.class));
+        }
+        public void ifNotSuperMethodBound(Object token) {
+            method.swap();
+            method.iconst_0();
+            method.invokevirtual(cg.p(RubyModule.class), "isMethodBound", cg.sig(boolean.class, cg.params(String.class, boolean.class)));
+            method.ifeq((Label)token);
         }
     }
 
@@ -1174,6 +1648,14 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             Label end = new Label();
             method.label(end);
             method.end();
+        }
+
+        protected String getNewRescueName() {
+            return closureMethodName + "_" + super.getNewRescueName();
+        }
+
+        protected String getNewEnsureName() {
+            return closureMethodName + "_" + super.getNewEnsureName();
         }
 
         public void performReturn() {
@@ -1255,6 +1737,14 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
                 variableCompiler = new StackBasedVariableCompiler(this, method, ARGS_INDEX);
             }
             invocationCompiler = new StandardInvocationCompiler(this, method);
+        }
+
+        protected String getNewRescueName() {
+            return friendlyName + "_" + super.getNewRescueName();
+        }
+
+        protected String getNewEnsureName() {
+            return friendlyName + "_" + super.getNewEnsureName();
         }
 
         public void beginMethod(ClosureCallback args, StaticScope scope) {

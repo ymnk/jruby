@@ -11,8 +11,7 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
- * Copyright (C) 2002-2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
- * Copyright (C) 2004-2005 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2007 Ola Bini <ola.bini@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -26,35 +25,51 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.internal.runtime.methods;
+package org.jruby.ast;
 
-import org.jruby.RubyModule;
-import org.jruby.runtime.Block;
-import org.jruby.runtime.ThreadContext;
-import org.jruby.runtime.Visibility;
-import org.jruby.runtime.builtin.IRubyObject;
+import java.util.List;
+
+import org.jruby.ast.visitor.NodeVisitor;
+import org.jruby.evaluator.Instruction;
+import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.parser.StaticScope;
 
 /**
- * 
- * @author jpetersen
+ * @author <a href="mailto:ola.bini@gmail.com">Ola Bini</a>
  */
-public class WrapperMethod extends DynamicMethod {
-    private DynamicMethod method;
+public class ScopeNode extends Node {
+	protected final StaticScope scope;
+	protected final Node bodyNode;
 
-    /**
-     * Constructor for WrapperCallable.
-     * @param visibility
-     */
-    public WrapperMethod(RubyModule implementationClass, DynamicMethod method, Visibility visibility) {
-        super(implementationClass, visibility, null);
-        this.method = method;
+    public ScopeNode(ISourcePosition position, StaticScope scope, Node bodyNode) {
+        super(position,NodeTypes.SCOPENODE);
+        this.scope = scope;
+        this.bodyNode = bodyNode;
     }
-    
-    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule klazz, String name, IRubyObject[] args, Block block) {
-        return method.call(context, self, klazz, name, args, block);
+
+    public Instruction accept(NodeVisitor iVisitor) {
+        return iVisitor.visitScopeNode(this);
     }
-    
-    public DynamicMethod dup() {
-        return new WrapperMethod(getImplementationClass(), method, getVisibility());
+
+	/**
+	 * Get the static scoping information.
+	 * 
+	 * @return the scoping info
+	 */
+	public StaticScope getScope() {
+	    return scope;
+	}
+
+	/**
+	 * Gets the body of this class.
+	 * 
+	 * @return the contents
+	 */
+	public Node getBodyNode() {
+	    return bodyNode;
+	}
+
+    public List childNodes() {
+        return Node.createList(bodyNode);
     }
-}
+}// ScopeNode
