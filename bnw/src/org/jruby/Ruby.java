@@ -92,7 +92,7 @@ import org.jruby.parser.Parser;
 import org.jruby.parser.ParserConfiguration;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Block;
-//import org.jruby.runtime.CacheMap;
+import org.jruby.runtime.CacheMap;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.EventHook;
@@ -122,7 +122,7 @@ public final class Ruby {
 
     // registry must be created before threadService
     private final Registry registry = new Registry(this);
-    //private final CacheMap cacheMap = new CacheMap();
+    private final CacheMap cacheMap = new CacheMap();
     private final MethodCache methodCache = new MethodCache();
     private final ThreadService threadService = new ThreadService(this);
     private Hashtable runtimeInformation;
@@ -400,8 +400,7 @@ public final class Ruby {
             Script script = (Script)scriptClass.newInstance();
             
             try {
-                DynamicScope scope = new DynamicScope(((RootNode)node).getStaticScope());
-
+                DynamicScope scope = ((RootNode)node).getScope();
                 StaticScope staticScope = scope.getStaticScope();
 
                 if (staticScope.getModule() == null) {
@@ -671,16 +670,16 @@ public final class Ruby {
         }
     }
 
-//    /**
-//     * Retrieve mappings of cached methods to where they have been cached.  When a cached
-//     * method needs to be invalidated this map can be used to remove all places it has been
-//     * cached.
-//     *
-//     * @return the mappings of where cached methods have been stored
-//     */
-//    public CacheMap getCacheMap() {
-//        return cacheMap;
-//    }
+    /**
+     * Retrieve mappings of cached methods to where they have been cached.  When a cached
+     * method needs to be invalidated this map can be used to remove all places it has been
+     * cached.
+     *
+     * @return the mappings of where cached methods have been stored
+     */
+    public CacheMap getCacheMap() {
+        return cacheMap;
+    }
     
 
     /**

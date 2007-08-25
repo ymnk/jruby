@@ -91,6 +91,15 @@ public class RubyModule extends RubyObject {
     
     public Dispatcher dispatcher = Dispatcher.DEFAULT_DISPATCHER;
 
+    public static class KindOf {
+        public static final KindOf DEFAULT_KIND_OF = new KindOf();
+        public boolean isKindOf(IRubyObject obj, RubyModule type) {
+            return obj.getMetaClass().hasModuleInHierarchy(type);
+        }
+    }
+
+    public KindOf kindOf = KindOf.DEFAULT_KIND_OF;
+
     public final int id;
 
     // Containing class...The parent of Object is null. Object should always be last in chain.
@@ -175,6 +184,11 @@ public class RubyModule extends RubyObject {
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyModule.class);   
         RubyClass moduleMetaClass = moduleClass.getMetaClass();
         moduleClass.index = ClassIndex.MODULE;
+        moduleClass.kindOf = new RubyModule.KindOf() {
+                public boolean isKindOf(IRubyObject obj, RubyModule type) {
+                    return obj instanceof RubyModule;
+                }
+            };
 
         moduleClass.defineFastMethod("===", callbackFactory.getFastMethod("op_eqq", IRubyObject.class));
         moduleClass.defineFastMethod("<=>", callbackFactory.getFastMethod("op_cmp", IRubyObject.class));
@@ -209,6 +223,7 @@ public class RubyModule extends RubyObject {
         moduleClass.defineFastMethod("public_class_method", callbackFactory.getFastOptMethod("public_class_method"));
         moduleClass.defineFastMethod("public_instance_methods", callbackFactory.getFastOptMethod("public_instance_methods"));
         moduleClass.defineFastMethod("to_s", callbackFactory.getFastMethod("to_s"));
+        moduleClass.defineFastMethod("class_variable_defined?", callbackFactory.getFastMethod("class_variable_defined_p", IRubyObject.class));
         
         moduleClass.defineAlias("class_eval", "module_eval");
         
@@ -696,16 +711,11 @@ public class RubyModule extends RubyObject {
 
         if (changed) {
             getRuntime().getMethodCache().clearCache();
-            /*
+            
             // MRI seems to blow away its cache completely after an include; is
             // what we're doing here really safe?
-            List methodNames = new ArrayList(((RubyModule) arg).getMethods().keySet());
-            for (Iterator iter = methodNames.iterator();
-                 iter.hasNext();) {
-                String methodName = (String) iter.next();
-                getRuntime().getCacheMap().remove(methodName, searchMethod(methodName));
-            }
-            */
+            // CON: clearing the whole cache now, though it's pretty inefficient
+            getRuntime().getCacheMap().clear();
         }
 
     }
@@ -873,12 +883,10 @@ public class RubyModule extends RubyObject {
         synchronized(getMethods()) {
             // If we add a method which already is cached in this class, then we should update the 
             // cachemap so it stays up to date.
-            /*
             DynamicMethod existingMethod = (DynamicMethod) getMethods().remove(name);
             if (existingMethod != null) {
                 getRuntime().getCacheMap().remove(name, existingMethod);
             }
-            */
             getRuntime().getMethodCache().removeMethod(name);
             putMethod(name, method);
         }
@@ -907,7 +915,7 @@ public class RubyModule extends RubyObject {
             
             getRuntime().getMethodCache().removeMethod(name);
 
-            //getRuntime().getCacheMap().remove(name, method);
+            getRuntime().getCacheMap().remove(name, method);
         }
         
         if(isSingleton()){
@@ -1137,7 +1145,7 @@ public class RubyModule extends RubyObject {
             }
         }
         getRuntime().getMethodCache().removeMethod(name);
-        //getRuntime().getCacheMap().remove(name, searchMethod(name));
+        getRuntime().getCacheMap().remove(name, method);
         putMethod(name, new AliasMethod(this, method, oldName));
     }
 
@@ -1497,6 +1505,21 @@ public class RubyModule extends RubyObject {
         }
 
         return fastGetClassVar(varName);
+    }
+
+    public IRubyObject class_variable_defined_p(IRubyObject var) {
+        String name = var.asSymbol();
+
+        if (!IdUtil.isClassVariable(name)) {
+            throw getRuntime().newNameError("`" + name + "' is not allowed as a class variable name", name);
+        }
+
+        RubyModule module = findModuleWithAttribute(name);
+
+        if (module != null) {
+            return module.getInstanceVariable(name) == null ? getRuntime().getFalse() : getRuntime().getTrue() ;
+        }
+        return getRuntime().getFalse();
     }
 
     /** rb_mod_cvar_set

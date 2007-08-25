@@ -99,7 +99,6 @@ public class ASTInspector {
         SCOPE_AWARE_METHODS.add("class_eval");
         SCOPE_AWARE_METHODS.add("binding");
         SCOPE_AWARE_METHODS.add("local_variables");
-        SCOPE_AWARE_METHODS.add("gsub");
     }
     
     public void disable() {
@@ -113,7 +112,7 @@ public class ASTInspector {
         hasRestArg = true;
     }
     
-    public static final boolean ENABLED = Boolean.getBoolean("jruby.astInspector.enabled");
+    public static final boolean ENABLED = System.getProperty("jruby.astInspector.enabled", "true").equals("true");
     
     public void inspect(Node node) {
         // TODO: This code effectively disables all inspection-based optimizations; none of them are 100% safe yet
@@ -211,6 +210,9 @@ public class ASTInspector {
             break;
         case NodeTypes.DVARNODE:
             break;
+        case NodeTypes.ENSURENODE:
+            disable();
+            break;
         case NodeTypes.EVSTRNODE:
             inspect(((EvStrNode)node).getBody());
             break;
@@ -221,10 +223,6 @@ public class ASTInspector {
         case NodeTypes.FLOATNODE:
             break;
         case NodeTypes.GLOBALVARNODE:
-            GlobalVarNode globalVarNode = (GlobalVarNode)node;
-            if (globalVarNode.getName().equals("$_") || globalVarNode.getName().equals("$~")) {
-                hasScopeAwareMethods = true;
-            }
             break;
         case NodeTypes.HASHNODE:
             HashNode hashNode = (HashNode)node;

@@ -202,13 +202,9 @@ test_exception {
   compile_and_run("1.times {|a[0]|}")
 }
 test_exception {
-  compile_and_run("1.times {|x, y|}")
-}
-test_exception {
   compile_and_run("1.times {|*x|}")
 }
 
-=begin
 class_string = <<EOS
 class CompiledClass1
   def foo
@@ -220,6 +216,7 @@ EOS
 
 test_equal("cc1", compile_and_run(class_string))
 
+=begin
 module_string = <<EOS
 module CompiledModule1
   def bar
@@ -262,3 +259,40 @@ test_exception { compile_and_run("foo(1, 2, 3)") }
 # we do not compile opt args that cause other vars to be assigned, as in def (a=(b=1))
 test_exception { compile_and_run("def foo(a=(b=1)); end")}
 test_exception { compile_and_run("def foo(a, b=(c=1)); end")}
+
+class CoercibleToArray
+  def to_ary
+    [2, 3]
+  end
+end
+
+# argscat
+def foo(a, b, c)
+  return a, b, c
+end
+
+test_equal([1, 2, 3], compile_and_run("foo(1, *[2, 3])"))
+test_equal([1, 2, 3], compile_and_run("foo(1, *CoercibleToArray.new)"))
+
+# multiple assignment
+test_equal([1, 2, 3], compile_and_run("a = nil; 1.times { a, b, @c = 1, 2, 3; a = [a, b, @c] }; a"))
+
+# There's a bug in this test script that prevents these succeeding; commenting out for now
+#test_equal([1, nil, nil], compile_and_run("a, (b, c) = 1; [a, b, c]"))
+#test_equal([1, 2, nil], compile_and_run("a, (b, c) = 1, 2; [a, b, c]"))
+#test_equal([1, 2, 3], compile_and_run("a, (b, c) = 1, [2, 3]; [a, b, c]"))
+#test_equal([1, 2, 3], compile_and_run("a, (b, c) = 1, CoercibleToArray.new; [a, b, c]"))
+
+# until loops
+test_equal(3, compile_and_run("a = 1; until a == 3; a += 1; end; a"))
+test_equal(3, compile_and_run("a = 3; until a == 3; end; a"))
+
+# dynamic regexp
+test_equal([/foobar/, /foobaz/], compile_and_run('a = "bar"; b = []; while true; b << %r[foo#{a}]; break if a == "baz"; a = "baz"; end; b'))
+
+# return
+test_no_exception {
+    test_equal(1, compile_and_run("def foo; 1; end; foo"))
+    test_equal(nil, compile_and_run("def foo; return; end; foo"))
+    test_equal(1, compile_and_run("def foo; return 1; end; foo"))
+}

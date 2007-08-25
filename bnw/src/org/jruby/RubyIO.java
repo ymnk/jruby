@@ -273,6 +273,11 @@ public class RubyIO extends RubyObject {
         RubyClass ioClass = runtime.defineClass("IO", runtime.getObject(), IO_ALLOCATOR);
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyIO.class);   
         RubyClass ioMetaClass = ioClass.getMetaClass();
+        ioClass.kindOf = new RubyModule.KindOf() {
+                public boolean isKindOf(IRubyObject obj, RubyModule type) {
+                    return obj instanceof RubyIO;
+                }
+            };
 
         ioClass.includeModule(runtime.getEnumerable());
         
@@ -357,7 +362,7 @@ public class RubyIO extends RubyObject {
      * See checkReadable for commentary.
      */
     protected void checkWriteable() {
-        if (!isOpen() || !modes.isWriteable()) {
+        if (!isOpen() || !modes.isWritable()) {
             throw getRuntime().newIOError("not opened for writing");
         }
     }
@@ -726,7 +731,7 @@ public class RubyIO extends RubyObject {
      */
     public IRubyObject print(IRubyObject[] args) {
         if (args.length == 0) {
-            args = new IRubyObject[] { getRuntime().getCurrentContext().getLastline() };
+            args = new IRubyObject[] { getRuntime().getCurrentContext().getCurrentFrame().getLastLine() };
         }
 
         IRubyObject fs = getRuntime().getGlobalVariables().get("$,");
@@ -953,7 +958,7 @@ public class RubyIO extends RubyObject {
     public IRubyObject gets(IRubyObject[] args) {
         IRubyObject result = internalGets(args);
 
-        if (!result.isNil()) getRuntime().getCurrentContext().setLastline(result);
+        if (!result.isNil()) getRuntime().getCurrentContext().getCurrentFrame().setLastLine(result);
 
         return result;
     }

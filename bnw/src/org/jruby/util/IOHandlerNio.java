@@ -215,20 +215,6 @@ public class IOHandlerNio extends IOHandler {
         outBuffer.clear();
     }
    
-    /* unused but looks like it could be at some point
-    private int buffer_rindex(ByteBuffer haystack, byte[] needle) {
-        search_loop:
-        for (int i = haystack.limit() - needle.length; i >= haystack.position(); i--) {
-            for (int j = 0; j < needle.length; j++) {
-                if (haystack.get(i + j) != needle[j]) {
-                    continue search_loop;
-                }
-            }
-            return i;
-        }
-        return -1;
-    }*/
-
     private int buffer_index(ByteBuffer haystack, ByteList needle) {
         search_loop:
         for (int i = haystack.position(); i + (needle.realSize - 1) < haystack.limit(); i++) {
@@ -279,25 +265,7 @@ public class IOHandlerNio extends IOHandler {
     }
 
     public int write(ByteList string) throws IOException, BadDescriptorException {
-        checkWritable();
-
-        ByteBuffer buffer = ByteBuffer.wrap(string.bytes, string.begin, string.realSize);
-        do {
-            /* append data */
-            while (buffer.hasRemaining() && outBuffer.hasRemaining()) {
-                outBuffer.put(buffer.get());
-            }
-
-            outBuffer.flip();
-            if ((buffer.hasRemaining() && !outBuffer.hasRemaining()) || isSync()) {
-                flushOutBuffer();
-            }
-        } while (buffer.hasRemaining());
-        
-        if(!isSync()) {
-          flushOutBuffer();
-        }
-        return buffer.capacity();
+        return syswrite(string);
     }
 
     public ByteList gets(ByteList separator) throws IOException, BadDescriptorException, EOFException {
@@ -436,7 +404,7 @@ public class IOHandlerNio extends IOHandler {
     }
 
     public void seek(long offset, int type) throws IOException, InvalidValueException, PipeException {
-        checkOpen();
+        checkOpen("not open");
         if (channel instanceof FileChannel) {
             if (bufferedIO) {
                 flushInBuffer();
@@ -477,7 +445,7 @@ public class IOHandlerNio extends IOHandler {
     }
     
     public void rewind() throws IOException, PipeException {
-        checkOpen();
+        checkOpen("not open");
         checkBuffered();
         if (channel instanceof FileChannel) {
             try {

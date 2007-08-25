@@ -81,6 +81,10 @@ public class RubyGlobal {
                 throw getRuntime().newTypeError("can't convert " + value.getMetaClass() + " into String");
             }
 
+            if (value.isNil()) {
+                return super.delete(key, org.jruby.runtime.Block.NULL_BLOCK);
+            }
+            
             ThreadContext context = getRuntime().getCurrentContext();
             //return super.aset(getRuntime().newString("sadfasdF"), getRuntime().newString("sadfasdF"));
             return super.aset(key.callMethod(context, MethodIndex.TO_STR, "to_str", IRubyObject.NULL_ARRAY),
@@ -157,6 +161,12 @@ public class RubyGlobal {
         runtime.defineVariable(new LastMatchGlobalVariable(runtime, "$+"));
         runtime.defineVariable(new LastMatchInfoGlobalVariable(runtime, "$~"));
 
+        // This is not the actual OS process id, but it is a valid JRuby runtime identifier within
+        // the same virtual machine.  So this is a minor incompatibility.  External job control with
+        // this could cause issues.  OTOH, we would not want to report JVM pid since that could 
+        // take down many runtimes.  
+        runtime.getGlobalVariables().defineReadonly("$$", new ValueAccessor(runtime.newFixnum(runtime.hashCode())));
+
         // after defn of $stderr as the call may produce warnings
         defineGlobalEnvConstants(runtime);
         
@@ -220,7 +230,7 @@ public class RubyGlobal {
         }
         
         public IRubyObject get() {
-            return RubyRegexp.last_match(runtime.getCurrentContext().getBackref());
+            return RubyRegexp.last_match(runtime.getCurrentContext().getCurrentFrame().getBackRef());
         }
     }
 
@@ -230,7 +240,7 @@ public class RubyGlobal {
         }
         
         public IRubyObject get() {
-            return RubyRegexp.match_pre(runtime.getCurrentContext().getBackref());
+            return RubyRegexp.match_pre(runtime.getCurrentContext().getCurrentFrame().getBackRef());
         }
     }
 
@@ -240,7 +250,7 @@ public class RubyGlobal {
         }
         
         public IRubyObject get() {
-            return RubyRegexp.match_post(runtime.getCurrentContext().getBackref());
+            return RubyRegexp.match_post(runtime.getCurrentContext().getCurrentFrame().getBackRef());
         }
     }
 
@@ -250,7 +260,7 @@ public class RubyGlobal {
         }
         
         public IRubyObject get() {
-            return RubyRegexp.match_last(runtime.getCurrentContext().getBackref());
+            return RubyRegexp.match_last(runtime.getCurrentContext().getCurrentFrame().getBackRef());
         }
     }
 
@@ -260,7 +270,7 @@ public class RubyGlobal {
         }
         
         public IRubyObject get() {
-            IRubyObject ret = runtime.getCurrentContext().getBackref();
+            IRubyObject ret = runtime.getCurrentContext().getCurrentFrame().getBackRef();
             if(ret instanceof RubyMatchData) {
                 ((RubyMatchData)ret).use();
             }
@@ -383,11 +393,11 @@ public class RubyGlobal {
         }
 
         public IRubyObject get() {
-            return runtime.getCurrentContext().getLastline();
+            return runtime.getCurrentContext().getCurrentFrame().getLastLine();
         }
 
         public IRubyObject set(IRubyObject value) {
-            runtime.getCurrentContext().setLastline(value);
+            runtime.getCurrentContext().getCurrentFrame().setLastLine(value);
             return value;
         }
     }

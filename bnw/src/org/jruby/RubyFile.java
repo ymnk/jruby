@@ -136,6 +136,12 @@ public class RubyFile extends RubyIO {
         RubyClass fileMetaClass = fileClass.getMetaClass();
         RubyString separator = runtime.newString("/");
         
+        fileClass.kindOf = new RubyModule.KindOf() {
+                public boolean isKindOf(IRubyObject obj, RubyModule type) {
+                    return obj instanceof RubyFile;
+                }
+            };
+
         separator.freeze();
         fileClass.defineConstant("SEPARATOR", separator);
         fileClass.defineConstant("Separator", separator);
@@ -881,8 +887,13 @@ public class RubyFile extends RubyIO {
     public static IRubyObject mtime(IRubyObject recv, IRubyObject filename) {
         Ruby runtime = recv.getRuntime();
         RubyString name = RubyString.stringValue(filename);
+        JRubyFile file = JRubyFile.create(runtime.getCurrentDirectory(), name.toString());
+
+        if (!file.exists()) {
+            throw runtime.newErrnoENOENTError("No such file or directory - " + name.toString());
+        }
         
-        return runtime.newTime(JRubyFile.create(runtime.getCurrentDirectory(), name.toString()).lastModified());
+        return runtime.newTime(file.lastModified());
     }
     
     public static IRubyObject open(IRubyObject recv, IRubyObject[] args, Block block) {

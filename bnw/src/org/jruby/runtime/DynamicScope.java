@@ -126,7 +126,7 @@ public class DynamicScope {
      */
     public void setArgValues(IRubyObject[] values, int size) {
         lazy();
-        System.arraycopy(values, 0, variableValues, 2, size);
+        System.arraycopy(values, 0, variableValues, 0, size);
     }
     
     public void setBlockArgValues(IRubyObject[] blockArgValues, int size) {
@@ -139,8 +139,8 @@ public class DynamicScope {
      */
     public void getArgValues(IRubyObject[] args, int size) {
         lazy();
-        if(variableValues != null && args != null && variableValues.length>=(size+2)) {
-            System.arraycopy(variableValues, 2, args, 0, size);
+        if(variableValues != null && args != null && variableValues.length>=(size)) {
+            System.arraycopy(variableValues, 0, args, 0, size);
         }
     }
 
@@ -165,38 +165,6 @@ public class DynamicScope {
             
             variableValues = values;
         }
-    }
-
-    // FIXME: Depending on profiling we may want to cache information on location and depth of
-    // both $_ and/or $~ since in some situations they may happen a lot.  isDefined should be
-    // fairly cheap, but you never know...
-    
-    public void setLastLine(IRubyObject value) {
-        lazy();
-        int location = staticScope.isDefined("$_");
-        
-        setValue(location & 0xffff, value, location >> 16);
-    }
-    
-    public IRubyObject getLastLine() {
-        lazy();
-        int location = staticScope.isDefined("$_");
-
-        return getValue(location & 0xffff, location >> 16);
-    }
-
-    public void setBackRef(IRubyObject value) {
-        lazy();
-        int location = staticScope.isDefined("$~");
-        
-        setValue(location & 0xffff, value, location >> 16);
-    }
-    
-    public IRubyObject getBackRef() {
-        lazy();
-        int location = staticScope.isDefined("$~");
-        
-        return getValue(location & 0xffff, location >> 16); 
     }
     
     public DynamicScope getBindingScope() {

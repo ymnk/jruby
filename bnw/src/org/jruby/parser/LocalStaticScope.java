@@ -40,12 +40,10 @@ import org.jruby.runtime.DynamicScope;
 
 public class LocalStaticScope extends StaticScope {
     private static final long serialVersionUID = 2204064248888411628L;
+    private static final String[] NO_NAMES = new String[0];
 
     public LocalStaticScope(StaticScope enclosingScope) {
-        super(enclosingScope);
-        
-        addVariable("$~");
-        addVariable("$_");
+        this(enclosingScope, NO_NAMES);
     }
 
     public LocalStaticScope(StaticScope enclosingScope, String[] names) {
@@ -64,21 +62,7 @@ public class LocalStaticScope extends StaticScope {
      * @see org.jruby.parser.StaticScope#getAllNamesInScope()
      */
     public String[] getAllNamesInScope(DynamicScope dynamicScope) {
-        String[] variables = getVariables();
-        List resultList = new ArrayList();
-
-        // We start at two since we know $_ and $~ are there and they are special and not
-        // what Ruby considers a local name.  BTW- We always add $~ and $_ so we know variables
-        // cannot be null.
-        for (int i = 2; i < variables.length; i++) {
-            if (dynamicScope.getValue(i, 0) != null) resultList.add(variables[i]);
-        }
-        int localNamesSize = resultList.size();
-        
-        String[] names = new String[localNamesSize];
-        resultList.toArray(names);
-        
-        return names;
+        return getVariables();
     }
     
     public AssignableNode assign(ISourcePosition position, String name, Node value, 

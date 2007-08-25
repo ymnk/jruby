@@ -37,7 +37,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import edu.emory.mathcs.backport.java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.jruby.evaluator.EvaluationState;
 import org.jruby.exceptions.JumpException;
 import org.jruby.internal.runtime.methods.DynamicMethod;
@@ -437,7 +437,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     }
 
     public boolean isKindOf(RubyModule type) {
-        return getMetaClass().hasModuleInHierarchy(type);
+        return type.kindOf.isKindOf(this, type);
     }
 
     /** rb_singleton_class
@@ -666,9 +666,20 @@ public class RubyObject implements Cloneable, IRubyObject {
     	return variable == null ? getRuntime().getNil() : variable;
     }
 
-    public IRubyObject getInstanceVariable(final String name) {
+    public IRubyObject instance_variable_defined_p(IRubyObject var) {
+    	String varName = var.asSymbol();
+
+    	if (!IdUtil.isInstanceVariable(varName)) {
+    		throw getRuntime().newNameError("`" + varName + "' is not allowable as an instance variable name", varName);
+    	}
+
+    	IRubyObject variable = getInstanceVariable(varName);
+
+        return (variable != null) ? getRuntime().getTrue() : getRuntime().getFalse();
+    }
+
+    public IRubyObject getInstanceVariable(String name) {
         return (IRubyObject) getRegistry().getInstanceVariable(this, name);
-        //return (IRubyObject) getInstanceVariables().get(name);
     }
 
     public IRubyObject fastGetInstanceVariable(final String name) {
@@ -1317,7 +1328,7 @@ public class RubyObject implements Cloneable, IRubyObject {
      */
     public RubyBoolean kind_of(IRubyObject type) {
         // TODO: Generalize this type-checking code into IRubyObject helper.
-        if (!type.isKindOf(getRuntime().getModule())) {
+        if (!(type instanceof RubyModule)) {
             // TODO: newTypeError does not offer enough for ruby error string...
             throw getRuntime().newTypeError(type, getRuntime().getModule());
         }

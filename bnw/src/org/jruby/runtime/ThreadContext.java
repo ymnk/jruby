@@ -36,7 +36,6 @@ package org.jruby.runtime;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyClass;
-import org.jruby.RubyMatchData;
 import org.jruby.RubyModule;
 import org.jruby.RubyThread;
 import org.jruby.bnw.CommonMetaClass;
@@ -241,16 +240,16 @@ public final class ThreadContext {
         this.thread = thread;
     }
     
-    public IRubyObject getLastline() {
-        IRubyObject value = getCurrentScope().getLastLine();
-        
-        // DynamicScope does not preinitialize these values since they are virtually never used.
-        return value == null ? runtime.getNil() : value;
-    }
-    
-    public void setLastline(IRubyObject value) {
-        getCurrentScope().setLastLine(value);
-    }
+//    public IRubyObject getLastline() {
+//        IRubyObject value = getCurrentScope().getLastLine();
+//        
+//        // DynamicScope does not preinitialize these values since they are virtually never used.
+//        return value == null ? runtime.getNil() : value;
+//    }
+//    
+//    public void setLastline(IRubyObject value) {
+//        getCurrentScope().setLastLine(value);
+//    }
     
     //////////////////// CATCH MANAGEMENT ////////////////////////
     private void expandCatchIfNecessary() {
@@ -390,19 +389,19 @@ public final class ThreadContext {
         sourcePosition = position;
     }
     
-    public IRubyObject getBackref() {
-        IRubyObject value = getCurrentScope().getBackRef();
-        
-        // DynamicScope does not preinitialize these values since they are virtually never used.
-        return value == null ? runtime.getNil() : value;
-    }
-    
-    public void setBackref(IRubyObject backref) {
-        if (!(backref instanceof RubyMatchData) && !backref.isNil()) {
-            throw runtime.newTypeError(backref, runtime.getMatchData());
-        }
-        getCurrentScope().setBackRef(backref);
-    }
+//    public IRubyObject getBackref() {
+//        IRubyObject value = getCurrentScope().getBackRef();
+//        
+//        // DynamicScope does not preinitialize these values since they are virtually never used.
+//        return value == null ? runtime.getNil() : value;
+//    }
+//    
+//    public void setBackref(IRubyObject backref) {
+//        if (!(backref instanceof RubyMatchData) && !backref.isNil()) {
+//            throw runtime.newTypeError(backref, runtime.getClass("MatchData"));
+//        }
+//        getCurrentScope().setBackRef(backref);
+//    }
     
     public Visibility getCurrentVisibility() {
         return getCurrentFrame().getVisibility();
@@ -626,12 +625,18 @@ public final class ThreadContext {
         getCurrentFrame().setSelf(runtime.getTopSelf());
     }
     
-    public void preCompiledClass(RubyModule type) {
+    public void preCompiledClass(RubyModule type, String[] scopeNames) {
         pushRubyClass(type);
+        pushFrameCopy();
+        getCurrentFrame().setVisibility(Visibility.PUBLIC);
+        StaticScope staticScope = new LocalStaticScope(getCurrentScope().getStaticScope(), scopeNames);
+        pushScope(new DynamicScope(staticScope, null));
     }
     
     public void postCompiledClass() {
+        popScope();
         popRubyClass();
+        popFrame();
     }
     
     public void preScopeNode(StaticScope staticScope) {

@@ -67,8 +67,11 @@ test_array_subclass_behavior
 test_autoload
 test_backquote
 test_big_decimal
+test_bignum
 test_block
+test_cache_map_leak
 test_case
+test_class
 test_comparable
 test_core_arities
 test_date_time
@@ -92,10 +95,11 @@ test_process
 test_parsing
 test_string_java_bytes
 test_string_printf
+test_string_sub
 test_string_to_number
 test_symbol
 test_thread
-test_trace_func
+#test_trace_func
 test_zlib
 test_yaml
 

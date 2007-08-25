@@ -43,8 +43,30 @@ JavaUtilities.extend_proxy('java.util.Collection') {
   def length
     self.size
   end
+  def join(*args)
+    self.to_a.join(*args)
+  end
 }
 
+JavaUtilities.extend_proxy('java.util.Enumeration') {
+  include Enumerable
+  
+  def each
+    while (has_more_elements)
+      yield next_element
+    end
+  end
+}
+
+JavaUtilities.extend_proxy('java.util.Iterator') {
+  include Enumerable
+  
+  def each
+    while (has_next)
+      yield self.next
+    end
+  end
+}
 
 JavaUtilities.extend_proxy('java.util.List') {
   def [](ix)

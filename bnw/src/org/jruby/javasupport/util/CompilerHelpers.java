@@ -10,6 +10,7 @@ import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
 import org.jruby.RubyProc;
+import org.jruby.ast.util.ArgsUtil;
 import org.jruby.evaluator.EvaluationState;
 import org.jruby.internal.runtime.methods.CallConfiguration;
 import org.jruby.internal.runtime.methods.DynamicMethod;
@@ -23,6 +24,7 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.CompiledBlock;
 import org.jruby.runtime.CompiledBlockCallback;
+import org.jruby.runtime.CompiledSharedScopeBlock;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.MethodFactory;
 import org.jruby.runtime.ThreadContext;
@@ -37,13 +39,19 @@ import org.jruby.util.ByteList;
  */
 public class CompilerHelpers {
     public static CompiledBlock createBlock(ThreadContext context, IRubyObject self, int arity, 
-            String[] staticScopeNames, CompiledBlockCallback callback) {
+            String[] staticScopeNames, CompiledBlockCallback callback, boolean hasMultipleArgsHead, int argsNodeId) {
         StaticScope staticScope = 
             new BlockStaticScope(context.getCurrentScope().getStaticScope(), staticScopeNames);
         staticScope.determineModule();
         
         return new CompiledBlock(context, self, Arity.createArity(arity), 
-                new DynamicScope(staticScope, context.getCurrentScope()), callback);
+                new DynamicScope(staticScope, context.getCurrentScope()), callback, hasMultipleArgsHead, argsNodeId);
+    }
+    public static CompiledSharedScopeBlock createSharedScopeBlock(ThreadContext context, IRubyObject self, int arity, 
+            CompiledBlockCallback callback, boolean hasMultipleArgsHead, int argsNodeId) {
+        
+        return new CompiledSharedScopeBlock(context, self, Arity.createArity(arity), 
+                context.getCurrentScope(), callback, hasMultipleArgsHead, argsNodeId);
     }
     
     public static IRubyObject def(ThreadContext context, IRubyObject self, Class compiledClass, String name, String javaName, String[] scopeNames,
@@ -144,6 +152,13 @@ public class CompilerHelpers {
     public static RubyArray ensureRubyArray(IRubyObject value) {
         if (!(value instanceof RubyArray)) {
             value = RubyArray.newArray(value.getRuntime(), value);
+        }
+        return (RubyArray) value;
+    }
+
+    public static RubyArray ensureMultipleAssignableRubyArray(Ruby runtime, IRubyObject value, boolean masgnHasHead) {
+        if (!(value instanceof RubyArray)) {
+            value = ArgsUtil.convertToRubyArray(runtime, value, masgnHasHead);
         }
         return (RubyArray) value;
     }

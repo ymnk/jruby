@@ -59,7 +59,13 @@ public class RubyNumeric extends RubyObject {
         numeric.defineFastMethod("singleton_method_added", callbackFactory.getFastMethod("sadded",
                 RubyKernel.IRUBY_OBJECT));
 
-        numeric.includeModule(runtime.fastGetModule("Comparable"));
+        numeric.kindOf = new RubyModule.KindOf() {
+                public boolean isKindOf(IRubyObject obj, RubyModule type) {
+                    return obj instanceof RubyNumeric;
+                }
+            };
+
+        numeric.includeModule(runtime.getModule("Comparable"));
 
         numeric.defineFastMethod("initialize_copy", callbackFactory.getFastMethod("init_copy", RubyKernel.IRUBY_OBJECT));
         numeric.defineFastMethod("coerce", callbackFactory.getFastMethod("coerce", RubyKernel.IRUBY_OBJECT));

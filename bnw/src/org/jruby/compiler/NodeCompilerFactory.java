@@ -55,6 +55,7 @@ import org.jruby.ast.DVarNode;
 import org.jruby.ast.DefinedNode;
 import org.jruby.ast.DefnNode;
 import org.jruby.ast.DotNode;
+import org.jruby.ast.EnsureNode;
 import org.jruby.ast.EvStrNode;
 import org.jruby.ast.FCallNode;
 import org.jruby.ast.FixnumNode;
@@ -98,6 +99,22 @@ import org.jruby.runtime.CallType;
 import org.jruby.util.ByteList;
 import org.jruby.exceptions.JumpException;
 import org.jruby.RubyMatchData;
+import org.jruby.ast.ArgsCatNode;
+import org.jruby.ast.CaseNode;
+import org.jruby.ast.ClassNode;
+import org.jruby.ast.DRegexpNode;
+import org.jruby.ast.DSymbolNode;
+import org.jruby.ast.DXStrNode;
+import org.jruby.ast.ForNode;
+import org.jruby.ast.MultipleAsgnNode;
+import org.jruby.ast.StarNode;
+import org.jruby.ast.ToAryNode;
+import org.jruby.ast.UndefNode;
+import org.jruby.ast.UntilNode;
+import org.jruby.ast.VAliasNode;
+import org.jruby.ast.WhenNode;
+import org.jruby.ast.XStrNode;
+import org.jruby.runtime.builtin.IRubyObject;
 
 /**
  *
@@ -118,6 +135,9 @@ public class NodeCompilerFactory {
             break;
         case NodeTypes.ANDNODE:
             compileAnd(node, context);
+            break;
+        case NodeTypes.ARGSCATNODE:
+            compileArgsCat(node, context);
             break;
         case NodeTypes.ARRAYNODE:
             compileArray(node, context);
@@ -140,8 +160,10 @@ public class NodeCompilerFactory {
         case NodeTypes.CALLNODE:
             compileCall(node, context);
             break;
+        case NodeTypes.CASENODE:
+            compileCase(node, context);
+            break;
         case NodeTypes.CLASSNODE:
-            if (SAFE) throw new NotCompilableException("Can't compile class definitions safely: " + node);
             compileClass(node, context);
             break;
         case NodeTypes.CLASSVARNODE:
@@ -171,11 +193,23 @@ public class NodeCompilerFactory {
         case NodeTypes.DOTNODE:
             compileDot(node, context);
             break;
+        case NodeTypes.DREGEXPNODE:
+            compileDRegexp(node, context);
+            break;
         case NodeTypes.DSTRNODE:
             compileDStr(node, context);
             break;
+        case NodeTypes.DSYMBOLNODE:
+            compileDSymbol(node, context);
+            break;
         case NodeTypes.DVARNODE:
             compileDVar(node, context);
+            break;
+        case NodeTypes.DXSTRNODE:
+            compileDXStr(node, context);
+            break;
+        case NodeTypes.ENSURENODE:
+            compileEnsureNode(node, context);
             break;
         case NodeTypes.EVSTRNODE:
             compileEvStr(node, context);
@@ -191,6 +225,9 @@ public class NodeCompilerFactory {
             break;
         case NodeTypes.FLOATNODE:
             compileFloat(node, context);
+            break;
+        case NodeTypes.FORNODE:
+            compileFor(node, context);
             break;
         case NodeTypes.GLOBALASGNNODE:
             compileGlobalAsgn(node, context);
@@ -232,6 +269,9 @@ public class NodeCompilerFactory {
             if (SAFE) throw new NotCompilableException("Can't compile module definitions safely: " + node);
             compileModule(node, context);
             break;
+        case NodeTypes.MULTIPLEASGNNODE:
+            compileMultipleAsgn(node, context);
+            break;
         case NodeTypes.NEWLINENODE:
             compileNewline(node, context);
             break;
@@ -253,11 +293,9 @@ public class NodeCompilerFactory {
         case NodeTypes.OPASGNANDNODE:
             compileOpAsgnAnd(node, context);
             break;
-            /* For some reason this compiler is DEAD slow right now...
         case NodeTypes.OPASGNORNODE:
             compileOpAsgnOr(node, context);
             break;
-            */
         case NodeTypes.ORNODE:
             compileOr(node, context);
             break;
@@ -274,27 +312,40 @@ public class NodeCompilerFactory {
             compileSelf(node, context);
             break;
         case NodeTypes.SPLATNODE:
-            if (SAFE) throw new NotCompilableException("Can't compile node safely: " + node);
             compileSplat(node, context);
             break;
         case NodeTypes.STRNODE:
             compileStr(node, context);
             break;
         case NodeTypes.SVALUENODE:
-            if (SAFE) throw new NotCompilableException("Can't compile node safely: " + node);
             compileSValue(node, context);
             break;
         case NodeTypes.SYMBOLNODE:
             compileSymbol(node, context);
             break;
+        case NodeTypes.TOARYNODE:
+            compileToAry(node, context);
+            break;
         case NodeTypes.TRUENODE:
             compileTrue(node, context);
+            break;
+        case NodeTypes.UNDEFNODE:
+            compileUndef(node, context);
+            break;
+        case NodeTypes.UNTILNODE:
+            compileUntil(node, context);
+            break;
+        case NodeTypes.VALIASNODE:
+            compileVAlias(node, context);
             break;
         case NodeTypes.VCALLNODE:
             compileVCall(node, context);
             break;
         case NodeTypes.WHILENODE:
             compileWhile(node, context);
+            break;
+        case NodeTypes.XSTRNODE:
+            compileXStr(node, context);
             break;
         case NodeTypes.YIELDNODE:
             compileYield(node, context);
@@ -309,22 +360,41 @@ public class NodeCompilerFactory {
     
     public static void compileArguments(Node node, MethodCompiler context) {
         switch (node.nodeId) {
+        case NodeTypes.ARGSCATNODE:
+            compileArgsCatArguments(node, context);
+            break;
         case NodeTypes.ARRAYNODE:
             compileArrayArguments(node, context);
+            break;
+        case NodeTypes.SPLATNODE:
+            compileSplatArguments(node, context);
             break;
         default:
             throw new NotCompilableException("Can't compile argument node: " + node);
         }
     }
     
-    public static NodeCompiler getAssignmentCompiler(Node node) {
+    public static void compileAssignment(Node node, MethodCompiler context) {
         switch (node.nodeId) {
-            // disabled for now; incomplete
-        //case NodeTypes.MULTIPLEASGNNODE:
-        //    return new MultipleAsgnNodeAsgnCompiler();
+        case NodeTypes.DASGNNODE:
+            compileDAsgnAssignment(node, context);
+            break;
+        case NodeTypes.CLASSVARASGNNODE:
+            compileClassVarAsgn(node, context);
+            break;
+        case NodeTypes.INSTASGNNODE:
+            compileInstAsgnAssignment(node, context);
+            break;
+        case NodeTypes.LOCALASGNNODE:
+            compileLocalAsgnAssignment(node, context);
+            break;
+        // working for straight-up assignment, but not yet for blocks; disabled in iter compilation
+        case NodeTypes.MULTIPLEASGNNODE:
+            compileMultipleAsgnAssignment(node, context);
+            break;
+        default:    
+            throw new NotCompilableException("Can't compile assignment node: " + node);
         }
-        
-        throw new NotCompilableException("Can't compile assignment node: " + node);
     }
     
     public static YARVNodesCompiler getYARVCompiler() {
@@ -388,6 +458,18 @@ public class NodeCompilerFactory {
         
         context.createObjectArray(arrayNode.childNodes().toArray(), callback);
         context.createNewArray(arrayNode.isLightweight());
+    }
+    
+    public static void compileArgsCat(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        ArgsCatNode argsCatNode = (ArgsCatNode)node;
+        
+        compile(argsCatNode.getFirstNode(), context);
+        context.ensureRubyArray();
+        compile(argsCatNode.getSecondNode(), context);
+        context.splatCurrentValue();
+        context.concatArrays();
     }
     
     public static void compileAttrAssign(Node node, MethodCompiler context) {
@@ -493,8 +575,166 @@ public class NodeCompilerFactory {
         }
     }
     
+    public static void compileCase(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        CaseNode caseNode = (CaseNode)node;
+        
+        boolean hasCase = false;
+        if (caseNode.getCaseNode() != null) {
+            compile(caseNode.getCaseNode(), context);
+            hasCase = true;
+        }
+
+        context.pollThreadEvents();
+
+        Node firstWhenNode = caseNode.getFirstWhenNode();
+        compileWhen(firstWhenNode, context, hasCase);
+    }
+    
+    public static void compileWhen(Node node, MethodCompiler context, final boolean hasCase) {
+        if (node == null) {
+            // reached the end of the when chain, pop the case (if provided) and we're done
+            if (hasCase) {
+                context.consumeCurrentValue();
+            }
+            context.loadNil();
+            return;
+        }
+        
+        if (!(node instanceof WhenNode)) {
+            if (hasCase) {
+                // case value provided and we're going into "else"; consume it.
+                context.consumeCurrentValue();
+            }
+            compile(node, context);
+            return;
+        }
+        
+        WhenNode whenNode = (WhenNode)node;
+        
+        if (whenNode.getExpressionNodes() instanceof ArrayNode) {
+            ArrayNode arrayNode = (ArrayNode)whenNode.getExpressionNodes();
+            
+            compileMultiArgWhen(whenNode, arrayNode, 0, context, hasCase);
+        } else {
+            if (hasCase) {
+                context.duplicateCurrentValue();
+            }
+            
+            // evaluate the when argument
+            compile(whenNode.getExpressionNodes(), context);
+
+            final WhenNode currentWhen = whenNode;
+
+            if (hasCase) {
+                // we have a case value, call === on the condition value passing the case value
+                context.swapValues();
+                context.createObjectArray(1);
+                context.getInvocationCompiler().invokeEqq();
+            }
+
+            // check if the condition result is true, branch appropriately
+            BranchCallback trueBranch = new BranchCallback() {
+                public void branch(MethodCompiler context) {
+                    // consume extra case value, we won't need it anymore
+                    if (hasCase) {
+                        context.consumeCurrentValue();
+                    }
+
+                    if (currentWhen.getBodyNode() != null) {
+                        NodeCompilerFactory.compile(currentWhen.getBodyNode(), context);
+                    } else {
+                        context.loadNil();
+                    }
+                }
+            };
+
+            BranchCallback falseBranch = new BranchCallback() {
+                public void branch(MethodCompiler context) {
+                    // proceed to the next when
+                    NodeCompilerFactory.compileWhen(currentWhen.getNextCase(), context, hasCase);
+                }
+            };
+
+            context.performBooleanBranch(trueBranch, falseBranch);
+        }
+    }
+    
+    public static void compileMultiArgWhen(
+            final WhenNode whenNode, final ArrayNode expressionsNode, final int conditionIndex, MethodCompiler context, final boolean hasCase) {
+        
+        if (conditionIndex >= expressionsNode.size()) {
+            // done with conditions, continue to next when in the chain
+            compileWhen(whenNode.getNextCase(), context, hasCase);
+            return;
+        }
+        
+        Node tag = expressionsNode.get(conditionIndex);
+
+        // need to add in position stuff some day :)
+        //context.setPosition(tag.getPosition());
+
+        // Ruby grammar has nested whens in a case body because of
+        // productions case_body and when_args.
+        if (tag instanceof WhenNode) {
+            throw new NotCompilableException("Can't compile nested when nodes at " + tag.getPosition());
+            //RubyArray expressions = (RubyArray) evalInternal(runtime,context, ((WhenNode) tag)
+            //                .getExpressionNodes(), self, aBlock);
+
+            //for (int j = 0,k = expressions.getLength(); j < k; j++) {
+            //    IRubyObject condition = expressions.eltInternal(j);
+
+            //    if ((expression != null && condition.callMethod(context, MethodIndex.OP_EQQ, "===", expression)
+            //            .isTrue())
+            //            || (expression == null && condition.isTrue())) {
+            //        node = ((WhenNode) firstWhenNode).getBodyNode();
+            //        return evalInternal(runtime, context, node, self, aBlock);
+            //    }
+            //}
+            //continue;
+        }
+
+        if (hasCase) {
+            context.duplicateCurrentValue();
+        }
+        // evaluate the when argument
+        compile(tag, context);
+
+        if (hasCase) {
+            // we have a case value, call === on the condition value passing the case value
+            context.swapValues();
+            context.createObjectArray(1);
+            context.getInvocationCompiler().invokeEqq();
+        }
+
+        // check if the condition result is true, branch appropriately
+        BranchCallback trueBranch = new BranchCallback() {
+            public void branch(MethodCompiler context) {
+                // consume extra case value, we won't need it anymore
+                if (hasCase) {
+                    context.consumeCurrentValue();
+                }
+
+                if (whenNode.getBodyNode() != null) {
+                    NodeCompilerFactory.compile(whenNode.getBodyNode(), context);
+                } else {
+                    context.loadNil();
+                }
+            }
+        };
+
+        BranchCallback falseBranch = new BranchCallback() {
+            public void branch(MethodCompiler context) {
+                // proceed to the next when
+                NodeCompilerFactory.compileMultiArgWhen(whenNode, expressionsNode, conditionIndex + 1, context, hasCase);
+            }
+        };
+
+        context.performBooleanBranch(trueBranch, falseBranch);
+    }
+    
     public static void compileClass(Node node, MethodCompiler context) {
-        /** needs new work
         context.lineNumber(node.getPosition());
         
         final ClassNode classNode = (ClassNode)node;
@@ -539,7 +779,7 @@ public class NodeCompilerFactory {
             }
         };
         
-        context.defineClass(classNode.getCPath().getName(), classNode.getScope(), superCallback, pathCallback, bodyCallback); */
+        context.defineClass(classNode.getCPath().getName(), classNode.getScope(), superCallback, pathCallback, bodyCallback);
     }
 
     public static void compileClassVar(Node node, MethodCompiler context) {
@@ -551,12 +791,19 @@ public class NodeCompilerFactory {
     }
 
     public static void compileClassVarAsgn(Node node, MethodCompiler context) {
-        context.lineNumber(node.getPosition());
-        
         ClassVarAsgnNode classVarAsgnNode = (ClassVarAsgnNode)node;
         
         // FIXME: probably more efficient with a callback
         compile(classVarAsgnNode.getValueNode(), context);
+        
+        compileClassVarAsgnAssignment(node, context);
+    }
+
+    public static void compileClassVarAsgnAssignment(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        ClassVarAsgnNode classVarAsgnNode = (ClassVarAsgnNode)node;
+        
         context.assignClassVariable(classVarAsgnNode.getName());
     }
     
@@ -635,17 +882,17 @@ public class NodeCompilerFactory {
                     context.outDefined();
                 }
             };
-        context.protect(reg,out);
-        context.nullToNil();
+        context.protect(reg,out,String.class);
     }
 
     public static void compileDefined(final Node node, MethodCompiler context) {
         compileGetDefinitionBase(((DefinedNode)node).getExpressionNode(), context);
+        context.stringOrNil();
     }
 
     public static void compileGetArgumentDefinition(final Node node, MethodCompiler context, String type) {
         if (node == null) {
-            context.createNewString(ByteList.create(type));
+            context.pushString(type);
         } else if(node instanceof ArrayNode) {
             Object endToken = context.getNewEnding();
             for (int i = 0; i < ((ArrayNode)node).size(); i++) {
@@ -653,7 +900,7 @@ public class NodeCompilerFactory {
                 compileGetDefinition(iterNode, context);
                 context.ifNull(endToken);
             }
-            context.createNewString(ByteList.create(type));
+            context.pushString(type);
             Object realToken = context.getNewEnding();
             context.go(realToken);
             context.setEnding(endToken);
@@ -663,7 +910,7 @@ public class NodeCompilerFactory {
             compileGetDefinition(node, context);
             Object endToken = context.getNewEnding();
             context.ifNull(endToken);
-            context.createNewString(ByteList.create(type));
+            context.pushString(type);
             Object realToken = context.getNewEnding();
             context.go(realToken);
             context.setEnding(endToken);
@@ -677,14 +924,14 @@ public class NodeCompilerFactory {
         case NodeTypes.CLASSVARASGNNODE: case NodeTypes.CLASSVARDECLNODE: case NodeTypes.CONSTDECLNODE:
         case NodeTypes.DASGNNODE: case NodeTypes.GLOBALASGNNODE: case NodeTypes.LOCALASGNNODE:
         case NodeTypes.MULTIPLEASGNNODE: case NodeTypes.OPASGNNODE: case NodeTypes.OPELEMENTASGNNODE:
-            context.createNewString(ByteList.create("assignment"));
+            context.pushString("assignment");
             break;
         case NodeTypes.BACKREFNODE:
             context.backref();
             context.isInstanceOf(RubyMatchData.class, 
                                  new BranchCallback(){
                 public void branch(MethodCompiler context) {
-                    context.createNewString(ByteList.create("$" + ((BackRefNode) node).getType()));
+                    context.pushString("$" + ((BackRefNode) node).getType());
                 }},
                                  new BranchCallback(){
                                      public void branch(MethodCompiler context) {
@@ -692,28 +939,28 @@ public class NodeCompilerFactory {
                                      }});
             break;
         case NodeTypes.DVARNODE:
-            context.createNewString(ByteList.create("local-variable(in-block)"));
+            context.pushString("local-variable(in-block)");
             break;
         case NodeTypes.FALSENODE:
-            context.createNewString(ByteList.create("false"));
+            context.pushString("false");
             break;
         case NodeTypes.TRUENODE:
-            context.createNewString(ByteList.create("true"));
+            context.pushString("true");
             break;
         case NodeTypes.LOCALVARNODE:
-            context.createNewString(ByteList.create("local-variable"));
+            context.pushString("local-variable");
             break;
         case NodeTypes.MATCH2NODE: case NodeTypes.MATCH3NODE:
-            context.createNewString(ByteList.create("method"));
+            context.pushString("method");
             break;
         case NodeTypes.NILNODE:
-            context.createNewString(ByteList.create("nil"));
+            context.pushString("nil");
             break;
         case NodeTypes.NTHREFNODE:
             context.isCaptured(((NthRefNode) node).getMatchNumber(),
                                new BranchCallback(){
                                    public void branch(MethodCompiler context) {
-                                       context.createNewString(ByteList.create("$" + ((NthRefNode) node).getMatchNumber()));
+                                       context.pushString("$" + ((NthRefNode) node).getMatchNumber());
                                    }},
                                new BranchCallback(){
                                    public void branch(MethodCompiler context) {
@@ -721,14 +968,14 @@ public class NodeCompilerFactory {
                                    }});
             break;
         case NodeTypes.SELFNODE:
-            context.createNewString(ByteList.create("self"));
+            context.pushString("self");
             break;
         case NodeTypes.VCALLNODE:
             context.loadSelf();
             context.isMethodBound(((VCallNode)node).getName(),
                                   new BranchCallback(){
                                       public void branch(MethodCompiler context){
-                                          context.createNewString(ByteList.create("method"));
+                                          context.pushString("method");
                                       }
                                   },
                                   new BranchCallback(){
@@ -740,7 +987,7 @@ public class NodeCompilerFactory {
         case NodeTypes.YIELDNODE:
             context.hasBlock(new BranchCallback(){
                     public void branch(MethodCompiler context){
-                        context.createNewString(ByteList.create("yield"));
+                        context.pushString("yield");
                     }
                 },
                 new BranchCallback(){
@@ -753,7 +1000,7 @@ public class NodeCompilerFactory {
             context.isGlobalDefined(((GlobalVarNode) node).getName(),
                                     new BranchCallback(){
                                         public void branch(MethodCompiler context){
-                                            context.createNewString(ByteList.create("global-variable"));
+                                            context.pushString("global-variable");
                                         }
                                     },
                                     new BranchCallback(){
@@ -766,7 +1013,7 @@ public class NodeCompilerFactory {
             context.isInstanceVariableDefined(((InstVarNode) node).getName(),
                                               new BranchCallback(){
                                                   public void branch(MethodCompiler context){
-                                                      context.createNewString(ByteList.create("instance-variable"));
+                                                      context.pushString("instance-variable");
                                                   }
                                               },
                                               new BranchCallback(){
@@ -779,7 +1026,7 @@ public class NodeCompilerFactory {
             context.isConstantDefined(((ConstNode) node).getName(),
                                       new BranchCallback(){
                                           public void branch(MethodCompiler context){
-                                              context.createNewString(ByteList.create("constant"));
+                                              context.pushString("constant");
                                           }
                                       },
                                       new BranchCallback(){
@@ -820,12 +1067,12 @@ public class NodeCompilerFactory {
                 };
             BranchCallback isConstant = new BranchCallback() {
                     public void branch(MethodCompiler context){
-                        context.createNewString(ByteList.create("constant"));
+                        context.pushString("constant");
                     }
                 };
             BranchCallback isMethod = new BranchCallback() {
                     public void branch(MethodCompiler context){
-                        context.createNewString(ByteList.create("method"));
+                        context.pushString("method");
                     }
                 };
             BranchCallback none = new BranchCallback() {
@@ -879,7 +1126,7 @@ public class NodeCompilerFactory {
                 new BranchCallback() {
                         public void branch(MethodCompiler context) {
                             context.pushNull();
-                        }});
+                        }}, String.class);
 
             //          context.swapValues();
             //context.consumeCurrentValue();
@@ -907,7 +1154,7 @@ public class NodeCompilerFactory {
                                       new BranchCallback() {
                                           public void branch(MethodCompiler context) {
                                               context.consumeCurrentValue();
-                                              context.createNewString(ByteList.create("class variable"));
+                                              context.pushString("class variable");
                                               context.go(ending);
                                           }},
                                       new BranchCallback() {
@@ -918,7 +1165,7 @@ public class NodeCompilerFactory {
                                       new BranchCallback() {
                                           public void branch(MethodCompiler context) {
                                               context.consumeCurrentValue();
-                                              context.createNewString(ByteList.create("class variable"));
+                                              context.pushString("class variable");
                                               context.go(ending);
                                           }},
                                       new BranchCallback() {
@@ -927,7 +1174,7 @@ public class NodeCompilerFactory {
             context.setEnding(third); //[RubyClass]
             context.getInstanceVariable("__attached__");  //[RubyClass]
             context.notIsModuleAndClassVarDefined(iVisited.getName(), failure); //[]
-            context.createNewString(ByteList.create("class variable"));
+            context.pushString("class variable");
             context.go(ending);
             context.setEnding(failure);
             context.pushNull();
@@ -949,7 +1196,7 @@ public class NodeCompilerFactory {
             context.superClass();
             context.ifNotSuperMethodBound(fail_easy);
 
-            context.createNewString(ByteList.create("super"));
+            context.pushString("super");
             context.go(ending);
             
             context.setEnding(fail2);
@@ -1031,7 +1278,7 @@ public class NodeCompilerFactory {
                 new BranchCallback() {
                         public void branch(MethodCompiler context) {
                             context.pushNull();
-                        }});
+                        }}, String.class);
 
             context.go(ending);
             context.setEnding(isnull);            
@@ -1047,9 +1294,9 @@ public class NodeCompilerFactory {
                         context.pushNull();
                     }
                 },JumpException.class, 
-                new BranchCallback(){public void branch(MethodCompiler context){context.pushNull();}});
+                new BranchCallback(){public void branch(MethodCompiler context){context.pushNull();}}, String.class);
             context.consumeCurrentValue();
-            context.createNewString(ByteList.create("expression"));
+            context.pushString("expression");
         }        
     }
 
@@ -1059,6 +1306,14 @@ public class NodeCompilerFactory {
         DAsgnNode dasgnNode = (DAsgnNode)node;
         
         compile(dasgnNode.getValueNode(), context);
+        
+        compileDAsgnAssignment(dasgnNode, context);
+    }
+
+    public static void compileDAsgnAssignment(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        DAsgnNode dasgnNode = (DAsgnNode)node;
         
         context.getVariableCompiler().assignLocalVariable(dasgnNode.getIndex(), dasgnNode.getDepth());
     }
@@ -1158,6 +1413,37 @@ public class NodeCompilerFactory {
         context.createNewRange(dotNode.isExclusive());
     }
     
+    public static void compileDRegexp(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+
+        final DRegexpNode dregexpNode = (DRegexpNode)node;
+        
+        ClosureCallback createStringCallback = new ClosureCallback() {
+            public void compile(MethodCompiler context) {
+                ArrayCallback dstrCallback = new ArrayCallback() {
+                public void nextValue(MethodCompiler context, Object sourceArray,
+                                      int index) {
+                        NodeCompilerFactory.compile(dregexpNode.get(index), context);
+                    }
+                };
+                context.createNewString(dstrCallback,dregexpNode.size());
+                context.toJavaString();
+            }
+        };
+   
+        int opts = dregexpNode.getOptions();
+        String lang = ((opts & 16) != 0) ? "n" : null;
+        if((opts & 48) == 48) { // param s
+            lang = "s";
+        } else if((opts & 32) == 32) { // param e
+            lang = "e";
+        } else if((opts & 64) != 0) { // param s
+            lang = "u";
+        }
+        
+        context.createNewRegexp(createStringCallback, opts, lang);
+    }
+    
     public static void compileDStr(Node node, MethodCompiler context) {
         context.lineNumber(node.getPosition());
 
@@ -1172,6 +1458,20 @@ public class NodeCompilerFactory {
         context.createNewString(dstrCallback,dstrNode.size());
     }
     
+    public static void compileDSymbol(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+
+        final DSymbolNode dsymbolNode = (DSymbolNode)node;
+        
+        ArrayCallback dstrCallback = new ArrayCallback() {
+                public void nextValue(MethodCompiler context, Object sourceArray,
+                                      int index) {
+                    compile(dsymbolNode.get(index), context);
+                }
+            };
+        context.createNewSymbol(dstrCallback,dsymbolNode.size());
+    }
+    
     public static void compileDVar(Node node, MethodCompiler context) {
         context.lineNumber(node.getPosition());
         
@@ -1180,6 +1480,50 @@ public class NodeCompilerFactory {
         context.getVariableCompiler().retrieveLocalVariable(dvarNode.getIndex(), dvarNode.getDepth());
     }
     
+    public static void compileDXStr(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+
+        final DXStrNode dxstrNode = (DXStrNode)node;
+        
+        final ArrayCallback dstrCallback = new ArrayCallback() {
+            public void nextValue(MethodCompiler context, Object sourceArray,
+                                  int index) {
+                compile(dxstrNode.get(index), context);
+            }
+        };
+        
+        ClosureCallback argsCallback = new ClosureCallback() {
+            public void compile(MethodCompiler context) {
+                context.createNewString(dstrCallback,dxstrNode.size());
+                context.createObjectArray(1);
+            }
+        };
+        
+        context.getInvocationCompiler().invokeDynamic("`", null, argsCallback, CallType.FUNCTIONAL, null, false);
+    }
+    
+    public static void compileEnsureNode(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        final EnsureNode ensureNode = (EnsureNode)node;
+        
+        if(ensureNode.getEnsureNode() != null) {
+            context.protect(new BranchCallback() {
+                    public void branch(MethodCompiler context) {
+                        compile(ensureNode.getBodyNode(), context);
+                    }
+                },
+                new BranchCallback() {
+                    public void branch(MethodCompiler context) {
+                        compile(ensureNode.getEnsureNode(), context);
+                        context.consumeCurrentValue();
+                    }
+                }, IRubyObject.class);
+        } else {
+            compile(ensureNode.getBodyNode(), context);
+        }
+    }
+
     public static void compileEvStr(Node node, MethodCompiler context) {
         context.lineNumber(node.getPosition());
         
@@ -1254,6 +1598,71 @@ public class NodeCompilerFactory {
         FloatNode floatNode = (FloatNode)node;
         
         context.createNewFloat(floatNode.getValue());
+    }
+    
+    public static void compileFor(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        final ForNode forNode = (ForNode)node;
+        
+        ClosureCallback receiverCallback = new ClosureCallback() {
+            public void compile(MethodCompiler context) {
+                NodeCompilerFactory.compile(forNode.getIterNode(), context);
+            }
+        };
+           
+        final ClosureCallback closureArg = new ClosureCallback() {
+            public void compile(MethodCompiler context) {
+                compileForIter(forNode, context);
+            }
+        };
+
+        context.getInvocationCompiler().invokeDynamic("each", receiverCallback, null, CallType.NORMAL, closureArg, false);
+    }
+    
+    public static void compileForIter(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+
+        final ForNode forNode = (ForNode)node;
+
+        // create the closure class and instantiate it
+        final ClosureCallback closureBody = new ClosureCallback() {
+            public void compile(MethodCompiler context) {
+                if (forNode.getBodyNode() != null) {
+                    NodeCompilerFactory.compile(forNode.getBodyNode(), context);
+                } else {
+                    context.loadNil();
+                }
+            }
+        };
+
+        // create the closure class and instantiate it
+        final ClosureCallback closureArgs = new ClosureCallback() {
+            public void compile(MethodCompiler context) {
+                if (forNode.getVarNode() != null) {
+                    compileAssignment(forNode.getVarNode(), context);
+                }
+            }
+        };
+        
+        boolean hasMultipleArgsHead = false;
+        if (forNode.getVarNode() instanceof MultipleAsgnNode) {
+            hasMultipleArgsHead = ((MultipleAsgnNode)forNode.getVarNode()).getHeadNode() != null;
+        }
+        
+        int argsNodeId = 0;
+        if (forNode.getVarNode() != null) {
+            argsNodeId = forNode.getVarNode().nodeId;
+        }
+        
+        if (argsNodeId == 0) {
+            // no args, do not pass args processor
+            context.createNewForLoop(Arity.procArityOf(forNode.getVarNode()).getValue(),
+                    closureBody, null, hasMultipleArgsHead, argsNodeId);
+        } else {
+            context.createNewForLoop(Arity.procArityOf(forNode.getVarNode()).getValue(),
+                    closureBody, closureArgs, hasMultipleArgsHead, argsNodeId);
+        }
     }
     
     public static void compileGlobalAsgn(Node node, MethodCompiler context) {
@@ -1352,11 +1761,17 @@ public class NodeCompilerFactory {
     }
     
     public static void compileInstAsgn(Node node, MethodCompiler context) {
-        context.lineNumber(node.getPosition());
-        
         InstAsgnNode instAsgnNode = (InstAsgnNode)node;
         
         compile(instAsgnNode.getValueNode(), context);
+        
+        compileInstAsgnAssignment(node, context);
+    }
+    
+    public static void compileInstAsgnAssignment(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        InstAsgnNode instAsgnNode = (InstAsgnNode)node;
         context.assignInstanceVariable(instAsgnNode.getName());
     }
     
@@ -1388,12 +1803,29 @@ public class NodeCompilerFactory {
         final ClosureCallback closureArgs = new ClosureCallback() {
             public void compile(MethodCompiler context) {
                 if (iterNode.getVarNode() != null) {
-                    AssignmentCompiler.assign(iterNode.getVarNode(), 0, context);
+                    compileAssignment(iterNode.getVarNode(), context);
                 }
             }
         };
         
-        context.createNewClosure(iterNode.getScope(), Arity.procArityOf(iterNode.getVarNode()).getValue(), closureBody, closureArgs);
+        boolean hasMultipleArgsHead = false;
+        if (iterNode.getVarNode() instanceof MultipleAsgnNode) {
+            hasMultipleArgsHead = ((MultipleAsgnNode)iterNode.getVarNode()).getHeadNode() != null;
+        }
+        
+        int argsNodeId = 0;
+        if (iterNode.getVarNode() != null) {
+            argsNodeId = iterNode.getVarNode().nodeId;
+        }
+        
+        if (argsNodeId == 0) {
+            // no args, do not pass args processor
+            context.createNewClosure(iterNode.getScope(), Arity.procArityOf(iterNode.getVarNode()).getValue(),
+                    closureBody, null, hasMultipleArgsHead, argsNodeId);
+        } else {
+            context.createNewClosure(iterNode.getScope(), Arity.procArityOf(iterNode.getVarNode()).getValue(),
+                    closureBody, closureArgs, hasMultipleArgsHead, argsNodeId);
+        }
     }
 
     public static void compileLocalAsgn(Node node, MethodCompiler context) {
@@ -1402,6 +1834,15 @@ public class NodeCompilerFactory {
         LocalAsgnNode localAsgnNode = (LocalAsgnNode)node;
         
         compile(localAsgnNode.getValueNode(), context);
+        
+        context.getVariableCompiler().assignLocalVariable(localAsgnNode.getIndex(), localAsgnNode.getDepth());
+    }
+
+    public static void compileLocalAsgnAssignment(Node node, MethodCompiler context) {
+        // "assignment" means the value is already on the stack
+        context.lineNumber(node.getPosition());
+        
+        LocalAsgnNode localAsgnNode = (LocalAsgnNode)node;
         
         context.getVariableCompiler().assignLocalVariable(localAsgnNode.getIndex(), localAsgnNode.getDepth());
     }
@@ -1481,9 +1922,85 @@ public class NodeCompilerFactory {
         
         context.defineModule(moduleNode.getCPath().getName(), moduleNode.getScope(), pathCallback, bodyCallback); */
     }
+    
+    public static void compileMultipleAsgn(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        MultipleAsgnNode multipleAsgnNode = (MultipleAsgnNode)node;
+        
+        // FIXME: This is a little less efficient than it could be, since in the interpreter we avoid objectspace for these arrays
+        compile(multipleAsgnNode.getValueNode(), context);
+        
+        compileMultipleAsgnAssignment(node, context);
+    }
+    
+    public static void compileMultipleAsgnAssignment(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        MultipleAsgnNode multipleAsgnNode = (MultipleAsgnNode)node;
+        
+        context.ensureMultipleAssignableRubyArray(multipleAsgnNode.getHeadNode() != null);
+        
+        if (multipleAsgnNode.getHeadNode() != null) {
+            // normal items at the "head" of the masgn
+            ArrayCallback headAssignCallback = new ArrayCallback() {
+                public void nextValue(MethodCompiler context, Object sourceArray,
+                                      int index) {
+                    ListNode headNode = (ListNode)sourceArray;
+                    Node assignNode = headNode.get(index);
+                    
+                    // perform assignment for the next node
+                    compileAssignment(assignNode, context);
+                }
+            };
+            
+            // head items for which we've run out of assignable elements
+            ArrayCallback headNilCallback = new ArrayCallback() {
+                public void nextValue(MethodCompiler context, Object sourceArray,
+                                      int index) {
+                    ListNode headNode = (ListNode)sourceArray;
+                    Node assignNode = headNode.get(index);
+                    
+                    // perform assignment for the next node
+                    context.loadNil();
+                    compileAssignment(assignNode, context);
+                }
+            };
+
+            context.forEachInValueArray(0, multipleAsgnNode.getHeadNode().size(), multipleAsgnNode.getHeadNode(), headAssignCallback, headNilCallback);
+        }
+        
+        // FIXME: This needs to fit in somewhere
+        //if (callAsProc && iter.hasNext()) {
+        //    throw runtime.newArgumentError("Wrong # of arguments (" + valueLen + " for " + varLen + ")");
+        //}
+        
+        { // "args node" handling
+            Node argsNode = multipleAsgnNode.getArgsNode();
+            if (argsNode != null) {
+                throw new NotCompilableException("Can't compile multiple assignment with special args");
+//                if (argsNode instanceof StarNode) {
+//                    // no check for '*'
+//                } else {
+//                    BranchCallback trueBranch = new BranchCallback() {
+//                        public void branch(MethodCompiler context) {
+//                            
+//                        }
+//                    };
+//                    
+//                    // check if the number of variables is exceeded by the number of values in the array
+//                    // the number of values
+//                    context.loadRubyArraySize();
+//                    context.loadInteger(varLen);
+//                    //context.performLTBranch(trueBranch, falseBranch);
+//                } 
+            }
+        }
+    }
 
     public static void compileNewline(Node node, MethodCompiler context) {
         // TODO: add trace call?
+        context.lineNumber(node.getPosition());
         
         NewlineNode newlineNode = (NewlineNode)node;
         
@@ -1553,7 +2070,7 @@ public class NodeCompilerFactory {
 
         compileGetDefinitionBase(orNode.getFirstNode(), context);
 
-        context.isNil(new BranchCallback() {
+        context.isNull(new BranchCallback() {
                 public void branch(MethodCompiler context) {
                     compile(orNode.getSecondNode(), context);
                 }}, new BranchCallback() {
@@ -1693,7 +2210,11 @@ public class NodeCompilerFactory {
         
         ReturnNode returnNode = (ReturnNode)node;
         
-        compile(returnNode.getValueNode(), context);
+        if (returnNode.getValueNode() != null) {
+            compile(returnNode.getValueNode(), context);
+        } else {
+            context.loadNil();
+        }
         
         context.performReturn();
     }
@@ -1760,12 +2281,63 @@ public class NodeCompilerFactory {
         context.createNewSymbol(((SymbolNode)node).getName());
     }    
     
+    public static void compileToAry(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+
+        ToAryNode toAryNode = (ToAryNode)node;
+
+        compile(toAryNode.getValue(), context);
+
+        context.aryToAry();
+    }    
+    
     public static void compileTrue(Node node, MethodCompiler context) {
         context.lineNumber(node.getPosition());
         
         context.loadTrue();
         
         context.pollThreadEvents();
+    }
+    
+    public static void compileUndef(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        context.undefMethod(((UndefNode)node).getName());
+    }
+    
+    public static void compileUntil(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        final UntilNode untilNode = (UntilNode)node;
+        
+        BranchCallback condition = new BranchCallback() {
+            public void branch(MethodCompiler context) {
+                compile(untilNode.getConditionNode(), context);
+                context.negateCurrentValue();
+            }
+        };
+        
+        BranchCallback body = new BranchCallback() {
+            public void branch(MethodCompiler context) {
+                if (untilNode.getBodyNode() == null) {
+                    context.loadNil();
+                    return;
+                }
+                compile(untilNode.getBodyNode(), context);
+            }
+        };
+        
+        context.performBooleanLoop(condition, body, untilNode.evaluateAtStart());
+        
+        context.pollThreadEvents();
+    }
+
+    public static void compileVAlias(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        VAliasNode valiasNode = (VAliasNode)node;
+        
+        context.aliasGlobal(valiasNode.getNewName(), valiasNode.getOldName());
     }
 
     public static void compileVCall(Node node, MethodCompiler context) {
@@ -1808,6 +2380,20 @@ public class NodeCompilerFactory {
         context.pollThreadEvents();
     }
     
+    public static void compileXStr(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        final XStrNode xstrNode = (XStrNode)node;
+        
+        ClosureCallback argsCallback = new ClosureCallback() {
+            public void compile(MethodCompiler context) {
+                context.createNewString(xstrNode.getValue());
+                context.createObjectArray(1);
+            }
+        };
+        context.getInvocationCompiler().invokeDynamic("`", null, argsCallback, CallType.FUNCTIONAL, null, false);
+    }
+    
     public static void compileYield(Node node, MethodCompiler context) {
         context.lineNumber(node.getPosition());
         
@@ -1826,6 +2412,21 @@ public class NodeCompilerFactory {
         context.createEmptyArray();
     }
     
+    public static void compileArgsCatArguments(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        ArgsCatNode argsCatNode = (ArgsCatNode)node;
+        
+        compileArguments(argsCatNode.getFirstNode(), context);
+        // arguments compilers always create IRubyObject[], but we want to use RubyArray.concat here;
+        // FIXME: as a result, this is NOT efficient, since it creates and then later unwraps an interface
+        context.createNewArray(true);
+        compile(argsCatNode.getSecondNode(), context);
+        context.splatCurrentValue();
+        context.concatArrays();
+        context.unwrapRubyArray();
+    }
+    
     public static void compileArrayArguments(Node node, MethodCompiler context) {
         context.lineNumber(node.getPosition());
         
@@ -1840,6 +2441,16 @@ public class NodeCompilerFactory {
         
         context.createObjectArray(arrayNode.childNodes().toArray(), callback);
         // leave as a normal array
+    }
+    
+    public static void compileSplatArguments(Node node, MethodCompiler context) {
+        context.lineNumber(node.getPosition());
+        
+        SplatNode splatNode = (SplatNode)node;
+        
+        compile(splatNode.getValue(), context);
+        context.splatCurrentValue();
+        context.unwrapRubyArray();
     }
     
     /**
@@ -1860,7 +2471,7 @@ public class NodeCompilerFactory {
                 int index = argsNode.getArgsCount() - 1;
                 
                 for (int i = 0; i < argsNode.getOptArgs().size(); i++) {
-                    int newIndex = ((LocalAsgnNode)argsNode.getOptArgs().get(i)).getIndex() - 2;
+                    int newIndex = ((LocalAsgnNode)argsNode.getOptArgs().get(i)).getIndex();
                     
                     if (newIndex - index != 1) {
                         throw new NotCompilableException("Can't compile def with optional args that assign other variables at: " + node.getPosition());

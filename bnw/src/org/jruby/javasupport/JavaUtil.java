@@ -36,10 +36,13 @@ package org.jruby.javasupport;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.jruby.Ruby;
 import org.jruby.RubyBignum;
 import org.jruby.RubyBoolean;
+import org.jruby.RubyFixnum;
 import org.jruby.RubyFloat;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
@@ -178,6 +181,139 @@ public class JavaUtil {
         }
         return rubyObjects;
     }
+    
+    public interface JavaConverter {
+        public IRubyObject convert(Ruby runtime, Object object);
+    }
+    
+    public static final JavaConverter JAVA_DEFAULT_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) {
+                return runtime.getNil();
+            }
+
+            if (object instanceof IRubyObject) {
+                return (IRubyObject) object;
+            }
+            
+            return JavaObject.wrap(runtime, object);
+        }
+    };
+    
+    public static final JavaConverter JAVA_BOOLEAN_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyBoolean.newBoolean(runtime, ((Boolean)object).booleanValue());
+        }
+    };
+    
+    public static final JavaConverter JAVA_FLOAT_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyFloat.newFloat(runtime, ((Float)object).doubleValue());
+        }
+    };
+    
+    public static final JavaConverter JAVA_DOUBLE_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyFloat.newFloat(runtime, ((Double)object).doubleValue());
+        }
+    };
+    
+    public static final JavaConverter JAVA_CHAR_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyFixnum.newFixnum(runtime, ((Character)object).charValue());
+        }
+    };
+    
+    public static final JavaConverter JAVA_BYTE_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyFixnum.newFixnum(runtime, ((Byte)object).byteValue());
+        }
+    };
+    
+    public static final JavaConverter JAVA_SHORT_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyFixnum.newFixnum(runtime, ((Short)object).shortValue());
+        }
+    };
+    
+    public static final JavaConverter JAVA_INT_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyFixnum.newFixnum(runtime, ((Integer)object).intValue());
+        }
+    };
+    
+    public static final JavaConverter JAVA_LONG_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyFixnum.newFixnum(runtime, ((Long)object).longValue());
+        }
+    };
+    
+    public static final JavaConverter JAVA_STRING_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyString.newUnicodeString(runtime, (String)object);
+        }
+    };
+    
+    public static final JavaConverter BYTELIST_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyString.newString(runtime, (ByteList)object);
+        }
+    };
+    
+    public static final JavaConverter JAVA_BIGINTEGER_CONVERTER = new JavaConverter() {
+        public IRubyObject convert(Ruby runtime, Object object) {
+            if (object == null) return runtime.getNil();
+            return RubyBignum.newBignum(runtime, (BigInteger)object);
+        }
+    };
+    
+    private static final Map JAVA_CONVERTERS = new HashMap();
+    
+    static {
+        JAVA_CONVERTERS.put(Byte.class, JAVA_BYTE_CONVERTER);
+        JAVA_CONVERTERS.put(Byte.TYPE, JAVA_BYTE_CONVERTER);
+        JAVA_CONVERTERS.put(Short.class, JAVA_SHORT_CONVERTER);
+        JAVA_CONVERTERS.put(Short.TYPE, JAVA_SHORT_CONVERTER);
+        JAVA_CONVERTERS.put(Character.class, JAVA_CHAR_CONVERTER);
+        JAVA_CONVERTERS.put(Character.TYPE, JAVA_CHAR_CONVERTER);
+        JAVA_CONVERTERS.put(Integer.class, JAVA_INT_CONVERTER);
+        JAVA_CONVERTERS.put(Integer.TYPE, JAVA_INT_CONVERTER);
+        JAVA_CONVERTERS.put(Long.class, JAVA_LONG_CONVERTER);
+        JAVA_CONVERTERS.put(Long.TYPE, JAVA_LONG_CONVERTER);
+        JAVA_CONVERTERS.put(Float.class, JAVA_FLOAT_CONVERTER);
+        JAVA_CONVERTERS.put(Float.TYPE, JAVA_FLOAT_CONVERTER);
+        JAVA_CONVERTERS.put(Double.class, JAVA_DOUBLE_CONVERTER);
+        JAVA_CONVERTERS.put(Double.TYPE, JAVA_DOUBLE_CONVERTER);
+        JAVA_CONVERTERS.put(Boolean.class, JAVA_BOOLEAN_CONVERTER);
+        JAVA_CONVERTERS.put(Boolean.TYPE, JAVA_BOOLEAN_CONVERTER);
+        
+        JAVA_CONVERTERS.put(String.class, JAVA_STRING_CONVERTER);
+        
+        JAVA_CONVERTERS.put(ByteList.class, BYTELIST_CONVERTER);
+        
+        JAVA_CONVERTERS.put(BigInteger.class, JAVA_BIGINTEGER_CONVERTER);
+
+    }
+    
+    public static JavaConverter getJavaConverter(Class clazz) {
+        JavaConverter converter = (JavaConverter)JAVA_CONVERTERS.get(clazz);
+        
+        if (converter == null) {
+            converter = JAVA_DEFAULT_CONVERTER;
+        }
+        
+        return converter;
+    }
 
     public static IRubyObject convertJavaToRuby(Ruby runtime, Object object) {
         if (object == null) {
@@ -187,59 +323,7 @@ public class JavaUtil {
     }
 
     public static IRubyObject convertJavaToRuby(Ruby runtime, Object object, Class javaClass) {
-        if (object == null) {
-            return runtime.getNil();
-        }
-        
-        if (object instanceof IRubyObject) {
-            return (IRubyObject) object;
-        }
-        
-        if (javaClass.isPrimitive()) {
-            String cName = javaClass.getName();
-            if (cName == "boolean") {
-                return RubyBoolean.newBoolean(runtime, ((Boolean) object).booleanValue());
-            } else if (cName == "float" || cName == "double") {
-                return RubyFloat.newFloat(runtime, ((Number) object).doubleValue());
-            } else if (cName == "char") {
-                return runtime.newFixnum(((Character) object).charValue());
-            } else {
-                // else it's one of the integral types
-                return runtime.newFixnum(((Number) object).longValue());
-            }
-            
-        } else if (javaClass == Boolean.class) {
-            return RubyBoolean.newBoolean(runtime, ((Boolean) object).booleanValue());
-            
-        } else if (javaClass == Float.class || javaClass == Double.class) {
-            return RubyFloat.newFloat(runtime, ((Number) object).doubleValue());
-            
-        } else if (javaClass == Character.class) {
-            return runtime.newFixnum(((Character) object).charValue());
-            
-        } else if (Number.class.isAssignableFrom(javaClass) && javaClass != BigDecimal.class && javaClass != BigInteger.class) {
-            return runtime.newFixnum(((Number) object).longValue());
-            
-        } else if (javaClass == String.class) {
-            String str = object.toString();
-            
-            return RubyString.newUnicodeString(runtime, str);
-            
-        } else if (javaClass == ByteList.class) {
-            return RubyString.newString(runtime,((ByteList)object));
-            
-        } else if (IRubyObject.class.isAssignableFrom(javaClass)) {
-            return (IRubyObject) object;
-            
-        } else if (javaClass == BigInteger.class) {
-            return RubyBignum.newBignum(runtime, (BigInteger)object);
-            
-        } else if (javaClass == BigDecimal.class) {
-            return JavaObject.wrap(runtime, object);
-            
-        } else {
-            return JavaObject.wrap(runtime, object);
-        }
+        return getJavaConverter(javaClass).convert(runtime, object);
     }
 
     public static Class primitiveToWrapper(Class type) {
