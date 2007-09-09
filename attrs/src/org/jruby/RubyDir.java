@@ -504,8 +504,8 @@ public class RubyDir extends RubyObject {
 	}
 	
 	public static RubyString getHomeDirectoryPath(IRubyObject recv) {
-        RubyHash systemHash = (RubyHash) recv.getRuntime().getObject().getConstant("ENV_JAVA");
-        RubyHash envHash = (RubyHash) recv.getRuntime().getObject().getConstant("ENV");
+        RubyHash systemHash = (RubyHash) recv.getRuntime().getObject().fastSearchConstant("ENV_JAVA");
+        RubyHash envHash = (RubyHash) recv.getRuntime().getObject().fastSearchConstant("ENV");
         IRubyObject  home = envHash.aref(recv.getRuntime().newString("HOME"));
 
         if (home == null || home.isNil()) {

@@ -396,7 +396,7 @@ public class RubyYAML {
         return self.toString().indexOf('\0') != -1 ? self.getRuntime().getTrue() : self.getRuntime().getFalse();
     }
     private static org.jruby.yaml.JRubyRepresenter into(IRubyObject arg) {
-        IRubyObject jobj = arg.getInstanceVariable("@java_object");
+        IRubyObject jobj = arg.fastGetInstanceVariable("@java_object");
         if(jobj != null) {
             return (org.jruby.yaml.JRubyRepresenter)(((org.jruby.javasupport.JavaObject)jobj).getValue());
         }

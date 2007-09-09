@@ -76,6 +76,6 @@ public class InstAsgnNode extends AssignableNode implements INameNode {
     }
 
 	public void setName(String name) {
-		this.name = name;
+		this.name = name == null ? null : name.intern();
 	}
 }

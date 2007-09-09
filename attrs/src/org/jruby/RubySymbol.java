@@ -54,8 +54,8 @@ public class RubySymbol extends RubyObject {
     private final int id;
     
     private RubySymbol(Ruby runtime, String symbol) {
-        super(runtime, runtime.getClass("Symbol"), false);
-        this.symbol = symbol;
+        super(runtime, runtime.getSymbol(), false);
+        this.symbol = symbol.intern();
 
         runtime.symbolLastId++;
         this.id = runtime.symbolLastId;

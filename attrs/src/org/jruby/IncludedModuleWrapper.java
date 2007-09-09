@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -15,6 +16,7 @@
  * Copyright (C) 2004-2006 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2005 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
+ * Copyright (C) 2007 William N Dortch <bill.dortch@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -30,7 +32,12 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import java.util.List;
 import java.util.Map;
+
+import org.jruby.runtime.builtin.Variable;
+import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.component.VariableStore;
 
 /**
  * This class is used to provide an intermediate superclass for modules and classes that include
@@ -38,7 +45,7 @@ import java.util.Map;
  * module methods to the actual superclass. Multiple of these intermediate superclasses can be
  * added for multiple included modules.
  * 
- * This allows the normal superclass-based searches (searchMethod, getConstant, etc) to traverse
+ * This allows the normal superclass-based searches (searchMethod, searchConstant, etc) to traverse
  * the superclass ancestors as normal while the included modules do not actually show up in
  * direct inheritance traversal.
  * 
@@ -102,11 +109,25 @@ public final class IncludedModuleWrapper extends RubyClass {
     public void setMethods(Map newMethods) {
         throw new UnsupportedOperationException("An included class is only a wrapper for a module");
     }
+    
+    protected VariableStore<IRubyObject> getVariableStore() {
+        return delegate.getVariableStore();
+    }
+    
+    protected VariableStore<IRubyObject> ensureVariableStore() {
+        return delegate.ensureVariableStore();
+    }
+    
+    public void syncVariables(final List<Variable<IRubyObject>> variables) {
+        throw new UnsupportedOperationException("An included class is only a wrapper for a module");
+    }
 
+    @Deprecated
     public Map getInstanceVariables() {
         return delegate.getInstanceVariables();
     }
 
+    @Deprecated
     public void setInstanceVariables(Map newMethods) {
         throw new UnsupportedOperationException("An included class is only a wrapper for a module");
     }

@@ -121,23 +121,23 @@ import org.jruby.regexp.RegexpFactory;
 public final class Ruby {
     private static String[] BUILTIN_LIBRARIES = {"fcntl", "yaml", "yaml/syck", "jsignal" };
 
-    private CacheMap cacheMap = new CacheMap<DynamicMethod, CacheMap.CacheSite>();
-    private MethodCache methodCache = new MethodCache();
-    private ThreadService threadService = new ThreadService(this);
+    private final CacheMap cacheMap = new CacheMap<DynamicMethod, CacheMap.CacheSite>();
+    private final MethodCache methodCache = new MethodCache();
+    private final ThreadService threadService = new ThreadService(this);
     private Hashtable runtimeInformation;
 
     private int stackTraces = 0;
 
-    private ObjectSpace objectSpace = new ObjectSpace();
+    private final ObjectSpace objectSpace = new ObjectSpace();
 
     private final RubyFixnum[] fixnumCache = new RubyFixnum[256];
     private final RubySymbol.SymbolTable symbolTable = new RubySymbol.SymbolTable();
-    private Hashtable ioHandlers = new Hashtable();
+    private final Hashtable ioHandlers = new Hashtable();
     private long randomSeed = 0;
     private long randomSeedSequence = 0;
     private Random random = new Random();
 
-    private List eventHooks = new LinkedList();
+    private final List eventHooks = new LinkedList();
     private boolean globalAbortOnExceptionEnabled = false;
     private boolean doNotReverseLookupEnabled = false;
     private final boolean objectSpaceEnabled;
@@ -159,6 +159,7 @@ public final class Ruby {
     private RubyBoolean falseObject;
     private RubyClass objectClass;
     private RubyClass stringClass;
+    private RubyClass symbolClass;
     private RubyModule enumerableModule;
     private RubyClass systemCallError = null;
     private RubyModule errnoModule = null;
@@ -463,6 +464,10 @@ public final class Ruby {
         return stringClass;
     }
 
+    public RubyClass getSymbol() {
+        return symbolClass;
+    }
+
     public RubyClass getFixnum() {
         return fixnumClass;
     }
@@ -504,8 +509,12 @@ public final class Ruby {
         return nilClass;
     }
 
-    public RubyModule getModule(String name) {
+    public RubyModule getModule(final String name) {
         return (RubyModule) objectClass.getConstantAt(name);
+    }
+
+    public RubyModule fastGetModule(final String name) {
+        return (RubyModule) objectClass.fastGetConstantAt(name);
     }
 
     /** Returns a class from the instance pool.
@@ -513,12 +522,12 @@ public final class Ruby {
      * @param name The name of the class.
      * @return The class.
      */
-    public RubyClass getClass(String name) {
-        try {
-            return objectClass.getClass(name);
-        } catch (ClassCastException e) {
-            throw newTypeError(name + " is not a Class");
-        }
+    public RubyClass getClass(final String name) {
+        return objectClass.getClass(name);
+    }
+
+    public RubyClass fastGetClass(final String name) {
+        return objectClass.fastGetClass(name);
     }
 
     /** Define a new class with name 'name' and super class 'superClass'.
@@ -743,10 +752,10 @@ public final class Ruby {
         registerBuiltin("readline.rb", new Readline.Service());
         registerBuiltin("thread.so", new ThreadLibrary());
         registerBuiltin("openssl.so", new Library() {
-                public void load(Ruby runtime) throws IOException {
-                    runtime.getModule("Kernel").callMethod(runtime.getCurrentContext(),"require",runtime.newString("rubygems"));
+                public void load(final Ruby runtime) throws IOException {
+                    runtime.getKernel().callMethod(runtime.getCurrentContext(),"require",runtime.newString("rubygems"));
                     runtime.getTopSelf().callMethod(runtime.getCurrentContext(),"gem",runtime.newString("jruby-openssl"));
-                    runtime.getModule("Kernel").callMethod(runtime.getCurrentContext(),"require",runtime.newString("openssl.rb"));
+                    runtime.getKernel().callMethod(runtime.getCurrentContext(),"require",runtime.newString("openssl.rb"));
                 }
             });
         registerBuiltin("digest.so", new DigestLibrary());
@@ -774,11 +783,11 @@ public final class Ruby {
         RubyObject.createObjectClass(this, objectMetaClass);
 
         objectClass = objectMetaClass;
-        objectClass.setConstant("Object", objectClass);
+        objectClass.fastSetConstant("Object", objectClass);
         RubyClass moduleClass = RubyClass.createBootstrapMetaClass(this, "Module", objectClass, RubyModule.MODULE_ALLOCATOR, objectClass);
-        objectClass.setConstant("Module", moduleClass);
+        objectClass.fastSetConstant("Module", moduleClass);
         RubyClass classClass = RubyClass.newClassClass(this, moduleClass);
-        objectClass.setConstant("Class", classClass);
+        objectClass.fastSetConstant("Class", classClass);
         
         classClass.setMetaClass(classClass);
         moduleClass.setMetaClass(classClass);
@@ -809,7 +818,7 @@ public final class Ruby {
         RubyComparable.createComparable(this);
         enumerableModule = RubyEnumerable.createEnumerableModule(this);
         stringClass = RubyString.createStringClass(this);
-        RubySymbol.createSymbolClass(this);
+        symbolClass = RubySymbol.createSymbolClass(this);
         
         if (profile.allowClass("ThreadGroup")) RubyThreadGroup.createThreadGroupClass(this);
         if (profile.allowClass("Thread")) RubyThread.createThreadClass(this);
@@ -1156,7 +1165,7 @@ public final class Ruby {
                 pbeg = p;
             }
 
-            IRubyObject cc = c.getConstant(str);
+            IRubyObject cc = c.searchConstant(str);
             if(!(cc instanceof RubyModule)) {
                 throw newTypeError("" + str + " does not refer to class/module");
             }

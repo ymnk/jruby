@@ -118,7 +118,7 @@ public class JRubyConstructor extends ConstructorImpl {
         } else {
             val = constructRubyScalar(node);
         }
-        return runtime.getModule("YAML").getConstant("PrivateType").callMethod(runtime.getCurrentContext(),"new",new IRubyObject[]{runtime.newString(node.getTag()),(IRubyObject)val});
+        return runtime.getModule("YAML").fastSearchConstant("PrivateType").callMethod(runtime.getCurrentContext(),"new",new IRubyObject[]{runtime.newString(node.getTag()),(IRubyObject)val});
     }
 
     public Object constructRubySequence(final Node node) {
@@ -162,7 +162,7 @@ public class JRubyConstructor extends ConstructorImpl {
 
     public static Object constructYamlOmap(final Constructor ctor, final Node node) {
         Ruby runtime = ((JRubyConstructor)ctor).runtime;
-        RubyArray arr = (RubyArray)(runtime.getModule("YAML").getConstant("Omap").callMethod(runtime.getCurrentContext(),"new"));
+        RubyArray arr = (RubyArray)(runtime.getModule("YAML").fastSearchConstant("Omap").callMethod(runtime.getCurrentContext(),"new"));
         List l = (List)ctor.constructSequence(node);
         ctor.doRecursionFix(node, arr);
         for(Iterator iter = l.iterator();iter.hasNext();) {
@@ -243,7 +243,7 @@ public class JRubyConstructor extends ConstructorImpl {
         RubyClass struct_type;
         String[] nms = tag.split("::");
         for(int i=0,j=nms.length;i<j && sClass != null;i++) {
-            sClass = (RubyModule)sClass.getConstant(nms[i]);
+            sClass = (RubyModule)sClass.searchConstant(nms[i]);
         }
 
         Map props = new HashMap();
@@ -316,11 +316,11 @@ public class JRubyConstructor extends ConstructorImpl {
             final String[] nms = tag.split("::");
             try {
                 for(int i=0,j=nms.length;i<j;i++) {
-                    objClass = (RubyModule)objClass.getConstant(nms[i]);
+                    objClass = (RubyModule)objClass.searchConstant(nms[i]);
                 }
             } catch(Exception e) {
                 // No constant available, so we'll fall back on YAML::Object
-                objClass = (RubyClass)runtime.getModule("YAML").getConstant("Object");
+                objClass = (RubyClass)runtime.getModule("YAML").fastSearchConstant("Object");
                 final RubyHash vars = (RubyHash)(((JRubyConstructor)ctor).constructRubyMapping(node));
                 return objClass.callMethod(runtime.getCurrentContext(), "new", new IRubyObject[]{runtime.newString(tag), vars});
             }
@@ -384,7 +384,7 @@ public class JRubyConstructor extends ConstructorImpl {
         if(tag != null) {
             final String[] nms = tag.split("::");
             for(int i=0,j=nms.length;i<j;i++) {
-                objClass = (RubyModule)objClass.getConstant(nms[i]);
+                objClass = (RubyModule)objClass.searchConstant(nms[i]);
             }
         }
         final RubyClass theCls = (RubyClass)objClass;
@@ -400,7 +400,7 @@ public class JRubyConstructor extends ConstructorImpl {
         if(tag != null) {
             final String[] nms = tag.split("::");
             for(int i=0,j=nms.length;i<j;i++) {
-                objClass = (RubyModule)objClass.getConstant(nms[i]);
+                objClass = (RubyModule)objClass.searchConstant(nms[i]);
             }
         }
         final RubyClass theCls = (RubyClass)objClass;
@@ -419,7 +419,7 @@ public class JRubyConstructor extends ConstructorImpl {
         if(tag != null) {
             final String[] nms = tag.split("::");
             for(int i=0,j=nms.length;i<j;i++) {
-                objClass = (RubyModule)objClass.getConstant(nms[i]);
+                objClass = (RubyModule)objClass.searchConstant(nms[i]);
             }
         }
         final RubyClass theCls = (RubyClass)objClass;

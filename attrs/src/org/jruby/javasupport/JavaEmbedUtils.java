@@ -1,6 +1,5 @@
-package org.jruby.javasupport;
-
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -27,6 +26,7 @@ package org.jruby.javasupport;
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
+package org.jruby.javasupport;
 
 import java.util.List;
 
@@ -85,7 +85,7 @@ public class JavaEmbedUtils {
         IRubyObject[] rubyArgs = JavaUtil.convertJavaArrayToRuby(runtime, args);
 
         // Create Ruby proxies for any input arguments that are not primitives.
-        IRubyObject javaUtilities = runtime.getObject().getConstant("JavaUtilities");
+        IRubyObject javaUtilities = runtime.getJavaSupport().getJavaUtilitiesModule();
         ThreadContext context = runtime.getCurrentContext();
         for (int i = 0; i < rubyArgs.length; i++) {
             IRubyObject obj = rubyArgs[i];
@@ -117,7 +117,7 @@ public class JavaEmbedUtils {
         }
         IRubyObject result = JavaUtil.convertJavaToRuby(runtime, value);
         if (result instanceof JavaObject) {
-            return runtime.getModule("JavaUtilities").callMethod(runtime.getCurrentContext(), "wrap", result);
+            return runtime.getJavaSupport().getJavaUtilitiesModule().callMethod(runtime.getCurrentContext(), "wrap", result);
         }
         return result;
     }   

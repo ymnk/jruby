@@ -232,7 +232,7 @@ public class JavaClass extends JavaObject {
                 javaField = new JavaField(getRuntime(),field);
             }
             return Java.java_to_ruby(self,
-                    javaField.value(self.getInstanceVariable("@java_object")),
+                    javaField.value(self.fastGetInstanceVariable("@java_object")),
                     Block.NULL_BLOCK);
         }
         public Arity getArity() {
@@ -254,7 +254,7 @@ public class JavaClass extends JavaObject {
                 javaField = new JavaField(getRuntime(),field);
             }
             return Java.java_to_ruby(self,
-                    javaField.set_value(self.getInstanceVariable("@java_object"),
+                    javaField.set_value(self.fastGetInstanceVariable("@java_object"),
                             Java.ruby_to_java(self,args[0],Block.NULL_BLOCK)),
                     Block.NULL_BLOCK);
         }
@@ -414,7 +414,7 @@ public class JavaClass extends JavaObject {
                 args = newArgs;
             }
             IRubyObject[] convertedArgs = new IRubyObject[len+1];
-            convertedArgs[0] = self.getInstanceVariable("@java_object");
+            convertedArgs[0] = self.fastGetInstanceVariable("@java_object");
             int i = len;
             if (block.isGiven()) {
                 convertedArgs[len] = args[len - 1];
@@ -451,18 +451,18 @@ public class JavaClass extends JavaObject {
 
     private static class ConstantField {
         static final int CONSTANT = Modifier.FINAL | Modifier.PUBLIC | Modifier.STATIC;
-        Field field;
+        final Field field;
         ConstantField(Field field) {
             this.field = field;
         }
         void install(RubyModule proxy) {
-            if (proxy.getConstantAt(field.getName()) == null) {
+            if (proxy.fastGetConstantAt(field.getName()) == null) {
                 JavaField javaField = new JavaField(proxy.getRuntime(),field);
                 RubyString name = javaField.name();
                 proxy.const_set(name,Java.java_to_ruby(proxy,javaField.static_value(),Block.NULL_BLOCK));
             }
         }
-        static boolean isConstant(Field field) {
+        static boolean isConstant(final Field field) {
             return (field.getModifiers() & CONSTANT) == CONSTANT &&
                 Character.isUpperCase(field.getName().charAt(0));
         }
@@ -755,13 +755,13 @@ public class JavaClass extends JavaObject {
     }
     
     
-    public void setupInterfaceProxy(RubyClass proxy) {
-        Class javaClass = javaClass();
+    public void setupInterfaceProxy(final RubyClass proxy) {
+        final Class javaClass = javaClass();
         for (Iterator iter = constantFields.iterator(); iter.hasNext(); ){
             ((ConstantField)iter.next()).install(proxy);
         }
         // setup constants for public inner classes
-        Class[] classes = javaClass.getClasses();
+        final Class[] classes = javaClass.getClasses();
         for (int i = classes.length; --i >= 0; ) {
             if (javaClass == classes[i].getDeclaringClass()) {
                 Class clazz = classes[i];
@@ -777,13 +777,13 @@ public class JavaClass extends JavaObject {
         }
     }
     
-    public void setupInterfaceModule(RubyModule module) {
-        Class javaClass = javaClass();
+    public void setupInterfaceModule(final RubyModule module) {
+        final Class javaClass = javaClass();
         for (Iterator iter = constantFields.iterator(); iter.hasNext(); ){
             ((ConstantField)iter.next()).install(module);
         }
         // setup constants for public inner classes
-        Class[] classes = javaClass.getClasses();
+        final Class[] classes = javaClass.getClasses();
         for (int i = classes.length; --i >= 0; ) {
             if (javaClass == classes[i].getDeclaringClass()) {
                 Class clazz = classes[i];
@@ -911,7 +911,8 @@ public class JavaClass extends JavaObject {
     }
 
     public static JavaClass for_name(IRubyObject recv, IRubyObject name) {
-        return forName(recv.getRuntime(), name.asSymbol());
+        return forName(recv.getRuntime(),
+                name instanceof RubyString ? name.toString() : name.asSymbol());
     }
     
     private static final Callback __jsend_method = new Callback() {

@@ -194,7 +194,7 @@ public class RubyKernel {
         module.defineFastPublicModuleFunction("private_methods", objectCallbackFactory.getFastOptMethod("private_methods"));
         module.defineFastPublicModuleFunction("protected_methods", objectCallbackFactory.getFastOptMethod("protected_methods"));
         module.defineFastPublicModuleFunction("public_methods", objectCallbackFactory.getFastOptMethod("public_methods"));
-        module.defineFastModuleFunction("remove_instance_variable", objectCallbackFactory.getMethod("remove_instance_variable", IRUBY_OBJECT));
+        module.defineFastModuleFunction("remove_instance_variable", objectCallbackFactory.getFastMethod("remove_instance_variable", IRUBY_OBJECT));
         module.defineFastPublicModuleFunction("respond_to?", objectCallbackFactory.getFastOptMethod("respond_to"));
         module.definePublicModuleFunction("send", objectCallbackFactory.getOptMethod("send"));
         module.defineAlias("__send__", "send");
@@ -225,17 +225,18 @@ public class RubyKernel {
     }
 
     public static IRubyObject autoload(final IRubyObject recv, IRubyObject symbol, final IRubyObject file) {
-        Ruby runtime = recv.getRuntime(); 
+        final Ruby runtime = recv.getRuntime(); 
         final LoadService loadService = runtime.getLoadService();
         final String baseName = symbol.asSymbol();
         final RubyModule module = recv instanceof RubyModule ? (RubyModule) recv : runtime.getObject();
-        String nm = module.getName() + "::" + baseName;
+        final String nm = module.getName() + "::" + baseName;
         
-        IRubyObject undef = runtime.getUndef();
-        IRubyObject existingValue = module.getInstanceVariable(baseName); 
+        final IRubyObject undef = runtime.getUndef();
+        final IRubyObject existingValue = module.fastGetLocalConstant(baseName); 
         if (existingValue != null && existingValue != undef) return runtime.getNil();
         
-        module.setInstanceVariable(baseName, undef);
+        // bypassing checks in RubyModule#setConstant
+        module.getVariableStore().fastSetConstant(baseName, undef);
         
         loadService.addAutoload(nm, new IAutoloadMethod() {
             public String file() {
@@ -250,7 +251,7 @@ public class RubyKernel {
                 // File to be loaded by autoload has already been or is being loaded.
                 if (!required) return null;
                 
-                return module.getConstant(baseName);
+                return module.fastSearchConstant(baseName);
             }
         });
         return runtime.getNil();
@@ -851,7 +852,7 @@ public class RubyKernel {
     
     public static IRubyObject warn(IRubyObject recv, IRubyObject message) {
         Ruby runtime = recv.getRuntime();
-        IRubyObject out = runtime.getObject().getConstant("STDERR");
+        IRubyObject out = runtime.getObject().fastSearchConstant("STDERR");
         RubyIO io = (RubyIO) out.convertToType(runtime.getClass("IO"), 0, "to_io", true); 
 
         io.puts(new IRubyObject[] { message });

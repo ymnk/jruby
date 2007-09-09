@@ -157,7 +157,7 @@ public class RubyJRuby {
         NodeCompilerFactory.compileRoot(node, compiler, inspector);
         byte[] bts = compiler.getClassByteArray();
 
-        IRubyObject compiledScript = ((RubyModule)recv).getConstant("CompiledScript").callMethod(recv.getRuntime().getCurrentContext(),"new");
+        IRubyObject compiledScript = ((RubyModule)recv).fastSearchConstant("CompiledScript").callMethod(recv.getRuntime().getCurrentContext(),"new");
         compiledScript.callMethod(recv.getRuntime().getCurrentContext(), "name=", recv.getRuntime().newString(filename));
         compiledScript.callMethod(recv.getRuntime().getCurrentContext(), "class_name=", recv.getRuntime().newString(classname));
         compiledScript.callMethod(recv.getRuntime().getCurrentContext(), "original_script=", content);
@@ -167,16 +167,16 @@ public class RubyJRuby {
     }
 
     public static IRubyObject compiled_script_to_s(IRubyObject recv) {
-        return recv.getInstanceVariable("@original_script");
+        return recv.fastGetInstanceVariable("@original_script");
     }
 
     public static IRubyObject compiled_script_inspect(IRubyObject recv) {
-        return recv.getRuntime().newString("#<JRuby::CompiledScript " + recv.getInstanceVariable("@name") + ">");
+        return recv.getRuntime().newString("#<JRuby::CompiledScript " + recv.fastGetInstanceVariable("@name") + ">");
     }
 
     public static IRubyObject compiled_script_inspect_bytecode(IRubyObject recv) {
         java.io.StringWriter sw = new java.io.StringWriter();
-        org.objectweb.asm.ClassReader cr = new org.objectweb.asm.ClassReader((byte[])org.jruby.javasupport.JavaUtil.convertRubyToJava(recv.getInstanceVariable("@code"),byte[].class));
+        org.objectweb.asm.ClassReader cr = new org.objectweb.asm.ClassReader((byte[])org.jruby.javasupport.JavaUtil.convertRubyToJava(recv.fastGetInstanceVariable("@code"),byte[].class));
         org.objectweb.asm.util.TraceClassVisitor cv = new org.objectweb.asm.util.TraceClassVisitor(new java.io.PrintWriter(sw));
         cr.accept(cv, ClassReader.SKIP_DEBUG);
         return recv.getRuntime().newString(sw.toString());

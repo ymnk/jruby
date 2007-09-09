@@ -35,6 +35,8 @@ package org.jruby.runtime.marshal;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyBignum;
@@ -49,7 +51,9 @@ import org.jruby.RubyStruct;
 import org.jruby.RubySymbol;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.Block;
+import org.jruby.runtime.builtin.Variable;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.component.VariableEntry;
 import org.jruby.util.ByteList;
 
 /**
@@ -92,7 +96,7 @@ public class UnmarshalStream extends BufferedInputStream {
         switch (type) {
             case 'I':
                 rubyObj = unmarshalObject();
-                defaultInstanceVarsUnmarshal(rubyObj);
+                defaultVariablesUnmarshal(rubyObj);
                 break;
             case '0' :
                 rubyObj = runtime.getNil();
@@ -264,14 +268,33 @@ public class UnmarshalStream extends BufferedInputStream {
         return result;
     }
     
-    public void defaultInstanceVarsUnmarshal(IRubyObject object) throws IOException {
-    	int count = unmarshalInt();
-    	
-    	for (int i = 0; i < count; i++) {
+    /**
+     * @deprecated superseded by {@link #defaultVariablesUnmarshal(IRubyObject)}
+     */
+    public void defaultInstanceVarsUnmarshal(final IRubyObject object) throws IOException {
+        defaultVariablesUnmarshal(object);
+//    	int count = unmarshalInt();
+//    	
+//    	for (int i = 0; i < count; i++) {
+//            String name = unmarshalObject().asSymbol();
+//            IRubyObject value = unmarshalObject();
+//            object.setInstanceVariable(name, value);
+//    	}
+    }
+    
+    public void defaultVariablesUnmarshal(final IRubyObject object) throws IOException {
+        final int count = unmarshalInt();
+
+        final List<Variable<IRubyObject>> attrs = 
+            new ArrayList<Variable<IRubyObject>>(count);
+        
+        for (int i = count; --i >= 0; ) {            
             String name = unmarshalObject().asSymbol();
             IRubyObject value = unmarshalObject();
-            object.setInstanceVariable(name, value);
-    	}
+            attrs.add(new VariableEntry<IRubyObject>(name, value));
+        }
+        
+        object.syncVariables(attrs);
     }
     
     private IRubyObject uclassUnmarshall() throws IOException {

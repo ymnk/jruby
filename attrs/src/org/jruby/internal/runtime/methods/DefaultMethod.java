@@ -92,7 +92,7 @@ public final class DefaultMethod extends DynamicMethod implements JumpTarget {
         if (implementationClass != null) {
             // Classes don't need the implementer search because they're not included
             // Kernel doesn't need the implementer class because it's always at the top of the hierarchy
-            needsImplementer = !implementationClass.isClass() && implementationClass != implementationClass.getRuntime().getModule("Kernel");
+            needsImplementer = !implementationClass.isClass() && implementationClass != implementationClass.getRuntime().getKernel();
         }
     }
 

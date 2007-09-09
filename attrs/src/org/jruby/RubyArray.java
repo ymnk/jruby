@@ -75,7 +75,7 @@ public class RubyArray extends RubyObject implements List {
             };
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyArray.class);
 
-        arrayc.includeModule(runtime.getModule("Enumerable"));
+        arrayc.includeModule(runtime.fastGetModule("Enumerable"));
         arrayc.getMetaClass().defineMethod("[]", callbackFactory.getOptSingletonMethod("create"));
 
         arrayc.defineMethod("initialize", callbackFactory.getOptMethod("initialize"));

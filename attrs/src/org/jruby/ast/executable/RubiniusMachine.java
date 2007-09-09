@@ -323,7 +323,7 @@ public class RubiniusMachine {
                 int index = getInt(bytecodes, ip);
                 ip += 4;
                 
-                String name = literals[index].toString();
+                String name = literals[index].toString().intern();
                 stack[++stackTop] = context.getConstant(name);
                 break;
             }

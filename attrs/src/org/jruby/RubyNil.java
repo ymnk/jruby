@@ -99,7 +99,12 @@ public class RubyNil extends RubyObject {
         return true;
     }
     
+    @Deprecated
     public boolean safeHasInstanceVariables() {
+        return false;
+    }
+    
+    public boolean hasVariables() {
         return false;
     }
     

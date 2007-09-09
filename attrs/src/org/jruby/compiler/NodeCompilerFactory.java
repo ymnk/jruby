@@ -1255,7 +1255,7 @@ public class NodeCompilerFactory {
                                           public void branch(MethodCompiler context) {
                                           }});
             context.setEnding(third); //[RubyClass]
-            context.getInstanceVariable("__attached__");  //[RubyClass]
+            context.getInternalVariable("__attached__");  //[RubyClass]
             context.notIsModuleAndClassVarDefined(iVisited.getName(), failure); //[]
             context.pushString("class variable");
             context.go(ending);

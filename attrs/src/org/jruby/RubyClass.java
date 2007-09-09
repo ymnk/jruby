@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -34,8 +35,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ClassIndex;
@@ -62,14 +64,14 @@ public class RubyClass extends RubyModule {
     
     private Set subclasses;
     
+    private final ReentrantLock lock = new ReentrantLock();
+    
     private static final ObjectMarshal DEFAULT_OBJECT_MARSHAL = new ObjectMarshal() {
         public void marshalTo(Ruby runtime, Object obj, RubyClass type,
                               MarshalStream marshalStream) throws IOException {
             IRubyObject object = (IRubyObject)obj;
             
-            Map iVars = object.getInstanceVariablesSnapshot();
-            
-            marshalStream.dumpInstanceVars(iVars);
+            marshalStream.dumpVariables(object.getVariableList());
         }
 
         public Object unmarshalFrom(Ruby runtime, RubyClass type,
@@ -78,7 +80,7 @@ public class RubyClass extends RubyModule {
             
             unmarshalStream.registerLinkTarget(result);
 
-            unmarshalStream.defaultInstanceVarsUnmarshal(result);
+            unmarshalStream.defaultVariablesUnmarshal(result);
 
             return result;
         }
@@ -209,6 +211,18 @@ public class RubyClass extends RubyModule {
 	public Ruby getRuntime() {
 		return runtime;
 	}
+    
+    public void lock() {
+        lock.lock();
+    }
+    
+    public void unlock() {
+        lock.unlock();
+    }
+    
+    public Lock getLock() {
+        return lock;
+    }
 
     public boolean isModule() {
         return false;
@@ -401,9 +415,9 @@ public class RubyClass extends RubyModule {
         return (RubyClass) RubyModule.unmarshalFrom(output);
     }
 
-    public RubyClass newSubClass(String name, ObjectAllocator allocator,
-            RubyModule parent, boolean invokeInherited, boolean warnOnRedefinition) {
-        RubyClass classClass = runtime.getClass("Class");
+    public RubyClass newSubClass(final String name, final ObjectAllocator allocator,
+            final RubyModule parent, final boolean invokeInherited, final boolean warnOnRedefinition) {
+        final RubyClass classClass = runtime.getClass("Class");
         
         // Cannot subclass 'Class' or metaclasses
         if (this == classClass) {
@@ -412,7 +426,7 @@ public class RubyClass extends RubyModule {
             throw runtime.newTypeError("can't make subclass of virtual class");
         }
 
-        RubyClass newClass = new RubyClass(runtime, classClass, this, allocator, parent, name);
+        final RubyClass newClass = new RubyClass(runtime, classClass, this, allocator, parent, name);
 
         newClass.makeMetaClass(getMetaClass(), newClass);
         
@@ -424,7 +438,11 @@ public class RubyClass extends RubyModule {
             if (warnOnRedefinition) {
                 parent.setConstant(name, newClass);
             } else {
-                parent.setInstanceVariable(name, newClass);
+                // bypassing check for redefinition in RubyModule#setConstant
+                // FIXME: this (old and new versions) won't set the base name
+                // or parent in the new class; should it?
+                //parent.setInstanceVariable(name, newClass); // old, don't reinstate
+                parent.getVariableStore().setConstant(name, newClass);
             }
         }
 

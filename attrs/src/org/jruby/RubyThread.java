@@ -270,7 +270,7 @@ public class RubyThread extends RubyObject {
         super(runtime, type);
         this.threadService = runtime.getThreadService();
         // set to default thread group
-        RubyThreadGroup defaultThreadGroup = (RubyThreadGroup)runtime.getClass("ThreadGroup").getConstant("Default");
+        RubyThreadGroup defaultThreadGroup = (RubyThreadGroup)runtime.getClass("ThreadGroup").fastSearchConstant("Default");
         defaultThreadGroup.add(this, Block.NULL_BLOCK);
         finalResult = runtime.getNil();
     }
@@ -323,7 +323,7 @@ public class RubyThread extends RubyObject {
         if (originalKey instanceof RubySymbol) {
             return originalKey;
         } else if (originalKey instanceof RubyString) {
-            return RubySymbol.newSymbol(getRuntime(), originalKey.asSymbol());
+            return RubySymbol.newSymbol(getRuntime(), originalKey.toString());
         } else if (originalKey instanceof RubyFixnum) {
             getRuntime().getWarnings().warn("Do not use Fixnums as Symbols");
             throw getRuntime().newArgumentError(originalKey + " is not a symbol");
@@ -674,7 +674,7 @@ public class RubyThread extends RubyObject {
         return threadImpl.isCurrent();
     }
 
-    public void exceptionRaised(RaiseException exception) {
+    public void exceptionRaised(final RaiseException exception) {
         assert isCurrent();
 
         Ruby runtime = exception.getException().getRuntime();
@@ -683,7 +683,7 @@ public class RubyThread extends RubyObject {
             //getRuntime().getRuntime().printError(exception.getException());
         	// TODO: Doesn't SystemExit have its own method to make this less wordy..
             RubyException re = RubyException.newException(getRuntime(), getRuntime().getClass("SystemExit"), exception.getMessage());
-            re.setInstanceVariable("status", getRuntime().newFixnum(1));
+            re.fastSetInternalVariable("status", getRuntime().newFixnum(1));
             threadService.getMainThread().raise(new IRubyObject[]{re}, Block.NULL_BLOCK);
         } else {
             exitingException = exception;

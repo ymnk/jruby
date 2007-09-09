@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -20,6 +21,7 @@
  * Copyright (C) 2004-2005 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006-2007 Miguel Covarrubias <mlcovarrubias@gmail.com>
+ * Copyright (C) 2007 William N Dortch <bill.dortch@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -45,6 +47,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.jruby.anno.JRubyMethod;
 import org.jruby.internal.runtime.methods.AliasMethod;
 import org.jruby.internal.runtime.methods.DynamicMethod;
@@ -62,8 +65,11 @@ import org.jruby.runtime.Dispatcher;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
+import org.jruby.runtime.builtin.Variable;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.callback.Callback;
+import org.jruby.runtime.component.VariableStore;
+import org.jruby.runtime.component.ConcurrentObjectVariableStore;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
 import org.jruby.util.ClassProvider;
@@ -111,7 +117,6 @@ public class RubyModule extends RubyObject {
     // when appropriate (e.g. when method is removed by source class or a new method is added
     // with same name by one of its subclasses).
     private Map methods = new HashMap();
-    
     
     // FIXME: I'm not sure what the serialization/marshalling implications
     // might be of defining this here. We could keep a hash in JavaSupport
@@ -173,11 +178,18 @@ public class RubyModule extends RubyObject {
             }
         }
         this.parent = parent;
+        
+        this.variableStore = new ConcurrentObjectVariableStore<IRubyObject>(runtime, this, 16);
 
         runtime.moduleLastId++;
         this.id = runtime.moduleLastId;
     }
 
+    @Override
+    protected VariableStore<IRubyObject> ensureVariableStore() {
+        return variableStore;
+    }
+    
     public static RubyClass createModuleClass(Ruby runtime, RubyClass moduleClass) {
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyModule.class);   
         RubyClass moduleMetaClass = moduleClass.getMetaClass();
@@ -385,16 +397,116 @@ public class RubyModule extends RubyObject {
 
         return includedModule;
     }
+    
+    //
+    // INTERNAL VARIABLES
+    //
+    
+    /**
+     * Behaves similarly to {@link #getClassVar(String)}. Searches this
+     * class/module <em>and its ancestors</em> for the specified internal
+     * variable.
+     * 
+     * @param name the internal variable name
+     * @return the value of the specified internal variable if found, else null
+     * @see #setInternalModuleVariable(String, IRubyObject)
+     */
+    public boolean hasInternalModuleVariable(final String name) {
+        for (RubyModule mod = this; mod != null; mod = mod.getSuperClass()) {
+            if (mod.hasInternalVariable(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * Behaves similarly to {@link #getClassVar(String)}. Searches this
+     * class/module <em>and its ancestors</em> for the specified internal
+     * variable.
+     * 
+     * @param name the internal variable name
+     * @return the value of the specified internal variable if found, else null
+     * @see #setInternalModuleVariable(String, IRubyObject)
+     */
+    public IRubyObject searchInternalModuleVariable(final String name) {
+        for (RubyModule mod = this; mod != null; mod = mod.getSuperClass()) {
+            IRubyObject value;
+            if ((value = mod.getInternalVariable(name)) != null) {
+                return value;
+            }
+        }
+        return null;
+    }
 
     /**
-     * Search this and parent modules for the named variable.
+     * Behaves similarly to {@link #setClassVar(String, IRubyObject)}. If the
+     * specified internal variable is found in this class/module <em>or an ancestor</em>,
+     * it is set where found.  Otherwise it is set in this module. 
+     * 
+     * @param name the internal variable name
+     * @param value the internal variable value
+     * @see #searchInternalModuleVariable(String)
+     */
+    public void setInternalModuleVariable(final String name, final IRubyObject value) {
+        for (RubyModule mod = this; mod != null; mod = mod.getSuperClass()) {
+            if (mod.hasInternalVariable(name)) {
+                mod.setInternalVariable(name, value);
+                return;
+            }
+        }
+        setInternalVariable(name, value);
+    }
+    
+    //
+    // CLASS VARIABLES
+    //
+    
+    public boolean hasLocalClassVariable(final String name) {
+        return getVariableStore().hasClassVariable(name);
+    }
+
+    public boolean fastHasLocalClassVariable(final String internedName) {
+        return getVariableStore().fastHasClassVariable(internedName);
+    }
+    
+    public IRubyObject getLocalClassVariable(final String name) {
+        return getVariableStore().getClassVariable(name);
+    }
+
+    public IRubyObject fastGetLocalClassVariable(final String internedName) {
+        return getVariableStore().fastGetClassVariable(internedName);
+    }
+    
+    public void setLocalClassVariable(final String name, final IRubyObject value) {
+        getVariableStore().setClassVariable(name, value);
+    }
+
+    public void fastSetLocalClassVariable(final String internedName, final IRubyObject value) {
+        getVariableStore().fastSetClassVariable(internedName, value);
+    }
+    
+    public List<String> getLocalClassVariableNameList() {
+        return getVariableStore().getClassVariableNameList();
+    }
+
+    /**
+     * Search this and parent modules for the named class variable.
      * 
      * @param name The variable to search for
      * @return The module in which that variable is found, or null if not found
      */
-    private RubyModule getModuleWithInstanceVar(String name) {
+    private RubyModule getModuleWithClassVar(final String name) {
         for (RubyModule p = this; p != null; p = p.getSuperClass()) {
-            if (p.getInstanceVariable(name) != null) {
+            if (p.hasLocalClassVariable(name)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    private RubyModule fastGetModuleWithClassVar(final String internedName) {
+        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
+            if (p.fastHasLocalClassVariable(internedName)) {
                 return p;
             }
         }
@@ -409,14 +521,25 @@ public class RubyModule extends RubyObject {
      * @param name The variable name to set
      * @param value The value to set it to
      */
-    public IRubyObject setClassVar(String name, IRubyObject value) {
-        RubyModule module = getModuleWithInstanceVar(name);
+    public IRubyObject setClassVar(final String name, final IRubyObject value) {
+        RubyModule module;
 
-        if (module == null) {
+        if ((module = getModuleWithClassVar(name)) == null) {
             module = this;
         }
 
-        return module.setInstanceVariable(name, value, CVAR_TAINT_ERROR, CVAR_FREEZE_ERROR);
+        module.getVariableStore().setClassVariable(name, value);
+        return value;
+    }
+
+    public IRubyObject fastSetClassVar(final String internedName, final IRubyObject value) {
+        RubyModule module;
+
+        if ((module = fastGetModuleWithClassVar(internedName)) == null) {
+            module = this;
+        }
+        module.getVariableStore().fastSetClassVariable(internedName, value);
+        return value;
     }
 
     /**
@@ -427,16 +550,32 @@ public class RubyModule extends RubyObject {
      * @param name The name of the variable to retrieve
      * @return The variable's value, or throws NameError if not found
      */
-    public IRubyObject getClassVar(String name) {
-        RubyModule module = getModuleWithInstanceVar(name);
+    public IRubyObject getClassVar(final String name) {
+        final RubyModule module;
 
-        if (module != null) {
-            IRubyObject variable = module.getInstanceVariable(name);
-
-            return variable == null ? getRuntime().getNil() : variable;
+        if ((module = getModuleWithClassVar(name)) != null) {
+            IRubyObject value;
+            if ((value = module.getVariableStore().getClassVariable(name)) != null) {
+                return value;
+            }
+            return getRuntime().getNil();
         }
 
         throw getRuntime().newNameError("uninitialized class variable " + name + " in " + getName(), name);
+    }
+
+    public IRubyObject fastGetClassVar(final String internedName) {
+        final RubyModule module;
+
+        if ((module = fastGetModuleWithClassVar(internedName)) != null) {
+            IRubyObject value;
+            if ((value = module.getVariableStore().fastGetClassVariable(internedName)) != null) {
+                return value;
+            }
+            return getRuntime().getNil();
+        }
+
+        throw getRuntime().newNameError("uninitialized class variable " + internedName + " in " + getName(), internedName);
     }
 
     /**
@@ -448,42 +587,11 @@ public class RubyModule extends RubyObject {
      * @return true if true, false if false
      */
     public boolean isClassVarDefined(String name) {
-        return getModuleWithInstanceVar(name) != null;
+        return getModuleWithClassVar(name) != null;
     }
 
-    /**
-     * Set the named constant on this module. Also, if the value provided is another Module and
-     * that module has not yet been named, assign it the specified name.
-     * 
-     * @param name The name to assign
-     * @param value The value to assign to it; if an unnamed Module, also set its basename to name
-     * @return The result of setting the variable.
-     * @see RubyObject#setInstanceVariable(String, IRubyObject, String, String)
-     */
-    public IRubyObject setConstant(String name, IRubyObject value) {
-        IRubyObject oldValue = getInstanceVariable(name);
-        
-        if (oldValue == getRuntime().getUndef()) {
-            getRuntime().getLoadService().removeAutoLoadFor(getName() + "::" + name);
-        } else if (oldValue != null) {
-            getRuntime().getWarnings().warn("already initialized constant " + name);
-        }
-
-        IRubyObject result = setInstanceVariable(name, value, "Insecure: can't set constant",
-                "class/module");
-
-        // if adding a module under a constant name, set that module's basename to the constant name
-        if (value instanceof RubyModule) {
-            RubyModule module = (RubyModule)value;
-            if (module.getBaseName() == null) {
-                module.setBaseName(name);
-                module.setParent(this);
-            }
-            /*
-            module.setParent(this);
-            */
-        }
-        return result;
+    public boolean fastIsClassVarDefined(String internedName) {
+        return fastGetModuleWithClassVar(internedName) != null;
     }
 
     /**
@@ -492,25 +600,20 @@ public class RubyModule extends RubyObject {
      * @param name to be found in this module (or class)
      * @return the class or null if no such class
      */
-    public RubyClass getClass(String name) {
-        IRubyObject module = getConstantAt(name);
-
-        return  (module instanceof RubyClass) ? (RubyClass) module : null;
+    public RubyClass getClass(final String name) {
+        final IRubyObject module;
+        if ((module = getConstantAt(name)) instanceof RubyClass) {
+            return (RubyClass) module;
+        }
+        return null;
     }
 
-    /**
-     * Base implementation of Module#const_missing, throws NameError for specific missing constant.
-     * 
-     * @param name The constant name which was found to be missing
-     * @return Nothing! Absolutely nothing! (though subclasses might choose to return something)
-     */
-    public IRubyObject const_missing(IRubyObject name, Block block) {
-        /* Uninitialized constant */
-        if (this != getRuntime().getObject()) {
-            throw getRuntime().newNameError("uninitialized constant " + getName() + "::" + name.asSymbol(), "" + getName() + "::" + name.asSymbol());
+    public RubyClass fastGetClass(final String internedName) {
+        final IRubyObject module;
+        if ((module = fastGetConstantAt(internedName)) instanceof RubyClass) {
+            return (RubyClass) module;
         }
-
-        throw getRuntime().newNameError("uninitialized constant " + name.asSymbol(), name.asSymbol());
+        return null;
     }
 
     /**
@@ -701,7 +804,7 @@ public class RubyModule extends RubyObject {
             RubyModule c = this;
 
             if (c.isSingleton()) {
-                IRubyObject obj = getInstanceVariable("__attached__");
+                IRubyObject obj = fastGetInternalVariable("__attached__");
 
                 if (obj != null && obj instanceof RubyModule) {
                     c = (RubyModule) obj;
@@ -716,7 +819,7 @@ public class RubyModule extends RubyObject {
         addMethod(name, UndefinedMethod.getInstance());
         
         if(isSingleton()){
-            IRubyObject singleton = getInstanceVariable("__attached__"); 
+            IRubyObject singleton = fastGetInternalVariable("__attached__"); 
             singleton.callMethod(runtime.getCurrentContext(), "singleton_method_undefined", getRuntime().newSymbol(name));
         }else{
             callMethod(runtime.getCurrentContext(), "method_undefined", getRuntime().newSymbol(name));
@@ -789,7 +892,7 @@ public class RubyModule extends RubyObject {
         }
         
         if(isSingleton()){
-            IRubyObject singleton = getInstanceVariable("__attached__"); 
+            IRubyObject singleton = fastGetInternalVariable("__attached__"); 
             singleton.callMethod(getRuntime().getCurrentContext(), "singleton_method_removed", getRuntime().newSymbol(name));
         }else{
             callMethod(getRuntime().getCurrentContext(), "method_removed", getRuntime().newSymbol(name));
@@ -894,8 +997,148 @@ public class RubyModule extends RubyObject {
         defineFastMethod(name, method);
         getSingletonClass().defineFastMethod(name, method);
     }
+    
+    /** rb_alias
+    *
+    */
+   public synchronized void defineAlias(String name, String oldName) {
+       testFrozen("module");
+       if (oldName.equals(name)) {
+           return;
+       }
+       if (this == getRuntime().getObject()) {
+           getRuntime().secure(4);
+       }
+       DynamicMethod method = searchMethod(oldName);
+       if (method.isUndefined()) {
+           if (isModule()) {
+               method = getRuntime().getObject().searchMethod(oldName);
+           }
 
-    private IRubyObject getConstantInner(String name, boolean exclude) {
+           if (method.isUndefined()) {
+               throw getRuntime().newNameError("undefined method `" + oldName + "' for " +
+                       (isModule() ? "module" : "class") + " `" + getName() + "'", oldName);
+           }
+       }
+       getRuntime().getMethodCache().removeMethod(name);
+       getRuntime().getCacheMap().remove(name, method);
+       putMethod(name, new AliasMethod(this, method, oldName));
+   }
+
+
+    //
+    // CONSTANTS
+    //
+    
+   
+    public boolean hasLocalConstant(final String name) {
+        return getVariableStore().hasConstant(name);
+    }
+    
+    public boolean fastHasLocalConstant(final String internedName) {
+        return getVariableStore().fastHasConstant(internedName);
+    }
+    
+    // returns the stored value without processing undefs (autoloads)
+    public IRubyObject getLocalConstant(final String name) {
+        return getVariableStore().getConstant(name);
+    }
+    
+    // returns the stored value without processing undefs (autoloads)
+    public IRubyObject fastGetLocalConstant(final String internedName) {
+        return getVariableStore().fastGetConstant(internedName);
+    }
+    
+    // removes and returns the stored value without processing undefs (autoloads)
+    public IRubyObject removeLocalConstant(final String name) {
+        return getVariableStore().removeConstant(name);
+    }
+
+    public List<Variable<IRubyObject>> getLocalConstantList() {
+        return getVariableStore().getConstantList();
+    }
+    public List<String> getLocalConstantNameList() {
+        return getVariableStore().getConstantNameList();
+    }
+    
+    // not actually called anywhere (all known uses call the fast version)
+    public IRubyObject searchConstantExclusive(final String name) {
+        return fastSearchConstantExclusive(name.intern());
+    }
+    
+    // replaces getConstantFrom (called from evaluator and thread context)
+    public IRubyObject fastSearchConstantExclusive(final String internedName) {
+        final RubyClass objectClass = getRuntime().getObject();
+        final IRubyObject undef = getRuntime().getUndef();
+        IRubyObject value;
+
+        RubyModule p = this;
+        
+        while (p != null) {
+            if ((value = p.fastGetLocalConstant(internedName)) != null) {
+                if (value != undef) {
+                    if (p == objectClass && this != objectClass) {
+                        getRuntime().getWarnings().warn("toplevel constant " + internedName +
+                                " referenced by " + getName() + "::" + internedName);
+                    }
+                    return value;
+                }
+                p.removeLocalConstant(internedName);
+                if (getRuntime().getLoadService().autoload(
+                        p.getName() + "::" + internedName) == null) {
+                    break;
+                }
+                continue;
+            }
+            p = p.getSuperClass();
+        }
+
+        return callMethod(getRuntime().getCurrentContext(),
+                "const_missing", RubySymbol.newSymbol(getRuntime(), internedName));
+    }
+
+    public IRubyObject searchConstant(final String name) {
+        // FIXME: lazy implementation
+        return fastSearchConstant(name.intern());
+    }
+
+    public IRubyObject fastSearchConstant(final String internedName) {
+        final IRubyObject undef = getRuntime().getUndef();
+        boolean retryForModule = false;
+        IRubyObject value;
+        RubyModule p = this;
+
+        retry: while (true) {
+            while (p != null) {
+                if ((value = p.fastGetLocalConstant(internedName)) != null) {
+                    if (value != undef) {
+                        return value;
+                    }
+                    p.removeLocalConstant(internedName);
+                    if (getRuntime().getLoadService().autoload(
+                            p.getName() + "::" + internedName) == null) {
+                        break;
+                    }
+                    continue;
+                }
+                p = p.getSuperClass();
+            }
+
+            if (!retryForModule && !isClass()) {
+                retryForModule = true;
+                p = getRuntime().getObject();
+                continue retry;
+            }
+
+            break;
+        }
+
+        return callMethod(getRuntime().getCurrentContext(),
+                "const_missing", RubySymbol.newSymbol(getRuntime(), internedName));
+    }
+
+    @Deprecated // FIXME: remove (just keeping until I've verified the new code works)
+    private IRubyObject getConstantInner(String name, final boolean exclude) {
         IRubyObject objectClass = getRuntime().getObject();
         IRubyObject undef = getRuntime().getUndef();
         boolean retryForModule = false;
@@ -938,56 +1181,183 @@ public class RubyModule extends RubyObject {
      * 
      * @param name The constant to retrieve
      * @return The value for the constant, or null if not found
+     * @deprecated superseded by {@link #searchConstant(String)}
      */
     public IRubyObject getConstant(String name) {
-        return getConstantInner(name, false);
+        return searchConstant(name);
     }
 
+    /**
+     * @deprecated superseded by {@link #searchConstantExclusive(String)}
+     */
     public IRubyObject getConstantFrom(String name) {
-        return getConstantInner(name, true);
+        return searchConstantExclusive(name);
     }
 
-    public IRubyObject getConstantAt(String name) {
-        IRubyObject constant = getInstanceVariable(name);
-
-        if (constant != getRuntime().getUndef()) return constant;
-        
-        removeInstanceVariable(name);
+    public IRubyObject getConstantAt(final String name) {
+        final IRubyObject value;
+        if ((value = getVariableStore().getConstant(name)) != getRuntime().getUndef()) {
+            return value;
+        }
+        getVariableStore().removeConstant(name);
         return getRuntime().getLoadService().autoload(getName() + "::" + name);
     }
 
-    /** rb_alias
-     *
-     */
-    public synchronized void defineAlias(String name, String oldName) {
-        testFrozen("module");
-        if (oldName.equals(name)) {
-            return;
+    public IRubyObject fastGetConstantAt(final String internedName) {
+        final IRubyObject value;
+        if ((value = getVariableStore().fastGetConstant(internedName)) != getRuntime().getUndef()) {
+            return value;
         }
-        if (this == getRuntime().getObject()) {
-            getRuntime().secure(4);
-        }
-        DynamicMethod method = searchMethod(oldName);
-        if (method.isUndefined()) {
-            if (isModule()) {
-                method = getRuntime().getObject().searchMethod(oldName);
-            }
-
-            if (method.isUndefined()) {
-                throw getRuntime().newNameError("undefined method `" + oldName + "' for " +
-                        (isModule() ? "module" : "class") + " `" + getName() + "'", oldName);
-            }
-        }
-        getRuntime().getMethodCache().removeMethod(name);
-        getRuntime().getCacheMap().remove(name, method);
-        putMethod(name, new AliasMethod(this, method, oldName));
+        getVariableStore().removeConstant(internedName);
+        return getRuntime().getLoadService().autoload(getName() + "::" + internedName);
     }
 
-    public RubyClass defineOrGetClassUnder(String name, RubyClass superClazz) {
+    /**
+     * Set the named constant on this module. Also, if the value provided is another Module and
+     * that module has not yet been named, assign it the specified name.
+     * 
+     * @param name The name to assign
+     * @param value The value to assign to it; if an unnamed Module, also set its basename to name
+     * @return The result of setting the variable.
+     * @see RubyObject#setInstanceVariable(String, IRubyObject, String, String)
+     */
+    public IRubyObject setConstant(final String name, final IRubyObject value) {
+        // this might seem lazy, but since constants normally only get
+        // set once, the name will have to be interned anyway. and most
+        // code will call the fast version in the first place.
+        return fastSetConstant(name.intern(), value);
+    }
+    
+    public IRubyObject fastSetConstant(final String internedName, final IRubyObject value) {
+        final VariableStore<IRubyObject> store = getVariableStore();
+        final IRubyObject oldValue;
+        if ((oldValue = store.fastGetConstant(internedName)) != null) {
+            if (oldValue == getRuntime().getUndef()) {
+                getRuntime().getLoadService().removeAutoLoadFor(getName() + "::" + internedName);
+            } else {
+                getRuntime().getWarnings().warn("already initialized constant " + internedName);
+            }
+        }
+
+        store.fastSetConstant(internedName, value);
+
+        // if adding a module under a constant name, set that module's basename to the constant name
+        if (value instanceof RubyModule) {
+            RubyModule module = (RubyModule)value;
+            if (module.getBaseName() == null) {
+                module.setBaseName(internedName);
+                module.setParent(this);
+            }
+            /*
+            module.setParent(this);
+            */
+        }
+        return value;
+    }
+    
+    private boolean hasConstantInHierarchy(final String name) {
+        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
+            if (p.hasLocalConstant(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /** rb_define_const
+     *
+     */
+    public void defineConstant(String name, IRubyObject value) {
+        assert value != null;
+
+        if (this == getRuntime().getClass("Class")) {
+            getRuntime().secure(4);
+        }
+
+        if (!IdUtil.isValidConstantName(name)) {
+            throw getRuntime().newNameError("bad constant name " + name, name);
+        }
+
+        setConstant(name, value);
+    }
+
+
+    /** rb_mod_const_get
+    *
+    */
+    public IRubyObject const_get(IRubyObject symbol) {
+        String name = symbol.asSymbol();
+
+        if (!IdUtil.isValidConstantName(name)) {
+            throw wrongConstantNameError(name);
+        }
+
+        return fastSearchConstant(name);
+    }
+
+    /** rb_mod_const_set
+     *
+     */
+    public IRubyObject const_set(IRubyObject symbol, IRubyObject value) {
+        String name = symbol.asSymbol();
+
+        VariableStore.validateConstant(getRuntime(), name);
+
+        return fastSetConstant(name, value);
+    }
+
+    /** rb_mod_const_defined
+     *
+     */
+    public RubyBoolean const_defined(IRubyObject symbol) {
+        return getRuntime().newBoolean(
+                getVariableStore().fastValidatedHasConstant(symbol.asSymbol()));
+    }
+
+    public IRubyObject remove_const(final IRubyObject name) {
+        final String id = name.asSymbol();
+        final IRubyObject value;
+        if ((value = getVariableStore().validatedRemoveConstant(id)) != null) {
+            if (value != getRuntime().getUndef()) {
+                return value;
+            }
+            getRuntime().getLoadService().removeAutoLoadFor(getName() + "::" + id);
+            // FIXME: I'm not sure this is right, but the old code returned
+            // the undef, which definitely isn't right...
+            return getRuntime().getNil();
+        }
+
+        if (hasConstantInHierarchy(id)) {
+            throw cannotRemoveError(id);
+        }
+
+        throw getRuntime().newNameError("constant " + id + " not defined for " + getName(), id);
+    }
+
+    private RaiseException wrongConstantNameError(String name) {
+        return getRuntime().newNameError("wrong constant name " + name, name);
+    }
+
+    /**
+     * Base implementation of Module#const_missing, throws NameError for specific missing constant.
+     * 
+     * @param name The constant name which was found to be missing
+     * @return Nothing! Absolutely nothing! (though subclasses might choose to return something)
+     */
+    public IRubyObject const_missing(IRubyObject name, Block block) {
+        /* Uninitialized constant */
+        if (this != getRuntime().getObject()) {
+            throw getRuntime().newNameError("uninitialized constant " + getName() + "::" + name.asSymbol(), "" + getName() + "::" + name.asSymbol());
+        }
+
+        throw getRuntime().newNameError("uninitialized constant " + name.asSymbol(), name.asSymbol());
+    }
+
+    public RubyClass defineOrGetClassUnder(final String name, final RubyClass superClazz) {
         // This method is intended only for defining new classes in Ruby code,
         // so it uses the allocator of the specified superclass or default to
         // the Object allocator. It should NOT be used to define classes that require a native allocator.
-        IRubyObject type = getInstanceVariable(name);
+        IRubyObject type = getLocalConstant(name);
         
         if (type == null || (type instanceof RubyUndef)) {
             if (classProviders != null) {
@@ -1011,8 +1381,8 @@ public class RubyModule extends RubyObject {
     /** rb_define_class_under
      *
      */
-    public RubyClass defineClassUnder(String name, RubyClass superClazz, ObjectAllocator allocator) {
-        IRubyObject type = getInstanceVariable(name);
+    public RubyClass defineClassUnder(final String name, final RubyClass superClazz, final ObjectAllocator allocator) {
+        IRubyObject type = getLocalConstant(name);
 
         if (type == null) {
             return getRuntime().defineClassUnder(name, superClazz, allocator, this);
@@ -1041,54 +1411,32 @@ public class RubyModule extends RubyObject {
         return (RubyModule) type;
     }
 
-    /** rb_define_const
-     *
-     */
-    public void defineConstant(String name, IRubyObject value) {
-        assert value != null;
-
-        if (this == getRuntime().getClass("Class")) {
-            getRuntime().secure(4);
-        }
-
-        if (!IdUtil.isConstant(name)) {
-            throw getRuntime().newNameError("bad constant name " + name, name);
-        }
-
-        setConstant(name, value);
-    }
 
     /** rb_mod_remove_cvar
      *
      */
-    public IRubyObject removeCvar(IRubyObject name) { // Wrong Parameter ?
-        if (!IdUtil.isClassVariable(name.asSymbol())) {
-            throw getRuntime().newNameError("wrong class variable name " + name.asSymbol(), name.asSymbol());
-        }
-
-        if (!isTaint() && getRuntime().getSafeLevel() >= 4) {
-            throw getRuntime().newSecurityError("Insecure: can't remove class variable");
-        }
-        testFrozen("class/module");
-
-        IRubyObject value = removeInstanceVariable(name.asSymbol());
+    public IRubyObject removeCvar(final IRubyObject name) { // Wrong Parameter ?
+        final String id = name.asSymbol();
+        IRubyObject value = getVariableStore().validatedRemoveClassVariable(id);
 
         if (value != null) {
             return value;
         }
 
-        if (isClassVarDefined(name.asSymbol())) {
-            throw cannotRemoveError(name.asSymbol());
+        if (fastIsClassVarDefined(id)) {
+            throw cannotRemoveError(id);
         }
 
-        throw getRuntime().newNameError("class variable " + name.asSymbol() + " not defined for " + getName(), name.asSymbol());
+        throw getRuntime().newNameError("class variable " + id + " not defined for " + getName(), id);
     }
 
-    private void addAccessor(String name, boolean readable, boolean writeable) {
-        ThreadContext tc = getRuntime().getCurrentContext();
+    private void addAccessor(String name, final boolean readable, final boolean writeable) {
+        final Ruby runtime = getRuntime();
+        final ThreadContext context = runtime.getCurrentContext();
+        //final ThreadContext tc = runtime.getCurrentContext();
 
         // Check the visibility of the previous frame, which will be the frame in which the class is being eval'ed
-        Visibility attributeScope = tc.getCurrentVisibility();
+        Visibility attributeScope = context.getCurrentVisibility();
         if (attributeScope.isPrivate()) {
             //FIXME warning
         } else if (attributeScope.isModuleFunction()) {
@@ -1096,16 +1444,16 @@ public class RubyModule extends RubyObject {
             // FIXME warning
         }
         final String variableName = ("@" + name).intern();
-        final Ruby runtime = getRuntime();
-        ThreadContext context = getRuntime().getCurrentContext();
         if (readable) {
             defineFastMethod(name, new Callback() {
-                public IRubyObject execute(IRubyObject self, IRubyObject[] args, Block block) {
+                public IRubyObject execute(final IRubyObject self, final IRubyObject[] args, final Block block) {
                     Arity.checkArgumentCount(getRuntime(), args, 0, 0);
 
-                    IRubyObject variable = self.getInstanceVariable(variableName);
-
-                    return variable == null ? runtime.getNil() : variable;
+                    final IRubyObject value;
+                    if ((value = self.fastGetInstanceVariable(variableName)) != null) {
+                        return value;
+                    }
+                    return runtime.getNil();
                 }
 
                 public Arity getArity() {
@@ -1115,13 +1463,13 @@ public class RubyModule extends RubyObject {
             callMethod(context, "method_added", RubySymbol.newSymbol(getRuntime(), name));
         }
         if (writeable) {
-            name = name + "=";
+            name = (name + "=").intern();
             defineFastMethod(name, new Callback() {
-                public IRubyObject execute(IRubyObject self, IRubyObject[] args, Block block) {
+                public IRubyObject execute(final IRubyObject self, final IRubyObject[] args, final Block block) {
                     // ENEBO: Can anyone get args to be anything but length 1?
                     Arity.checkArgumentCount(getRuntime(), args, 1, 1);
 
-                    return self.setInstanceVariable(variableName, args[0]);
+                    return self.fastSetInstanceVariable(variableName, args[0]);
                 }
 
                 public Arity getArity() {
@@ -1251,7 +1599,7 @@ public class RubyModule extends RubyObject {
         }
 
         if(isSingleton()){
-            IRubyObject singleton = getInstanceVariable("__attached__"); 
+            IRubyObject singleton = fastGetInternalVariable("__attached__"); 
             singleton.callMethod(context, "singleton_method_added", symbol);
         }else{
         callMethod(context, "method_added", symbol);
@@ -1300,19 +1648,24 @@ public class RubyModule extends RubyObject {
      *
      */
     public RubyArray class_variables() {
-        RubyArray ary = getRuntime().newArray();
+        // in theory we shouldn't have duplicates, but using Set to be sure (old logic
+        // called #contains on array).
+        // TODO: throw an exception if we find a duplicate?
+        final Set<String> names = new HashSet<String>();
 
         for (RubyModule p = this; p != null; p = p.getSuperClass()) {
-            for (Iterator iter = p.instanceVariableNames(); iter.hasNext();) {
-                String id = (String) iter.next();
-                if (IdUtil.isClassVariable(id)) {
-                    RubyString kval = getRuntime().newString(id);
-                    if (!ary.includes(kval)) {
-                        ary.append(kval);
-                    }
-                }
+            for (String name : p.getLocalClassVariableNameList()) {
+                names.add(name);
             }
         }
+        
+        final Ruby runtime = getRuntime();
+        final RubyArray ary = runtime.newArray();
+ 
+        for (String name : names) {
+            ary.add(runtime.newString(name));
+        }
+        
         return ary;
     }
 
@@ -1326,20 +1679,20 @@ public class RubyModule extends RubyObject {
             throw getRuntime().newNameError("`" + varName + "' is not allowed as a class variable name", varName);
         }
 
-        return getClassVar(varName);
+        return fastGetClassVar(varName);
     }
 
-    public IRubyObject class_variable_defined_p(IRubyObject var) {
-        String name = var.asSymbol();
+    public IRubyObject class_variable_defined_p(final IRubyObject var) {
+        final String name = var.asSymbol();
 
         if (!IdUtil.isValidClassVariableName(name)) {
             throw getRuntime().newNameError("`" + name + "' is not allowed as a class variable name", name);
         }
 
-        RubyModule module = getModuleWithInstanceVar(name);
+        final RubyModule module;
 
-        if (module != null) {
-            return module.getInstanceVariable(name) == null ? getRuntime().getFalse() : getRuntime().getTrue() ;
+        if ((module = fastGetModuleWithClassVar(name)) != null) {
+            return getRuntime().getTrue() ;
         }
         return getRuntime().getFalse();
     }
@@ -1347,14 +1700,14 @@ public class RubyModule extends RubyObject {
     /** rb_mod_cvar_set
     *
     */
-    public IRubyObject class_variable_set(IRubyObject var, IRubyObject value) {
-        String varName = var.asSymbol();
+    public IRubyObject class_variable_set(final IRubyObject var, final IRubyObject value) {
+        final String varName = var.asSymbol();
 
         if (!IdUtil.isValidClassVariableName(varName)) {
             throw getRuntime().newNameError("`" + varName + "' is not allowed as a class variable name", varName);
         }
 
-        return setClassVar(varName, value);
+        return fastSetClassVar(varName, value);
     }
 
     protected IRubyObject cloneMethods(RubyModule clone) {
@@ -1397,8 +1750,8 @@ public class RubyModule extends RubyObject {
 
         setSuperClass(originalModule.getSuperClass());
         
-        if (originalModule.instanceVariables != null){
-            setInstanceVariables(new HashMap(originalModule.getInstanceVariables()));
+        if (originalModule.hasVariables()){
+            syncVariables(originalModule.getVariableList());
         }
         
         // no __classpath__ and __classid__ stuff in JRuby here (yet?)        
@@ -1469,7 +1822,7 @@ public class RubyModule extends RubyObject {
      */
     public IRubyObject to_s() {
         if(isSingleton()){            
-            IRubyObject attached = getInstanceVariable("__attached__");
+            IRubyObject attached = fastGetInternalVariable("__attached__");
             StringBuffer buffer = new StringBuffer("#<Class:");
             if(attached instanceof RubyClass || attached instanceof RubyModule){
                 buffer.append(attached.inspect());
@@ -1627,49 +1980,6 @@ public class RubyModule extends RubyObject {
         return getRuntime().getNil();
     }
 
-    /** rb_mod_const_get
-     *
-     */
-    public IRubyObject const_get(IRubyObject symbol) {
-        String name = symbol.asSymbol();
-
-        if (!IdUtil.isValidConstantName(name)) {
-            throw wrongConstantNameError(name);
-        }
-
-        return getConstant(name);
-    }
-
-    /** rb_mod_const_set
-     *
-     */
-    public IRubyObject const_set(IRubyObject symbol, IRubyObject value) {
-        String name = symbol.asSymbol();
-
-        if (!IdUtil.isValidConstantName(name)) {
-            throw wrongConstantNameError(name);
-        }
-
-        return setConstant(name, value);
-    }
-
-    /** rb_mod_const_defined
-     *
-     */
-    public RubyBoolean const_defined(IRubyObject symbol) {
-        String name = symbol.asSymbol();
-
-        if (!IdUtil.isValidConstantName(name)) {
-            throw wrongConstantNameError(name);
-        }
-        
-        return getRuntime().newBoolean(getInstanceVariable(name) != null);
-    }
-
-    private RaiseException wrongConstantNameError(String name) {
-        return getRuntime().newNameError("wrong constant name " + name, name);
-    }
-
     private RubyArray instance_methods(IRubyObject[] args, final Visibility visibility) {
         boolean includeSuper = args.length > 0 ? args[0].isTrue() : true;
         RubyArray ary = getRuntime().newArray();
@@ -1735,98 +2045,59 @@ public class RubyModule extends RubyObject {
      *
      */
     public RubyArray constants() {
-        ArrayList constantNames = new ArrayList();
-        RubyModule objectClass = getRuntime().getObject();
+        final Ruby runtime = getRuntime();
+        final RubyArray array = runtime.newArray();
+        final RubyModule objectClass = runtime.getObject();
 
         if (getRuntime().getClass("Module") == this) {
-            for (Iterator vars = objectClass.instanceVariableNames();
-                 vars.hasNext();) {
-                String name = (String) vars.next();
-                if (IdUtil.isConstant(name)) {
-                    constantNames.add(getRuntime().newString(name));
-                }
+
+            for (String name : objectClass.getLocalConstantNameList()) {
+                array.add(runtime.newString(name));
             }
 
-            return getRuntime().newArray(constantNames);
-        } else if (getRuntime().getObject() == this) {
-            for (Iterator vars = instanceVariableNames(); vars.hasNext();) {
-                String name = (String) vars.next();
-                if (IdUtil.isConstant(name)) {
-                    constantNames.add(getRuntime().newString(name));
-                }
+        } else if (objectClass == this) {
+
+            for (String name : getLocalConstantNameList()) {
+                array.add(runtime.newString(name));
             }
 
-            return getRuntime().newArray(constantNames);
-        }
-
-        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
-            if (objectClass == p) {
-                continue;
-            }
-
-            for (Iterator vars = p.instanceVariableNames(); vars.hasNext();) {
-                String name = (String) vars.next();
-                if (IdUtil.isConstant(name)) {
-                    constantNames.add(getRuntime().newString(name));
+        } else {
+            Set<String> names = new HashSet<String>();
+            for (RubyModule p = this; p != null; p = p.getSuperClass()) {
+                if (objectClass != p) {
+                    for (String name : p.getLocalConstantNameList()) {
+                        names.add(name);
+                    }
                 }
+            }
+            for (String name : names) {
+                array.add(runtime.newString(name));
             }
         }
 
-        return getRuntime().newArray(constantNames);
+        return array;
     }
 
     /** rb_mod_remove_cvar
      *
      */
-    public IRubyObject remove_class_variable(IRubyObject name) {
-        String id = name.asSymbol();
+    public IRubyObject remove_class_variable(final IRubyObject name) {
+        final String id = name.asSymbol();
+        IRubyObject value = getVariableStore().validatedRemoveClassVariable(id);
 
-        if (!IdUtil.isClassVariable(id)) {
-            throw getRuntime().newNameError("wrong class variable name " + id, id);
-        }
-        if (!isTaint() && getRuntime().getSafeLevel() >= 4) {
-            throw getRuntime().newSecurityError("Insecure: can't remove class variable");
-        }
-        testFrozen("class/module");
-
-        IRubyObject variable = removeInstanceVariable(id);
-        if (variable != null) {
-            return variable;
+        if (value != null) {
+            return value;
         }
 
-        if (isClassVarDefined(id)) {
+        if (fastIsClassVarDefined(id)) {
             throw cannotRemoveError(id);
         }
+
         throw getRuntime().newNameError("class variable " + id + " not defined for " + getName(), id);
     }
 
     private RaiseException cannotRemoveError(String id) {
         return getRuntime().newNameError("cannot remove " + id + " for " + getName(), id);
-    }
-
-    public IRubyObject remove_const(IRubyObject name) {
-        String id = name.asSymbol();
-
-        if (!IdUtil.isConstant(id)) {
-            throw wrongConstantNameError(id);
-        }
-        if (!isTaint() && getRuntime().getSafeLevel() >= 4) {
-            throw getRuntime().newSecurityError("Insecure: can't remove class variable");
-        }
-        testFrozen("class/module");
-
-        IRubyObject variable = getInstanceVariable(id);
-        if (variable != null) {
-            if (variable == getRuntime().getUndef()) {
-                getRuntime().getLoadService().removeAutoLoadFor(getName() + "::" + id);
-            }
-            return removeInstanceVariable(id);
-        }
-
-        if (isClassVarDefined(id)) {
-            throw cannotRemoveError(id);
-        }
-        throw getRuntime().newNameError("constant " + id + " not defined for " + getName(), id);
     }
 
     /** rb_mod_append_features

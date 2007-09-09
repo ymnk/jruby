@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -12,6 +13,7 @@
  * rights and limitations under the License.
  *
  * Copyright (C) 2006 Kresten Krab Thorup <krab@gnu.org>
+ * Copyright (C) 2007 William N Dortch <bill.dortch@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -543,17 +545,16 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
             RubyModule ancestor = (RubyModule)iter.next();
             if (ancestor instanceof RubyClass) {
                 if (skipRemainingClasses) continue;
-                Map vars = ancestor.getInstanceVariables();
                 // we only collect methods and interfaces for 
                 // user-defined proxy classes.
-                if (!vars.containsKey("@java_proxy_class")) {
+                if (!ancestor.fastHasInstanceVariable("@java_proxy_class")) {
                     skipRemainingClasses = true;
                     continue;
                 }
 
                 // get JavaClass if this is the new proxy class; verify it
                 // matches if this is a superclass proxy.
-                IRubyObject var = (IRubyObject)vars.get("@java_class");
+                IRubyObject var = (IRubyObject)ancestor.fastGetInstanceVariable("@java_class");
                 if (var == null) {
                     throw runtime.newTypeError(
                             "no java_class defined for proxy (or ancestor): " + ancestor);
@@ -571,7 +572,7 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
                             " (" + var + ")");
                 }
                 // get any included interfaces
-                var = (IRubyObject)vars.get("@java_interfaces");
+                var = (IRubyObject)ancestor.fastGetInstanceVariable("@java_interfaces");
                 if (var != null && !(var instanceof RubyNil)) {
                     if (!(var instanceof RubyArray)) {
                         throw runtime.newTypeError(
@@ -601,7 +602,10 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
                 // set this class's method names in var @__java_ovrd_methods if this
                 // is the new class; otherwise, get method names from there if this is
                 // a proxy superclass.
-                var = (IRubyObject)vars.get("@__java_ovrd_methods");
+                
+                // FIXME: shouldn't need @__java_ovrd_methods, just query locally defined methods.
+                
+                var = (IRubyObject)ancestor.fastGetInstanceVariable("@__java_ovrd_methods");
                 if (var == null) {
                     // lock in the overridden methods for the new class, and any as-yet
                     // uninstantiated ancestor class.
@@ -617,8 +621,7 @@ public class JavaProxyClass extends JavaProxyReflectionObject {
                             }
                         }
                     }
-                    // TODO: OK to just do a put here?
-                    ancestor.setInstanceVariable("@__java_ovrd_methods",methodNames);
+                    ancestor.fastSetInstanceVariable("@__java_ovrd_methods",methodNames);
                 } else {
                     if (!(var instanceof RubyArray)) {
                         throw runtime.newTypeError(

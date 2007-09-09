@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -17,6 +18,7 @@
  * Copyright (C) 2004 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Ola Bini <ola.bini@ki.se>
+ * Copyright (C) 2007 William N Dortch <bill.dortch@gmail.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -54,7 +56,12 @@ import org.jruby.runtime.ThreadContext;
  *
  * @author  jpetersen
  */
-public interface IRubyObject {
+public interface IRubyObject
+extends
+    ObjectVariables<IRubyObject>,
+    Callable<IRubyObject>,
+    Mutable<IRubyObject>
+{
     /**
      *
      */
@@ -71,75 +78,6 @@ public interface IRubyObject {
      */
     int getNativeTypeIndex();
     
-    /**
-     * Gets a copy of the instance variables for this object, if any exist.
-     * Returns null if this object has no instance variables.
-     * "safe" in that it doesn't cause the instance var map to be created.
-     *
-     * @return A snapshot of the instance vars, or null if none.
-     */
-    Map safeGetInstanceVariables();
-    
-    /**
-     * Returns true if the object has any instance variables, false otherwise.
-     * "safe" in that it doesn't cause the instance var map to be created.
-     *
-     * @return true if the object has instance variables, false otherwise.
-     */
-    boolean safeHasInstanceVariables();
-    
-    /**
-     * RubyMethod getInstanceVar.
-     * @param string
-     * @return RubyObject
-     */
-    IRubyObject getInstanceVariable(String string);
-    
-    /**
-     * RubyMethod setInstanceVar.
-     * @param string
-     * @param rubyObject
-     * @return RubyObject
-     */
-    IRubyObject setInstanceVariable(String string, IRubyObject rubyObject);
-    
-    /**
-     *
-     * @return
-     */
-    Map getInstanceVariables();
-    
-    /**
-     *
-     * 
-     * @param instanceVariables 
-     */
-    void setInstanceVariables(Map instanceVariables);
-    
-    /**
-     *
-     * @return
-     */
-    Map getInstanceVariablesSnapshot();
-    
-    public IRubyObject callSuper(ThreadContext context, IRubyObject[] args, Block block);
-
-    public IRubyObject callMethod(ThreadContext context, String name);
-    public IRubyObject callMethod(ThreadContext context, String name, Block block);
-    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject arg);
-    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args);
-    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, Block block);
-    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, CallType callType);
-    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, CallType callType, Block block);
-    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name);
-    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name, IRubyObject arg);
-    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name, IRubyObject[] args);
-    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name, IRubyObject[] args, CallType callType);
-    public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, String name, IRubyObject[] args, CallType callType, Block block);
-    public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, int methodIndex, String name, IRubyObject[] args, CallType callType, Block block);
-    public IRubyObject compilerCallMethodWithIndex(ThreadContext context, int methodIndex, String name, IRubyObject[] args, IRubyObject self, CallType callType, Block block);
-    public IRubyObject compilerCallMethod(ThreadContext context, String name,
-            IRubyObject[] args, IRubyObject self, CallType callType, Block block);
     
     /**
      * RubyMethod isNil.
@@ -154,30 +92,6 @@ public interface IRubyObject {
     boolean isTrue();
     
     /**
-     * RubyMethod isTaint.
-     * @return boolean
-     */
-    boolean isTaint();
-    
-    /**
-     * RubyMethod setTaint.
-     * @param b
-     */
-    void setTaint(boolean b);
-    
-    /**
-     * RubyMethod isFrozen.
-     * @return boolean
-     */
-    boolean isFrozen();
-    
-    /**
-     * RubyMethod setFrozen.
-     * @param b
-     */
-    void setFrozen(boolean b);
-    
-    /**
      *
      * @return
      */
@@ -189,13 +103,6 @@ public interface IRubyObject {
      * @return boolean
      */
     boolean isKindOf(RubyModule rubyClass);
-    
-    /**
-     * Infect this object using the taint of another object
-     * @param obj
-     * @return
-     */
-    IRubyObject infectBy(IRubyObject obj);
     
     /**
      * RubyMethod getRubyClass.
@@ -377,12 +284,6 @@ public interface IRubyObject {
     boolean isSingleton();
     
     /**
-     *
-     * @return
-     */
-    Iterator instanceVariableNames();
-    
-    /**
      * Our version of Data_Wrap_Struct.
      *
      * This method will just set a private pointer to the object provided. This pointer is transient
@@ -420,4 +321,28 @@ public interface IRubyObject {
     public void addFinalizer(RubyProc finalizer);
 
     public void removeFinalizers();
+    
+    
+    //
+    // DEPRECATED METHODS
+    //
+    
+    @Deprecated
+    Map getInstanceVariables();
+    
+    @Deprecated
+    Map getInstanceVariablesSnapshot();
+    
+    @Deprecated
+    Iterator instanceVariableNames();
+   
+    @Deprecated
+    Map safeGetInstanceVariables();
+    
+    @Deprecated
+    boolean safeHasInstanceVariables();
+        
+    @Deprecated
+    void setInstanceVariables(Map instanceVariables);
+    
 }

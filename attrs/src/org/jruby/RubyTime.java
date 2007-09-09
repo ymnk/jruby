@@ -67,7 +67,7 @@ public class RubyTime extends RubyObject {
     public static TimeZone getLocalTimeZone(Ruby runtime) {
         // TODO: cache the RubyString "TZ" so it doesn't need to be recreated for each call?
         RubyString tzVar = runtime.newString("TZ");
-        RubyHash h = ((RubyHash)runtime.getObject().getConstant("ENV"));
+        RubyHash h = ((RubyHash)runtime.getObject().fastSearchConstant("ENV"));
         IRubyObject tz = h.aref(tzVar);
         if (tz == null || ! (tz instanceof RubyString)) {
             return TimeZone.getDefault();
@@ -512,7 +512,7 @@ public class RubyTime extends RubyObject {
         }
         
         RubyString str = (RubyString) mdump(new IRubyObject[] { this });
-        str.setInstanceVariables(this.getInstanceVariables());
+        str.syncVariables(this.getVariableList());
         return str;
     }    
 

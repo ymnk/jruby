@@ -459,7 +459,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         public void retrieveConstantFromModule(String name) {
             method.visitTypeInsn(CHECKCAST, cg.p(RubyModule.class));
             method.ldc(name);
-            method.invokevirtual(cg.p(RubyModule.class), "getConstantFrom", cg.sig(IRubyObject.class, cg.params(String.class)));
+            //method.invokevirtual(cg.p(RubyModule.class), "getConstantFrom", cg.sig(IRubyObject.class, cg.params(String.class)));
+            method.invokevirtual(cg.p(RubyModule.class), "fastSearchConstantExclusive", cg.sig(IRubyObject.class, cg.params(String.class)));
         }
 
         public void retrieveClassVariable(String name) {
@@ -992,7 +993,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             loadSelf();
 
             method.ldc(name);
-            invokeIRubyObject("getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
+            //invokeIRubyObject("getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
+            invokeIRubyObject("fastGetInstanceVariable", cg.sig(Object.class, cg.params(String.class)));
 
             // check if it's null; if so, load nil
             method.dup();
@@ -1014,7 +1016,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.ldc(name);
             method.swap();
 
-            invokeIRubyObject("setInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class, IRubyObject.class)));
+            //invokeIRubyObject("setInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class, IRubyObject.class)));
+            invokeIRubyObject("fastSetInstanceVariable", cg.sig(Object.class, cg.params(String.class, Object.class)));
         }
 
         public void assignInstanceVariableBlockArg(int argIndex, String name) {
@@ -1025,7 +1028,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.ldc(new Integer(argIndex));
             method.arrayload();
 
-            invokeIRubyObject("setInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class, IRubyObject.class)));
+            //invokeIRubyObject("setInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class, IRubyObject.class)));
+            invokeIRubyObject("fastSetInstanceVariable", cg.sig(Object.class, cg.params(String.class, Object.class)));
         }
 
         public void retrieveGlobalVariable(String name) {
@@ -1607,10 +1611,12 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         public void isInstanceVariableDefined(String name, BranchCallback trueBranch, BranchCallback falseBranch) {
             loadSelf();
             method.ldc(name);
-            method.invokeinterface(cg.p(IRubyObject.class), "getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
+            //method.invokeinterface(cg.p(IRubyObject.class), "getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
+            method.invokeinterface(cg.p(IRubyObject.class), "fastHasInstanceVariable", cg.sig(Object.class, cg.params(String.class)));
             Label trueLabel = new Label();
             Label exitLabel = new Label();
-            method.ifnonnull(trueLabel);
+            //method.ifnonnull(trueLabel);
+            method.ifne(trueLabel);
             falseBranch.branch(this);
             method.go_to(exitLabel);
             method.label(trueLabel);
@@ -1681,7 +1687,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
                         method.visitTypeInsn(CHECKCAST, cg.p(RubyModule.class));
                         method.dup(); //[C, C]
                         method.ldc(name); //[C, C, String]
-                        method.invokevirtual(cg.p(RubyModule.class), "getConstantAt", cg.sig(IRubyObject.class, cg.params(String.class))); //[C, null|C]
+                        //method.invokevirtual(cg.p(RubyModule.class), "getConstantAt", cg.sig(IRubyObject.class, cg.params(String.class))); //[C, null|C]
+                        method.invokevirtual(cg.p(RubyModule.class), "fastGetConstantAt", cg.sig(IRubyObject.class, cg.params(String.class))); //[C, null|C]
                         method.dup();
                         method.ifnull(nextJmpPop);
                         method.pop(); method.pop();
@@ -1769,7 +1776,12 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         }
         public void getInstanceVariable(String name) {
             method.ldc(name);
-            method.invokeinterface(cg.p(IRubyObject.class), "getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
+            //method.invokeinterface(cg.p(IRubyObject.class), "getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
+            method.invokeinterface(cg.p(IRubyObject.class), "fastGetInstanceVariable", cg.sig(Object.class, cg.params(String.class)));
+        }
+        public void getInternalVariable(String name) {
+            method.ldc(name);
+            method.invokeinterface(cg.p(IRubyObject.class), "fastGetInternalVariable", cg.sig(Object.class, cg.params(String.class)));
         }
         public void getFrameName() {
             loadThreadContext();

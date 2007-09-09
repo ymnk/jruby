@@ -48,7 +48,7 @@ public final class IdUtil {
         
         switch (c) {
         case '@':
-            return id.charAt(1) == '@' ? CLASS_VAR : INSTANCE_VAR;
+            return id.length() > 1 && id.charAt(1) == '@' ? CLASS_VAR : INSTANCE_VAR;
         case '$':
             return GLOBAL_VAR;
         }

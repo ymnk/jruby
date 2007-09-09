@@ -74,7 +74,7 @@ public class ConstNode extends Node implements INameNode {
     }
 
 	public void setName(String name) {
-		this.name = name;
+		this.name = name.intern();
 	}
 
 }

@@ -524,7 +524,8 @@ public class RubyString extends RubyObject {
      *
      */
     public String asSymbol() {
-        return toString();
+        // this needs to be interned here - call #toString for non-interned value
+        return toString().intern();
     }
 
 

@@ -62,7 +62,7 @@ public class RubyTCPServer extends RubyTCPSocket {
         rb_cTCPServer.defineFastMethod("listen", cfact.getFastMethod("listen",IRubyObject.class));
         rb_cTCPServer.getMetaClass().defineMethod("open", cfact.getOptSingletonMethod("open"));
         
-        runtime.getObject().setConstant("TCPserver",rb_cTCPServer);
+        runtime.getObject().fastSetConstant("TCPserver",rb_cTCPServer);
     }
 
     private static ObjectAllocator TCPSERVER_ALLOCATOR = new ObjectAllocator() {

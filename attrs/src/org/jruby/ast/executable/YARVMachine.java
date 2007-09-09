@@ -283,24 +283,24 @@ public class YARVMachine {
                 context.getCurrentScope().setValue((int) bytecodes[ip].l_op0, pop(), 0);
                 break;
             case YARVInstructions.GETINSTANCEVARIABLE:
-                push(self.getInstanceVariable(bytecodes[ip].s_op0));
+                push(self.fastGetInstanceVariable(bytecodes[ip].s_op0));
                 break;
             case YARVInstructions.SETINSTANCEVARIABLE:
-                self.setInstanceVariable(bytecodes[ip].s_op0, pop());
+                self.fastSetInstanceVariable(bytecodes[ip].s_op0, pop());
                 break;
             case YARVInstructions.GETCLASSVARIABLE: {
                 RubyModule rubyClass = context.getRubyClass();
                 String name = bytecodes[ip].s_op0;
     
                 if (rubyClass == null) {
-                    push(self.getMetaClass().getClassVar(name));
+                    push(self.getMetaClass().fastGetClassVar(name));
                 } else if (!rubyClass.isSingleton()) {
-                    push(rubyClass.getClassVar(name));
+                    push(rubyClass.fastGetClassVar(name));
                 } else {
-                    RubyModule module = (RubyModule) rubyClass.getInstanceVariable("__attached__");
+                    RubyModule module = (RubyModule) rubyClass.fastGetInternalVariable("__attached__");
     
                     if (module != null) {
-                        push(module.getClassVar(name));
+                        push(module.fastGetClassVar(name));
                     } else {
                         push(runtime.getNil());
                     }
@@ -313,10 +313,10 @@ public class YARVMachine {
                 if (rubyClass == null) {
                     rubyClass = self.getMetaClass();
                 } else if (rubyClass.isSingleton()) {
-                    rubyClass = (RubyModule) rubyClass.getInstanceVariable("__attached__");
+                    rubyClass = (RubyModule) rubyClass.fastGetInternalVariable("__attached__");
                 }
     
-                rubyClass.setClassVar(bytecodes[ip].s_op0, pop());
+                rubyClass.fastSetClassVar(bytecodes[ip].s_op0, pop());
                 break;
             }
             case YARVInstructions.GETCONSTANT:
@@ -324,7 +324,7 @@ public class YARVMachine {
                 break;
             case YARVInstructions.SETCONSTANT:
                 RubyModule module = context.getCurrentScope().getStaticScope().getModule();
-                module.setConstant(bytecodes[ip].s_op0, pop());
+                module.fastSetConstant(bytecodes[ip].s_op0, pop());
                 runtime.incGlobalState();
                 break;
             case YARVInstructions.PUTNIL:

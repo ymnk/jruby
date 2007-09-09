@@ -53,14 +53,14 @@ public class RubyTCPSocket extends RubyIPSocket {
         RubyClass rb_cTCPSocket = runtime.defineClass("TCPSocket", runtime.getClass("IPSocket"), TCPSOCKET_ALLOCATOR);
         CallbackFactory cfact = runtime.callbackFactory(RubyTCPSocket.class);
 
-        rb_cTCPSocket.includeModule(runtime.getClass("Socket").getConstant("Constants"));
+        rb_cTCPSocket.includeModule(runtime.getClass("Socket").fastGetConstantAt("Constants"));
 
         rb_cTCPSocket.defineFastMethod("initialize", cfact.getFastMethod("initialize",IRubyObject.class, IRubyObject.class));
         rb_cTCPSocket.defineFastMethod("setsockopt", cfact.getFastOptMethod("setsockopt"));
         rb_cTCPSocket.getMetaClass().defineFastMethod("gethostbyname", cfact.getFastSingletonMethod("gethostbyname", IRubyObject.class));
         rb_cTCPSocket.getMetaClass().defineMethod("open", cfact.getOptSingletonMethod("open"));
 
-        runtime.getObject().setConstant("TCPsocket",rb_cTCPSocket);
+        runtime.getObject().fastSetConstant("TCPsocket",rb_cTCPSocket);
     }
 
     private static ObjectAllocator TCPSOCKET_ALLOCATOR = new ObjectAllocator() {

@@ -236,11 +236,11 @@ public class RubyZlib {
     }
 
     public static IRubyObject zlib_version(IRubyObject recv) {
-        return ((RubyModule)recv).getConstant("ZLIB_VERSION");
+        return ((RubyModule)recv).fastSearchConstant("ZLIB_VERSION");
     }
 
     public static IRubyObject version(IRubyObject recv) {
-        return ((RubyModule)recv).getConstant("VERSION");
+        return ((RubyModule)recv).fastSearchConstant("VERSION");
     }
 
     public static IRubyObject crc32(IRubyObject recv, IRubyObject[] args) throws Exception {
@@ -341,7 +341,7 @@ public class RubyZlib {
         }
 
         public IRubyObject data_type() {
-            return getRuntime().getModule("Zlib").getConstant("UNKNOWN");
+            return getRuntime().getModule("Zlib").fastSearchConstant("UNKNOWN");
         }
 
         public IRubyObject closed_p() {

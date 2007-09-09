@@ -50,7 +50,7 @@ public class RubyIPSocket extends RubyBasicSocket {
         rb_cIPSocket.defineFastMethod("peeraddr", cfact.getFastMethod("peeraddr"));
         rb_cIPSocket.getMetaClass().defineFastMethod("getaddress", cfact.getFastSingletonMethod("getaddress", IRubyObject.class));
 
-        runtime.getObject().setConstant("IPsocket",rb_cIPSocket);
+        runtime.getObject().fastSetConstant("IPsocket",rb_cIPSocket);
     }
     
     private static ObjectAllocator IPSOCKET_ALLOCATOR = new ObjectAllocator() {

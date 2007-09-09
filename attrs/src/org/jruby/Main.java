@@ -260,8 +260,22 @@ public class Main {
         defineGlobalVERBOSE(runtime);
         defineGlobalDEBUG(runtime);
 
-        runtime.getObject().setConstant("$VERBOSE",
+        //
+        // FIXME: why "constant" and not global variable? this doesn't seem right,
+        // $VERBOSE is set as global var elsewhere.
+        //
+//        runtime.getObject().setConstant("$VERBOSE",
+//                commandline.isVerbose() ? runtime.getTrue() : runtime.getNil());
+
+        // storing via internal var for now, as setConstant will now fail
+        // validation
+        runtime.getObject().setInternalVariable("$VERBOSE",
                 commandline.isVerbose() ? runtime.getTrue() : runtime.getNil());
+        //
+        //
+
+        
+        
         runtime.defineGlobalConstant("ARGV", argumentArray);
 
         defineGlobal(runtime, "$-p", commandline.isAssumePrinting());

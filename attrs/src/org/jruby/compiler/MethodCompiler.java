@@ -463,6 +463,7 @@ public interface MethodCompiler {
     public void loadSelf();
     public void ifSingleton(Object gotoToken);
     public void getInstanceVariable(String name);
+    public void getInternalVariable(String name);
     public void getFrameName();
     public void getFrameKlazz(); 
     public void superClass();

@@ -242,13 +242,13 @@ public class CompilerHelpers {
         return (RubyArray) value;
     }
     
-    public static IRubyObject fetchClassVariable(ThreadContext context, Ruby runtime, 
-            IRubyObject self, String name) {
+    public static IRubyObject fetchClassVariable(final ThreadContext context, final Ruby runtime, 
+            final IRubyObject self, final String internedName) {
         RubyModule rubyClass = EvaluationState.getClassVariableBase(context, runtime);
    
         if (rubyClass == null) rubyClass = self.getMetaClass();
 
-        return rubyClass.getClassVar(name);
+        return rubyClass.getClassVar(internedName);
     }
    
     // needs to be rewritten to support new jump exceptions
@@ -304,13 +304,13 @@ public class CompilerHelpers {
         }
     }
 
-    public static IRubyObject setClassVariable(ThreadContext context, Ruby runtime, 
-            IRubyObject self, String name, IRubyObject value) {
+    public static IRubyObject setClassVariable(final ThreadContext context, final Ruby runtime, 
+            final IRubyObject self, final String internedName, final IRubyObject value) {
         RubyModule rubyClass = EvaluationState.getClassVariableBase(context, runtime);
    
         if (rubyClass == null) rubyClass = self.getMetaClass();
 
-        rubyClass.setClassVar(name, value);
+        rubyClass.fastSetClassVar(internedName, value);
    
         return value;
     }
