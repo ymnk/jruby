@@ -237,7 +237,7 @@ implements Serializable {
     private final BaseObjectType fetchValue(final String name) {
 //        if (size > 0) { // read-volatile
             Entry<BaseObjectType> e;
-            final BaseObjectType value;
+            //final BaseObjectType value;
             final int hash = name.hashCode();
             final Entry<BaseObjectType>[] table = this.table;
             for (e = table[hash & (table.length - 1)]; e != null; e = e.next) {
@@ -257,7 +257,7 @@ implements Serializable {
         assert internedName == internedName.intern() : internedName + " not interned";
 //        if (size > 0) { // read-volatile
             Entry<BaseObjectType> e;
-            final BaseObjectType value;
+            //final BaseObjectType value;
             final Entry<BaseObjectType>[] table = this.table;
             for (e = table[internedName.hashCode() & (table.length - 1)]; e != null; e = e.next) {
                 if (internedName == e.name) {
@@ -273,8 +273,6 @@ implements Serializable {
     }
     
     private final void storeValue(final String name, final BaseObjectType value) {
-        // TODO: null value may be legal someday (if lightweight null => nil)
-        assert value != null;
         final int hash = name.hashCode();
         final ReentrantLock lock;
         (lock = tableLock).lock();
@@ -293,7 +291,7 @@ implements Serializable {
                 }
             }
             
-            table[index] = (e = new Entry<BaseObjectType>(hash, name.intern(), value, table[index]));
+            table[index] = new Entry<BaseObjectType>(hash, name.intern(), value, table[index]);
             size = s; // write-volatile
             // this is also write-volatile - since we have to read this anyway,
             // I think we should be able to forego the read of +size+ for getXxx
@@ -306,8 +304,6 @@ implements Serializable {
     }
     
     private final void fastStoreValue(final String internedName, final BaseObjectType value) {
-        // TODO: null value may be legal someday (if lightweight null => nil)
-        assert value != null;
         assert internedName == internedName.intern() : internedName + " not interned";
         final int hash = internedName.hashCode();
         final ReentrantLock lock;
@@ -327,7 +323,7 @@ implements Serializable {
                 }
             }
             
-            table[index] = (e = new Entry<BaseObjectType>(hash, internedName, value, table[index]));
+            table[index] = new Entry<BaseObjectType>(hash, internedName, value, table[index]);
             size = s; // write-volatile
             // this is also write-volatile - since we have to read this anyway,
             // I think we should be able to forego the read of +size+ for getXxx
@@ -571,23 +567,27 @@ implements Serializable {
     
     public void setInstanceVariable(final String name, final BaseObjectType value) {
         assert IdUtil.isInstanceVariable(name);
+        assert value != null : name + " is null";
         checkInstanceVariablesSettable();
         storeValue(name, value);
     }
     
     public void fastSetInstanceVariable(final String internedName, final BaseObjectType value) {
         assert IdUtil.isInstanceVariable(internedName);
+        assert value != null : internedName + " is null";
         checkInstanceVariablesSettable();
         fastStoreValue(internedName, value);
     }
     
     public void validatedSetInstanceVariable(final String name, final BaseObjectType value) {
+        assert value != null : name + " is null";
         validateInstanceVariable(name);
         checkInstanceVariablesSettable();
         storeValue(name, value);
     }
     
     public void fastValidatedSetInstanceVariable(final String internedName, final BaseObjectType value) {
+        assert value != null : internedName + " is null";
         validateInstanceVariable(internedName);
         checkInstanceVariablesSettable();
         fastStoreValue(internedName, value);
@@ -653,23 +653,27 @@ implements Serializable {
     
     public void setClassVariable(final String name, final BaseObjectType value) {
         assert IdUtil.isClassVariable(name);
+        assert value != null : name + " is null";
         checkClassVariablesSettable();
         storeValue(name, value);
     }
     
     public void fastSetClassVariable(final String internedName, final BaseObjectType value) {
         assert IdUtil.isClassVariable(internedName);
+        assert value != null : internedName + " is null";
         checkClassVariablesSettable();
         fastStoreValue(internedName, value);
     }
     
     public void validatedSetClassVariable(final String name, final BaseObjectType value) {
+        assert value != null : name + " is null";
         validateClassVariable(name);
         checkClassVariablesSettable();
         storeValue(name, value);
     }
     
     public void fastValidatedSetClassVariable(final String internedName, final BaseObjectType value) {
+        assert value != null : internedName + " is null";
         validateClassVariable(internedName);
         checkClassVariablesSettable();
         fastStoreValue(internedName, value);
@@ -734,23 +738,27 @@ implements Serializable {
     
     public void setConstant(final String name, final BaseObjectType value) {
         assert IdUtil.isConstant(name);
+        assert value != null : name + " is null";
         checkConstantsSettable();
         storeValue(name, value);
     }
     
     public void fastSetConstant(final String internedName, final BaseObjectType value) {
         assert IdUtil.isConstant(internedName);
+        assert value != null : internedName + " is null";
         checkConstantsSettable();
         fastStoreValue(internedName, value);
     }
     
     public void validatedSetConstant(final String name, final BaseObjectType value) {
+        assert value != null : name + " is null";
         validateConstant(name);
         checkConstantsSettable();
         storeValue(name, value);
     }
     
     public void fastValidatedSetConstant(final String internedName, final BaseObjectType value) {
+        assert value != null : internedName + " is null";
         validateConstant(internedName);
         checkConstantsSettable();
         fastStoreValue(internedName, value);

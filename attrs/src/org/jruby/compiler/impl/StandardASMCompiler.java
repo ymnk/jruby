@@ -1612,7 +1612,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             loadSelf();
             method.ldc(name);
             //method.invokeinterface(cg.p(IRubyObject.class), "getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
-            method.invokeinterface(cg.p(IRubyObject.class), "fastHasInstanceVariable", cg.sig(Object.class, cg.params(String.class)));
+            method.invokeinterface(cg.p(IRubyObject.class), "fastHasInstanceVariable", cg.sig(boolean.class, cg.params(String.class)));
             Label trueLabel = new Label();
             Label exitLabel = new Label();
             //method.ifnonnull(trueLabel);

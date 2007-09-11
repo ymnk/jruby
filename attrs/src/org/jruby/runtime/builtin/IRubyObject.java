@@ -48,7 +48,6 @@ import org.jruby.RubyFixnum;
 import org.jruby.RubyProc;
 import org.jruby.RubyString;
 import org.jruby.runtime.Block;
-import org.jruby.runtime.CallType;
 import org.jruby.runtime.ThreadContext;
 
 /** Object is the parent class of all classes in Ruby. Its methods are
