@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import org.jruby.Main;
 
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
@@ -184,6 +185,9 @@ public class TestUnitTestSuite extends TestCase {
         
 
         public void runTest() throws Throwable {
+          System.out.println("Running test [" + this.filename + "]");
+          System.out.flush();
+          
             StringBuffer script = new StringBuffer();
 
             try {
@@ -193,7 +197,7 @@ public class TestUnitTestSuite extends TestCase {
                 script.append("runner.start\n");
                 script.append("runner.faults\n");
 
-                RubyArray faults = (RubyArray)runtime.evalScriptlet(script.toString());
+                RubyArray faults = (RubyArray)runtime.executeScript(script.toString(), scriptName() + "_generated_test.rb");
 
                 if (!faults.isEmpty()) {
                     StringBuffer faultString = new StringBuffer("Faults encountered running " + scriptName() + ", complete output follows:\n");

@@ -11,7 +11,7 @@
   <property file="default.build.properties"/>
 
   <path id="build.classpath">
-    <fileset dir="${lib.dir}" includes="*.jar" excludes="jruby.jar"/>
+    <fileset dir="${lib.dir}" includes="*.jar" excludes="jruby*.jar"/>
   </path>
 
   <!-- directory that contains emma.jar and emma_ant.jar: -->
@@ -137,6 +137,8 @@
       <sysproperty key="jruby.dump_invocations" value="${jruby.classes.dir}"/>
       <arg value="-rjava"/>
       <arg value="${build.dir}/__empty.rb"/>
+      <jvmarg value="-ea"/>
+
     </java>
     <delete file="${build.dir}/__empty.rb" quiet="true"/>
   </target>
@@ -177,6 +179,7 @@
         <zipfileset src="${lib.dir}/asm-util-3.0.jar"/>
         <zipfileset src="${lib.dir}/jline-0.9.91.jar"/>
       	<zipfileset src="${lib.dir}/backport-util-concurrent.jar"/>
+        <zipfileset src="${lib.dir}/jna.jar"/>
         <rule pattern="org.objectweb.asm.**" result="jruby.objectweb.asm.@1"/>
         <zipfileset dir="${basedir}" prefix="META-INF/jruby.home">
           <include name="bin/*"/>

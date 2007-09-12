@@ -177,3 +177,79 @@ text = <<-YAML
 YAML
 
 test_equal text, YAML.load(YAML.dump(text))
+
+text = <<-YAML
+stack-bar-chart
+  conditions: 'Release' in (R1) and not 'Iteration Scheduled' = null
+  labels: SELECT DISTINCT 'Iteration Scheduled' ORDER BY 'Iteration Scheduled'
+  cumulative: true
+  series:
+  - label: New
+    color: green
+    data: SELECT 'Iteration Scheduled', COUNT(*) WHERE Status = 'New'
+    combine: overlay-bottom
+  - label: Open
+    color: pink
+    data: SELECT 'Iteration Scheduled', COUNT(*) WHERE Status = 'Open'
+    combine: overlay-bottom
+  - label: Ready for Development
+    color: yellow
+    data: SELECT 'Iteration Scheduled', COUNT(*) WHERE Status = 'Ready for Development'
+    combine: overlay-bottom
+  - label: Complete
+    color: blue
+    data: SELECT 'Iteration Scheduled', COUNT(*) WHERE Status = 'Complete'
+    combine: overlay-bottom
+  - label: Other statuses
+    color: red
+    data: SELECT 'Iteration Scheduled', COUNT(*)
+    combine: total
+YAML
+
+test_equal text, YAML.load(YAML.dump(text))
+
+text = <<YAML
+valid_key:
+key1: value
+invalid_key
+akey: blah
+YAML
+
+test_exception(ArgumentError) do 
+  YAML.load(text)
+end
+
+def roundtrip(text)
+  test_equal text, YAML.load(YAML.dump(text))
+end
+
+roundtrip("C VW\205\v\321XU\346")
+roundtrip("\n8 xwKmjHG")
+roundtrip("1jq[\205qIB\ns")
+roundtrip("\rj\230fso\304\nEE")
+roundtrip("ks]qkYM\2073Un\317\nL\346Yp\204 CKMfFcRDFZ\vMNk\302fQDR<R\v \314QUa\234P\237s aLJnAu \345\262Wqm_W\241\277J\256ILKpPNsMPuok")
+
+def fuzz_roundtrip(str)
+  out = YAML.load(YAML.dump(str))
+  test_equal str, out
+end
+
+values = (1..255).to_a
+more = ('a'..'z').to_a + ('A'..'Z').to_a
+blanks = [' ', "\t", "\n"]
+
+types = [more*10 + blanks*2, values + more*10 + blanks*2, values + more*10 + blanks*20]
+sizes = [10, 81, 214]
+
+errors = []
+types.each do |t|
+  sizes.each do |s|
+    1000.times do |vv|
+      val = ""
+      s.times do 
+        val << t[rand(t.length)]
+      end
+      fuzz_roundtrip(val)
+    end      
+  end
+end

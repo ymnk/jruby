@@ -473,7 +473,7 @@ public interface MethodCompiler {
     public void isCaptured(int number, BranchCallback trueBranch, BranchCallback falseBranch);
     public void concatArrays();
     public void appendToArray();
-    public void unwrapRubyArray();
+    public void convertToJavaArray();
     public void aryToAry();
     public void toJavaString();
     public void aliasGlobal(String newName, String oldName);
@@ -483,4 +483,5 @@ public interface MethodCompiler {
     public void unwrapPassedBlock();
     public void performBackref(char type);
     public void callZSuper(ClosureCallback closure);
+    public void appendToObjectArray();
 }

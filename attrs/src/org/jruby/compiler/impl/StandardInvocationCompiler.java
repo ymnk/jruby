@@ -31,6 +31,8 @@ public class StandardInvocationCompiler implements InvocationCompiler {
     private static final CodegenUtils cg = CodegenUtils.cg;
     private StandardASMCompiler.AbstractMethodCompiler methodCompiler;
     private SkinnyMethodAdapter method;
+    
+    private static final int THIS = 0;
 
     public StandardInvocationCompiler(StandardASMCompiler.AbstractMethodCompiler methodCompiler, SkinnyMethodAdapter method) {
         this.methodCompiler = methodCompiler;
@@ -62,6 +64,71 @@ public class StandardInvocationCompiler implements InvocationCompiler {
         // pop result, use args[length - 1] captured above
         method.pop(); // [val]
     }
+        
+    public void opElementAsgn(ClosureCallback valueCallback, String operator) {
+        // FIXME: op element asgn is not yet using CallAdapter. Boo hoo.
+        
+        // receiver and args are already on the stack
+        methodCompiler.method.dup2();
+        
+        // invoke the [] operator and dup the result
+        invokeDynamic("[]", true, true, CallType.FUNCTIONAL, null, false);
+        methodCompiler.method.dup();
+        
+        // stack is now: .. receiver, args, result, result
+        Label end = new Label();
+        if (operator == "||") {
+            Label falseResult = new Label();
+            methodCompiler.invokeIRubyObject("isTrue", cg.sig(boolean.class)); // receiver, args, result, istrue
+            methodCompiler.method.ifeq(falseResult); // receiver, args, result
+            
+            // it's true, clear everything but the result
+            methodCompiler.method.dup_x2(); // result, receiver, args, result
+            methodCompiler.method.pop(); // result, receiver, args
+            methodCompiler.method.pop2(); // result
+            methodCompiler.method.go_to(end);
+            
+            // it's false, stuff the element in
+            methodCompiler.method.label(falseResult);
+            // START: .. receiver, args, result
+            methodCompiler.method.pop(); // receiver, args
+            valueCallback.compile(methodCompiler); // receiver, args, value
+            methodCompiler.appendToObjectArray(); // receiver, combinedArgs
+            invokeDynamic("[]=", true, true, CallType.FUNCTIONAL, null, false); // assignmentResult
+            
+            methodCompiler.method.label(end);
+        } else if (operator == "&&") {
+            // TODO: This is the reverse of the above logic, and could probably be abstracted better
+            Label falseResult = new Label();
+            methodCompiler.invokeIRubyObject("isTrue", cg.sig(boolean.class));
+            methodCompiler.method.ifeq(falseResult);
+            
+            // it's true, stuff the element in
+            // START: .. receiver, args, result
+            methodCompiler.method.pop(); // receiver, args
+            valueCallback.compile(methodCompiler); // receiver, args, value
+            methodCompiler.appendToObjectArray(); // receiver, combinedArgs
+            invokeDynamic("[]=", true, true, CallType.FUNCTIONAL, null, false); // assignmentResult
+            methodCompiler.method.go_to(end);
+            
+            // it's false, clear everything but the result
+            methodCompiler.method.label(falseResult);
+            methodCompiler.method.dup_x2();
+            methodCompiler.method.pop();
+            methodCompiler.method.pop2();
+            
+            methodCompiler.method.label(end);
+        } else {
+            // remove extra result, operate on it, and reassign with original args
+            methodCompiler.method.pop();
+            // START: .. receiver, args, result
+            valueCallback.compile(methodCompiler); // receiver, args, result, value
+            methodCompiler.createObjectArray(1);
+            invokeDynamic(operator, true, true, CallType.FUNCTIONAL, null, false); // receiver, args, newresult
+            methodCompiler.appendToObjectArray(); // receiver, newargs
+            invokeDynamic("[]=", true, true, CallType.FUNCTIONAL, null, false); // assignmentResult
+        }
+    }
 
     public void invokeDynamic(String name, ClosureCallback receiverCallback, ClosureCallback argsCallback, CallType callType, ClosureCallback closureArg, boolean attrAssign) {
         String classname = methodCompiler.getScriptCompiler().getClassname();
@@ -76,7 +143,8 @@ public class StandardInvocationCompiler implements InvocationCompiler {
         
         // load call adapter
         // FIXME: These swaps suck, but OpAsgn breaks if it can't dup receiver in the middle of making this call :(
-        method.getstatic(classname, fieldname, cg.ci(CallAdapter.class));
+        method.aload(THIS);
+        method.getfield(classname, fieldname, cg.ci(CallAdapter.class));
         method.swap();
 
         methodCompiler.loadThreadContext(); // [adapter, tc]
@@ -107,29 +175,31 @@ public class StandardInvocationCompiler implements InvocationCompiler {
             }
         }
         // adapter, tc, recv, args{0,1}, block{0,1}]
-        if (closureArg != null) {
-            // wrap with try/catch for block flow-control exceptions
-            // FIXME: for flow-control from containing blocks, but it's not working right;
-            // stack is not as expected for invoke calls below...
-            //method.trycatch(tryBegin, tryEnd, tryCatch, cg.p(JumpException.class));
-        }
+        Label tryBegin = new Label();
+        Label tryEnd = new Label();
+        Label catchBreak = new Label();
+        
+//        if (closureArg != null) {
+//            // wrap with try/catch for return jumps
+//            method.trycatch(tryBegin, tryEnd, catchReturn, cg.p(JumpException.BreakJump.class));
+//        }
 
         method.invokevirtual(cg.p(CallAdapter.class), "call", signature);
 
-        if (closureArg != null) {
-            // no physical break, terminate loop and skip catch block
-            // FIXME: for flow-control from containing blocks, but it's not working right;
-            // stack is not as expected for invoke calls below...
-            //            Label normalEnd = new Label();
-            //            method.go_to(normalEnd);
-            //
-            //            method.label(tryCatch);
-            //            {
-            //                loadClosure();
-            //                invokeUtilityMethod("handleJumpException", cg.sig(IRubyObject.class, cg.params(JumpException.class, Block.class)));
-            //            }
-            //
-        }
+//        if (closureArg != null) {
+//            Label normalEnd = new Label();
+//            method.go_to(normalEnd);
+//
+//            method.label(catchReturn);
+//            {
+//                // if we get here, we're going to either continue raising the exception or do a normal return
+//                methodCompiler.loadThreadContext();
+//                methodCompiler.invokeUtilityMethod("handleReturnJump", cg.sig(IRubyObject.class, JumpException.ReturnJump.class, ThreadContext.class));
+//                methodCompiler.performReturn();
+//            }
+//            
+//            method.label(normalEnd);
+//        }
     }
 
     private void invokeDynamic(String name, boolean hasReceiver, boolean hasArgs, CallType callType, ClosureCallback closureArg, boolean attrAssign) {

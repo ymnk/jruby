@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -15,8 +16,8 @@
  * Copyright (C) 2002-2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2003 Joey Gibson <joey@joeygibson.com>
- * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
- * Copyright (C) 2004-2006 Charles O Nutter <headius@headius.com>
+ * Copyright (C) 2004-2007 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2004-2007 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
@@ -46,12 +47,10 @@ import java.nio.channels.FileLock;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
-import org.jruby.runtime.MethodIndex;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
-import org.jruby.util.Chmod;
 import org.jruby.util.IOHandler;
 import org.jruby.util.IOHandlerNull;
 import org.jruby.util.IOHandlerSeekable;
@@ -59,13 +58,10 @@ import org.jruby.util.IOHandlerUnseekable;
 import org.jruby.util.IOModes;
 import org.jruby.util.JRubyFile;
 import org.jruby.util.ShellLauncher;
-import org.jruby.util.Sprintf;
 import org.jruby.util.IOHandler.InvalidValueException;
 
 /**
  * Ruby File class equivalent in java.
- *
- * @author jpetersen
  **/
 public class RubyFile extends RubyIO {
     public static final int LOCK_SH = 1;
@@ -248,7 +244,7 @@ public class RubyFile extends RubyIO {
         
         // TODO: Define instance methods: lchmod, lchown, lstat
         fileClass.defineFastMethod("chmod", callbackFactory.getFastMethod("chmod", IRubyObject.class));
-        fileClass.defineFastMethod("chown", callbackFactory.getFastMethod("chown", IRubyObject.class));
+        fileClass.defineFastMethod("chown", callbackFactory.getFastMethod("chown", IRubyObject.class, IRubyObject.class));
         // atime and ctime are implemented like mtime, since we don't have an atime API in Java
         fileClass.defineFastMethod("atime", callbackFactory.getFastMethod("mtime"));
         fileClass.defineFastMethod("ctime", callbackFactory.getFastMethod("mtime"));
@@ -402,34 +398,26 @@ public class RubyFile extends RubyIO {
 
     public IRubyObject chmod(IRubyObject arg) {
         RubyInteger mode = arg.convertToInteger();
-        File file = new File(path);
 
-        if (!file.exists()) {
-            throw getRuntime().newErrnoENOENTError("No such file or directory - " + path);
-        }
-        
-        String modeString = Sprintf.sprintf(getRuntime(), "%o", mode.getLongValue()).toString();
-        Chmod.chmod(file, modeString);
-        
-        return getRuntime().newFixnum(0);
-    }
-
-    public IRubyObject chown(IRubyObject arg) {
-        RubyInteger owner = arg.convertToInteger();
         if (!new File(path).exists()) {
             throw getRuntime().newErrnoENOENTError("No such file or directory - " + path);
         }
-            
-        try {
-            Process chown = Runtime.getRuntime().exec("chown " + owner + " " + path);
-            chown.waitFor();
-        } catch (IOException ioe) {
-            // FIXME: ignore?
-        } catch (InterruptedException ie) {
-            // FIXME: ignore?
+        
+        int result = Ruby.getPosix().chmod(path, (int)mode.getLongValue());
+        
+        return getRuntime().newFixnum(result);
+    }
+
+    public IRubyObject chown(IRubyObject arg, IRubyObject arg2) {
+        RubyInteger owner = arg.convertToInteger();
+        RubyInteger group = arg2.convertToInteger();
+        if (!new File(path).exists()) {
+            throw getRuntime().newErrnoENOENTError("No such file or directory - " + path);
         }
         
-        return getRuntime().newFixnum(0);
+        int result = Ruby.getPosix().chown(path, (int)owner.getLongValue(), (int)group.getLongValue());
+        
+        return RubyFixnum.newFixnum(getRuntime(), result);
     }
 
     public IRubyObject mtime() {
@@ -546,8 +534,7 @@ public class RubyFile extends RubyIO {
                 throw runtime.newErrnoENOENTError("No such file or directory - " + filename);
             }
             
-            String modeString = Sprintf.sprintf(runtime, "%o", mode.getLongValue()).toString();
-            boolean result = Chmod.chmod(JRubyFile.create(runtime.getCurrentDirectory(), filename.toString()), modeString);
+            boolean result = 0 == Ruby.getPosix().chmod(filename.toString(), (int)mode.getLongValue());
             if (result) {
                 count++;
             }
@@ -558,28 +545,21 @@ public class RubyFile extends RubyIO {
     
     public static IRubyObject chown(IRubyObject recv, IRubyObject[] args) {
         Ruby runtime = recv.getRuntime();
-        Arity.checkArgumentCount(runtime, args, 2, -1);
+        Arity.checkArgumentCount(runtime, args, 3, -1);
         
         int count = 0;
         RubyInteger owner = args[0].convertToInteger();
-        for (int i = 1; i < args.length; i++) {
+        RubyInteger group = args[1].convertToInteger();
+        for (int i = 2; i < args.length; i++) {
             IRubyObject filename = args[i];
             
             if (!RubyFileTest.exist_p(filename, filename.convertToString()).isTrue()) {
                 throw runtime.newErrnoENOENTError("No such file or directory - " + filename);
             }
             
-            try {
-                Process chown = Runtime.getRuntime().exec("chown " + owner + " " + filename);
-                chown.waitFor();
-                int result = chown.exitValue();
-                if (result == 0) {
-                    count++;
-                }
-            } catch (IOException ioe) {
-                // FIXME: ignore?
-            } catch (InterruptedException ie) {
-                // FIXME: ignore?
+            boolean result = 0 == Ruby.getPosix().chown(filename.toString(), (int)owner.getLongValue(), (int)group.getLongValue());
+            if (result) {
+                count++;
             }
         }
         

@@ -17,6 +17,7 @@ import org.jruby.RubyRegexp;
 import org.jruby.ast.NodeType;
 import org.jruby.ast.util.ArgsUtil;
 import org.jruby.evaluator.EvaluationState;
+import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.methods.CallConfiguration;
 import org.jruby.internal.runtime.methods.DynamicMethod;
@@ -61,8 +62,9 @@ public class CompilerHelpers {
                 context.getCurrentScope(), callback, hasMultipleArgsHead, argsNodeType);
     }
     
-    public static IRubyObject def(ThreadContext context, IRubyObject self, Class compiledClass, String name, String javaName, String[] scopeNames,
+    public static IRubyObject def(ThreadContext context, IRubyObject self, Object scriptObject, String name, String javaName, String[] scopeNames,
             int arity, CallConfiguration callConfig) {
+        Class compiledClass = scriptObject.getClass();
         Ruby runtime = context.getRuntime();
         
         RubyModule containingClass = context.getRubyClass();
@@ -83,11 +85,11 @@ public class CompilerHelpers {
         DynamicMethod method;
         
         if (name == "initialize" || visibility.isModuleFunction()) {
-            method = factory.getCompiledMethod(containingClass, compiledClass, javaName, 
-                    Arity.createArity(arity), Visibility.PRIVATE, scope);
+            method = factory.getCompiledMethod(containingClass, javaName, 
+                    Arity.createArity(arity), Visibility.PRIVATE, scope, scriptObject);
         } else {
-            method = factory.getCompiledMethod(containingClass, compiledClass, javaName, 
-                    Arity.createArity(arity), visibility, scope);
+            method = factory.getCompiledMethod(containingClass, javaName, 
+                    Arity.createArity(arity), visibility, scope, scriptObject);
         }
         
         method.setCallConfig(callConfig);
@@ -112,8 +114,9 @@ public class CompilerHelpers {
         return runtime.getNil();
     }
     
-    public static IRubyObject defs(ThreadContext context, IRubyObject self, IRubyObject receiver, Class compiledClass, String name, String javaName, String[] scopeNames,
+    public static IRubyObject defs(ThreadContext context, IRubyObject self, IRubyObject receiver, Object scriptObject, String name, String javaName, String[] scopeNames,
             int arity, CallConfiguration callConfig) {
+        Class compiledClass = scriptObject.getClass();
         Ruby runtime = context.getRuntime();
         
         RubyClass rubyClass;
@@ -151,8 +154,8 @@ public class CompilerHelpers {
         MethodFactory factory = MethodFactory.createFactory(compiledClass.getClassLoader());
         DynamicMethod method;
         
-        method = factory.getCompiledMethod(rubyClass, compiledClass, javaName, 
-                Arity.createArity(arity), Visibility.PUBLIC, scope);
+        method = factory.getCompiledMethod(rubyClass, javaName, 
+                Arity.createArity(arity), Visibility.PUBLIC, scope, scriptObject);
         
         method.setCallConfig(callConfig);
         
@@ -476,5 +479,23 @@ public class CompilerHelpers {
         
         context.getCurrentScope().getArgValues(context.getFrameArgs(),context.getCurrentFrame().getRequiredArgCount());
         return self.callSuper(context, context.getFrameArgs(), block);
+    }
+    
+    public static IRubyObject[] appendToObjectArray(IRubyObject[] array, IRubyObject add) {
+        IRubyObject[] newArray = new IRubyObject[array.length + 1];
+        System.arraycopy(array, 0, newArray, 0, array.length);
+        newArray[array.length] = add;
+        return newArray;
+    }
+    
+    public static IRubyObject returnJump(IRubyObject result, ThreadContext context) {
+        throw new JumpException.ReturnJump(context.getFrameJumpTarget(), result);
+    }
+    
+    public static IRubyObject[] concatObjectArrays(IRubyObject[] array, IRubyObject[] add) {
+        IRubyObject[] newArray = new IRubyObject[array.length + add.length];
+        System.arraycopy(array, 0, newArray, 0, array.length);
+        System.arraycopy(add, 0, newArray, array.length, add.length);
+        return newArray;
     }
 }

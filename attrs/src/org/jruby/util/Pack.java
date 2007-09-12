@@ -836,16 +836,15 @@ public class Pack {
                         byte[] lElem = new byte[Math.max(encode.remaining(),0)];
                         int index = 0;
                         for(;;) {
-                            byte c = safeGet(encode);
                             if (!encode.hasRemaining()) break;
+                            byte c = safeGet(encode);
                             if (c != '=') {
                                 lElem[index++] = c;
                             } else {
-                                byte c1 = safeGet(encode);
                                 if (!encode.hasRemaining()) break;
+                                byte c1 = safeGet(encode);
                                 if (c1 == '\n') continue;
                                 byte c2 = safeGet(encode);
-                                if (!encode.hasRemaining()) break;
                                 byte value = (byte)(Character.digit((char)(c1 & 0xFF), 16) * 16 + Character.digit((char)(c2 & 0xFF), 16));
                                 lElem[index++] = value;
                             }

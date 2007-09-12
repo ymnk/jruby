@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ **** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -38,6 +39,8 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import com.sun.jna.Native;
+import com.sun.jna.NativeLibrary;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -86,6 +89,8 @@ import org.jruby.libraries.ThreadLibrary;
 import org.jruby.libraries.IOWaitLibrary;
 import org.jruby.ext.socket.RubySocket;
 import org.jruby.ext.Generator;
+import org.jruby.ext.JavaBasedPOSIX;
+import org.jruby.ext.POSIX;
 import org.jruby.ext.Readline;
 import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.libraries.FiberLibrary;
@@ -125,12 +130,14 @@ public final class Ruby {
     private final MethodCache methodCache = new MethodCache();
     private final ThreadService threadService = new ThreadService(this);
     private Hashtable runtimeInformation;
+    
+    private static POSIX posix = loadPosix();
 
     private int stackTraces = 0;
 
     private final ObjectSpace objectSpace = new ObjectSpace();
 
-    private final RubyFixnum[] fixnumCache = new RubyFixnum[256];
+    public final RubyFixnum[] fixnumCache = new RubyFixnum[256];
     private final RubySymbol.SymbolTable symbolTable = new RubySymbol.SymbolTable(this);
     private final Hashtable ioHandlers = new Hashtable();
     private long randomSeed = 0;
@@ -300,6 +307,22 @@ public final class Ruby {
         } catch (JumpException.RedoJump rj) {
             throw newLocalJumpError("redo", (IRubyObject)rj.getValue(), "unexpected redo");
         }
+    }
+    
+    /**
+     * This differs from the other methods in that it accepts a string-based script and
+     * parses and runs it as though it were loaded at a command-line. This is the preferred
+     * way to start up a new script when calling directly into the Ruby object (which is
+     * generally *dis*couraged.
+     * 
+     * @param script The contents of the script to run as a normal, root script
+     * @return The last value of the script
+     */
+    public IRubyObject executeScript(String script, String filename) {
+        Reader reader = new StringReader(script);
+        Node node = parseInline(reader, filename, getCurrentContext().getCurrentScope());
+        
+        return compileOrFallbackAndRun(node);
     }
     
     public IRubyObject compileOrFallbackAndRun(Node node) {
@@ -1757,10 +1780,6 @@ public final class Ruby {
         return ioHandlers;
     }
 
-    public RubyFixnum[] getFixnumCache() {
-        return fixnumCache;
-    }
-
     public long incrementRandomSeedSequence() {
         return randomSeedSequence++;
     }
@@ -1879,5 +1898,22 @@ public final class Ruby {
     
     public static void setSecurityRestricted(boolean restricted) {
         securityRestricted = restricted;
+    }
+
+    private static POSIX loadPosix() {
+        try {
+            POSIX posix = (POSIX)Native.loadLibrary("c", POSIX.class);
+            if (posix != null) {
+                return posix;
+            }
+        } catch (Throwable t) {
+        }
+
+        // on any error, fall back on our own stupid POSIX impl
+        return new JavaBasedPOSIX();
+    }
+    
+    public static POSIX getPosix() {
+        return posix;
     }
 }

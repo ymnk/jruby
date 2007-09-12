@@ -386,3 +386,32 @@ test_equal(expected, compile_and_run(big_triple_flip))
 
 # bug 1305, no values yielded to single-arg block assigns a null into the arg
 test_equal(NilClass, compile_and_run("def foo; yield; end; foo {|x| x.class}"))
+
+# ensure that invalid classes and modules raise errors
+AFixnum = 1;
+test_exception(TypeError) { compile_and_run("class AFixnum; end")}
+test_exception(TypeError) { compile_and_run("class B < AFixnum; end")}
+test_exception(TypeError) { compile_and_run("module AFixnum; end")}
+
+# attr assignment in multiple assign
+test_equal("bar", compile_and_run("a = Object.new; class << a; attr_accessor :b; end; a.b, a.b = 'baz', 'bar'; a.b"))
+test_equal(["foo", "bar"], compile_and_run("a = []; a[0], a[1] = 'foo', 'bar'; a"))
+
+# for loops
+test_equal([2, 4, 6], compile_and_run("a = []; for b in [1, 2, 3]; a << b * 2; end; a"))
+# FIXME: scoping is all wrong for running these tests, so c doesn't scope right here
+#test_equal([1, 2, 3], compile_and_run("a = []; for b, c in {:a => 1, :b => 2, :c => 3}; a << c; end; a.sort"))
+
+# ensure blocks
+test_equal(1, compile_and_run("a = 2; begin; a = 3; ensure; a = 1; end; a"))
+test_equal(1, compile_and_run("$a = 2; def foo; return; ensure; $a = 1; end; foo; $a"))
+
+# op element assign
+test_equal([4, 4], compile_and_run("a = []; [a[0] ||= 4, a[0]]"))
+test_equal([4, 4], compile_and_run("a = [4]; [a[0] ||= 5, a[0]]"))
+test_equal([4, 4], compile_and_run("a = [1]; [a[0] += 3, a[0]]"))
+test_equal([1], compile_and_run("a = {}; a[0] ||= [1]; a[0]"))
+test_equal(2, compile_and_run("a = [1]; a[0] &&= 2; a[0]"))
+
+# non-local return
+test_equal(3, compile_and_run("def foo; loop {return 3}; return 4; end; foo"))
