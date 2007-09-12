@@ -295,7 +295,6 @@ public class RubySymbol extends RubyObject {
     
     @JRubyMethod(name = "all_symbols", singleton = true)
     public static IRubyObject all_symbols(IRubyObject recv) {
-        //return recv.getRuntime().newArrayNoCopy(recv.getRuntime().getSymbolTable().all_symbols());
         return recv.getRuntime().getSymbolTable().all_symbols();
     }
 
@@ -327,7 +326,7 @@ public class RubySymbol extends RubyObject {
         
         // note all fields are final -- rehash creates new entries when necessary.
         // as documented in java.util.concurrent.ConcurrentHashMap.java, that will
-        // usually affect only a small percentage of entries.
+        // usually affect only a small percentage (< 20%) of entries for a given rehash.
         static class SymbolEntry {
             final int hash;
             final String name;

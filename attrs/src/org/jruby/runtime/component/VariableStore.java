@@ -13,11 +13,11 @@ import org.jruby.util.IdUtil;
 
 public abstract class VariableStore<BaseObjectType> implements Serializable {
 
-    private static final String ERR_INSECURE_SET_INST_VAR  = "Insecure: can't modify instance variable";
-    private static final String ERR_INSECURE_SET_CLASS_VAR = "Insecure: can't modify class variable";
-    private static final String ERR_INSECURE_SET_CONSTANT  = "Insecure: can't modify constant";
-    private static final String ERR_FROZEN_CONST_TYPE = "class/module ";
-    private static final String ERR_FROZEN_CVAR_TYPE = "class/module ";
+    protected static final String ERR_INSECURE_SET_INST_VAR  = "Insecure: can't modify instance variable";
+    protected static final String ERR_INSECURE_SET_CLASS_VAR = "Insecure: can't modify class variable";
+    protected static final String ERR_INSECURE_SET_CONSTANT  = "Insecure: can't modify constant";
+    protected static final String ERR_FROZEN_CONST_TYPE = "class/module ";
+    protected static final String ERR_FROZEN_CVAR_TYPE = "class/module ";
 
     
     // FIXME: will need to figure out how to restore this when

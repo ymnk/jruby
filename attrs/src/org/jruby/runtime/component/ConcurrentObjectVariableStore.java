@@ -51,23 +51,52 @@ import org.jruby.util.IdUtil;
  * Hash functionality adapted from java.util.concurrent.ConcurrentHashMap, (C) Sun Microsystems, Inc.
  *
  */
-public final class ConcurrentObjectVariableStore<BaseObjectType>
+public class ConcurrentObjectVariableStore<BaseObjectType>
 extends VariableStore<BaseObjectType>
 implements Serializable {
     
-    static final int DEFAULT_INITIAL_CAPACITY = 8;
-    static final int MAXIMUM_CAPACITY = 1 << 30;
-    static final float DEFAULT_LOAD_FACTOR = 0.75f;
+    //
+    // STATICS
+    //
+    
+    protected static final class Entry<BaseObjectType> {
+        final int hash;
+        final String name;
+        volatile BaseObjectType value;
+        final Entry<BaseObjectType> next;
+        
+        Entry(final int hash, final String name, final BaseObjectType value, final Entry<BaseObjectType> next) {
+            this.hash = hash;
+            this.name = name;
+            this.value = value;
+            this.next = next;
+        }
+    }
+    
+    // array allocator prevents warning messages, as generics
+    // don't support parameterized array creation
+    @SuppressWarnings("unchecked")
+    private static final <BaseObjectType> Entry<BaseObjectType>[] newArray(final int i) {
+        return new Entry[i];
+    }
+    
+    protected static final int DEFAULT_INITIAL_CAPACITY = 8; // must be a power of 2!
+    protected static final int MAXIMUM_CAPACITY = 1 << 30;
+    protected static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
-    final ReentrantLock tableLock = new ReentrantLock();
-    transient volatile Entry<BaseObjectType>[] table;
+    //
+    // INSTANCE FIELDS
+    //
+    
+    protected final ReentrantLock tableLock = new ReentrantLock();
+    protected transient volatile Entry<BaseObjectType>[] table;
     // FIXME: does +size+ still need to be volatile?  I'm writing back to
     // +table+ after structural updates in the belief that doing so establishes
     // the necessary happens-before ordering, so reading a separate volatile
     // (size) before gets/fetches shouldn't be necessary... I think... -bd
-    transient volatile int size;
-    transient int threshold;
-    final float loadFactor;
+    protected transient volatile int size;
+    protected transient int threshold;
+    protected final float loadFactor;
     
     //
     // SERIALIZATION METHODS
@@ -135,12 +164,18 @@ implements Serializable {
         if (loadFactor <= 0 || Float.isNaN(loadFactor))
             throw new IllegalArgumentException("Illegal Load factor: "+
                                                loadFactor);
-        int capacity = 1;
-        while (capacity < initialCapacity)
-            capacity <<= 1;
+        final int capacity = nextCapacity(initialCapacity);
         table = newArray(capacity);
         this.loadFactor = loadFactor;
         threshold = (int)(capacity * loadFactor);
+    }
+    
+    // returns the next valid (power of two) capacity
+    protected static final int nextCapacity(final int requestedCapacity) {
+        int capacity = 1;
+        while (capacity < requestedCapacity)
+            capacity <<= 1;
+        return capacity;
     }
     
     public ConcurrentObjectVariableStore(
@@ -153,14 +188,14 @@ implements Serializable {
     public ConcurrentObjectVariableStore(
             final Ruby runtime,
             final BaseObjectType owner,
-            final List<Variable<BaseObjectType>> attrList) {
-        this(runtime, owner, (int)(attrList.size()/DEFAULT_LOAD_FACTOR) + 1, DEFAULT_LOAD_FACTOR);
+            final List<Variable<BaseObjectType>> varList) {
+        this(runtime, owner, (int)(varList.size()/DEFAULT_LOAD_FACTOR) + 1, DEFAULT_LOAD_FACTOR);
         ReentrantLock lock = tableLock;
         lock.lock();
         try {
-            for (Variable<BaseObjectType> attr : attrList) {
-                String name = attr.getName().intern();
-                BaseObjectType value = attr.getValue();
+            for (Variable<BaseObjectType> var : varList) {
+                String name = var.getName().intern();
+                BaseObjectType value = var.getValue();
                 switch(IdUtil.getVarType(name)) {
                 case IdUtil.CONSTANT:
                     fastSetConstant(name, value);
@@ -182,20 +217,20 @@ implements Serializable {
     }
 
     /**
-     * Constructor provided to ease transition to new attributes mechanism. May
+     * Constructor provided to ease transition to new variables mechanism. May
      * be deprecated in the near future.
      */
     @SuppressWarnings("unchecked")
     public ConcurrentObjectVariableStore(
             final Ruby runtime,
             final BaseObjectType owner,
-            final Map attrMap) {
-        this(runtime, owner, (int)(attrMap.size()/DEFAULT_LOAD_FACTOR) + 1, DEFAULT_LOAD_FACTOR);
+            final Map varMap) {
+        this(runtime, owner, (int)(varMap.size()/DEFAULT_LOAD_FACTOR) + 1, DEFAULT_LOAD_FACTOR);
         ReentrantLock lock = tableLock;
         lock.lock();
         try {
-            synchronized(attrMap) {
-                for (Iterator iter = attrMap.entrySet().iterator(); iter.hasNext(); ) {
+            synchronized(varMap) {
+                for (Iterator iter = varMap.entrySet().iterator(); iter.hasNext(); ) {
                     Map.Entry entry = (Map.Entry)iter.next();
                     String name = ((String)entry.getKey()).intern();
                     BaseObjectType value = (BaseObjectType)entry.getValue();
@@ -224,7 +259,7 @@ implements Serializable {
     // INTERNAL METHODS
     //
     
-    private final BaseObjectType readValueUnderLock(final Entry<BaseObjectType> e) {
+    protected final BaseObjectType readValueUnderLock(final Entry<BaseObjectType> e) {
         final ReentrantLock lock;
         (lock = tableLock).lock();
         try {
@@ -234,7 +269,7 @@ implements Serializable {
         }
     }
     
-    private final BaseObjectType fetchValue(final String name) {
+    protected final BaseObjectType fetchValue(final String name) {
 //        if (size > 0) { // read-volatile
             Entry<BaseObjectType> e;
             //final BaseObjectType value;
@@ -253,7 +288,7 @@ implements Serializable {
         return null;
     }
 
-    private final BaseObjectType fastFetchValue(final String internedName) {
+    protected final BaseObjectType fastFetchValue(final String internedName) {
         assert internedName == internedName.intern() : internedName + " not interned";
 //        if (size > 0) { // read-volatile
             Entry<BaseObjectType> e;
@@ -272,7 +307,7 @@ implements Serializable {
         return null;
     }
     
-    private final void storeValue(final String name, final BaseObjectType value) {
+    protected final void storeValue(final String name, final BaseObjectType value) {
         final int hash = name.hashCode();
         final ReentrantLock lock;
         (lock = tableLock).lock();
@@ -303,7 +338,7 @@ implements Serializable {
         }
     }
     
-    private final void fastStoreValue(final String internedName, final BaseObjectType value) {
+    protected final void fastStoreValue(final String internedName, final BaseObjectType value) {
         assert internedName == internedName.intern() : internedName + " not interned";
         final int hash = internedName.hashCode();
         final ReentrantLock lock;
@@ -335,7 +370,7 @@ implements Serializable {
         }
     }
     
-    private final BaseObjectType remove(final String name) {
+    protected final BaseObjectType remove(final String name) {
         final int hash = name.hashCode();
         final ReentrantLock lock;
         (lock = tableLock).lock();
@@ -369,7 +404,7 @@ implements Serializable {
         }
     }
     
-    private final boolean containsName(final String name) {
+    protected final boolean containsName(final String name) {
 //        if (size > 0) { // read-volatile
             Entry<BaseObjectType> e;
             final int hash = name.hashCode();
@@ -383,7 +418,7 @@ implements Serializable {
         return false;
     }
     
-    private final boolean fastContainsName(final String internedName) {
+    protected final boolean fastContainsName(final String internedName) {
         assert internedName == internedName.intern() : internedName + " not interned";
         Entry<BaseObjectType> e;
 //        if (size > 0) { // read-volatile
@@ -399,7 +434,7 @@ implements Serializable {
 
     // TODO: not sure we have a use case for this; if so, need to look
     // at implications of calling value.equals(v)
-    private final boolean containsValue(final BaseObjectType value) {
+    protected final boolean containsValue(final BaseObjectType value) {
         if (size != 0) {
             Entry<BaseObjectType> e;
             BaseObjectType v;
@@ -418,7 +453,7 @@ implements Serializable {
         return false;
     }
     
-    private final void rehash() {
+    protected final void rehash() {
         final Entry<BaseObjectType>[] oldTable = table;
         final int oldCapacity;
         if ((oldCapacity = oldTable.length) >= MAXIMUM_CAPACITY) {
@@ -478,10 +513,54 @@ implements Serializable {
         return size == 0;
     }
     
+    public void syncVariables(final List<Variable<BaseObjectType>> varList) {
+        // similar to doing a clear() followed by a putAll() in a ConcurrentHashMap.
+        
+        // TODO: in theory, a reader could see this store in a transitional state
+        // (after old table is cleared and before all new values are set).  In practice
+        // (the way this method is actually used), that won't happen, since this
+        // is always called before the owner object has actually been used (as
+        // part of a dup or clone operation, for example). Still, it might (someday)
+        // be useful if this method transitioned cleanly.
+        
+        final int capacity = nextCapacity(Math.max(
+                ((int)(varList.size()/DEFAULT_LOAD_FACTOR) + 1),
+                DEFAULT_INITIAL_CAPACITY));
+        final ReentrantLock lock;
+        (lock = tableLock).lock();
+        try {
+            size = 0;
+            threshold = (int)(capacity * loadFactor);
+            table = newArray(capacity);
+            
+            for (Variable<BaseObjectType> var : varList) {
+                String name = var.getName().intern();
+                BaseObjectType value = var.getValue();
+                switch(IdUtil.getVarType(name)) {
+                case IdUtil.CONSTANT:
+                    fastSetConstant(name, value);
+                    break;
+                case IdUtil.INSTANCE_VAR:
+                    fastSetInstanceVariable(name, value);
+                    break;
+                case IdUtil.CLASS_VAR:
+                    fastSetClassVariable(name, value);
+                    break;
+                default:
+                    fastSetInternalVariable(name, value);
+                    break;
+                }
+            }
+            
+        } finally {
+            lock.unlock();
+        }
+    }
+    
     //
-    // PSEUDO/INTERNAL ATTRIBUTES (i.e, not ivar/cvar/constant)
-    // Don't use these methods for real attributes (ivar/cvar/constant),
-    // as that may fail in implementations that store different attribute
+    // PSEUDO/INTERNAL VARIABLES (i.e, not ivar/cvar/constant)
+    // Don't use these methods for real variables (ivar/cvar/constant),
+    // as that may fail in implementations that store different variable
     // types separately.
     //
 
@@ -781,8 +860,8 @@ implements Serializable {
     //
     
     /**
-     * Returns all attributes - instance variables, class variables, constants,
-     * and any "special" attributes.  Use this in place of the old
+     * Returns all variables - instance variables, class variables, constants,
+     * and any internal "variables".  Use this in place of the old
      * RubyObject#getInstanceVariablesSnapshot method.
      */
     public List<Variable<BaseObjectType>> getVariableList() {
@@ -803,7 +882,7 @@ implements Serializable {
     }
     
     /**
-     * Returns only "internal" attributes - those that are NOT instance
+     * Returns only "internal" variables - those that are NOT instance
      * variables, class variables, or constants.
      */
     public List<Variable<BaseObjectType>> getInternalVariableList() {
@@ -962,26 +1041,5 @@ implements Serializable {
         return map;
     }
  
-    
-    static final class Entry<BaseObjectType> {
-        final int hash;
-        final String name;
-        volatile BaseObjectType value;
-        final Entry<BaseObjectType> next;
-        
-        Entry(final int hash, final String name, final BaseObjectType value, final Entry<BaseObjectType> next) {
-            this.hash = hash;
-            this.name = name;
-            this.value = value;
-            this.next = next;
-        }
-    }
-    
-    // array allocator prevents warning messages, as generics
-    // don't support parameterized array creation
-    @SuppressWarnings("unchecked")
-    private static final <BaseObjectType> Entry<BaseObjectType>[] newArray(final int i) {
-        return new Entry[i];
-    }
     
 }

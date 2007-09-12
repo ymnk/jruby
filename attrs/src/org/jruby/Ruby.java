@@ -1547,7 +1547,7 @@ public final class Ruby {
      * @return the symbol for name
      */
     public RubySymbol fastNewSymbol(String internedName) {
-        return symbolTable.getSymbol(internedName);
+        return symbolTable.fastGetSymbol(internedName);
     }
 
     public RubyTime newTime(long milliseconds) {
