@@ -232,11 +232,11 @@ public class RubyKernel {
         final String nm = module.getName() + "::" + baseName;
         
         final IRubyObject undef = runtime.getUndef();
-        final IRubyObject existingValue = module.fastGetLocalConstant(baseName); 
+        final IRubyObject existingValue = module.fastFetchConstant(baseName); 
         if (existingValue != null && existingValue != undef) return runtime.getNil();
         
         // bypassing checks in RubyModule#setConstant
-        module.getVariableStore().fastSetConstant(baseName, undef);
+        module.getVariableStore().fastStoreConstant(baseName, undef);
         
         loadService.addAutoload(nm, new IAutoloadMethod() {
             public String file() {

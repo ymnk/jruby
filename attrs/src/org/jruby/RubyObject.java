@@ -627,7 +627,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public IRubyObject getInternalVariable(final String name) {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.getInternalVariable(name);
+            return store.fetchInternalVariable(name);
         }
         return null;
     }
@@ -635,23 +635,23 @@ public class RubyObject implements Cloneable, IRubyObject {
     public IRubyObject fastGetInternalVariable(final String internedName) {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.fastGetInternalVariable(internedName);
+            return store.fastFetchInternalVariable(internedName);
         }
         return null;
     }
 
     public void setInternalVariable(final String name, final IRubyObject value) {
-        ensureVariableStore().setInternalVariable(name, value);
+        ensureVariableStore().storeInternalVariable(name, value);
     }
 
     public void fastSetInternalVariable(final String internedName, final IRubyObject value) {
-        ensureVariableStore().fastSetInternalVariable(internedName, value);
+        ensureVariableStore().fastStoreInternalVariable(internedName, value);
     }
 
     public IRubyObject removeInternalVariable(final String name) {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.removeInternalVariable(name);
+            return store.deleteInternalVariable(name);
         }
         return null;
     }
@@ -679,7 +679,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public List<Variable<IRubyObject>> getVariableList() {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.getVariableList();
+            return store.getStoredVariableList();
         }
         return new ArrayList<Variable<IRubyObject>>(0);
     }
@@ -687,7 +687,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public List<Variable<IRubyObject>> getInternalVariableList() {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.getInternalVariableList();
+            return store.getStoredInternalVariableList();
         }
         return new ArrayList<Variable<IRubyObject>>(0);
     }
@@ -695,7 +695,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public List<String> getVariableNameList() {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.getVariableNameList();
+            return store.getStoredVariableNameList();
         }
         return new ArrayList<String>(0);
     }
@@ -703,7 +703,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public Map getVariableMap() {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.getVariableMap();
+            return store.getStoredVariableMap();
         }
         return new HashMap(1);
     }
@@ -733,7 +733,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public IRubyObject getInstanceVariable(final String name) {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.getInstanceVariable(name);
+            return store.fetchInstanceVariable(name);
         }
         return null;
     }
@@ -741,7 +741,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public IRubyObject fastGetInstanceVariable(final String internedName) {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.fastGetInstanceVariable(internedName);
+            return store.fastFetchInstanceVariable(internedName);
         }
         return null;
     }
@@ -750,19 +750,19 @@ public class RubyObject implements Cloneable, IRubyObject {
     *
     */
     public IRubyObject setInstanceVariable(final String name, final IRubyObject value) {
-       ensureVariableStore().setInstanceVariable(name, value);
+       ensureVariableStore().storeInstanceVariable(name, value);
        return value;
     }
     
     public IRubyObject fastSetInstanceVariable(final String internedName, final IRubyObject value) {
-        ensureVariableStore().fastSetInstanceVariable(internedName, value);
+        ensureVariableStore().fastStoreInstanceVariable(internedName, value);
         return value;
      }
 
     public IRubyObject removeInstanceVariable(String name) {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.removeInstanceVariable(name);
+            return store.deleteInstanceVariable(name);
         }
         return null;
     }
@@ -770,7 +770,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public List<Variable<IRubyObject>> getInstanceVariableList() {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.getInstanceVariableList();
+            return store.getStoredInstanceVariableList();
         }
         return new ArrayList<Variable<IRubyObject>>(0);
     }
@@ -778,7 +778,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public List<String> getInstanceVariableNameList() {
         final VariableStore<IRubyObject> store;
         if ((store = getVariableStore()) != null) {
-            return store.getInstanceVariableNameList();
+            return store.getStoredInstanceVariableNameList();
         }
         return new ArrayList<String>(0);
     }
@@ -788,7 +788,7 @@ public class RubyObject implements Cloneable, IRubyObject {
         final VariableStore<IRubyObject> store;
         final IRubyObject value;
         if ((store = getVariableStore()) != null) {
-            if ((value = store.fastValidatedGetInstanceVariable(name.asSymbol())) != null) {
+            if ((value = store.fastValidatedFetchInstanceVariable(name.asSymbol())) != null) {
                 return value;
             }
         } else {
@@ -799,7 +799,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     }
     
     public IRubyObject instance_variable_set(final IRubyObject name, final IRubyObject value) {
-        ensureVariableStore().fastValidatedSetInstanceVariable(name.asSymbol(), value);
+        ensureVariableStore().fastValidatedStoreInstanceVariable(name.asSymbol(), value);
         return value;
     }
     
@@ -821,7 +821,7 @@ public class RubyObject implements Cloneable, IRubyObject {
         final VariableStore<IRubyObject> store;
         final IRubyObject value;
         if ((store = getVariableStore()) != null) {
-            if ((value = store.validatedRemoveInstanceVariable(id)) != null) {
+            if ((value = store.validatedDeleteInstanceVariable(id)) != null) {
                 return value;
             }
         } else {
@@ -1646,7 +1646,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public Map getInstanceVariables() {
         getRuntime().getWarnings().warn("internal: deprecated getInstanceVariables() called");
         if (getVariableStore() != null) {
-            return getVariableStore().getVariableMap();
+            return getVariableStore().getStoredVariableMap();
         } else {
             return new HashMap(0);
         }
@@ -1656,7 +1656,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public Map getInstanceVariablesSnapshot() {
         getRuntime().getWarnings().warn("internal: deprecated getInstanceVariablesSnapshot() called");
         if (getVariableStore() != null) {
-            return getVariableStore().getVariableMap();
+            return getVariableStore().getStoredVariableMap();
         } else {
             return new HashMap(0);
         }
@@ -1666,7 +1666,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public Iterator instanceVariableNames() {
         getRuntime().getWarnings().warn("internal: deprecated instanceVariableNames() called");
         if (getVariableStore() != null) {
-            return getVariableStore().getVariableMap().keySet().iterator();
+            return getVariableStore().getStoredVariableMap().keySet().iterator();
         } else {
             return new HashMap(0).keySet().iterator();
         }
@@ -1676,7 +1676,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     public Map safeGetInstanceVariables() {
         getRuntime().getWarnings().warn("internal: deprecated safeGetInstanceVariables() called");
         if (getVariableStore() != null) {
-            return getVariableStore().getVariableMap();
+            return getVariableStore().getStoredVariableMap();
         } else {
             return null;
         }

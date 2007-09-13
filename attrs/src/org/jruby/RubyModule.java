@@ -47,6 +47,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
 
 import org.jruby.anno.JRubyMethod;
 import org.jruby.internal.runtime.methods.AliasMethod;
@@ -113,12 +114,14 @@ public class RubyModule extends RubyObject {
     // If it is null, then it an anonymous class.
     private String classId;
 
+    protected final VariableStore<IRubyObject> moduleVariableStore;
+    
     // All methods and all CACHED methods for the module.  The cached methods will be removed
     // when appropriate (e.g. when method is removed by source class or a new method is added
     // with same name by one of its subclasses).
     private Map methods = new HashMap();
     
-    // FIXME: I'm not sure what the serialization/marshalling implications
+    // FIXME: I'm not sure what the serialization/marshaling implications
     // might be of defining this here. We could keep a hash in JavaSupport
     // (or elsewhere) instead, but then RubyModule might need a reference to 
     // JavaSupport code, which I've tried to avoid...
@@ -179,16 +182,27 @@ public class RubyModule extends RubyObject {
         }
         this.parent = parent;
         
-        this.variableStore = new ConcurrentObjectVariableStore<IRubyObject>(runtime, this, 16);
+        this.moduleVariableStore = new ConcurrentObjectVariableStore<IRubyObject>(runtime, this, 16);
 
         runtime.moduleLastId++;
         this.id = runtime.moduleLastId;
     }
 
     @Override
-    protected VariableStore<IRubyObject> ensureVariableStore() {
-        return variableStore;
+    protected VariableStore<IRubyObject> getVariableStore() {
+        return moduleVariableStore;
     }
+    
+    @Override
+    protected VariableStore<IRubyObject> ensureVariableStore() {
+        return moduleVariableStore;
+    }
+    
+    @Override
+    public void syncVariables(final List<Variable<IRubyObject>> varList) {
+        moduleVariableStore.syncVariables(varList);
+    }
+    
     
     public static RubyClass createModuleClass(Ruby runtime, RubyClass moduleClass) {
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyModule.class);   
@@ -470,23 +484,23 @@ public class RubyModule extends RubyObject {
     }
     
     public IRubyObject getLocalClassVariable(final String name) {
-        return getVariableStore().getClassVariable(name);
+        return getVariableStore().fetchClassVariable(name);
     }
 
     public IRubyObject fastGetLocalClassVariable(final String internedName) {
-        return getVariableStore().fastGetClassVariable(internedName);
+        return getVariableStore().fastFetchClassVariable(internedName);
     }
     
     public void setLocalClassVariable(final String name, final IRubyObject value) {
-        getVariableStore().setClassVariable(name, value);
+        getVariableStore().storeClassVariable(name, value);
     }
 
     public void fastSetLocalClassVariable(final String internedName, final IRubyObject value) {
-        getVariableStore().fastSetClassVariable(internedName, value);
+        getVariableStore().fastStoreClassVariable(internedName, value);
     }
     
     public List<String> getLocalClassVariableNameList() {
-        return getVariableStore().getClassVariableNameList();
+        return getVariableStore().getStoredClassVariableNameList();
     }
 
     /**
@@ -528,7 +542,7 @@ public class RubyModule extends RubyObject {
             module = this;
         }
 
-        module.getVariableStore().setClassVariable(name, value);
+        module.getVariableStore().storeClassVariable(name, value);
         return value;
     }
 
@@ -538,7 +552,7 @@ public class RubyModule extends RubyObject {
         if ((module = fastGetModuleWithClassVar(internedName)) == null) {
             module = this;
         }
-        module.getVariableStore().fastSetClassVariable(internedName, value);
+        module.getVariableStore().fastStoreClassVariable(internedName, value);
         return value;
     }
 
@@ -551,30 +565,22 @@ public class RubyModule extends RubyObject {
      * @return The variable's value, or throws NameError if not found
      */
     public IRubyObject getClassVar(final String name) {
-        final RubyModule module;
-
-        if ((module = getModuleWithClassVar(name)) != null) {
-            IRubyObject value;
-            if ((value = module.getVariableStore().getClassVariable(name)) != null) {
-                return value;
+        Object value;
+        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
+            if ((value = p.getVariableStore().fetchClassVariable(name)) != null) {
+                return (IRubyObject)value;
             }
-            return getRuntime().getNil();
         }
-
         throw getRuntime().newNameError("uninitialized class variable " + name + " in " + getName(), name);
     }
 
     public IRubyObject fastGetClassVar(final String internedName) {
-        final RubyModule module;
-
-        if ((module = fastGetModuleWithClassVar(internedName)) != null) {
-            IRubyObject value;
-            if ((value = module.getVariableStore().fastGetClassVariable(internedName)) != null) {
-                return value;
+        Object value;
+        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
+            if ((value = p.getVariableStore().fastFetchClassVariable(internedName)) != null) {
+                return (IRubyObject)value;
             }
-            return getRuntime().getNil();
         }
-
         throw getRuntime().newNameError("uninitialized class variable " + internedName + " in " + getName(), internedName);
     }
 
@@ -1029,37 +1035,42 @@ public class RubyModule extends RubyObject {
     //
     // CONSTANTS
     //
-    
+
+   // LOW-LEVEL CONSTANT METHODS
+   // fetch/store/list constants for this module
    
-    public boolean hasLocalConstant(final String name) {
+    public boolean hasConstant(final String name) {
         return getVariableStore().hasConstant(name);
     }
     
-    public boolean fastHasLocalConstant(final String internedName) {
+    public boolean fastHasConstant(final String internedName) {
         return getVariableStore().fastHasConstant(internedName);
     }
     
     // returns the stored value without processing undefs (autoloads)
-    public IRubyObject getLocalConstant(final String name) {
-        return getVariableStore().getConstant(name);
+    public IRubyObject fetchConstant(final String name) {
+        return getVariableStore().fetchConstant(name);
     }
     
     // returns the stored value without processing undefs (autoloads)
-    public IRubyObject fastGetLocalConstant(final String internedName) {
-        return getVariableStore().fastGetConstant(internedName);
+    public IRubyObject fastFetchConstant(final String internedName) {
+        return getVariableStore().fastFetchConstant(internedName);
     }
     
     // removes and returns the stored value without processing undefs (autoloads)
-    public IRubyObject removeLocalConstant(final String name) {
-        return getVariableStore().removeConstant(name);
+    public IRubyObject deleteConstant(final String name) {
+        return getVariableStore().deleteConstant(name);
     }
 
-    public List<Variable<IRubyObject>> getLocalConstantList() {
-        return getVariableStore().getConstantList();
+    public List<Variable<IRubyObject>> getStoredConstantList() {
+        return getVariableStore().getStoredConstantList();
     }
-    public List<String> getLocalConstantNameList() {
-        return getVariableStore().getConstantNameList();
+    public List<String> getStoredConstantNameList() {
+        return getVariableStore().getStoredConstantNameList();
     }
+    
+
+    // HIGH-LEVEL CONSTANT METHODS
     
     // not actually called anywhere (all known uses call the fast version)
     public IRubyObject searchConstantExclusive(final String name) {
@@ -1075,7 +1086,7 @@ public class RubyModule extends RubyObject {
         RubyModule p = this;
         
         while (p != null) {
-            if ((value = p.fastGetLocalConstant(internedName)) != null) {
+            if ((value = p.fastFetchConstant(internedName)) != null) {
                 if (value != undef) {
                     if (p == objectClass && this != objectClass) {
                         getRuntime().getWarnings().warn("toplevel constant " + internedName +
@@ -1083,7 +1094,7 @@ public class RubyModule extends RubyObject {
                     }
                     return value;
                 }
-                p.removeLocalConstant(internedName);
+                p.deleteConstant(internedName);
                 if (getRuntime().getLoadService().autoload(
                         p.getName() + "::" + internedName) == null) {
                     break;
@@ -1105,16 +1116,16 @@ public class RubyModule extends RubyObject {
     public IRubyObject fastSearchConstant(final String internedName) {
         final IRubyObject undef = getRuntime().getUndef();
         boolean retryForModule = false;
-        IRubyObject value;
+        Object value;
         RubyModule p = this;
 
         retry: while (true) {
             while (p != null) {
-                if ((value = p.fastGetLocalConstant(internedName)) != null) {
+                if ((value = p.fastFetchConstant(internedName)) != null) {
                     if (value != undef) {
-                        return value;
+                        return (IRubyObject)value;
                     }
-                    p.removeLocalConstant(internedName);
+                    p.deleteConstant(internedName);
                     if (getRuntime().getLoadService().autoload(
                             p.getName() + "::" + internedName) == null) {
                         break;
@@ -1137,44 +1148,6 @@ public class RubyModule extends RubyObject {
                 "const_missing", RubySymbol.newSymbol(getRuntime(), internedName));
     }
 
-    @Deprecated // FIXME: remove (just keeping until I've verified the new code works)
-    private IRubyObject getConstantInner(String name, final boolean exclude) {
-        IRubyObject objectClass = getRuntime().getObject();
-        IRubyObject undef = getRuntime().getUndef();
-        boolean retryForModule = false;
-        RubyModule p = this;
-
-        retry: while (true) {
-            while (p != null) {
-                IRubyObject constant = p.getInstanceVariable(name);
-
-                if (constant == undef) {
-                    p.removeInstanceVariable(name);
-                    if (getRuntime().getLoadService().autoload(p.getName() + "::" + name) == null) break;
-                    continue;
-                }
-                if (constant != null) {
-                    if (exclude && p == objectClass && this != objectClass) {
-                        getRuntime().getWarnings().warn("toplevel constant " + name +
-                                " referenced by " + getName() + "::" + name);
-                    }
-
-                    return constant;
-                }
-                p = p.getSuperClass();
-            }
-
-            if (!exclude && !retryForModule && getClass().equals(RubyModule.class)) {
-                retryForModule = true;
-                p = getRuntime().getObject();
-                continue retry;
-            }
-
-            break;
-        }
-
-        return callMethod(getRuntime().getCurrentContext(), "const_missing", RubySymbol.newSymbol(getRuntime(), name));
-    }
 
     /**
      * Retrieve the named constant, invoking 'const_missing' should that be appropriate.
@@ -1196,19 +1169,19 @@ public class RubyModule extends RubyObject {
 
     public IRubyObject getConstantAt(final String name) {
         final IRubyObject value;
-        if ((value = getVariableStore().getConstant(name)) != getRuntime().getUndef()) {
+        if ((value = getVariableStore().fetchConstant(name)) != getRuntime().getUndef()) {
             return value;
         }
-        getVariableStore().removeConstant(name);
+        getVariableStore().deleteConstant(name);
         return getRuntime().getLoadService().autoload(getName() + "::" + name);
     }
 
     public IRubyObject fastGetConstantAt(final String internedName) {
         final IRubyObject value;
-        if ((value = getVariableStore().fastGetConstant(internedName)) != getRuntime().getUndef()) {
+        if ((value = getVariableStore().fastFetchConstant(internedName)) != getRuntime().getUndef()) {
             return value;
         }
-        getVariableStore().removeConstant(internedName);
+        getVariableStore().deleteConstant(internedName);
         return getRuntime().getLoadService().autoload(getName() + "::" + internedName);
     }
 
@@ -1231,7 +1204,7 @@ public class RubyModule extends RubyObject {
     public IRubyObject fastSetConstant(final String internedName, final IRubyObject value) {
         final VariableStore<IRubyObject> store = getVariableStore();
         final IRubyObject oldValue;
-        if ((oldValue = store.fastGetConstant(internedName)) != null) {
+        if ((oldValue = store.fastFetchConstant(internedName)) != null) {
             if (oldValue == getRuntime().getUndef()) {
                 getRuntime().getLoadService().removeAutoLoadFor(getName() + "::" + internedName);
             } else {
@@ -1239,7 +1212,7 @@ public class RubyModule extends RubyObject {
             }
         }
 
-        store.fastSetConstant(internedName, value);
+        store.fastStoreConstant(internedName, value);
 
         // if adding a module under a constant name, set that module's basename to the constant name
         if (value instanceof RubyModule) {
@@ -1257,7 +1230,7 @@ public class RubyModule extends RubyObject {
     
     private boolean hasConstantInHierarchy(final String name) {
         for (RubyModule p = this; p != null; p = p.getSuperClass()) {
-            if (p.hasLocalConstant(name)) {
+            if (p.hasConstant(name)) {
                 return true;
             }
         }
@@ -1317,7 +1290,7 @@ public class RubyModule extends RubyObject {
     public IRubyObject remove_const(final IRubyObject name) {
         final String id = name.asSymbol();
         final IRubyObject value;
-        if ((value = getVariableStore().validatedRemoveConstant(id)) != null) {
+        if ((value = getVariableStore().validatedDeleteConstant(id)) != null) {
             if (value != getRuntime().getUndef()) {
                 return value;
             }
@@ -1357,7 +1330,7 @@ public class RubyModule extends RubyObject {
         // This method is intended only for defining new classes in Ruby code,
         // so it uses the allocator of the specified superclass or default to
         // the Object allocator. It should NOT be used to define classes that require a native allocator.
-        IRubyObject type = getLocalConstant(name);
+        IRubyObject type = fetchConstant(name);
         
         if (type == null || (type instanceof RubyUndef)) {
             if (classProviders != null) {
@@ -1382,7 +1355,7 @@ public class RubyModule extends RubyObject {
      *
      */
     public RubyClass defineClassUnder(final String name, final RubyClass superClazz, final ObjectAllocator allocator) {
-        IRubyObject type = getLocalConstant(name);
+        IRubyObject type = fetchConstant(name);
 
         if (type == null) {
             return getRuntime().defineClassUnder(name, superClazz, allocator, this);
@@ -1417,7 +1390,7 @@ public class RubyModule extends RubyObject {
      */
     public IRubyObject removeCvar(final IRubyObject name) { // Wrong Parameter ?
         final String id = name.asSymbol();
-        IRubyObject value = getVariableStore().validatedRemoveClassVariable(id);
+        IRubyObject value = getVariableStore().validatedDeleteClassVariable(id);
 
         if (value != null) {
             return value;
@@ -2051,13 +2024,13 @@ public class RubyModule extends RubyObject {
 
         if (getRuntime().getClass("Module") == this) {
 
-            for (String name : objectClass.getLocalConstantNameList()) {
+            for (String name : objectClass.getStoredConstantNameList()) {
                 array.add(runtime.newString(name));
             }
 
         } else if (objectClass == this) {
 
-            for (String name : getLocalConstantNameList()) {
+            for (String name : getStoredConstantNameList()) {
                 array.add(runtime.newString(name));
             }
 
@@ -2065,7 +2038,7 @@ public class RubyModule extends RubyObject {
             Set<String> names = new HashSet<String>();
             for (RubyModule p = this; p != null; p = p.getSuperClass()) {
                 if (objectClass != p) {
-                    for (String name : p.getLocalConstantNameList()) {
+                    for (String name : p.getStoredConstantNameList()) {
                         names.add(name);
                     }
                 }
@@ -2083,7 +2056,7 @@ public class RubyModule extends RubyObject {
      */
     public IRubyObject remove_class_variable(final IRubyObject name) {
         final String id = name.asSymbol();
-        IRubyObject value = getVariableStore().validatedRemoveClassVariable(id);
+        IRubyObject value = getVariableStore().validatedDeleteClassVariable(id);
 
         if (value != null) {
             return value;

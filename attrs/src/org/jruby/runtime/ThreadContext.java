@@ -463,9 +463,9 @@ public final class ThreadContext {
         // flipped from while to do to search current class first
         for (StaticScope scope = getCurrentScope().getStaticScope(); scope != null; scope = scope.getPreviousCRefScope()) {
             RubyModule module = scope.getModule();
-            if ((result = module.fastGetLocalConstant(internedName)) != null) {
+            if ((result = module.fastFetchConstant(internedName)) != null) {
                 if (result != undef) return true;
-                module.removeLocalConstant(internedName);
+                module.deleteConstant(internedName);
                 return runtime.getLoadService().autoload(module.getName() + "::" + internedName) != null;
             }
         }
@@ -479,7 +479,7 @@ public final class ThreadContext {
     public IRubyObject getConstant(final String internedName) {
         StaticScope scope = getCurrentScope().getStaticScope();
         final RubyClass object = runtime.getObject();
-        IRubyObject result = null;
+        IRubyObject result;
         final IRubyObject undef = runtime.getUndef();
         
         // flipped from while to do to search current class first
@@ -488,12 +488,11 @@ public final class ThreadContext {
             
             // Not sure how this can happen
             //if (NIL_P(klass)) return rb_const_get(CLASS_OF(self), id);
-            result = klass.fastGetLocalConstant(internedName);
-            if (result != null) {
+            if ((result = klass.fastFetchConstant(internedName)) != null) {
                 if (result != undef) {
                     return result;
                 }
-                klass.removeLocalConstant(internedName);
+                klass.deleteConstant(internedName);
                 if (runtime.getLoadService().autoload(klass.getName() + "::" + internedName) == null) break;
                 continue;
             }

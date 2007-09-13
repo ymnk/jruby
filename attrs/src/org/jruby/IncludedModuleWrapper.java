@@ -52,7 +52,7 @@ import org.jruby.runtime.component.VariableStore;
  * @see org.jruby.RubyModule
  */
 public final class IncludedModuleWrapper extends RubyClass {
-    private RubyModule delegate;
+    private final RubyModule delegate;
 
     public IncludedModuleWrapper(Ruby runtime, RubyClass superClass, RubyModule delegate) {
         super(runtime, superClass, null, false);

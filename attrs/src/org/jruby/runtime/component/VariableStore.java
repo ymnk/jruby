@@ -114,44 +114,46 @@ public abstract class VariableStore<BaseObjectType> implements Serializable {
     
     public abstract boolean isEmpty();
 
+    public abstract void syncVariables(final List<Variable<BaseObjectType>> varList);
+    
     //
     // PSEUDO/INTERNAL VARIABLES (i.e, not ivar/cvar/constant)
-    // Don't use these methods for real attributes (ivar/cvar/constant),
-    // as that may fail in implementations that store different attribute
+    // Don't use these methods for real variables (ivar/cvar/constant),
+    // as that may fail in implementations that store different variable
     // types separately.
     //
 
     public abstract boolean hasInternalVariable(final String name);
     public abstract boolean fastHasInternalVariable(final String internedName);
-    public abstract BaseObjectType getInternalVariable(final String name);
-    public abstract BaseObjectType fastGetInternalVariable(final String internedName);
-    public abstract void setInternalVariable(final String name, final BaseObjectType value);
-    public abstract void fastSetInternalVariable(final String internedName, final BaseObjectType value);
-    public abstract BaseObjectType removeInternalVariable(final String name);
+    public abstract BaseObjectType fetchInternalVariable(final String name);
+    public abstract BaseObjectType fastFetchInternalVariable(final String internedName);
+    public abstract void storeInternalVariable(final String name, final BaseObjectType value);
+    public abstract void fastStoreInternalVariable(final String internedName, final BaseObjectType value);
+    public abstract BaseObjectType deleteInternalVariable(final String name);
 
     /**
-     * @return all attributes (ivar/cvar/constant/internal)
+     * @return all stored variables (ivar/cvar/constant/internal)
      */
-    public abstract List<Variable<BaseObjectType>> getVariableList();
+    public abstract List<Variable<BaseObjectType>> getStoredVariableList();
 
     /**
-     * @return only "internal" attributes (NOT ivar/cvar/constant)
+     * @return only "internal" variables (NOT ivar/cvar/constant)
      */
-    public abstract List<Variable<BaseObjectType>> getInternalVariableList();
+    public abstract List<Variable<BaseObjectType>> getStoredInternalVariableList();
     
     /**
-     * @return all attribute names (ivar/cvar/constant/internal)
+     * @return all variable names (ivar/cvar/constant/internal)
      */
-    public abstract List<String> getVariableNameList();
+    public abstract List<String> getStoredVariableNameList();
     
     /**
-     * @return all attributes (ivar/cvar/constant/internal) as a HashMap.
+     * @return all variables (ivar/cvar/constant/internal) as a HashMap.
      *         This is a snapshot, not the store itself.  Provided mostly
-     *         to ease transition to new attributes mechanism. May be 
+     *         to ease transition to new variables mechanism. May be 
      *         deprecated in the near future -- call the appropriate 
      *         getXxxList method for future compatiblity.
      */
-    public abstract Map getVariableMap();
+    public abstract Map getStoredVariableMap();
 
     
     //
@@ -163,18 +165,18 @@ public abstract class VariableStore<BaseObjectType> implements Serializable {
     public abstract boolean fastHasInstanceVariable(final String internedName);
     public abstract boolean validatedHasInstanceVariable(final String name);
     public abstract boolean fastValidatedHasInstanceVariable(final String internedName);
-    public abstract BaseObjectType getInstanceVariable(final String name);
-    public abstract BaseObjectType fastGetInstanceVariable(final String internedName);
-    public abstract BaseObjectType validatedGetInstanceVariable(final String name);
-    public abstract BaseObjectType fastValidatedGetInstanceVariable(final String internedName);
-    public abstract void setInstanceVariable(final String name, final BaseObjectType value);
-    public abstract void fastSetInstanceVariable(final String internedName, final BaseObjectType value);
-    public abstract void validatedSetInstanceVariable(final String name, final BaseObjectType value);
-    public abstract void fastValidatedSetInstanceVariable(final String internedName, final BaseObjectType value);
-    public abstract BaseObjectType removeInstanceVariable(final String name);
-    public abstract BaseObjectType validatedRemoveInstanceVariable(final String name);
-    public abstract List<Variable<BaseObjectType>> getInstanceVariableList();
-    public abstract List<String> getInstanceVariableNameList();
+    public abstract BaseObjectType fetchInstanceVariable(final String name);
+    public abstract BaseObjectType fastFetchInstanceVariable(final String internedName);
+    public abstract BaseObjectType validatedFetchInstanceVariable(final String name);
+    public abstract BaseObjectType fastValidatedFetchInstanceVariable(final String internedName);
+    public abstract void storeInstanceVariable(final String name, final BaseObjectType value);
+    public abstract void fastStoreInstanceVariable(final String internedName, final BaseObjectType value);
+    public abstract void validatedStoreInstanceVariable(final String name, final BaseObjectType value);
+    public abstract void fastValidatedStoreInstanceVariable(final String internedName, final BaseObjectType value);
+    public abstract BaseObjectType deleteInstanceVariable(final String name);
+    public abstract BaseObjectType validatedDeleteInstanceVariable(final String name);
+    public abstract List<Variable<BaseObjectType>> getStoredInstanceVariableList();
+    public abstract List<String> getStoredInstanceVariableNameList();
 
     //
     // CLASS VARIABLES
@@ -185,18 +187,18 @@ public abstract class VariableStore<BaseObjectType> implements Serializable {
     public abstract boolean fastHasClassVariable(final String internedName);
     public abstract boolean validatedHasClassVariable(final String name);
     public abstract boolean fastValidatedHasClassVariable(final String internedName);
-    public abstract BaseObjectType getClassVariable(final String name);
-    public abstract BaseObjectType fastGetClassVariable(final String internedName);
-    public abstract BaseObjectType validatedGetClassVariable(final String name);
-    public abstract BaseObjectType fastValidatedGetClassVariable(final String internedName);
-    public abstract void setClassVariable(final String name, final BaseObjectType value);
-    public abstract void fastSetClassVariable(final String internedName, final BaseObjectType value);
-    public abstract void validatedSetClassVariable(final String name, final BaseObjectType value);
-    public abstract void fastValidatedSetClassVariable(final String internedName, final BaseObjectType value);
-    public abstract BaseObjectType removeClassVariable(final String name);
-    public abstract BaseObjectType validatedRemoveClassVariable(final String name);
-    public abstract List<Variable<BaseObjectType>> getClassVariableList();
-    public abstract List<String> getClassVariableNameList();
+    public abstract BaseObjectType fetchClassVariable(final String name);
+    public abstract BaseObjectType fastFetchClassVariable(final String internedName);
+    public abstract BaseObjectType validatedFetchClassVariable(final String name);
+    public abstract BaseObjectType fastValidatedFetchClassVariable(final String internedName);
+    public abstract void storeClassVariable(final String name, final BaseObjectType value);
+    public abstract void fastStoreClassVariable(final String internedName, final BaseObjectType value);
+    public abstract void validatedStoreClassVariable(final String name, final BaseObjectType value);
+    public abstract void fastValidatedStoreClassVariable(final String internedName, final BaseObjectType value);
+    public abstract BaseObjectType deleteClassVariable(final String name);
+    public abstract BaseObjectType validatedDeleteClassVariable(final String name);
+    public abstract List<Variable<BaseObjectType>> getStoredClassVariableList();
+    public abstract List<String> getStoredClassVariableNameList();
     
     //
     // CONSTANTS
@@ -207,18 +209,18 @@ public abstract class VariableStore<BaseObjectType> implements Serializable {
     public abstract boolean fastHasConstant(final String internedName);
     public abstract boolean validatedHasConstant(final String name);
     public abstract boolean fastValidatedHasConstant(final String internedName);
-    public abstract BaseObjectType getConstant(final String name);
-    public abstract BaseObjectType fastGetConstant(final String internedName);
-    public abstract BaseObjectType validatedGetConstant(final String name);
-    public abstract BaseObjectType fastValidatedGetConstant(final String internedName);
-    public abstract void setConstant(final String name, final BaseObjectType value);
-    public abstract void fastSetConstant(final String internedName, final BaseObjectType value);
-    public abstract void validatedSetConstant(final String name, final BaseObjectType value);
-    public abstract void fastValidatedSetConstant(final String internedName, final BaseObjectType value);
-    public abstract BaseObjectType removeConstant(final String name);
-    public abstract BaseObjectType validatedRemoveConstant(final String name);
-    public abstract List<Variable<BaseObjectType>> getConstantList();
-    public abstract List<String> getConstantNameList();
+    public abstract BaseObjectType fetchConstant(final String name);
+    public abstract BaseObjectType fastFetchConstant(final String internedName);
+    public abstract BaseObjectType validatedFetchConstant(final String name);
+    public abstract BaseObjectType fastValidatedFetchConstant(final String internedName);
+    public abstract void storeConstant(final String name, final BaseObjectType value);
+    public abstract void fastStoreConstant(final String internedName, final BaseObjectType value);
+    public abstract void validatedStoreConstant(final String name, final BaseObjectType value);
+    public abstract void fastValidatedStoreConstant(final String internedName, final BaseObjectType value);
+    public abstract BaseObjectType deleteConstant(final String name);
+    public abstract BaseObjectType validatedDeleteConstant(final String name);
+    public abstract List<Variable<BaseObjectType>> getStoredConstantList();
+    public abstract List<String> getStoredConstantNameList();
  
     // FIXME: this should go somewhere more generic -- maybe IdUtil
     public static final boolean isRubyVariable(final String name) {

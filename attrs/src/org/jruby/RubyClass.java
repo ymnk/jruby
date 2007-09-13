@@ -442,7 +442,7 @@ public class RubyClass extends RubyModule {
                 // FIXME: this (old and new versions) won't set the base name
                 // or parent in the new class; should it?
                 //parent.setInstanceVariable(name, newClass); // old, don't reinstate
-                parent.getVariableStore().setConstant(name, newClass);
+                parent.getVariableStore().storeConstant(name, newClass);
             }
         }
 
