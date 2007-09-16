@@ -185,8 +185,8 @@ public class TestUnitTestSuite extends TestCase {
         
 
         public void runTest() throws Throwable {
-          System.out.println("Running test [" + this.filename + "]");
-          System.out.flush();
+//          System.out.println("Running test [" + this.filename + "]");
+//          System.out.flush();
           
             StringBuffer script = new StringBuffer();
 

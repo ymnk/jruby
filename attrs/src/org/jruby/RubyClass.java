@@ -36,8 +36,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ClassIndex;
@@ -63,8 +61,6 @@ public class RubyClass extends RubyModule {
     private ObjectMarshal marshal;
     
     private Set subclasses;
-    
-    private final ReentrantLock lock = new ReentrantLock();
     
     private static final ObjectMarshal DEFAULT_OBJECT_MARSHAL = new ObjectMarshal() {
         public void marshalTo(Ruby runtime, Object obj, RubyClass type,
@@ -212,18 +208,6 @@ public class RubyClass extends RubyModule {
 		return runtime;
 	}
     
-    public void lock() {
-        lock.lock();
-    }
-    
-    public void unlock() {
-        lock.unlock();
-    }
-    
-    public Lock getLock() {
-        return lock;
-    }
-
     public boolean isModule() {
         return false;
     }
@@ -442,7 +426,7 @@ public class RubyClass extends RubyModule {
                 // FIXME: this (old and new versions) won't set the base name
                 // or parent in the new class; should it?
                 //parent.setInstanceVariable(name, newClass); // old, don't reinstate
-                parent.getVariableStore().storeConstant(name, newClass);
+                parent.storeConstant(name, newClass);
             }
         }
 

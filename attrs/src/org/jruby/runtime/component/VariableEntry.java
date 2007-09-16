@@ -12,27 +12,27 @@ public class VariableEntry<BaseObjectType> implements Variable<BaseObjectType> {
         this.value = value;
     }
 
-    public String getName() {
+    public final String getName() {
         return name;
     }
     
-    public BaseObjectType getValue() {
+    public final BaseObjectType getValue() {
         return value;
     }
     
-    public boolean isClassVariable() {
+    public final boolean isClassVariable() {
         return IdUtil.isClassVariable(name);
     }
     
-    public boolean isConstant() {
+    public final boolean isConstant() {
         return IdUtil.isConstant(name);
     }
     
-    public boolean isInstanceVariable() {
+    public final boolean isInstanceVariable() {
         return IdUtil.isInstanceVariable(name);
     }
 
-    public boolean isRubyVariable() {
+    public final boolean isRubyVariable() {
         char c;
         return name.length() > 0 && ((c = name.charAt(0)) == '@' || (c <= 'Z' && c >= 'A'));
     }

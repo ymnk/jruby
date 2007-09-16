@@ -35,9 +35,10 @@ package org.jruby;
 import java.util.List;
 import java.util.Map;
 
+import org.jruby.internal.runtime.methods.DynamicMethod;
+import org.jruby.runtime.builtin.NamedMethod;
 import org.jruby.runtime.builtin.Variable;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.runtime.component.VariableStore;
 
 /**
  * This class is used to provide an intermediate superclass for modules and classes that include
@@ -110,14 +111,6 @@ public final class IncludedModuleWrapper extends RubyClass {
         throw new UnsupportedOperationException("An included class is only a wrapper for a module");
     }
     
-    protected VariableStore<IRubyObject> getVariableStore() {
-        return delegate.getVariableStore();
-    }
-    
-    protected VariableStore<IRubyObject> ensureVariableStore() {
-        return delegate.ensureVariableStore();
-    }
-    
     public void syncVariables(final List<Variable<IRubyObject>> variables) {
         throw new UnsupportedOperationException("An included class is only a wrapper for a module");
     }
@@ -155,4 +148,218 @@ public final class IncludedModuleWrapper extends RubyClass {
     public RubyFixnum id() {
         return delegate.id();
     }
+
+    
+    // VARIABLE TABLE METHODS - pass to delegate
+    
+    @Override
+    protected boolean variableTableContains(final String name) {
+        return delegate.variableTableContains(name);
+    }
+    
+    @Override
+    protected boolean variableTableFastContains(final String internedName) {
+        return delegate.variableTableFastContains(internedName);
+    }
+    
+    @Override
+    protected IRubyObject variableTableFetch(final String name) {
+        return delegate.variableTableFetch(name);
+    }
+    
+    @Override
+    protected IRubyObject variableTableFastFetch(final String internedName) {
+        return delegate.variableTableFastFetch(internedName);
+    }
+    
+    @Override
+    protected IRubyObject variableTableStore(final String name, final IRubyObject value) {
+        return delegate.variableTableStore(name, value);
+    }
+    
+    @Override
+    protected IRubyObject variableTableFastStore(final String internedName, final IRubyObject value) {
+        return delegate.variableTableFastStore(internedName, value);
+    }
+        
+    @Override
+    protected IRubyObject variableTableRemove(final String name) {
+        return delegate.variableTableRemove(name);
+    }
+
+    @Override
+    protected VariableTableEntry[] variableTableGetTable() {
+        return delegate.variableTableGetTable();
+    }
+    
+    @Override
+    protected int variableTableGetSize() {
+        return delegate.variableTableGetSize();
+    }
+    
+    @Override
+    protected void variableTableSync(List<Variable<IRubyObject>> vars) {
+        delegate.variableTableSync(vars);
+    }
+    
+    /**
+     * Method to help ease transition to new variables implementation.
+     * Will likely be deprecated in the near future.
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    @Deprecated // born deprecated
+    protected Map variableTableGetMap() {
+        return delegate.variableTableGetMap();
+    }
+    
+    /**
+     * Method to help ease transition to new variables implementation.
+     * Will likely be deprecated in the near future.
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    @Deprecated // born deprecated
+    protected Map variableTableGetMap(final Map map) {
+        return delegate.variableTableGetMap(map);
+    }
+    
+
+    // CONSTANT TABLE METHODS - pass to delegate
+    
+
+    @Override
+    protected boolean constantTableContains(final String name) {
+        return delegate.constantTableContains(name);
+    }
+    
+    @Override
+    protected boolean constantTableFastContains(final String internedName) {
+        return delegate.constantTableFastContains(internedName);
+    }
+    
+    @Override
+    protected IRubyObject constantTableFetch(final String name) {
+        return delegate.constantTableFetch(name);
+    }
+    
+    @Override
+    protected IRubyObject constantTableFastFetch(final String internedName) {
+        return delegate.constantTableFastFetch(internedName);
+    }
+    
+    @Override
+    protected IRubyObject constantTableStore(final String name, final IRubyObject value) {
+        // FIXME: legal here? may want UnsupportedOperationException
+        return delegate.constantTableStore(name, value);
+    }
+    
+    @Override
+    protected IRubyObject constantTableFastStore(final String internedName, final IRubyObject value) {
+        // FIXME: legal here? may want UnsupportedOperationException
+        return delegate.constantTableFastStore(internedName, value);
+    }
+        
+    @Override
+    protected IRubyObject constantTableRemove(final String name) {
+        // this _is_ legal (when removing an undef)
+        return delegate.constantTableRemove(name);
+    }
+    
+    @Override
+    protected ConstantTableEntry[] constantTableGetTable() {
+        return delegate.constantTableGetTable();
+    }
+    
+    @Override
+    protected int constantTableGetSize() {
+        return delegate.constantTableGetSize();
+    }
+    
+    @Override
+    protected void constantTableSync(List<Variable<IRubyObject>> vars) {
+        // FIXME: legal here? may want UnsupportedOperationException
+        delegate.constantTableSync(vars);
+    }
+
+    /**
+     * Method to help ease transition to new variables implementation.
+     * Will likely be deprecated in the near future.
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    @Deprecated // born deprecated
+    protected Map constantTableGetMap() {
+        return delegate.constantTableGetMap();
+    }
+    
+    /**
+     * Method to help ease transition to new variables implementation.
+     * Will likely be deprecated in the near future.
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    @Deprecated // born deprecated
+    protected Map constantTableGetMap(final Map map) {
+        return delegate.constantTableGetMap(map);
+    }
+    
+    // METHOD TABLE METHODS - pass to delegate
+    
+
+    @Override
+    protected boolean methodTableContains(final String name) {
+        return delegate.methodTableContains(name);
+    }
+    
+    @Override
+    protected boolean methodTableFastContains(final String internedName) {
+        return delegate.methodTableFastContains(internedName);
+    }
+    
+    @Override
+    protected DynamicMethod methodTableFetch(final String name) {
+        return delegate.methodTableFetch(name);
+    }
+    
+    @Override
+    protected DynamicMethod methodTableFastFetch(final String internedName) {
+        return delegate.methodTableFastFetch(internedName);
+    }
+    
+    @Override
+    protected DynamicMethod methodTableStore(final String name, final DynamicMethod method) {
+        // FIXME: legal here? may want UnsupportedOperationException
+        return delegate.methodTableStore(name, method);
+    }
+    
+    @Override
+    protected DynamicMethod methodTableFastStore(final String internedName, final DynamicMethod method) {
+        // FIXME: legal here? may want UnsupportedOperationException
+        return delegate.methodTableFastStore(internedName, method);
+    }
+        
+    @Override
+    protected DynamicMethod methodTableRemove(final String name) {
+        // FIXME: legal here? may want UnsupportedOperationException
+        return delegate.methodTableRemove(name);
+    }
+    
+    @Override
+    protected MethodTableEntry[] methodTableGetTable() {
+        return delegate.methodTableGetTable();
+    }
+    
+    @Override
+    protected int methodTableGetSize() {
+        return delegate.methodTableGetSize();
+    }
+    
+    @Override
+    protected void methodTableSync(List<NamedMethod> methods) {
+        // FIXME: legal here? may want UnsupportedOperationException
+        delegate.methodTableSync(methods);
+    }
+    
+   
 }

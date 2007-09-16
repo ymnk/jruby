@@ -45,7 +45,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
 
 import org.jruby.ast.Node;
 import org.jruby.evaluator.EvaluationState;
@@ -64,14 +63,16 @@ import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.Variable;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.callback.Callback;
-import org.jruby.runtime.component.VariableStore;
-import org.jruby.runtime.component.ConcurrentObjectVariableStore;
+import org.jruby.runtime.component.VariableEntry;
+import org.jruby.util.IdUtil;
 
 /**
  *
  * @author  jpetersen
  */
 public class RubyObject implements Cloneable, IRubyObject {
+
+    private static final long serialVersionUID = -1;
     
     private RubyObject(){};
     // An instance that never equals any other instance
@@ -81,41 +82,19 @@ public class RubyObject implements Cloneable, IRubyObject {
     protected RubyClass metaClass;
 
     /**
-     * The variableStore contains variables for an object, defined as:
+     * The variableTable contains variables for an object, defined as:
      * <ul>
      * <li> instance variables
      * <li> class variables (for classes/modules)
-     * <li> constants (for classes/modules)
      * <li> internal variables (such as those used when marshaling RubyRange and RubyException)
      * </ul>
      * 
+     * Constants are stored separately, see {@link RubyModule}. 
+     * 
      */
-    protected volatile VariableStore<IRubyObject> variableStore;
-    
-    protected VariableStore<IRubyObject> getVariableStore() {
-        return variableStore;
-    }
-    
-    // TODO: This mechanism is intended, in part, to work around the
-    // double-lock idiom issue with normal Java synchronization.  Does it?
-    // Specifically, does it prevent a partially-initialized VariableStore
-    // from being read?  Not so sure it does...
-    protected VariableStore<IRubyObject> ensureVariableStore() {
-        VariableStore<IRubyObject> store;
-        if ((store = variableStore) != null) {
-            return store;
-        }
-        Lock lock = getMetaClass().getLock();
-        lock.lock();
-        try {
-            if (variableStore == null) {
-                variableStore = new ConcurrentObjectVariableStore<IRubyObject>(getRuntime(), this);
-            }
-        } finally {
-            lock.unlock();
-        }
-        return variableStore;
-    }
+    protected transient volatile VariableTableEntry[] variableTable;
+    protected transient int variableTableSize;
+    protected transient int variableTableThreshold;
 
     private transient Object dataStruct;
 
@@ -594,242 +573,33 @@ public class RubyObject implements Cloneable, IRubyObject {
         return receiver.callMethod(context, "method_missing", newArgs, block);
     }
 
-
-    //
-    // VARIABLE METHODS
-    //
-
-    /**
-     * Returns true if object has any variables, defined as:
-     * <ul>
-     * <li> instance variables
-     * <li> class variables
-     * <li> constants
-     * <li> internal variables, such as those used when marshaling Ranges and Exceptions
-     * </ul>
-     * @return true if object has any variables, else false
-     */
-    public boolean hasVariables() {
-        final VariableStore<IRubyObject> store;
-        return (store = getVariableStore()) != null && !store.isEmpty();
-    }
-
-    public boolean hasInternalVariable(final String name) {
-        final VariableStore<IRubyObject> store;
-        return (store = getVariableStore()) != null && store.hasInternalVariable(name);
-    }
-
-    public boolean fastHasInternalVariable(final String internedName) {
-        final VariableStore<IRubyObject> store;
-        return (store = getVariableStore()) != null && store.fastHasInternalVariable(internedName);
-    }
-
-    public IRubyObject getInternalVariable(final String name) {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.fetchInternalVariable(name);
-        }
-        return null;
-    }
-
-    public IRubyObject fastGetInternalVariable(final String internedName) {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.fastFetchInternalVariable(internedName);
-        }
-        return null;
-    }
-
-    public void setInternalVariable(final String name, final IRubyObject value) {
-        ensureVariableStore().storeInternalVariable(name, value);
-    }
-
-    public void fastSetInternalVariable(final String internedName, final IRubyObject value) {
-        ensureVariableStore().fastStoreInternalVariable(internedName, value);
-    }
-
-    public IRubyObject removeInternalVariable(final String name) {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.deleteInternalVariable(name);
-        }
-        return null;
-    }
-
-    public void syncVariables(final List<Variable<IRubyObject>> variables) {
-        final VariableStore<IRubyObject> store =
-            new ConcurrentObjectVariableStore<IRubyObject>(getRuntime(), this, variables);
-        final Lock lock = getMetaClass().getLock();
-        lock.lock();
-        try {
-            variableStore = store;
-        } finally {
-            lock.unlock();
-        }
-    }
-    
-    public int getVariableCount() {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.size();
-        }
-        return 0;
-    }
-
-    public List<Variable<IRubyObject>> getVariableList() {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.getStoredVariableList();
-        }
-        return new ArrayList<Variable<IRubyObject>>(0);
-    }
-
-    public List<Variable<IRubyObject>> getInternalVariableList() {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.getStoredInternalVariableList();
-        }
-        return new ArrayList<Variable<IRubyObject>>(0);
-    }
-
-    public List<String> getVariableNameList() {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.getStoredVariableNameList();
-        }
-        return new ArrayList<String>(0);
-    }
-    
-    public Map getVariableMap() {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.getStoredVariableMap();
-        }
-        return new HashMap(1);
-    }
-
-
-    //
-    // INSTANCE VARIABLE METHODS
-    //
- 
-    
-    public boolean hasInstanceVariable(final String name) {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.hasInstanceVariable(name);
-        }
-        return false;
-    }
-    
-    public boolean fastHasInstanceVariable(final String internedName) {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.fastHasInstanceVariable(internedName);
-        }
-        return false;
-    }
-    
-    public IRubyObject getInstanceVariable(final String name) {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.fetchInstanceVariable(name);
-        }
-        return null;
-    }
-    
-    public IRubyObject fastGetInstanceVariable(final String internedName) {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.fastFetchInstanceVariable(internedName);
-        }
-        return null;
-    }
-
-    /** rb_iv_set / rb_ivar_set
-    *
-    */
-    public IRubyObject setInstanceVariable(final String name, final IRubyObject value) {
-       ensureVariableStore().storeInstanceVariable(name, value);
-       return value;
-    }
-    
-    public IRubyObject fastSetInstanceVariable(final String internedName, final IRubyObject value) {
-        ensureVariableStore().fastStoreInstanceVariable(internedName, value);
-        return value;
-     }
-
-    public IRubyObject removeInstanceVariable(String name) {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.deleteInstanceVariable(name);
-        }
-        return null;
-    }
-
-    public List<Variable<IRubyObject>> getInstanceVariableList() {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.getStoredInstanceVariableList();
-        }
-        return new ArrayList<Variable<IRubyObject>>(0);
-    }
-
-    public List<String> getInstanceVariableNameList() {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            return store.getStoredInstanceVariableNameList();
-        }
-        return new ArrayList<String>(0);
-    }
-
-
     public IRubyObject instance_variable_get(final IRubyObject name) {
-        final VariableStore<IRubyObject> store;
         final IRubyObject value;
-        if ((store = getVariableStore()) != null) {
-            if ((value = store.fastValidatedFetchInstanceVariable(name.asSymbol())) != null) {
-                return value;
-            }
-        } else {
-            // no store, validate name anyway
-            VariableStore.validateInstanceVariable(getRuntime(), name.asSymbol());
+        if ((value = variableTableFastFetch(validateInstanceVariable(name.asSymbol()))) != null) {
+            return value;
         }
         return getRuntime().getNil();
     }
     
     public IRubyObject instance_variable_set(final IRubyObject name, final IRubyObject value) {
-        ensureVariableStore().fastValidatedStoreInstanceVariable(name.asSymbol(), value);
-        return value;
+        ensureInstanceVariablesSettable();
+        return variableTableFastStore(validateInstanceVariable(name.asSymbol()), value);
     }
     
     public IRubyObject instance_variable_defined_p(final IRubyObject name) {
-        final VariableStore<IRubyObject> store;
-        if ((store = getVariableStore()) != null) {
-            if (store.fastValidatedHasInstanceVariable(name.asSymbol())) {
-                return getRuntime().getTrue();
-            }
-        } else {
-            // no store, validate name anyway
-            VariableStore.validateInstanceVariable(getRuntime(), name.asSymbol());
+        if (variableTableFastContains(validateInstanceVariable(name.asSymbol()))) {
+            return getRuntime().getTrue();
         }
         return getRuntime().getFalse();
     }
     
     public IRubyObject remove_instance_variable(final IRubyObject name) {
-        final String id = name.asSymbol();
-        final VariableStore<IRubyObject> store;
+        ensureInstanceVariablesSettable();
         final IRubyObject value;
-        if ((store = getVariableStore()) != null) {
-            if ((value = store.validatedDeleteInstanceVariable(id)) != null) {
-                return value;
-            }
-        } else {
-            // no store, validate name anyway
-            VariableStore.validateInstanceVariable(getRuntime(), id);
+        if ((value = variableTableRemove(validateInstanceVariable(name.asSymbol()))) != null) {
+            return value;
         }
-
-        throw getRuntime().newNameError("instance variable " + id + " not defined", id);
+        throw getRuntime().newNameError("instance variable " + name.asSymbol() + " not defined", name.asSymbol());
     }
      
 
@@ -1636,56 +1406,556 @@ public class RubyObject implements Cloneable, IRubyObject {
         }
     }
     
+    //
+    // INSTANCE VARIABLE METHODS
+    //
+    
+    protected static final String ERR_INSECURE_SET_INST_VAR  = "Insecure: can't modify instance variable";
+
+    protected final String validateInstanceVariable(final String name) {
+        if (IdUtil.isValidInstanceVariableName(name)) {
+            return name;
+        }
+        throw getRuntime().newNameError("`" + name + "' is not allowable as an instance variable name", name);
+    }
+
+    protected final void ensureInstanceVariablesSettable() {
+        if (!isFrozen() && (getRuntime().getSafeLevel() < 4 || isTaint())) {
+            return;
+        }
+        
+        if (getRuntime().getSafeLevel() >= 4 && !isTaint()) {
+            throw getRuntime().newSecurityError(ERR_INSECURE_SET_INST_VAR);
+        }
+        if (isFrozen()) {
+            if (this instanceof RubyModule) {
+                throw getRuntime().newFrozenError("class/module ");
+            } else {
+                throw getRuntime().newFrozenError("");
+            }
+        }
+    }
+
+    public boolean hasInstanceVariable(final String name) {
+        assert IdUtil.isInstanceVariable(name);
+        return variableTableContains(name);
+    }
+    
+    public boolean fastHasInstanceVariable(final String internedName) {
+        assert IdUtil.isInstanceVariable(internedName);
+        return variableTableFastContains(internedName);
+    }
+    
+    public IRubyObject getInstanceVariable(final String name) {
+        assert IdUtil.isInstanceVariable(name);
+        return variableTableFetch(name);
+    }
+    
+    public IRubyObject fastGetInstanceVariable(final String internedName) {
+        assert IdUtil.isInstanceVariable(internedName);
+        return variableTableFastFetch(internedName);
+    }
+
+    /** rb_iv_set / rb_ivar_set
+    *
+    */
+    public IRubyObject setInstanceVariable(final String name, final IRubyObject value) {
+        assert IdUtil.isInstanceVariable(name) && value != null;
+        ensureInstanceVariablesSettable();
+        return variableTableStore(name, value);
+    }
+    
+    public IRubyObject fastSetInstanceVariable(final String internedName, final IRubyObject value) {
+        assert IdUtil.isInstanceVariable(internedName) && value != null;
+        ensureInstanceVariablesSettable();
+        return variableTableFastStore(internedName, value);
+     }
+
+    public IRubyObject removeInstanceVariable(String name) {
+        assert IdUtil.isInstanceVariable(name);
+        ensureInstanceVariablesSettable();
+        return variableTableRemove(name);
+    }
+
+    public List<Variable<IRubyObject>> getInstanceVariableList() {
+        final VariableTableEntry[] table = variableTableGetTable();
+        final ArrayList<Variable<IRubyObject>> list = new ArrayList<Variable<IRubyObject>>();
+        for (int i = table.length; --i >= 0; ) {
+            for (VariableTableEntry e = table[i]; e != null; e = e.next) {
+                if (IdUtil.isInstanceVariable(e.name)) {
+                    list.add(new VariableEntry<IRubyObject>(e.name, e.value));
+                }
+            }
+        }
+        return list;
+    }
+
+    public List<String> getInstanceVariableNameList() {
+        final VariableTableEntry[] table = variableTableGetTable();
+        final ArrayList<String> list = new ArrayList<String>();
+        for (int i = table.length; --i >= 0; ) {
+            for (VariableTableEntry e = table[i]; e != null; e = e.next) {
+                if (IdUtil.isInstanceVariable(e.name)) {
+                    list.add(e.name);
+                }
+            }
+        }
+        return list;
+    }
+
+    //
+    // VARIABLE METHODS
+    //
+
+    /**
+     * Returns true if object has any variables, defined as:
+     * <ul>
+     * <li> instance variables
+     * <li> class variables
+     * <li> constants
+     * <li> internal variables, such as those used when marshaling Ranges and Exceptions
+     * </ul>
+     * @return true if object has any variables, else false
+     */
+    public boolean hasVariables() {
+        return variableTableGetSize() > 0;
+    }
+
+    public int getVariableCount() {
+        return variableTableGetSize();
+    }
+    
+   public boolean hasInternalVariable(final String name) {
+        assert !isRubyVariable(name);
+        return variableTableContains(name);
+    }
+
+    public boolean fastHasInternalVariable(final String internedName) {
+        assert !isRubyVariable(internedName);
+        return variableTableFastContains(internedName);
+    }
+
+    public IRubyObject getInternalVariable(final String name) {
+        assert !isRubyVariable(name);
+        return variableTableFetch(name);
+    }
+
+    public IRubyObject fastGetInternalVariable(final String internedName) {
+        assert !isRubyVariable(internedName);
+        return variableTableFastFetch(internedName);
+    }
+
+    public void setInternalVariable(final String name, final IRubyObject value) {
+        assert !isRubyVariable(name);
+        variableTableStore(name, value);
+    }
+
+    public void fastSetInternalVariable(final String internedName, final IRubyObject value) {
+        assert !isRubyVariable(internedName);
+        variableTableFastStore(internedName, value);
+    }
+
+    public IRubyObject removeInternalVariable(final String name) {
+        assert !isRubyVariable(name);
+        return variableTableRemove(name);
+    }
+
+    public void syncVariables(final List<Variable<IRubyObject>> variables) {
+        variableTableSync(variables);
+    }
+
+    public List<Variable<IRubyObject>> getInternalVariableList() {
+        final VariableTableEntry[] table = variableTableGetTable();
+        final ArrayList<Variable<IRubyObject>> list = new ArrayList<Variable<IRubyObject>>();
+        for (int i = table.length; --i >= 0; ) {
+            for (VariableTableEntry e = table[i]; e != null; e = e.next) {
+                if (!isRubyVariable(e.name)) {
+                    list.add(new VariableEntry<IRubyObject>(e.name, e.value));
+                }
+            }
+        }
+        return list;
+    }
+
+    // TODO: must override in RubyModule to pick up constants
+    public List<Variable<IRubyObject>> getVariableList() {
+        final VariableTableEntry[] table = variableTableGetTable();
+        final ArrayList<Variable<IRubyObject>> list = new ArrayList<Variable<IRubyObject>>();
+        for (int i = table.length; --i >= 0; ) {
+            for (VariableTableEntry e = table[i]; e != null; e = e.next) {
+                list.add(new VariableEntry<IRubyObject>(e.name, e.value));
+            }
+        }
+        return list;
+    }
+
+   // TODO: must override in RubyModule to pick up constants
+   public List<String> getVariableNameList() {
+        final VariableTableEntry[] table = variableTableGetTable();
+        final ArrayList<String> list = new ArrayList<String>();
+        for (int i = table.length; --i >= 0; ) {
+            for (VariableTableEntry e = table[i]; e != null; e = e.next) {
+                list.add(e.name);
+            }
+        }
+        return list;
+    }
+    
+    @SuppressWarnings("unchecked")
+    @Deprecated // born deprecated
+    public Map getVariableMap() {
+        return variableTableGetMap();
+    }
+
+
+    // FIXME: this should go somewhere more generic -- maybe IdUtil
+    protected static final boolean isRubyVariable(final String name) {
+        char c;
+        return name.length() > 0 && ((c = name.charAt(0)) == '@' || (c <= 'Z' && c >= 'A'));
+    }
+    
+    //
+    // VARIABLE TABLE METHODS, ETC.
+    //
+    
+    protected static final int VARIABLE_TABLE_DEFAULT_CAPACITY = 8; // MUST be power of 2!
+    protected static final int VARIABLE_TABLE_MAXIMUM_CAPACITY = 1 << 30;
+    protected static final float VARIABLE_TABLE_LOAD_FACTOR = 0.75f;
+    protected static final VariableTableEntry[] VARIABLE_TABLE_EMPTY_TABLE = new VariableTableEntry[0];
+
+    protected static final class VariableTableEntry {
+        final int hash;
+        final String name;
+        volatile IRubyObject value;
+        final VariableTableEntry next;
+        
+        // note that volatile value is not passed to the constructor. the ConcurrentHashMap
+        // approach is to set the value here, but then the value must be checked for null
+        // on every read on the off-to-nonexistent chance a compiler might reorder the
+        // initialization with respect to insertion of the entry into the table. the approach
+        // here is to set the value externally after the entry is instantiated, and before
+        // it is inserted into the table. it should not be permissible for a compiler to 
+        // reorder those operations (TODO: confirm!).  this will be a little slower, but it
+        // only applies the first time a variable is written (though also on rehashes), while
+        // it allows every read to be a little faster.
+        VariableTableEntry( final int hash, final String name, final VariableTableEntry next) {
+            this.hash = hash;
+            this.name = name;
+            this.next = next;
+        }
+    }
+
+
+    protected boolean variableTableContains(final String name) {
+        final VariableTableEntry[] table;
+        if ((table = variableTable) != null) {
+            final int hash = name.hashCode();
+            for (VariableTableEntry e = table[hash & (table.length - 1)]; e != null; e = e.next) {
+                if (hash == e.hash && name.equals(e.name)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    protected boolean variableTableFastContains(final String internedName) {
+        final VariableTableEntry[] table;
+        if ((table = variableTable) != null) {
+            for (VariableTableEntry e = table[internedName.hashCode() & (table.length - 1)]; e != null; e = e.next) {
+                if (internedName == e.name) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    protected IRubyObject variableTableFetch(final String name) {
+        final VariableTableEntry[] table;
+        if ((table = variableTable) != null) {
+            final int hash = name.hashCode();
+            for (VariableTableEntry e = table[hash & (table.length - 1)]; e != null; e = e.next) {
+                if (hash == e.hash && name.equals(e.name)) {
+                    return e.value;
+                }
+            }
+        }
+        return null;
+    }
+    
+    protected IRubyObject variableTableFastFetch(final String internedName) {
+        final VariableTableEntry[] table;
+        if ((table = variableTable) != null) {
+            for (VariableTableEntry e = table[internedName.hashCode() & (table.length - 1)]; e != null; e = e.next) {
+                if (internedName == e.name) {
+                    return e.value;
+                }
+            }
+        }
+        return null;
+    }
+    
+    protected IRubyObject variableTableStore(final String name, final IRubyObject value) {
+        final int hash = name.hashCode();
+        synchronized(this) {
+            VariableTableEntry[] table;
+            VariableTableEntry e;
+            if ((table = variableTable) == null) {
+                table =  new VariableTableEntry[VARIABLE_TABLE_DEFAULT_CAPACITY];
+                e = new VariableTableEntry(hash, name.intern(), null);
+                e.value = value;
+                table[hash & (VARIABLE_TABLE_DEFAULT_CAPACITY - 1)] = e;
+                variableTableThreshold = (int)(VARIABLE_TABLE_DEFAULT_CAPACITY * VARIABLE_TABLE_LOAD_FACTOR);
+                variableTableSize = 1;
+                variableTable = table;
+                return value;
+            }
+            final int potentialNewSize;
+            if ((potentialNewSize = variableTableSize + 1) > variableTableThreshold) {
+                table = variableTableRehash();
+            }
+            final int index;
+            for (e = table[index = hash & (table.length - 1)]; e != null; e = e.next) {
+                if (hash == e.hash && name.equals(e.name)) {
+                    e.value = value;
+                    return value;
+                }
+            }
+            // external volatile value initialization intended to obviate the need for
+            // readValueUnderLock technique used in ConcurrentHashMap. may be a little
+            // slower, but better to pay a price on first write rather than all reads.
+            e = new VariableTableEntry(hash, name.intern(), table[index]);
+            e.value = value;
+            table[index] = e;
+            variableTableSize = potentialNewSize;
+            variableTable = table; // write-volatile
+        }
+        return value;
+    }
+    
+    protected IRubyObject variableTableFastStore(final String internedName, final IRubyObject value) {
+        assert internedName == internedName.intern() : internedName + " not interned";
+        final int hash = internedName.hashCode();
+        synchronized(this) {
+            VariableTableEntry[] table;
+            VariableTableEntry e;
+            if ((table = variableTable) == null) {
+                table =  new VariableTableEntry[VARIABLE_TABLE_DEFAULT_CAPACITY];
+                e = new VariableTableEntry(hash, internedName, null);
+                e.value = value;
+                table[hash & (VARIABLE_TABLE_DEFAULT_CAPACITY - 1)] = e;
+                variableTableThreshold = (int)(VARIABLE_TABLE_DEFAULT_CAPACITY * VARIABLE_TABLE_LOAD_FACTOR);
+                variableTableSize = 1;
+                variableTable = table;
+                return value;
+            }
+            final int potentialNewSize;
+            if ((potentialNewSize = variableTableSize + 1) > variableTableThreshold) {
+                table = variableTableRehash();
+            }
+            final int index;
+            for (e = table[index = hash & (table.length - 1)]; e != null; e = e.next) {
+                if (internedName == e.name) {
+                    e.value = value;
+                    return value;
+                }
+            }
+            // external volatile value initialization intended to obviate the need for
+            // readValueUnderLock technique used in ConcurrentHashMap. may be a little
+            // slower, but better to pay a price on first write rather than all reads.
+            e = new VariableTableEntry(hash, internedName, table[index]);
+            e.value = value;
+            table[index] = e;
+            variableTableSize = potentialNewSize;
+            variableTable = table; // write-volatile
+        }
+        return value;
+    }
+        
+    protected IRubyObject variableTableRemove(final String name) {
+        synchronized(this) {
+            final VariableTableEntry[] table;
+            if ((table = variableTable) != null) {
+                final int hash = name.hashCode();
+                final int index = hash & (table.length - 1);
+                VariableTableEntry first = table[index];
+                VariableTableEntry e;
+                for (e = first; e != null; e = e.next) {
+                    if (hash == e.hash && name.equals(e.name)) {
+                        IRubyObject oldValue = e.value;
+                        // All entries following removed node can stay
+                        // in list, but all preceding ones need to be
+                        // cloned.
+                        VariableTableEntry newFirst = e.next;
+                        for (VariableTableEntry p = first; p != e; p = p.next) {
+                            newFirst = new VariableTableEntry(p.hash, p.name, newFirst);
+                            newFirst.value = p.value;
+                        }
+                        table[index] = newFirst;
+                        variableTableSize--;
+                        variableTable = table; // write-volatile 
+                        return oldValue;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+    
+
+    protected VariableTableEntry[] variableTableGetTable() {
+        final VariableTableEntry[] table;
+        if ((table = variableTable) != null) {
+            return table;
+        }
+        return VARIABLE_TABLE_EMPTY_TABLE;
+    }
+    
+    protected int variableTableGetSize() {
+        if (variableTable != null) {
+//            System.out.println("returning vtab size = " + variableTableSize);
+            return variableTableSize;
+        }
+//        System.out.println("returning vtab size = 0");
+        return 0;
+    }
+    
+    protected void variableTableSync(List<Variable<IRubyObject>> vars) {
+        synchronized(this) {
+            variableTableSize = 0;
+            variableTableThreshold = (int)(VARIABLE_TABLE_DEFAULT_CAPACITY * VARIABLE_TABLE_LOAD_FACTOR);
+            variableTable =  new VariableTableEntry[VARIABLE_TABLE_DEFAULT_CAPACITY];
+            for (Variable<IRubyObject> var : vars) {
+                variableTableStore(var.getName(), var.getValue());
+            }
+        }
+    }
+    
+    // MUST be called from synchronized/locked block!
+    // should only be called by variableTableStore/variableTableFastStore
+    protected final VariableTableEntry[] variableTableRehash() {
+        final VariableTableEntry[] oldTable = variableTable;
+        final int oldCapacity;
+        if ((oldCapacity = oldTable.length) >= VARIABLE_TABLE_MAXIMUM_CAPACITY) {
+            return oldTable;
+        }
+        
+        final int newCapacity = oldCapacity << 1;
+        final VariableTableEntry[] newTable = new VariableTableEntry[newCapacity];
+        variableTableThreshold = (int)(newCapacity * VARIABLE_TABLE_LOAD_FACTOR);
+        final int sizeMask = newCapacity - 1;
+        VariableTableEntry e;
+        for (int i = oldCapacity; --i >= 0; ) {
+            // We need to guarantee that any existing reads of old Map can
+            //  proceed. So we cannot yet null out each bin.
+            e = oldTable[i];
+
+            if (e != null) {
+                VariableTableEntry next = e.next;
+                int idx = e.hash & sizeMask;
+
+                //  Single node on list
+                if (next == null)
+                    newTable[idx] = e;
+
+                else {
+                    // Reuse trailing consecutive sequence at same slot
+                    VariableTableEntry lastRun = e;
+                    int lastIdx = idx;
+                    for (VariableTableEntry last = next;
+                         last != null;
+                         last = last.next) {
+                        int k = last.hash & sizeMask;
+                        if (k != lastIdx) {
+                            lastIdx = k;
+                            lastRun = last;
+                        }
+                    }
+                    newTable[lastIdx] = lastRun;
+
+                    // Clone all remaining nodes
+                    for (VariableTableEntry p = e; p != lastRun; p = p.next) {
+                        int k = p.hash & sizeMask;
+                        VariableTableEntry m = new VariableTableEntry(p.hash, p.name, newTable[k]);
+                        m.value = p.value;
+                        newTable[k] = m;
+                    }
+                }
+            }
+        }
+        variableTable = newTable;
+        return newTable;
+    }
+    
+    /**
+     * Method to help ease transition to new variables implementation.
+     * Will likely be deprecated in the near future.
+     */
+    @SuppressWarnings("unchecked")
+    protected Map variableTableGetMap() {
+        final HashMap map = new HashMap();
+        final VariableTableEntry[] table;
+        if ((table = variableTable) != null) {
+            for (int i = table.length; --i >= 0; ) {
+                for (VariableTableEntry e = table[i]; e != null; e = e.next) {
+                    map.put(e.name, e.value);
+                }
+            }
+        }
+        return map;
+    }
+    
+    /**
+     * Method to help ease transition to new variables implementation.
+     * Will likely be deprecated in the near future.
+     */
+    @SuppressWarnings("unchecked")
+    protected Map variableTableGetMap(final Map map) {
+        final VariableTableEntry[] table;
+        if ((table = variableTable) != null) {
+            for (int i = table.length; --i >= 0; ) {
+                for (VariableTableEntry e = table[i]; e != null; e = e.next) {
+                    map.put(e.name, e.value);
+                }
+            }
+        }
+        return map;
+    }
+    
     
     //
     // DEPRECATED METHODS
     //
 
-
     @Deprecated
     public Map getInstanceVariables() {
         getRuntime().getWarnings().warn("internal: deprecated getInstanceVariables() called");
-        if (getVariableStore() != null) {
-            return getVariableStore().getStoredVariableMap();
-        } else {
-            return new HashMap(0);
-        }
+        return variableTableGetMap();
     }
 
     @Deprecated
     public Map getInstanceVariablesSnapshot() {
         getRuntime().getWarnings().warn("internal: deprecated getInstanceVariablesSnapshot() called");
-        if (getVariableStore() != null) {
-            return getVariableStore().getStoredVariableMap();
-        } else {
-            return new HashMap(0);
-        }
+        return variableTableGetMap();
     }
 
     @Deprecated
     public Iterator instanceVariableNames() {
         getRuntime().getWarnings().warn("internal: deprecated instanceVariableNames() called");
-        if (getVariableStore() != null) {
-            return getVariableStore().getStoredVariableMap().keySet().iterator();
-        } else {
-            return new HashMap(0).keySet().iterator();
-        }
+        return variableTableGetMap().keySet().iterator();
     }
 
     @Deprecated
     public Map safeGetInstanceVariables() {
         getRuntime().getWarnings().warn("internal: deprecated safeGetInstanceVariables() called");
-        if (getVariableStore() != null) {
-            return getVariableStore().getStoredVariableMap();
-        } else {
-            return null;
-        }
+        return variableTableGetMap();
     }
 
     @Deprecated
     public boolean safeHasInstanceVariables() {
         getRuntime().getWarnings().warn("internal: deprecated safeHasInstanceVariables() called");
-        return getVariableStore() != null && !getVariableStore().isEmpty();
+        return variableTable != null && variableTableSize > 0;
     }
     
     @Deprecated // allowed message customization for cvar/constant errors; built in to cvar/constant logic now

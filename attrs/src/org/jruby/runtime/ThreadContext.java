@@ -456,6 +456,7 @@ public final class ThreadContext {
         return parentModule.getNonIncludedClass();
     }
     
+    // FIXME: this isn't right, but not sure what it needs to be -- see JRUBY-1339
     public boolean getConstantDefined(final String internedName) {
         IRubyObject result;
         final IRubyObject undef = runtime.getUndef();
@@ -463,6 +464,8 @@ public final class ThreadContext {
         // flipped from while to do to search current class first
         for (StaticScope scope = getCurrentScope().getStaticScope(); scope != null; scope = scope.getPreviousCRefScope()) {
             RubyModule module = scope.getModule();
+            // FIXME: I think we need to call module.fastIsConstantDefined here,
+            // which searches the hierarchy -- ??? -BD
             if ((result = module.fastFetchConstant(internedName)) != null) {
                 if (result != undef) return true;
                 module.deleteConstant(internedName);
