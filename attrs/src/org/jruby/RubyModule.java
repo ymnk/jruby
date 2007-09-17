@@ -2238,14 +2238,13 @@ public class RubyModule extends RubyObject {
     //
 
     public boolean isConstantDefined(final String name) {
-        final IRubyObject undef = getRuntime().getUndef();
+        final int hash = name.hashCode();
+        ConstantTableEntry[] table;
+        ConstantTableEntry e;
         RubyModule module = this;
-        IRubyObject value;
         do {
-            if ((value = module.fetchConstant(name)) != null) {
-                if (value != undef) return true;
-                module.deleteConstant(name);
-                return getRuntime().getLoadService().autoload(module.getName() + "::" + name) != null;
+            for (e = (table = module.constantTableGetTable())[hash & (table.length - 1)]; e != null; e = e.next) {
+                if (hash == e.hash && name.equals(e.name)) return true;
             }
         } while ((module = module.getSuperClass()) != null);
 
@@ -2253,14 +2252,13 @@ public class RubyModule extends RubyObject {
     }
 
     public boolean fastIsConstantDefined(final String internedName) {
-        final IRubyObject undef = getRuntime().getUndef();
+        final int hash = internedName.hashCode();
+        ConstantTableEntry[] table;
+        ConstantTableEntry e;
         RubyModule module = this;
-        IRubyObject value;
         do {
-            if ((value = module.fastFetchConstant(internedName)) != null) {
-                if (value != undef) return true;
-                module.deleteConstant(internedName);
-                return getRuntime().getLoadService().autoload(module.getName() + "::" + internedName) != null;
+            for (e = (table = module.constantTableGetTable())[hash & (table.length - 1)]; e != null; e = e.next) {
+                if (internedName == e.name) return true;
             }
         } while ((module = module.getSuperClass()) != null);
 

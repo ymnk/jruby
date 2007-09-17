@@ -215,24 +215,12 @@ public class RubyKernel {
     }
 
     public static IRubyObject autoload_p(final IRubyObject recv, IRubyObject symbol) {
-
-        boolean DEBUG = symbol.asSymbol() == "Autoloaded";
-
-        
         RubyModule module = recv instanceof RubyModule ? (RubyModule) recv : recv.getRuntime().getObject();
         String name = module.getName() + "::" + symbol.asSymbol();
         
-        if(DEBUG) System.out.println("autoload? for " + module);
-        if(DEBUG) System.out.println("  name = " + name);
-
         IAutoloadMethod autoloadMethod = recv.getRuntime().getLoadService().autoloadFor(name);
-
-        if(DEBUG && autoloadMethod == null) System.out.println("  null autoloadMethod");
-
-        
         if (autoloadMethod == null) return recv.getRuntime().getNil();
 
-        if(DEBUG) System.out.println("  file = " + autoloadMethod.file());
         return recv.getRuntime().newString(autoloadMethod.file());
     }
 
@@ -241,14 +229,7 @@ public class RubyKernel {
         final LoadService loadService = runtime.getLoadService();
         final String baseName = symbol.asSymbol();
         
-        boolean DEBUG = baseName == "Autoloaded";
-        
-        
         final RubyModule module = recv instanceof RubyModule ? (RubyModule) recv : runtime.getObject();
-
-        if(DEBUG) System.out.println("autoload for " + module);
-
-        
         final String nm = module.getName() + "::" + baseName;
         
         final IRubyObject undef = runtime.getUndef();
@@ -256,10 +237,8 @@ public class RubyKernel {
         if (existingValue != null && existingValue != undef) return runtime.getNil();
         
         // bypassing checks in RubyModule#setConstant
-        if(DEBUG) System.out.println("autoload setting undef for " + baseName);
         module.fastStoreConstant(baseName, undef);
         
-        if(DEBUG) System.out.println("autoload adding autoload for " + nm);
         loadService.addAutoload(nm, new IAutoloadMethod() {
             public String file() {
                 return file.toString();
