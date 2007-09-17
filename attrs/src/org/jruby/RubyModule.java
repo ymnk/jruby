@@ -2854,7 +2854,9 @@ public class RubyModule extends RubyObject {
     }
         
     protected IRubyObject constantTableRemove(final String name) {
-        synchronized(this) {
+        final ReentrantLock lock;
+        (lock = variableWriteLock).lock();
+        try {
             final ConstantTableEntry[] table;
             if ((table = constantTable) != null) {
                 final int hash = name.hashCode();
@@ -2878,6 +2880,8 @@ public class RubyModule extends RubyObject {
                     }
                 }
             }
+        } finally {
+            lock.unlock();
         }
         return null;
     }
@@ -3082,7 +3086,7 @@ public class RubyModule extends RubyObject {
     protected DynamicMethod methodTableStore(final String name, final DynamicMethod method) {
         final int hash = name.hashCode();
         final ReentrantLock lock;
-        (lock = variableWriteLock).lock();
+        (lock = methodWriteLock).lock();
         try {
             final MethodTableEntry[] table;
             MethodTableEntry e;
@@ -3124,7 +3128,7 @@ public class RubyModule extends RubyObject {
         assert internedName == internedName.intern() : internedName + " not interned";
         final int hash = internedName.hashCode();
         final ReentrantLock lock;
-        (lock = variableWriteLock).lock();
+        (lock = methodWriteLock).lock();
         try {
             final MethodTableEntry[] table;
             MethodTableEntry e;
@@ -3163,7 +3167,9 @@ public class RubyModule extends RubyObject {
     }
         
     protected DynamicMethod methodTableRemove(final String name) {
-        synchronized(this) {
+        final ReentrantLock lock;
+        (lock = methodWriteLock).lock();
+        try {
             final MethodTableEntry[] table;
             if ((table = methodTable) != null) {
                 final int hash = name.hashCode();
@@ -3187,6 +3193,8 @@ public class RubyModule extends RubyObject {
                     }
                 }
             }
+        } finally {
+            lock.unlock();
         }
         return null;
     }
