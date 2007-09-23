@@ -45,7 +45,7 @@ public class RubyBoolean extends RubyObject {
     private final Ruby runtime;
     
     public RubyBoolean(Ruby runtime, boolean value) {
-        super(runtime, (value ? runtime.getClass("TrueClass") : runtime.getClass("FalseClass")), // Don't initialize with class
+        super(runtime, (value ? runtime.getTrueClass() : runtime.getFalseClass()), // Don't initialize with class
                 false); // Don't put in object space
 
         if (!value) flags = FALSE_F;
@@ -64,7 +64,11 @@ public class RubyBoolean extends RubyObject {
     public boolean isImmediate() {
         return true;
     }
-    
+
+    public RubyClass getSingletonClass() {
+        return metaClass;
+    }
+
     public Class getJavaClass() {
         return Boolean.TYPE;
     }
@@ -81,6 +85,7 @@ public class RubyBoolean extends RubyObject {
     
     public static RubyClass createFalseClass(Ruby runtime) {
         RubyClass falseClass = runtime.defineClass("FalseClass", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        runtime.setFalseClass(falseClass);
         falseClass.index = ClassIndex.FALSE;
         
         CallbackFactory fact = runtime.callbackFactory(RubyBoolean.class);
@@ -100,6 +105,7 @@ public class RubyBoolean extends RubyObject {
     
     public static RubyClass createTrueClass(Ruby runtime) {
         RubyClass trueClass = runtime.defineClass("TrueClass", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        runtime.setTrueClass(trueClass);
         trueClass.index = ClassIndex.TRUE;
         
         CallbackFactory fact = runtime.callbackFactory(RubyBoolean.class);

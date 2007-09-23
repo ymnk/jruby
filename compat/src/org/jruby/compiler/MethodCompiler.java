@@ -468,6 +468,7 @@ public interface MethodCompiler {
     public void getFrameName();
     public void getFrameKlazz(); 
     public void superClass();
+    public void attached();    
     public void ifNotSuperMethodBound(Object token);
     public void debug(String str);
     public void isInstanceOf(Class clazz, BranchCallback trueBranch, BranchCallback falseBranch);
