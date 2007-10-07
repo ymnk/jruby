@@ -324,7 +324,7 @@ public class RubyThread extends RubyObject {
         if (originalKey instanceof RubySymbol) {
             return originalKey;
         } else if (originalKey instanceof RubyString) {
-            return RubySymbol.newSymbol(getRuntime(), originalKey.asSymbol());
+            return RubySymbol.fastNewSymbol(getRuntime(), originalKey.asSymbol());
         } else if (originalKey instanceof RubyFixnum) {
             getRuntime().getWarnings().warn("Do not use Fixnums as Symbols");
             throw getRuntime().newArgumentError(originalKey + " is not a symbol");

@@ -636,10 +636,10 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             invokeIRuby("newStringShared", cg.sig(RubyString.class, cg.params(ByteList.class)));
         }
 
-        public void createNewSymbol(String name) {
+        public void createNewSymbol(String internedName) {
             loadRuntime();
-            method.ldc(name);
-            invokeIRuby("newSymbol", cg.sig(RubySymbol.class, cg.params(String.class)));
+            method.ldc(internedName);
+            invokeIRuby("fastNewSymbol", cg.sig(RubySymbol.class, cg.params(String.class)));
         }
 
         public void createNewArray(boolean lightweight) {

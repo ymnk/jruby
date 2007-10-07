@@ -139,7 +139,7 @@ public final class Ruby {
     private ObjectSpace objectSpace = new ObjectSpace();
 
     public final RubyFixnum[] fixnumCache = new RubyFixnum[256];
-    private final RubySymbol.SymbolTable symbolTable = new RubySymbol.SymbolTable();
+    private final RubySymbol.SymbolTable symbolTable = new RubySymbol.SymbolTable(this);
     private Hashtable<Integer, WeakReference<IOHandler>> ioHandlers = new Hashtable<Integer, WeakReference<IOHandler>>();
     private long randomSeed = 0;
     private long randomSeedSequence = 0;
@@ -1971,8 +1971,22 @@ public final class Ruby {
         return RubyString.newStringShared(this, byteList);
     }    
 
-    public RubySymbol newSymbol(String string) {
-        return RubySymbol.newSymbol(this, string);
+    public RubySymbol newSymbol(String name) {
+        return symbolTable.getSymbol(name);
+    }
+
+    /**
+     * Faster than {@link #newSymbol(String)} if you already have an interned
+     * name String. Don't intern your string just to call this version - the
+     * overhead of interning will more than wipe out any benefit from the faster
+     * lookup.
+     *   
+     * @param internedName the symbol name, <em>must</em> be interned! if in
+     *                     doubt, call {@link #newSymbol(String)} instead.
+     * @return the symbol for name
+     */
+    public RubySymbol fastNewSymbol(String internedName) {
+        return symbolTable.fastGetSymbol(internedName);
     }
 
     public RubyTime newTime(long milliseconds) {

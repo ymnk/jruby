@@ -35,8 +35,8 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
+
 import org.jruby.anno.JRubyMethod;
 
 import org.jruby.runtime.CallbackFactory;
@@ -52,9 +52,10 @@ public class RubySymbol extends RubyObject {
     private final String symbol;
     private final int id;
     
-    private RubySymbol(Ruby runtime, String symbol) {
+    private RubySymbol(Ruby runtime, String internedSymbol) {
         super(runtime, runtime.getSymbol(), false);
-        this.symbol = symbol;
+        // note that internedSymbol *must* have been previously interned!
+        this.symbol = internedSymbol;
 
         runtime.symbolLastId++;
         this.id = runtime.symbolLastId;
@@ -116,18 +117,11 @@ public class RubySymbol extends RubyObject {
      */
 
     public static RubySymbol newSymbol(Ruby runtime, String name) {
-        RubySymbol result;
-        synchronized (RubySymbol.class) {
-            // Locked to prevent the creation of multiple instances of
-            // the same symbol. Most code depends on them being unique.
+        return runtime.getSymbolTable().getSymbol(name);
+    }
 
-            result = runtime.getSymbolTable().lookup(name);
-            if (result == null) {
-                result = new RubySymbol(runtime, name);
-                runtime.getSymbolTable().store(result);
-            }
-        }
-        return result;
+    public static RubySymbol fastNewSymbol(Ruby runtime, String name) {
+        return runtime.getSymbolTable().fastGetSymbol(name);
     }
 
     @JRubyMethod(name = "to_i")
@@ -309,7 +303,7 @@ public class RubySymbol extends RubyObject {
     
     @JRubyMethod(name = "all_symbols", singleton = true)
     public static IRubyObject all_symbols(IRubyObject recv) {
-        return recv.getRuntime().newArrayNoCopy(recv.getRuntime().getSymbolTable().all_symbols());
+        return recv.getRuntime().getSymbolTable().all_symbols();
     }
 
     public static RubySymbol unmarshalFrom(UnmarshalStream input) throws java.io.IOException {
@@ -319,28 +313,202 @@ public class RubySymbol extends RubyObject {
     }
 
     public static class SymbolTable {
-        private Map<String, RubySymbol> table = new HashMap<String, RubySymbol>();
+        static final int DEFAULT_INITIAL_CAPACITY = 2048; // *must* be power of 2!
+        static final int MAXIMUM_CAPACITY = 1 << 30;
+        static final float DEFAULT_LOAD_FACTOR = 0.75f;
         
-        public RubySymbol[] all_symbols() {
-            int length = table.size();
-            RubySymbol[] array = new RubySymbol[length];
-            System.arraycopy(table.values().toArray(), 0, array, 0, length);
-            return array;
+        final ReentrantLock tableLock = new ReentrantLock();
+        volatile SymbolEntry[] table;
+        volatile int size;
+        int threshold;
+        final float loadFactor;
+        final Ruby runtime;
+        
+        public SymbolTable(Ruby runtime) {
+            this.runtime = runtime;
+            this.loadFactor = DEFAULT_LOAD_FACTOR;
+            this.threshold = (int)(DEFAULT_INITIAL_CAPACITY * DEFAULT_LOAD_FACTOR);
+            this.table = new SymbolEntry[DEFAULT_INITIAL_CAPACITY];
         }
         
-        public RubySymbol lookup(long symbolId) {
-            for (RubySymbol symbol : table.values()) {
-                if (symbol != null && symbol.id == symbolId) return symbol;
+        // note all fields are final -- rehash creates new entries when necessary.
+        // as documented in java.util.concurrent.ConcurrentHashMap.java, that will
+        // usually affect only a small percentage (< 20%) of entries for a given rehash.
+        static class SymbolEntry {
+            final int hash;
+            final String name;
+            final RubySymbol symbol;
+            final SymbolEntry next;
+            
+            SymbolEntry(int hash, String name, RubySymbol symbol, SymbolEntry next) {
+                this.hash = hash;
+                this.name = name;
+                this.symbol = symbol;
+                this.next = next;
+            }
+        }
+
+        public RubySymbol getSymbol(String name) {
+            int hash = name.hashCode();
+            SymbolEntry[] readTable = this.table;
+            for (SymbolEntry e = readTable[(readTable.length - 1) & hash]; e != null; e = e.next) {
+                if (hash == e.hash && name.equals(e.name)) {
+                    return e.symbol;
+                }
+            }
+            ReentrantLock lock;
+            (lock = tableLock).lock();
+            try {
+                int s;
+                if ((s = size + 1) > threshold) {
+                    rehash();
+                }
+                SymbolEntry[] updateTable = this.table;
+                int index;
+                // try lookup again under lock
+                for (SymbolEntry e = updateTable[index = (updateTable.length - 1) & hash]; e != null; e = e.next) {
+                    if (hash == e.hash && name.equals(e.name)) {
+                        return e.symbol;
+                    }
+                }
+                String internedName;
+                RubySymbol symbol = new RubySymbol(runtime, internedName = name.intern());
+                updateTable[index] = new SymbolEntry(hash, internedName, symbol, updateTable[index]);
+                size = s;
+                // write-volatile
+                table = updateTable;
+                return symbol;
+            } finally {
+                lock.unlock();
+            }
+        }
+        
+        public RubySymbol fastGetSymbol(String internedName) {
+            int hash = internedName.hashCode();
+            SymbolEntry[] readTable = this.table;
+            for (SymbolEntry e = readTable[(readTable.length - 1) & hash]; e != null; e = e.next) {
+                if (internedName == e.name) {
+                    return e.symbol;
+                }
+            }
+            ReentrantLock lock;
+            (lock = tableLock).lock();
+            try {
+                int s;
+                if ((s = size + 1) > threshold) {
+                    rehash();
+                }
+                SymbolEntry[] updateTable = this.table;
+                int index;
+                // try lookup again under lock
+                for (SymbolEntry e = updateTable[index = (updateTable.length - 1) & hash]; e != null; e = e.next) {
+                    if (internedName == e.name) {
+                        return e.symbol;
+                    }
+                }
+                RubySymbol symbol = new RubySymbol(runtime, internedName);
+                updateTable[index] = new SymbolEntry(hash, internedName, symbol, updateTable[index]);
+                size = s;
+                // write-volatile
+                table = updateTable;
+                return symbol;
+            } finally {
+                lock.unlock();
+            }
+        }
+        
+        // backwards-compatibility, but threadsafe now
+        public RubySymbol lookup(String name) {
+            int hash = name.hashCode();
+            SymbolEntry[] search = this.table;
+            for (SymbolEntry e = search[(search.length - 1) & hash]; e != null; e = e.next) {
+                if (hash == e.hash && name.equals(e.name)) {
+                    return e.symbol;
+                }
             }
             return null;
         }
         
-        public RubySymbol lookup(String name) {
-            return table.get(name);
+        public RubySymbol lookup(long id) {
+            SymbolEntry[] search = this.table;
+            for (int i = search.length; --i >= 0; ) {
+                for (SymbolEntry e = search[i]; e != null; e = e.next) {
+                    if (id == e.symbol.id) {
+                        return e.symbol;
+                    }
+                }
+            }
+            return null;
         }
         
+        public RubyArray all_symbols() {
+            SymbolEntry[] syms = this.table;
+            RubyArray array = runtime.newArray(this.size);
+            for (int i = syms.length; --i >= 0; ) {
+                for (SymbolEntry e = syms[i]; e != null; e = e.next) {
+                    array.append(e.symbol);
+                }
+            }
+            return array;
+        }
+        
+        // not so backwards-compatible here, but no one should have been
+        // calling this anyway.
+        @Deprecated
         public void store(RubySymbol symbol) {
-            table.put(symbol.asSymbol(), symbol);
+            throw new UnsupportedOperationException();
+        }
+        
+        private void rehash() {
+            SymbolEntry[] oldTable = table;
+            int oldCapacity;
+            if ((oldCapacity = oldTable.length) >= MAXIMUM_CAPACITY) {
+                return;
+            }
+            
+            int newCapacity = oldCapacity << 1;
+            SymbolEntry[] newTable = new SymbolEntry[newCapacity];
+            threshold = (int)(newCapacity * loadFactor);
+            int sizeMask = newCapacity - 1;
+            SymbolEntry e;
+            for (int i = oldCapacity; --i >= 0; ) {
+                // We need to guarantee that any existing reads of old Map can
+                //  proceed. So we cannot yet null out each bin.
+                e = oldTable[i];
+
+                if (e != null) {
+                    SymbolEntry next = e.next;
+                    int idx = e.hash & sizeMask;
+
+                    //  Single node on list
+                    if (next == null)
+                        newTable[idx] = e;
+
+                    else {
+                        // Reuse trailing consecutive sequence at same slot
+                        SymbolEntry lastRun = e;
+                        int lastIdx = idx;
+                        for (SymbolEntry last = next;
+                             last != null;
+                             last = last.next) {
+                            int k = last.hash & sizeMask;
+                            if (k != lastIdx) {
+                                lastIdx = k;
+                                lastRun = last;
+                            }
+                        }
+                        newTable[lastIdx] = lastRun;
+
+                        // Clone all remaining nodes
+                        for (SymbolEntry p = e; p != lastRun; p = p.next) {
+                            int k = p.hash & sizeMask;
+                            SymbolEntry n = newTable[k];
+                            newTable[k] = new SymbolEntry(p.hash, p.name, p.symbol, n);
+                        }
+                    }
+                }
+            }
+            table = newTable;       
         }
         
     }

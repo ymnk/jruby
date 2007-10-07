@@ -138,15 +138,15 @@ public class RuntimeHelpers {
             containingClass.getSingletonClass().addMethod(name,
                     new WrapperMethod(containingClass.getSingletonClass(), method,
                     Visibility.PUBLIC));
-            containingClass.callMethod(context, "singleton_method_added", runtime.newSymbol(name));
+            containingClass.callMethod(context, "singleton_method_added", runtime.fastNewSymbol(name));
         }
         
         // 'class << state.self' and 'class << obj' uses defn as opposed to defs
         if (containingClass.isSingleton()) {
             ((MetaClass) containingClass).getAttached().callMethod(
-                    context, "singleton_method_added", runtime.newSymbol(name));
+                    context, "singleton_method_added", runtime.fastNewSymbol(name));
         } else {
-            containingClass.callMethod(context, "method_added", runtime.newSymbol(name));
+            containingClass.callMethod(context, "method_added", runtime.fastNewSymbol(name));
         }
         
         return runtime.getNil();
