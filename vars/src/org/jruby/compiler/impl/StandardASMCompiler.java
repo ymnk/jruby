@@ -365,6 +365,27 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
 
         public abstract void endMethod();
         
+        public MethodCompiler chainToMethod(String methodName, ASTInspector inspector) {
+            // chain to the next segment of this giant method
+            method.aload(THIS);
+            loadThreadContext();
+            loadSelf();
+            method.aload(ARGS_INDEX);
+            if(this instanceof ASMClosureCompiler) {
+                pushNull();
+            } else {
+                loadBlock();
+            }
+            method.invokevirtual(classname, methodName, cg.sig(IRubyObject.class, new Class[]{ThreadContext.class, IRubyObject.class, IRubyObject[].class, Block.class}));
+            endMethod();
+
+            ASMMethodCompiler methodCompiler = new ASMMethodCompiler(methodName, inspector);
+
+            methodCompiler.beginChainedMethod();
+
+            return methodCompiler;
+        }
+        
         public StandardASMCompiler getScriptCompiler() {
             return StandardASMCompiler.this;
         }
@@ -921,11 +942,18 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.label(done);
         }
 
-        public void createNewClosure(StaticScope scope, int arity, ClosureCallback body, ClosureCallback args, boolean hasMultipleArgsHead, NodeType argsNodeId) {
+        public void createNewClosure(
+                StaticScope scope,
+                int arity,
+                ClosureCallback body,
+                ClosureCallback args,
+                boolean hasMultipleArgsHead,
+                NodeType argsNodeId,
+                ASTInspector inspector) {
             String closureMethodName = "closure" + ++innerIndex;
             String closureFieldName = "_" + closureMethodName;
             
-            ASMClosureCompiler closureCompiler = new ASMClosureCompiler(closureMethodName, closureFieldName);
+            ASMClosureCompiler closureCompiler = new ASMClosureCompiler(closureMethodName, closureFieldName, inspector);
             
             closureCompiler.beginMethod(args, scope);
             
@@ -964,16 +992,18 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.getfield(classname, closureFieldName, cg.ci(CompiledBlockCallback.class));
             method.ldc(Boolean.valueOf(hasMultipleArgsHead));
             method.ldc(Block.asArgumentType(argsNodeId));
+            // if there's a sub-closure or there's scope-aware methods, it can't be "light"
+            method.ldc(!(inspector.hasClosure() || inspector.hasScopeAwareMethods()));
 
             invokeUtilityMethod("createBlock", cg.sig(CompiledBlock.class,
-                    cg.params(ThreadContext.class, IRubyObject.class, Integer.TYPE, String[].class, CompiledBlockCallback.class, Boolean.TYPE, Integer.TYPE)));
+                    cg.params(ThreadContext.class, IRubyObject.class, Integer.TYPE, String[].class, CompiledBlockCallback.class, Boolean.TYPE, Integer.TYPE, boolean.class)));
         }
 
         public void runBeginBlock(StaticScope scope, ClosureCallback body) {
             String closureMethodName = "closure" + ++innerIndex;
             String closureFieldName = "_" + closureMethodName;
             
-            ASMClosureCompiler closureCompiler = new ASMClosureCompiler(closureMethodName, closureFieldName);
+            ASMClosureCompiler closureCompiler = new ASMClosureCompiler(closureMethodName, closureFieldName, null);
             
             closureCompiler.beginMethod(null, scope);
             
@@ -1018,7 +1048,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             String closureMethodName = "closure" + ++innerIndex;
             String closureFieldName = "_" + closureMethodName;
             
-            ASMClosureCompiler closureCompiler = new ASMClosureCompiler(closureMethodName, closureFieldName);
+            ASMClosureCompiler closureCompiler = new ASMClosureCompiler(closureMethodName, closureFieldName, null);
             
             closureCompiler.beginMethod(args, null);
             
@@ -1064,7 +1094,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             String closureMethodName = "END_closure" + ++innerIndex;
             String closureFieldName = "_" + closureMethodName;
             
-            ASMClosureCompiler closureCompiler = new ASMClosureCompiler(closureMethodName, closureFieldName);
+            ASMClosureCompiler closureCompiler = new ASMClosureCompiler(closureMethodName, closureFieldName, null);
             
             closureCompiler.beginMethod(null, null);
             
@@ -1310,36 +1340,17 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         }
 
         public void match3() {
-            // FIXME: more efficient with a callback?
-            method.dup();
-            method.instance_of(cg.p(RubyString.class));
-
-            Label isNotString = new Label();
-            method.ifeq(isNotString);
-
-            method.invokevirtual(cg.p(RubyRegexp.class), "match", cg.sig(IRubyObject.class, cg.params(IRubyObject.class)));
-
-            Label doneWithMatch = new Label();
-            method.go_to(doneWithMatch);
-            method.label(isNotString);
-
-            method.swap();
             loadThreadContext();
-            method.swap();
-            method.ldc("=~");
-            method.swap();
-
-            method.invokeinterface(cg.p(IRubyObject.class), "callMethod", cg.sig(IRubyObject.class, cg.params(ThreadContext.class, String.class, IRubyObject.class)));
-            method.label(doneWithMatch);
+            invokeUtilityMethod("match3", cg.sig(IRubyObject.class, RubyRegexp.class, IRubyObject.class, ThreadContext.class));
         }
 
         public void createNewRegexp(final ByteList value, final int options, final String lang) {
-            String regname = getNewConstant(cg.ci(RubyRegexp.class), "literal_reg_");
-            String name = getNewConstant(cg.ci(RegexpPattern.class), "literal_re_");
+            String regexpField = getNewConstant(cg.ci(RubyRegexp.class), "lit_reg_");
+            String patternField = getNewConstant(cg.ci(RegexpPattern.class), "lit_pat_");
 
             // in current method, load the field to see if we've created a Pattern yet
             method.aload(THIS);
-            method.getfield(classname, name, cg.ci(RegexpPattern.class));
+            method.getfield(classname, regexpField, cg.ci(RubyRegexp.class));
 
             Label alreadyCreated = new Label();
             method.ifnonnull(alreadyCreated);
@@ -1362,7 +1373,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
 
             method.aload(THIS);
             method.swap();
-            method.putfield(classname, name, cg.ci(RegexpPattern.class));
+            method.putfield(classname, patternField, cg.ci(RegexpPattern.class));
 
             if (null == lang) {
                 method.aconst_null();
@@ -1374,10 +1385,10 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
 
             method.aload(THIS);
             method.swap();
-            method.putfield(classname, regname, cg.ci(RubyRegexp.class));
+            method.putfield(classname, regexpField, cg.ci(RubyRegexp.class));
             method.label(alreadyCreated);
             method.aload(THIS);
-            method.getfield(classname, regname, cg.ci(RubyRegexp.class));
+            method.getfield(classname, regexpField, cg.ci(RubyRegexp.class));
         }
 
         public void createNewRegexp(ClosureCallback createStringCallback, final int options, final String lang) {
@@ -2316,14 +2327,18 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
     public class ASMClosureCompiler extends AbstractMethodCompiler {
         private String closureMethodName;
         
-        public ASMClosureCompiler(String closureMethodName, String closureFieldName) {
+        public ASMClosureCompiler(String closureMethodName, String closureFieldName, ASTInspector inspector) {
             this.closureMethodName = closureMethodName;
 
             // declare the field
             getClassVisitor().visitField(ACC_PRIVATE, closureFieldName, cg.ci(CompiledBlockCallback.class), null, null);
             
             method = new SkinnyMethodAdapter(getClassVisitor().visitMethod(ACC_PUBLIC | ACC_SYNTHETIC, closureMethodName, CLOSURE_SIGNATURE, null, null));
-            variableCompiler = new HeapBasedVariableCompiler(this, method, DYNAMIC_SCOPE_INDEX, VARS_ARRAY_INDEX, ARGS_INDEX, CLOSURE_INDEX);
+            if (inspector == null || inspector.hasClosure() || inspector.hasScopeAwareMethods()) {
+                variableCompiler = new HeapBasedVariableCompiler(this, method, DYNAMIC_SCOPE_INDEX, VARS_ARRAY_INDEX, ARGS_INDEX, CLOSURE_INDEX);
+            } else {
+                variableCompiler = new StackBasedVariableCompiler(this, method, DYNAMIC_SCOPE_INDEX, ARGS_INDEX, CLOSURE_INDEX);
+            }
             invocationCompiler = new StandardInvocationCompiler(this, method);
         }
 
@@ -2449,9 +2464,27 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             if (inspector == null || inspector.hasClosure() || inspector.hasScopeAwareMethods()) {
                 variableCompiler = new HeapBasedVariableCompiler(this, method, DYNAMIC_SCOPE_INDEX, VARS_ARRAY_INDEX, ARGS_INDEX, CLOSURE_INDEX);
             } else {
-                variableCompiler = new StackBasedVariableCompiler(this, method, ARGS_INDEX, CLOSURE_INDEX);
+                variableCompiler = new StackBasedVariableCompiler(this, method, DYNAMIC_SCOPE_INDEX, ARGS_INDEX, CLOSURE_INDEX);
             }
             invocationCompiler = new StandardInvocationCompiler(this, method);
+        }
+        
+        public void beginChainedMethod() {
+            method.aload(THREADCONTEXT_INDEX);
+            method.dup();
+            method.invokevirtual(cg.p(ThreadContext.class), "getRuntime", cg.sig(Ruby.class));
+            method.dup();
+            method.astore(RUNTIME_INDEX);
+
+            // grab nil for local variables
+            method.invokevirtual(cg.p(Ruby.class), "getNil", cg.sig(IRubyObject.class));
+            method.astore(NIL_INDEX);
+
+            method.invokevirtual(cg.p(ThreadContext.class), "getCurrentScope", cg.sig(DynamicScope.class));
+            method.dup();
+            method.astore(DYNAMIC_SCOPE_INDEX);
+            method.invokevirtual(cg.p(DynamicScope.class), "getValues", cg.sig(IRubyObject[].class));
+            method.astore(VARS_ARRAY_INDEX);
         }
 
         public void beginMethod(ClosureCallback args, StaticScope scope) {

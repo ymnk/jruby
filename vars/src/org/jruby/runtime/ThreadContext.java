@@ -55,7 +55,10 @@ import org.jruby.runtime.builtin.IRubyObject;
 public final class ThreadContext {
     public static synchronized ThreadContext newContext(Ruby runtime) {
         ThreadContext context = new ThreadContext(runtime);
-        
+        //        if(runtime.getInstanceConfig().isSamplingEnabled()) {
+        //    org.jruby.util.SimpleSampler.registerThreadContext(context);
+        //}
+
         return context;
     }
     
@@ -119,7 +122,7 @@ public final class ThreadContext {
             
         for (int i = 0; i < frameStack.length; i++) {
             frameStack[i] = new Frame();
-    }
+        }
     }
     
     CallType lastCallType;
@@ -184,8 +187,8 @@ public final class ThreadContext {
         return scopeStack[scopeIndex - 1];
     }
     
-    private void expandFramesIfNecessary() {
-        if (frameIndex + 1 == frameStack.length) {
+    private void expandFramesIfNecessary(int newMax) {
+        if (newMax == frameStack.length) {
             int newSize = frameStack.length * 2;
             Frame[] newFrameStack = new Frame[newSize];
             
@@ -289,12 +292,12 @@ public final class ThreadContext {
     private void pushFrameCopy() {
         Frame currentFrame = getCurrentFrame();
         frameStack[++frameIndex].updateFrame(currentFrame);
-        expandFramesIfNecessary();
+        expandFramesIfNecessary(frameIndex + 1);
     }
     
     private void pushFrame(Frame frame) {
         frameStack[++frameIndex] = frame;
-        expandFramesIfNecessary();
+        expandFramesIfNecessary(frameIndex + 1);
     }
     
     private void pushCallFrame(RubyModule clazz, String name, 
@@ -305,12 +308,12 @@ public final class ThreadContext {
     private void pushFrame(RubyModule clazz, String name, 
                                IRubyObject self, Block block, JumpTarget jumpTarget) {
         frameStack[++frameIndex].updateFrame(clazz, self, name, block, getPosition(), jumpTarget);
-        expandFramesIfNecessary();
+        expandFramesIfNecessary(frameIndex + 1);
     }
     
     private void pushFrame() {
         frameStack[++frameIndex].updateFrame(getPosition());
-        expandFramesIfNecessary();
+        expandFramesIfNecessary(frameIndex + 1);
     }
     
     private void popFrame() {
@@ -319,15 +322,20 @@ public final class ThreadContext {
         setPosition(frame.getPosition());
     }
         
-    private void popFrameReal() {
+    private void popFrameReal(Frame oldFrame) {
         Frame frame = frameStack[frameIndex];
-        frameStack[frameIndex] = new Frame();
+        frameStack[frameIndex] = oldFrame;
         frameIndex--;
         setPosition(frame.getPosition());
     }
     
     public Frame getCurrentFrame() {
         return frameStack[frameIndex];
+    }
+    
+    public Frame getNextFrame() {
+        expandFramesIfNecessary(frameIndex + 1);
+        return frameStack[frameIndex + 1];
     }
     
     public Frame getPreviousFrame() {
@@ -749,6 +757,7 @@ public final class ThreadContext {
     }
     
     public void preForBlock(Block block, RubyModule klass) {
+        block.oldFrame = getNextFrame();
         pushFrame(block.getFrame());
         getCurrentFrame().setVisibility(block.getVisibility());
         pushScope(block.getDynamicScope());
@@ -756,15 +765,25 @@ public final class ThreadContext {
     }
     
     public void preYieldSpecificBlock(Block block, RubyModule klass) {
+        block.oldFrame = getNextFrame();
         pushFrame(block.getFrame());
         getCurrentFrame().setVisibility(block.getVisibility());
         pushScope(block.getDynamicScope().cloneScope());
         pushRubyClass((klass != null) ? klass : block.getKlass());
     }
     
+    public void preYieldLightBlock(Block block, RubyModule klass) {
+        block.oldFrame = getNextFrame();
+        pushFrame(block.getFrame());
+        getCurrentFrame().setVisibility(block.getVisibility());
+        pushScope(block.getDynamicScope());
+        pushRubyClass((klass != null) ? klass : block.getKlass());
+    }
+    
     public void preEvalWithBinding(Block block) {
         Frame frame = block.getFrame();
         
+        block.oldFrame = getNextFrame();
         frame.setIsBindingFrame(true);
         pushFrame(frame);
         getCurrentFrame().setVisibility(block.getVisibility());
@@ -773,13 +792,19 @@ public final class ThreadContext {
     
     public void postEvalWithBinding(Block block) {
         block.getFrame().setIsBindingFrame(false);
-        popFrameReal();
+        popFrameReal(block.oldFrame);
         popRubyClass();
     }
     
-    public void postYield() {
+    public void postYield(Block block) {
         popScope();
-        popFrameReal();
+        popFrameReal(block.oldFrame);
+        popRubyClass();
+    }
+    
+    public void postYieldLight(Block block) {
+        popScope();
+        popFrameReal(block.oldFrame);
         popRubyClass();
     }
     

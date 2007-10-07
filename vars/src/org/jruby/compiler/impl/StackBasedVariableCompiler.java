@@ -28,34 +28,26 @@
 
 package org.jruby.compiler.impl;
 
-import org.jruby.Ruby;
-import org.jruby.compiler.ArrayCallback;
 import org.jruby.compiler.ClosureCallback;
 import org.jruby.compiler.NotCompilableException;
-import org.jruby.compiler.VariableCompiler;
 import org.jruby.parser.StaticScope;
-import org.jruby.runtime.Arity;
-import org.jruby.runtime.Block;
-import org.jruby.runtime.Frame;
-import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.CodegenUtils;
-import org.objectweb.asm.Label;
 
 /**
  *
  * @author headius
  */
 public class StackBasedVariableCompiler extends AbstractVariableCompiler {
-    private int argsIndex; // the index where an IRubyObject[] representing incoming arguments can be found
-    private int closureIndex; // the index of the block parameter
+    private int scopeIndex; // the index of the dynamic scope for higher scopes
 
-    public StackBasedVariableCompiler(StandardASMCompiler.AbstractMethodCompiler methodCompiler, SkinnyMethodAdapter method, int argsIndex, int closureIndex) {
+    public StackBasedVariableCompiler(StandardASMCompiler.AbstractMethodCompiler methodCompiler, SkinnyMethodAdapter method, int scopeIndex, int argsIndex, int closureIndex) {
         super(methodCompiler, method, argsIndex, closureIndex);
+        this.scopeIndex = scopeIndex;
     }
 
     public void beginMethod(ClosureCallback argsCallback, StaticScope scope) {
-        // fill in all vars with nol so compiler is happy about future accesses
+        // fill in all vars with nil so compiler is happy about future accesses
         methodCompiler.loadNil();
         for (int i = 0; i < scope.getNumberOfVariables(); i++) {
             assignLocalVariable(i);
@@ -72,21 +64,26 @@ public class StackBasedVariableCompiler extends AbstractVariableCompiler {
     }
 
     public void beginClosure(ClosureCallback argsCallback, StaticScope scope) {
-        // FIXME: This is not yet active, but it could be made to work
-        // load args[0] which will be the IRubyObject representing block args
-        method.aload(argsIndex);
-        method.ldc(new Integer(0));
-        method.arrayload();
-
-        // load nil into all vars to avoid null/nil checking
-        methodCompiler.loadNil();
-        for (int i = 0; i < scope.getNumberOfVariables(); i++) {
-            assignLocalVariable(i);
+        // store the local vars in a local variable
+        methodCompiler.loadThreadContext();
+        methodCompiler.invokeThreadContext("getCurrentScope", cg.sig(DynamicScope.class));
+        method.astore(scopeIndex);
+        
+        if (scope != null) {
+            methodCompiler.loadNil();
+            for (int i = 0; i < scope.getNumberOfVariables(); i++) {
+                assignLocalVariable(i);
+            }
+            method.pop();
         }
-        method.pop();
         
         if (argsCallback != null) {
+            // load args[0] which will be the IRubyObject representing block args
+            method.aload(argsIndex);
+            method.ldc(new Integer(0));
+            method.arrayload();
             argsCallback.compile(methodCompiler);
+            method.pop(); // clear remaining value on the stack
         }
     }
 
@@ -100,7 +97,14 @@ public class StackBasedVariableCompiler extends AbstractVariableCompiler {
         if (depth == 0) {
             assignLocalVariable(index);
         } else {
-            throw new NotCompilableException("Stack-based local variables are not applicable to nested scopes");
+            method.dup();
+
+            method.aload(scopeIndex);
+            method.swap();
+            method.ldc(new Integer(index));
+            method.swap();
+            method.ldc(new Integer(depth));
+            method.invokevirtual(cg.p(DynamicScope.class), "setValue", cg.sig(Void.TYPE, cg.params(Integer.TYPE, IRubyObject.class, Integer.TYPE)));
         }
     }
 
@@ -112,153 +116,11 @@ public class StackBasedVariableCompiler extends AbstractVariableCompiler {
         if (depth == 0) {
             retrieveLocalVariable(index);
         } else {
-            throw new NotCompilableException("Stack-based local variables are not applicable to nested scopes");
+            method.aload(scopeIndex);
+            method.ldc(new Integer(index));
+            method.ldc(new Integer(depth));
+            methodCompiler.loadNil();
+            method.invokevirtual(cg.p(DynamicScope.class), "getValueOrNil", cg.sig(IRubyObject.class, cg.params(Integer.TYPE, Integer.TYPE, IRubyObject.class)));
         }
-    }
-
-    public void assignLastLine() {
-        method.dup();
-
-        methodCompiler.loadThreadContext();
-        methodCompiler.invokeThreadContext("getCurrentFrame", cg.sig(Frame.class));
-        method.swap();
-        method.invokevirtual(cg.p(Frame.class), "setLastLine", cg.sig(Void.TYPE, cg.params(IRubyObject.class)));
-    }
-
-    public void retrieveLastLine() {
-        methodCompiler.loadThreadContext();
-        methodCompiler.invokeThreadContext("getCurrentFrame", cg.sig(Frame.class));
-        method.invokevirtual(cg.p(Frame.class), "getLastLine", cg.sig(IRubyObject.class));
-    }
-
-    public void retrieveBackRef() {
-        methodCompiler.loadThreadContext();
-        methodCompiler.invokeThreadContext("getCurrentFrame", cg.sig(Frame.class));
-        method.invokevirtual(cg.p(Frame.class), "getBackRef", cg.sig(IRubyObject.class));
-    }
-
-    public void processRequiredArgs(Arity arity, int requiredArgs, int optArgs, int restArg) {
-        // check arity
-        methodCompiler.loadThreadContext();
-        methodCompiler.loadRuntime();
-        method.aload(argsIndex);
-        method.arraylength();
-        method.ldc(new Integer(requiredArgs));
-        method.ldc(new Integer(optArgs));
-        method.ldc(new Integer(restArg));
-        methodCompiler.invokeUtilityMethod("handleArgumentSizes", cg.sig(Void.TYPE, ThreadContext.class, Ruby.class, Integer.TYPE, Integer.TYPE, Integer.TYPE, Integer.TYPE));
-
-        Label noArgs = new Label();
-
-        // check if args is null
-        method.aload(argsIndex);
-        method.ifnull(noArgs);
-
-        // check if args length is zero
-        method.aload(argsIndex);
-        method.arraylength();
-        method.ifeq(noArgs);
-
-        if (requiredArgs + optArgs == 0 && restArg == 0) {
-            // only restarg, just jump to noArgs and it will be processed separately
-            method.go_to(noArgs);
-        } else if (requiredArgs + optArgs > 0) {
-            // assign all given, non-rest args to local variables
-
-            // test whether total args count or actual args given is lower, for optional args
-            Label useArgsLength = new Label();
-            Label setArgValues = new Label();
-            method.aload(argsIndex);
-            method.arraylength();
-            method.ldc(new Integer(requiredArgs + optArgs));
-            method.if_icmplt(useArgsLength);
-
-            // total args is lower, use that
-            method.ldc(new Integer(requiredArgs + optArgs));
-            method.go_to(setArgValues);
-
-            // args length is lower, use that
-            method.label(useArgsLength);
-            method.aload(argsIndex);
-            method.arraylength();
-
-            // do the dew
-            method.label(setArgValues);
-
-            Label defaultLabel = new Label();
-            Label[] labels = new Label[requiredArgs + optArgs];
-
-            for (int i = 0; i < requiredArgs + optArgs; i++) {
-                labels[i] = new Label();
-            }
-
-            method.tableswitch(1, requiredArgs + optArgs, defaultLabel, labels);
-
-            for (int i = requiredArgs + optArgs; i >= 1; i--) {
-                method.label(labels[i - 1]);
-                
-                // load provided arg
-                method.aload(argsIndex);
-                method.ldc(i - 1);
-                method.arrayload();
-                
-                // assign it
-                assignLocalVariable(i - 1);
-                
-                // pop extra copy
-                method.pop();
-            }
-            
-            method.label(defaultLabel);
-        }
-
-        method.label(noArgs);
-
-        // push down the argument count of this method
-        this.arity = arity;
-    }
-
-    public void assignOptionalArgs(Object object, int expectedArgsCount, int size, ArrayCallback optEval) {
-        // NOTE: By the time we're here, arity should have already been checked. We proceed without boundschecking.
-        // opt args are handled with a switch; the key is how many args we have coming in, and the cases are
-        // each opt arg index. The cases fall-through, so remaining opt args are handled.
-        method.aload(argsIndex);
-        method.arraylength();
-        
-        Label defaultLabel = new Label();
-        Label[] labels = new Label[size];
-
-        for (int i = 0; i < size; i++) {
-            labels[i] = new Label();
-        }
-
-        method.tableswitch(expectedArgsCount, expectedArgsCount + size - 1, defaultLabel, labels);
-
-        for (int i = 0; i < size; i++) {
-            method.label(labels[i]);
-            optEval.nextValue(methodCompiler, object, i);
-            method.pop();
-        }
-
-        method.label(defaultLabel);
-    }
-
-    public void processRestArg(int startIndex, int restArg) {
-        methodCompiler.loadRuntime();
-        method.aload(argsIndex);
-        method.ldc(new Integer(startIndex));
-
-        methodCompiler.invokeUtilityMethod("processRestArg", cg.sig(IRubyObject.class, cg.params(Ruby.class, IRubyObject[].class, int.class)));
-        assignLocalVariable(restArg);
-        method.pop();
-    }
-
-    public void processBlockArgument(int index) {
-        methodCompiler.loadRuntime();
-        method.aload(closureIndex);
-        
-        methodCompiler.invokeUtilityMethod("processBlockArgument", cg.sig(IRubyObject.class, cg.params(Ruby.class, Block.class)));
-        assignLocalVariable(index);
-        method.pop();
     }
 }

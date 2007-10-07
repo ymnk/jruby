@@ -129,7 +129,7 @@ public final class Ruby {
 
     private CacheMap cacheMap = new CacheMap();
     private MethodCache methodCache = new MethodCache();
-    private ThreadService threadService = new ThreadService(this);
+    private ThreadService threadService;
     private Hashtable<Object, Object> runtimeInformation;
     
     private static POSIX posix = loadPosix();
@@ -294,6 +294,11 @@ public final class Ruby {
      */
     private Ruby(RubyInstanceConfig config) {
         this.config             = config;
+        this.threadService      = new ThreadService(this);
+        if(config.isSamplingEnabled()) {
+            org.jruby.util.SimpleSampler.registerThreadContext(threadService.getCurrentContext());
+        }
+
         this.in                 = config.getInput();
         this.out                = config.getOutput();
         this.err                = config.getError();
@@ -461,7 +466,7 @@ public final class Ruby {
     public IRubyObject runNormally(Node scriptNode, boolean compile, boolean yarvCompile) {
         Script script = null;
         YARVCompiledRunner runner = null;
-        if (compile || !yarvCompile) {
+        if (compile || (config.isJitEnabled() && !yarvCompile)) {
             script = tryCompile(scriptNode);
             if (compile && script == null) {
                 System.err.println("Error, could not compile; pass -J-Djruby.jit.logging.verbose=true for more details");
@@ -490,8 +495,9 @@ public final class Ruby {
             } else {
                 classname = filename.replace('\\', '/').replaceAll(".rb", "");
             }
-            // remove leading / from classname, since it will muck up the dotted name
+            // remove leading / or ./ from classname, since it will muck up the dotted name
             if (classname.startsWith("/")) classname = classname.substring(1);
+            if (classname.startsWith("./")) classname = classname.substring(2);
 
             ASTInspector inspector = new ASTInspector();
             inspector.inspect(node);

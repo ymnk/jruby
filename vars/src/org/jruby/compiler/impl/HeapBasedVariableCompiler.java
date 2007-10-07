@@ -10,21 +10,10 @@
 package org.jruby.compiler.impl;
 
 import java.util.Arrays;
-import org.jruby.Ruby;
-import org.jruby.RubyArray;
-import org.jruby.compiler.ArrayCallback;
 import org.jruby.compiler.ClosureCallback;
-import org.jruby.compiler.NotCompilableException;
-import org.jruby.compiler.VariableCompiler;
 import org.jruby.parser.StaticScope;
-import org.jruby.runtime.Arity;
-import org.jruby.runtime.Block;
 import org.jruby.runtime.DynamicScope;
-import org.jruby.runtime.Frame;
-import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.CodegenUtils;
-import org.objectweb.asm.Label;
 
 /**
  *
@@ -160,9 +149,7 @@ public class HeapBasedVariableCompiler extends AbstractVariableCompiler {
         method.aload(scopeIndex);
         method.ldc(new Integer(index));
         method.ldc(new Integer(depth));
-        method.invokevirtual(cg.p(DynamicScope.class), "getValue", cg.sig(IRubyObject.class, cg.params(Integer.TYPE, Integer.TYPE)));
-        
-        // FIXME: This is a pretty unpleasant perf hit, and it's not required for most local var accesses. We need a better way
-        methodCompiler.nullToNil();
+        methodCompiler.loadNil();
+        method.invokevirtual(cg.p(DynamicScope.class), "getValueOrNil", cg.sig(IRubyObject.class, cg.params(Integer.TYPE, Integer.TYPE, IRubyObject.class)));
     }
 }
