@@ -39,6 +39,7 @@ package org.jruby;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.jruby.runtime.Arity;
@@ -50,6 +51,8 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ObjectMarshal;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.builtin.Variable;
+import org.jruby.runtime.component.VariableEntry;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
 
@@ -91,13 +94,12 @@ public class RubyException extends RubyObject {
         public void marshalTo(Ruby runtime, Object obj, RubyClass type,
                               MarshalStream marshalStream) throws IOException {
             RubyException exc = (RubyException)obj;
-            
-            Map iVars = new HashMap(exc.getInstanceVariables());
-            
-            iVars.put("mesg", exc.message == null ? runtime.getNil() : exc.message);
-            iVars.put("bt", exc.getBacktrace());
-            
-            marshalStream.dumpInstanceVars(iVars);
+
+            List<Variable<IRubyObject>> attrs = exc.getVariableList();
+            attrs.add(new VariableEntry<IRubyObject>(
+                    "mesg", exc.message == null ? runtime.getNil() : exc.message));
+            attrs.add(new VariableEntry<IRubyObject>("bt", exc.getBacktrace()));
+            marshalStream.dumpVariables(attrs);
         }
 
         public Object unmarshalFrom(Ruby runtime, RubyClass type,
@@ -107,8 +109,8 @@ public class RubyException extends RubyObject {
             unmarshalStream.registerLinkTarget(exc);
             unmarshalStream.defaultInstanceVarsUnmarshal(exc);
             
-            exc.message = exc.removeInstanceVariable("mesg");
-            exc.set_backtrace(exc.removeInstanceVariable("bt"));
+            exc.message = exc.removeInternalVariable("mesg");
+            exc.set_backtrace(exc.removeInternalVariable("bt"));
             
             return exc;
         }

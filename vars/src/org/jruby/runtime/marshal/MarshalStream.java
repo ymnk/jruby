@@ -36,6 +36,7 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
@@ -54,6 +55,7 @@ import org.jruby.IncludedModuleWrapper;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.Constants;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.builtin.Variable;
 import org.jruby.util.ByteList;
 import org.jruby.internal.runtime.methods.DynamicMethod;
 
@@ -129,14 +131,14 @@ public class MarshalStream extends FilterOutputStream {
         }
     }
 
-    private Map getInstanceVariables(IRubyObject value) throws IOException {
-        Map instanceVariables = null;
-        if(value.getNativeTypeIndex() != ClassIndex.OBJECT) {
-            if (!value.isImmediate() && value.safeHasInstanceVariables() && value.getNativeTypeIndex() != ClassIndex.CLASS) {
+    private List<Variable<IRubyObject>> getVariables(IRubyObject value) throws IOException {
+        List<Variable<IRubyObject>> variables = null;
+        if (value.getNativeTypeIndex() != ClassIndex.OBJECT) {
+            if (!value.isImmediate() && value.hasVariables() && value.getNativeTypeIndex() != ClassIndex.CLASS) {
                 // object has instance vars and isn't a class, get a snapshot to be marshalled
                 // and output the ivar header here
 
-                instanceVariables = value.safeGetInstanceVariables();
+                variables = value.getVariableList();
 
                 // write `I' instance var signet if class is NOT a direct subclass of Object
                 write(TYPE_IVAR);
@@ -156,17 +158,17 @@ public class MarshalStream extends FilterOutputStream {
                 writeUserClass(value, type);
             }
         }
-        return instanceVariables;
+        return variables;
     }
 
     private void writeDirectly(IRubyObject value) throws IOException {
-        Map instanceVariables = getInstanceVariables(value);
+        List<Variable<IRubyObject>> variables = getVariables(value);
         writeObjectData(value);
-        if (instanceVariables != null) {
-            dumpInstanceVars(instanceVariables);
+        if (variables != null) {
+            dumpVariables(variables);
         }
     }
-    
+
     public static String getPathFromClass(RubyModule clazz) {
         String path = clazz.getName();
         
@@ -276,7 +278,7 @@ public class MarshalStream extends FilterOutputStream {
         return value.respondsTo("marshal_dump");
     }
 
-    private void userNewMarshal(final IRubyObject value) throws IOException {
+    private void userNewMarshal(IRubyObject value) throws IOException {
         write(TYPE_USRMARSHAL);
         RubyClass metaclass = value.getMetaClass();
         while (metaclass.isSingleton()) {
@@ -295,8 +297,8 @@ public class MarshalStream extends FilterOutputStream {
     private void userMarshal(IRubyObject value) throws IOException {
         RubyString marshaled = (RubyString) value.callMethod(runtime.getCurrentContext(), "_dump", runtime.newFixnum(depthLimit)); 
 
-        Map instanceVariables = marshaled.safeGetInstanceVariables();
-        if(instanceVariables != null) {
+        boolean hasVars;
+        if (hasVars = marshaled.hasVariables()) {
             write(TYPE_IVAR);
         }
 
@@ -309,8 +311,9 @@ public class MarshalStream extends FilterOutputStream {
         dumpObject(RubySymbol.newSymbol(runtime, metaclass.getName()));
 
         writeString(marshaled.getByteList());
-        if(instanceVariables != null) {
-            dumpInstanceVars(instanceVariables);
+
+        if (hasVars) {
+            dumpVariables(marshaled.getVariableList());
         }
     }
     
@@ -326,13 +329,27 @@ public class MarshalStream extends FilterOutputStream {
     	dumpObject(runtime.newSymbol(type.getName()));
     }
     
+    /**
+     * @deprecated superseded by {@link #dumpVariables()} 
+     */
     public void dumpInstanceVars(Map instanceVars) throws IOException {
+
+        runtime.getWarnings().warn("internal: deprecated dumpInstanceVars() called");
+
         writeInt(instanceVars.size());
         for (Iterator iter = instanceVars.keySet().iterator(); iter.hasNext();) {
             String name = (String) iter.next();
             IRubyObject value = (IRubyObject)instanceVars.get(name);
             writeAndRegister(runtime.newSymbol(name));
             dumpObject(value);
+        }
+    }
+    
+    public void dumpVariables(List<Variable<IRubyObject>> vars) throws IOException {
+        writeInt(vars.size());
+        for (Variable<IRubyObject> var : vars) {
+            writeAndRegister(runtime.newSymbol(var.getName()));
+            dumpObject(var.getValue());
         }
     }
     
@@ -353,7 +370,7 @@ public class MarshalStream extends FilterOutputStream {
      */
     private RubyClass dumpExtended(RubyClass type) throws IOException {
         if(type.isSingleton()) {
-            if (hasSingletonMethods(type) || type.safeHasInstanceVariables()) { // any ivars, since we don't have __attached__ ivar now
+            if (hasSingletonMethods(type) || type.hasVariables()) { // any ivars, since we don't have __attached__ ivar now
                 throw type.getRuntime().newTypeError("singleton can't be dumped");
             }
             type = type.getSuperClass();

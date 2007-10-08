@@ -367,9 +367,7 @@ public class RubyClass extends RubyModule {
                               MarshalStream marshalStream) throws IOException {
             IRubyObject object = (IRubyObject)obj;
             
-            Map iVars = object.getInstanceVariablesSnapshot();
-            
-            marshalStream.dumpInstanceVars(iVars);
+            marshalStream.dumpVariables(object.getVariableList());
         }
 
         public Object unmarshalFrom(Ruby runtime, RubyClass type,
