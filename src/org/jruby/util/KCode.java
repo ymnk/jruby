@@ -119,5 +119,9 @@ public class KCode {
     public String name() {
         return kcode;
     }
+
+    public Encoding getEncoding() {
+        return encoding;
+    }
 }
 	
