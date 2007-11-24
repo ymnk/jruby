@@ -264,6 +264,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             rb_reg_raise(s.bytes,start,len,e.getMessage());
         }
         //TODO: handle joni warnings correctly
+        return null;
     }
 
     private final void rb_reg_raise(byte[] s, int start, int len, String err) {
