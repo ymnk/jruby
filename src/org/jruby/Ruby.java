@@ -83,7 +83,6 @@ import org.jruby.javasupport.JavaSupport;
 import org.jruby.libraries.RbConfigLibrary;
 import org.jruby.parser.Parser;
 import org.jruby.parser.ParserConfiguration;
-import org.jruby.regexp.RegexpFactory;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CacheMap;
 import org.jruby.runtime.CallbackFactory;
@@ -279,8 +278,6 @@ public final class Ruby {
 
     private Object respondToMethod;
 
-    private RegexpFactory regexpFactory;
-    
     /**
      * A list of finalizers, weakly referenced, to be executed on tearDown
      */
@@ -1189,8 +1186,6 @@ public final class Ruby {
         defineGlobalVERBOSE();
         defineGlobalDEBUG();
 
-        this.regexpFactory = RegexpFactory.getFactory(this.config.getDefaultRegexpEngine());
-
         javaSupport = new JavaSupport(this);
 
         tc.preInitCoreClasses();
@@ -1662,10 +1657,6 @@ public final class Ruby {
 
     public RubyWarnings getWarnings() {
         return warnings;
-    }
-
-    public RegexpFactory getRegexpFactory() {
-        return this.regexpFactory;
     }
 
     public PrintStream getErrorStream() {
