@@ -166,7 +166,7 @@ public class StringScanner {
                 regs = new Region();
             }
             byte[] ccc = ByteList.plain(string);
-            if(pattern.matcher(ccc,pos,ccc.length-pos).search(0,ccc.length-pos,regs, Option.NONE) == 0) {
+            if(pattern.matcher(ccc,pos,ccc.length).search(pos,ccc.length,regs, Option.NONE) == 0) {
                 matchStart = pos;
                 matchEnd = regs.end[0]+pos;
             } else {
@@ -183,7 +183,7 @@ public class StringScanner {
                 regs = new Region();
             }
             byte[] ccc = ByteList.plain(string);
-            if(pattern.matcher(ccc,pos,ccc.length-pos).search(0,ccc.length-pos,regs, Option.NONE) >= 0) {
+            if(pattern.matcher(ccc,pos,ccc.length).search(pos,ccc.length,regs, Option.NONE) >= 0) {
                 lastPos = pos;
                 matchStart = regs.beg[0]+pos;
                 matchEnd = regs.end[0]+pos;
@@ -204,7 +204,7 @@ public class StringScanner {
                 regs = new Region();
             }
             byte[] ccc = ByteList.plain(string);
-            if(pattern.matcher(ccc,pos,ccc.length-pos).search(0,ccc.length-pos,regs, Option.NONE) == 0) {
+            if(pattern.matcher(ccc,pos,ccc.length).search(pos,ccc.length,regs, Option.NONE) == 0) {
                 lastPos = pos;
                 matchStart = pos;
                 pos = regs.end[0]+lastPos;
@@ -225,7 +225,7 @@ public class StringScanner {
                 regs = new Region();
             }
             byte[] ccc = ByteList.plain(string);
-            if(pattern.matcher(ccc,pos,ccc.length-pos).search(0,ccc.length-pos,regs, Option.NONE) == 0) {
+            if(pattern.matcher(ccc,pos,ccc.length).search(pos,ccc.length,regs, Option.NONE) == 0) {
                 matchStart = pos;
                 matchEnd = regs.end[0]+pos;
                 return string.subSequence(regs.beg[0]+pos,regs.end[0]+pos);
@@ -243,7 +243,7 @@ public class StringScanner {
                 regs = new Region();
             }
             byte[] ccc = ByteList.plain(string);
-            if(pattern.matcher(ccc,pos,ccc.length-pos).search(0,ccc.length-pos,regs, Option.NONE) >= 0) {
+            if(pattern.matcher(ccc,pos,ccc.length).search(pos,ccc.length,regs, Option.NONE) >= 0) {
                 matchStart = regs.beg[0]+pos;
                 matchEnd = regs.end[0]+pos;
                 return string.subSequence(pos,matchEnd);
@@ -261,7 +261,7 @@ public class StringScanner {
                 regs = new Region();
             }
             byte[] ccc = ByteList.plain(string);
-            if(pattern.matcher(ccc,pos,ccc.length-pos).search(0,ccc.length-pos,regs, Option.NONE) == 0) {
+            if(pattern.matcher(ccc,pos,ccc.length).search(pos,ccc.length,regs, Option.NONE) == 0) {
                 lastPos = pos;
                 matchStart = pos;
                 pos = regs.end[0]+lastPos;
@@ -281,7 +281,7 @@ public class StringScanner {
                 regs = new Region();
             }
             byte[] ccc = ByteList.plain(string);
-            if(pattern.matcher(ccc,pos,ccc.length-pos).search(0,ccc.length-pos,regs, Option.NONE) >= 0) {
+            if(pattern.matcher(ccc,pos,ccc.length).search(pos,ccc.length,regs, Option.NONE) >= 0) {
                 lastPos = pos;
                 pos = regs.end[0]+lastPos;
                 matchStart = regs.beg[0]+lastPos;
@@ -301,7 +301,7 @@ public class StringScanner {
                 regs = new Region();
             }
             byte[] ccc = ByteList.plain(string);
-            if(pattern.matcher(ccc,pos,ccc.length-pos).search(0,ccc.length-pos,regs, Option.NONE) >= 0) {
+            if(pattern.matcher(ccc,pos,ccc.length).search(pos,ccc.length,regs, Option.NONE) >= 0) {
                 matchStart = regs.beg[0]+pos;
                 matchEnd = regs.end[0]+pos;
                 return matchEnd-pos;

@@ -480,8 +480,14 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         } else {
             range = bl.realSize - _pos;
         }
-        
-        result = ptr.matcher(bl.bytes, bl.begin, bl.realSize).search(_pos, range, regs, Option.NONE);
+
+        result = ptr.matcher(bl.bytes, 
+                             bl.begin, 
+                             bl.begin+bl.realSize).search(
+                                                          bl.begin+_pos, 
+                                                          bl.begin+_pos+range, 
+                                                          regs, 
+                                                          Option.NONE);
 
         if(result == -2) {
             rb_reg_raise(bl.bytes,bl.begin,bl.realSize,"Stack overflow in regexp matcher");
@@ -641,22 +647,11 @@ public class RubyRegexp extends RubyObject implements ReOptions {
     }
 
     public int adjust_startpos(IRubyObject str, int pos, boolean reverse) {
-        return pos;
-
-        // TODO: Implement correctly
-        /*
-        int range;
         rb_reg_check(this);
-        if(reverse) {
-            range = -pos;
-        } else {
-            range = ((RubyString)str).getByteList().length() - pos;
-        }
 
-        return ptr.adjust_startpos(((RubyString)str).getByteList().bytes, 
-                                   ((RubyString)str).getByteList().begin, 
-                                   ((RubyString)str).getByteList().realSize, pos, range);
-        */
+        return ptr.adjustStartPosition(((RubyString)str).getByteList().bytes, 
+                                       ((RubyString)str).getByteList().begin, 
+                                       ((RubyString)str).getByteList().realSize, pos, reverse);
     }
 
     @JRubyMethod(name = "casefold?")

@@ -117,7 +117,10 @@ public class KCode {
     }
 
     public String name() {
-        return kcode;
+        if(kcode != null) {
+            return kcode.toLowerCase();
+        }
+        return null;
     }
 
     public Encoding getEncoding() {

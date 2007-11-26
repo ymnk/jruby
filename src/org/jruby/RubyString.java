@@ -2041,7 +2041,7 @@ public class RubyString extends RubyObject {
                 if (len < 0) throw getRuntime().newIndexError("negative length");
                 if (beg < 0) beg += strLen;
 
-                if (beg < 0 || (beg > 0 && beg >= strLen)) {
+                if (beg < 0 || (beg > 0 && beg > strLen)) {
                     throw getRuntime().newIndexError("string index out of bounds");
                 }
                 if (beg + len > strLen) len = strLen - beg;
@@ -2483,6 +2483,9 @@ public class RubyString extends RubyObject {
         Ruby runtime = getRuntime();
         ThreadContext context = runtime.getCurrentContext();
 
+        byte[]_p = value.bytes;
+        int len = value.realSize;
+        
         if(!block.isGiven()) {
             RubyArray ary = runtime.newArray();
             while(!(result = scan_once(pattern, start)).isNil()) {
@@ -2496,7 +2499,11 @@ public class RubyString extends RubyObject {
         while(!(result = scan_once(pattern, start)).isNil()) {
             match = context.getCurrentFrame().getBackRef();
             context.getPreviousFrame().setBackRef(match);
+            if(match instanceof RubyMatchData) {
+                ((RubyMatchData)match).use();
+            }
             block.yield(context,result);
+            modifyCheck(_p,len);
             context.getPreviousFrame().setBackRef(match);
         }
         context.getPreviousFrame().setBackRef(match);
@@ -2504,21 +2511,28 @@ public class RubyString extends RubyObject {
         return this;
     }
 
-    private IRubyObject scan_once(IRubyObject _pat, int[] start) {
-        IRubyObject match;
-        RubyRegexp pat = (RubyRegexp)_pat;
+    /**
+     * rb_enc_check
+     */
+    private Encoding encodingCheck(RubyRegexp pattern) {
+        // For 1.9 compatibility, should check encoding compat between string and pattern
+        return pattern.getKCode().getEncoding();
+    }
+
+    private IRubyObject scan_once(RubyRegexp pat, int[] start) {
+        Encoding enc = encodingCheck(pat);
         Region regs;
         int i;
 
         if(pat.search(this, start[0], false) >= 0) {
-            match = getRuntime().getCurrentContext().getCurrentFrame().getBackRef();
-            regs = ((RubyMatchData)match).regs;
+            RubyMatchData match = (RubyMatchData)getRuntime().getCurrentContext().getCurrentFrame().getBackRef();
+            regs = match.regs;
             if(regs.beg[0] == regs.end[0]) {
                 /*
                  * Always consume at least one character of the input string
                  */
                 if(value.realSize > regs.end[0]) {
-                    start[0] = regs.end[0] + pat.getKCode().getEncoding().length((byte)value.charAt(regs.end[0]));
+                    start[0] = regs.end[0] + enc.length(value.bytes[value.begin+regs.end[0]]);
                 } else {
                     start[0] = regs.end[0] + 1;
                 }
