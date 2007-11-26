@@ -60,6 +60,7 @@ import org.joni.Option;
 import org.joni.Regex;
 import org.joni.Region;
 import org.joni.Syntax;
+import org.joni.WarnCallback;
 import org.joni.encoding.Encoding;
 
 /**
@@ -102,6 +103,16 @@ public class RubyRegexp extends RubyObject implements ReOptions {
             return instance;
         }
     };
+
+    private final static class RubyWarnings implements WarnCallback {
+        private Ruby runtime;
+        public RubyWarnings(Ruby runtime)  {
+            this.runtime = runtime;
+        }
+        public void warn(String message) {
+            runtime.getWarnings().warn(message);
+        }
+    }
 
     public static RubyClass createRegexpClass(Ruby runtime) {
         RubyClass regexpClass = runtime.defineClass("Regexp", runtime.getObject(), REGEXP_ALLOCATOR);
@@ -259,11 +270,10 @@ public class RubyRegexp extends RubyObject implements ReOptions {
 
     private final Regex make_regexp(ByteList s, int start, int len, int flags, Encoding enc) {
         try {
-            return new Regex(s.bytes,start,len,flags,enc,Syntax.DEFAULT);
+            return new Regex(s.bytes,start,len,flags,enc,Syntax.DEFAULT,new RubyWarnings(getRuntime()));
         } catch(Exception e) {
             rb_reg_raise(s.bytes,start,len,e.getMessage());
         }
-        //TODO: handle joni warnings correctly
         return null;
     }
 
