@@ -272,27 +272,27 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         try {
             return new Regex(s.bytes,start,len,flags,enc,Syntax.DEFAULT,new RubyWarnings(getRuntime()));
         } catch(Exception e) {
-            rb_reg_raise(s.bytes,start,len,e.getMessage());
+            rb_reg_raise(s.bytes,start,len,e.getMessage(),flags);
         }
         return null;
     }
 
-    private final void rb_reg_raise(byte[] s, int start, int len, String err) {
-        throw getRuntime().newRegexpError(err + ": " + rb_reg_desc(s,start, len));
+    private final void rb_reg_raise(byte[] s, int start, int len, String err,int flags) {
+        throw getRuntime().newRegexpError(err + ": " + rb_reg_desc(s,start, len,flags));
     }
 
-    private final StringBuffer rb_reg_desc(byte[] s, int start, int len) {
+    private final StringBuffer rb_reg_desc(byte[] s, int start, int len,int flags) {
         StringBuffer sb = new StringBuffer("/");
         rb_reg_expr_str(sb, s, start, len);
         sb.append("/");
 
-        if((ptr.getOptions() & ReOptions.RE_OPTION_MULTILINE) != 0) {
+        if((flags & ReOptions.RE_OPTION_MULTILINE) != 0) {
             sb.append("m");
         }
-        if((ptr.getOptions() & ReOptions.RE_OPTION_IGNORECASE) != 0) {
+        if((flags & ReOptions.RE_OPTION_IGNORECASE) != 0) {
             sb.append("i");
         }
-        if((ptr.getOptions() & ReOptions.RE_OPTION_EXTENDED) != 0) {
+        if((flags & ReOptions.RE_OPTION_EXTENDED) != 0) {
             sb.append("x");
         }
 
@@ -490,7 +490,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
                                                           Option.NONE);
 
         if(result == -2) {
-            rb_reg_raise(bl.bytes,bl.begin,bl.realSize,"Stack overflow in regexp matcher");
+            rb_reg_raise(bl.bytes,bl.begin,bl.realSize,"Stack overflow in regexp matcher",ptr.getOptions());
         }
         if(result < 0) {
             currentFrame.setBackRef(runtime.getNil());
@@ -687,7 +687,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
     @JRubyMethod(name = "inspect")
     public IRubyObject inspect() {
         rb_reg_check(this);
-        return getRuntime().newString(ByteList.create(rb_reg_desc(str.bytes,str.begin,str.realSize).toString()));
+        return getRuntime().newString(ByteList.create(rb_reg_desc(str.bytes,str.begin,str.realSize,ptr.getOptions()).toString()));
     }
 
 
