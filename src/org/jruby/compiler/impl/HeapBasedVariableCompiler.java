@@ -129,11 +129,24 @@ public class HeapBasedVariableCompiler extends AbstractVariableCompiler {
     public void assignLocalVariable(int index) {
         method.dup();
 
-        method.aload(varsIndex);
-        method.swap();
-        method.ldc(new Integer(index));
-        method.swap();
-        method.arraystore();
+        switch (index) {
+        case 0:
+            method.aload(scopeIndex);
+            method.swap();
+            method.invokevirtual(cg.p(DynamicScope.class), "setValueZeroDepthZero", cg.sig(Void.TYPE, cg.params(IRubyObject.class)));
+            break;
+        case 1:
+            method.aload(scopeIndex);
+            method.swap();
+            method.invokevirtual(cg.p(DynamicScope.class), "setValueOneDepthZero", cg.sig(Void.TYPE, cg.params(IRubyObject.class)));
+            break;
+        default:
+            method.aload(varsIndex);
+            method.swap();
+            method.ldc(new Integer(index));
+            method.swap();
+            method.arraystore();
+        }
     }
 
     public void assignLocalVariable(int index, int depth) {
@@ -144,18 +157,46 @@ public class HeapBasedVariableCompiler extends AbstractVariableCompiler {
 
         method.dup();
 
+        // unwrap scopes to appropriate depth
         method.aload(scopeIndex);
-        method.swap();
-        method.ldc(new Integer(index));
-        method.swap();
-        method.ldc(new Integer(depth));
-        method.invokevirtual(cg.p(DynamicScope.class), "setValue", cg.sig(Void.TYPE, cg.params(Integer.TYPE, IRubyObject.class, Integer.TYPE)));
+        while (depth > 0) {
+            method.invokevirtual(cg.p(DynamicScope.class), "getNextCapturedScope", cg.sig(DynamicScope.class));
+            depth--;
+        }
+        
+        switch (index) {
+        case 0:
+            method.swap();
+            method.invokevirtual(cg.p(DynamicScope.class), "setValueZeroDepthZero", cg.sig(Void.TYPE, cg.params(IRubyObject.class)));
+            break;
+        case 1:
+            method.swap();
+            method.invokevirtual(cg.p(DynamicScope.class), "setValueOneDepthZero", cg.sig(Void.TYPE, cg.params(IRubyObject.class)));
+            break;
+        default:
+            method.swap();
+            method.ldc(new Integer(index));
+            method.invokevirtual(cg.p(DynamicScope.class), "setValueDepthZero", cg.sig(Void.TYPE, cg.params(IRubyObject.class, Integer.TYPE)));
+        }
     }
 
     public void retrieveLocalVariable(int index) {
-        method.aload(varsIndex);
-        method.ldc(new Integer(index));
-        method.arrayload();
+        switch (index) {
+        case 0:
+            method.aload(scopeIndex);
+            methodCompiler.loadNil();
+            method.invokevirtual(cg.p(DynamicScope.class), "getValueZeroDepthZeroOrNil", cg.sig(IRubyObject.class, IRubyObject.class));
+            break;
+        case 1:
+            method.aload(scopeIndex);
+            methodCompiler.loadNil();
+            method.invokevirtual(cg.p(DynamicScope.class), "getValueOneDepthZeroOrNil", cg.sig(IRubyObject.class, IRubyObject.class));
+            break;
+        default:
+            method.aload(varsIndex);
+            method.ldc(new Integer(index));
+            method.arrayload();
+        }
     }
 
     public void retrieveLocalVariable(int index, int depth) {
@@ -164,10 +205,26 @@ public class HeapBasedVariableCompiler extends AbstractVariableCompiler {
             return;
         }
 
+        // unwrap scopes to appropriate depth
         method.aload(scopeIndex);
-        method.ldc(new Integer(index));
-        method.ldc(new Integer(depth));
-        methodCompiler.loadNil();
-        method.invokevirtual(cg.p(DynamicScope.class), "getValueOrNil", cg.sig(IRubyObject.class, cg.params(Integer.TYPE, Integer.TYPE, IRubyObject.class)));
+        while (depth > 0) {
+            method.invokevirtual(cg.p(DynamicScope.class), "getNextCapturedScope", cg.sig(DynamicScope.class));
+            depth--;
+        }
+        
+        switch (index) {
+        case 0:
+            methodCompiler.loadNil();
+            method.invokevirtual(cg.p(DynamicScope.class), "getValueZeroDepthZeroOrNil", cg.sig(IRubyObject.class, IRubyObject.class));
+            break;
+        case 1:
+            methodCompiler.loadNil();
+            method.invokevirtual(cg.p(DynamicScope.class), "getValueOneDepthZeroOrNil", cg.sig(IRubyObject.class, IRubyObject.class));
+            break;
+        default:
+            method.ldc(new Integer(index));
+            methodCompiler.loadNil();
+            method.invokevirtual(cg.p(DynamicScope.class), "getValueDepthZeroOrNil", cg.sig(IRubyObject.class, cg.params(Integer.TYPE, IRubyObject.class)));
+        }
     }
 }

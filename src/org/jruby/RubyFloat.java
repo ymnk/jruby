@@ -81,7 +81,7 @@ public class RubyFloat extends RubyNumeric {
         // Double.MAX_EXPONENT since Java 1.6            
         floatc.defineConstant("MAX_EXP", RubyFixnum.newFixnum(runtime, 1024));
         floatc.defineConstant("MIN_10_EXP", RubyFixnum.newFixnum(runtime, -307));
-        floatc.defineConstant("MAX_10_EXP", RubyFixnum.newFixnum(runtime, -308));
+        floatc.defineConstant("MAX_10_EXP", RubyFixnum.newFixnum(runtime, 308));
         floatc.defineConstant("MIN", RubyFloat.newFloat(runtime, Double.MIN_VALUE));
         floatc.defineConstant("MAX", RubyFloat.newFloat(runtime, Double.MAX_VALUE));
         floatc.defineConstant("EPSILON", RubyFloat.newFloat(runtime, 2.2204460492503131e-16));
@@ -197,7 +197,16 @@ public class RubyFloat extends RubyNumeric {
      */
     @JRubyMethod(name = "coerce", required = 1)
     public IRubyObject coerce(IRubyObject other) {
-        if (other instanceof RubyNumeric) {
+        if (other instanceof RubyString) {
+            double otherDouble = 0.0;
+            try {
+                otherDouble = Double.parseDouble(other.toString());
+            } catch (Exception e) {
+                throw getRuntime().newArgumentError("invalid value for Float(): \"" + other.toString() + "\"");
+            }
+            return getRuntime().newArray(
+                    newFloat(getRuntime(), otherDouble), this);
+        } else if (other instanceof RubyNumeric) {
             return getRuntime().newArray(
                     newFloat(getRuntime(), ((RubyNumeric) other).getDoubleValue()), this);
         }

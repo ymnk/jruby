@@ -18,6 +18,7 @@ import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.internal.runtime.methods.YARVMethod;
 import org.jruby.internal.runtime.methods.WrapperMethod;
+import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.runtime.MethodIndex;
 
 public class YARVMachine {
@@ -250,7 +251,7 @@ public class YARVMachine {
         try {
             IRubyObject self = context.getRuntime().getObject();
             
-            context.preScopedBody(new DynamicScope(scope));
+            context.preScopedBody(DynamicScope.newDynamicScope(scope));
             
             return exec(context, self, bytecodes);
         } finally {
@@ -284,10 +285,10 @@ public class YARVMachine {
                 context.getCurrentScope().setValue((int) bytecodes[ip].l_op0, pop(), 0);
                 break;
             case YARVInstructions.GETINSTANCEVARIABLE:
-                push(self.fastGetInstanceVariable(bytecodes[ip].s_op0));
+                push(self.getInstanceVariables().fastGetInstanceVariable(bytecodes[ip].s_op0));
                 break;
             case YARVInstructions.SETINSTANCEVARIABLE:
-                self.fastSetInstanceVariable(bytecodes[ip].s_op0, pop());
+                self.getInstanceVariables().fastSetInstanceVariable(bytecodes[ip].s_op0, pop());
                 break;
             case YARVInstructions.GETCLASSVARIABLE: {
                 RubyModule rubyClass = context.getRubyClass();
@@ -522,7 +523,7 @@ public class YARVMachine {
                 //YARV will never emit this, for some reason.
                 IRubyObject value = pop();
                 other = pop();
-                push(pop().callMethod(context,MethodIndex.ASET, "[]=",new IRubyObject[]{other,value}));
+                push(RuntimeHelpers.invoke(context, pop(), MethodIndex.ASET, "[]=",new IRubyObject[]{other,value}));
                 break;
             }
             case YARVInstructions.OPT_LENGTH: 

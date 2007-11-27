@@ -55,10 +55,14 @@ import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.MainExitException;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.JumpTarget;
+import org.jruby.javasupport.util.RuntimeHelpers;
+import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.Binding;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.Frame;
 import org.jruby.runtime.MethodIndex;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
@@ -68,6 +72,7 @@ import org.jruby.runtime.load.LoadService;
 import org.jruby.util.IdUtil;
 import org.jruby.util.ShellLauncher;
 import org.jruby.util.Sprintf;
+import org.jruby.util.TypeConverter;
 
 /**
  * Note: For CVS history, see KernelModule.java.
@@ -102,7 +107,7 @@ public class RubyKernel {
     @JRubyMethod(name = "autoload?", required = 1, module = true, visibility = Visibility.PRIVATE)
     public static IRubyObject autoload_p(final IRubyObject recv, IRubyObject symbol) {
         RubyModule module = recv instanceof RubyModule ? (RubyModule) recv : recv.getRuntime().getObject();
-        String name = module.getName() + "::" + symbol.asSymbol();
+        String name = module.getName() + "::" + symbol.asInternedString();
         
         IAutoloadMethod autoloadMethod = recv.getRuntime().getLoadService().autoloadFor(name);
         if (autoloadMethod == null) return recv.getRuntime().getNil();
@@ -114,7 +119,7 @@ public class RubyKernel {
     public static IRubyObject autoload(final IRubyObject recv, IRubyObject symbol, final IRubyObject file) {
         Ruby runtime = recv.getRuntime(); 
         final LoadService loadService = runtime.getLoadService();
-        final String baseName = symbol.asSymbol(); // interned, OK for "fast" methods
+        final String baseName = symbol.asInternedString(); // interned, OK for "fast" methods
         final RubyModule module = recv instanceof RubyModule ? (RubyModule) recv : runtime.getObject();
         String nm = module.getName() + "::" + baseName;
         
@@ -149,7 +154,7 @@ public class RubyKernel {
 
         if (args.length == 0 || !(args[0] instanceof RubySymbol)) throw runtime.newArgumentError("no id given");
         
-        String name = args[0].asSymbol();
+        String name = args[0].asInternedString();
         ThreadContext context = runtime.getCurrentContext();
         Visibility lastVis = context.getLastVisibility();
         CallType lastCallType = context.getLastCallType();
@@ -298,7 +303,7 @@ public class RubyKernel {
         }else if(object.isNil()){
             throw recv.getRuntime().newTypeError("can't convert nil into Float");
         } else {
-            RubyFloat rFloat = (RubyFloat)object.convertToType(recv.getRuntime().getFloat(), MethodIndex.TO_F, "to_f");
+            RubyFloat rFloat = (RubyFloat)TypeConverter.convertToType(object, recv.getRuntime().getFloat(), MethodIndex.TO_F, "to_f");
             if (Double.isNaN(rFloat.getDoubleValue())) throw recv.getRuntime().newArgumentError("invalid value for Float()");
             return rFloat;
         }
@@ -317,14 +322,14 @@ public class RubyKernel {
             return RubyNumeric.str2inum(recv.getRuntime(),(RubyString)object,0,true);
         }
         
-        IRubyObject tmp = object.convertToType(recv.getRuntime().getInteger(), MethodIndex.TO_INT, "to_int", false);
+        IRubyObject tmp = TypeConverter.convertToType(object, recv.getRuntime().getInteger(), MethodIndex.TO_INT, "to_int", false);
         if (tmp.isNil()) return object.convertToInteger(MethodIndex.TO_I, "to_i");
         return tmp;
     }
 
     @JRubyMethod(name = "String", required = 1, module = true, visibility = Visibility.PRIVATE)
     public static IRubyObject new_string(IRubyObject recv, IRubyObject object) {
-        return object.convertToType(recv.getRuntime().getString(), MethodIndex.TO_S, "to_s");
+        return TypeConverter.convertToType(object, recv.getRuntime().getString(), MethodIndex.TO_S, "to_s");
     }
 
     @JRubyMethod(name = "p", rest = true, module = true, visibility = Visibility.PRIVATE)
@@ -650,7 +655,7 @@ public class RubyKernel {
             exception = args[0].callMethod(context, "exception", args[1]);
         }
         
-        if (!exception.isKindOf(runtime.fastGetClass("Exception"))) {
+        if (!runtime.fastGetClass("Exception").isInstance(exception)) {
             throw runtime.newTypeError("exception object expected");
         }
         
@@ -685,39 +690,53 @@ public class RubyKernel {
 
     @JRubyMethod(name = "eval", required = 1, optional = 3, frame = true, module = true, visibility = Visibility.PRIVATE)
     public static IRubyObject eval(IRubyObject recv, IRubyObject[] args, Block block) {
-        if (args == null || args.length == 0) {
-            throw recv.getRuntime().newArgumentError(args.length, 1);
-        }
+        Ruby runtime = recv.getRuntime();
             
+        // string to eval
         RubyString src = args[0].convertToString();
+        runtime.checkSafeString(src);
+        
         IRubyObject scope = null;
         String file = "(eval)";
         int line = 1;
-
-        if (args.length > 1) {
-            if (!args[1].isNil()) {
-                scope = args[1];
-
-                org.jruby.lexer.yacc.ISourcePosition pos = ((scope instanceof RubyBinding) ? (RubyBinding)scope : (RubyBinding)((RubyProc)scope).binding()).getBinding().getFrame().getPosition();
-                file = pos.getFile();
-                line = pos.getEndLine();
-            }
-            
-            if (args.length > 2) {
-                file = args[2].toString();
-            }
-
-            if(args.length > 3) {
-                line = RubyNumeric.fix2int(args[3]) - 1;
-            }
-        }
-
-        recv.getRuntime().checkSafeString(src);
-        ThreadContext context = recv.getRuntime().getCurrentContext();
         
-        if (scope == null) {
-            scope = RubyBinding.newBindingForEval(recv.getRuntime());
+        // determine scope and position
+        if (args.length > 1 && !args[1].isNil()) {
+            scope = args[1];
+
+            Binding binding;
+            if (scope instanceof RubyBinding) {
+                binding = ((RubyBinding)scope).getBinding();
+            } else if (scope instanceof RubyProc) {
+                RubyProc proc = (RubyProc)scope;
+                binding = proc.getBlock().getBinding();
+            } else {
+                throw runtime.newTypeError("Wrong argument type " + scope.getMetaClass() + "(expected Proc/Binding)");
+            }
+
+            Frame frame = binding.getFrame();
+            ISourcePosition pos = frame.getPosition();
+
+            file = pos.getFile();
+            line = pos.getEndLine();
+        } else {
+            scope = RubyBinding.newBindingForEval(runtime);
         }
+            
+        // if we have additional args, use them for file and line number
+        if (args.length > 2) {
+            file = args[2].convertToString().toString();
+        } else {
+            file = "(eval)";
+        }
+
+        if (args.length > 3) {
+            line = (int)args[3].convertToInteger().getLongValue();
+        } else {
+            line = 1;
+        }
+        
+        ThreadContext context = runtime.getCurrentContext();
         
         return ASTInterpreter.evalWithBinding(context, src, scope, file, line);
     }
@@ -745,7 +764,7 @@ public class RubyKernel {
     @JRubyMethod(name = "catch", required = 1, frame = true, module = true, visibility = Visibility.PRIVATE)
     public static IRubyObject rbCatch(IRubyObject recv, IRubyObject tag, Block block) {
         ThreadContext context = recv.getRuntime().getCurrentContext();
-        CatchTarget target = new CatchTarget(tag.asSymbol());
+        CatchTarget target = new CatchTarget(tag.asInternedString());
         try {
             context.pushCatch(target);
             return block.yield(context, tag);
@@ -768,7 +787,7 @@ public class RubyKernel {
     public static IRubyObject rbThrow(IRubyObject recv, IRubyObject[] args, Block block) {
         Ruby runtime = recv.getRuntime();
 
-        String tag = args[0].asSymbol();
+        String tag = args[0].asInternedString();
         ThreadContext context = runtime.getCurrentContext();
         CatchTarget[] catches = context.getActiveCatches();
 
@@ -789,7 +808,7 @@ public class RubyKernel {
     @JRubyMethod(name = "trap", required = 1, frame = true, optional = 1, module = true, visibility = Visibility.PRIVATE)
     public static IRubyObject trap(IRubyObject recv, IRubyObject[] args, Block block) {
         recv.getRuntime().getLoadService().require("jsignal");
-        return recv.callMethod(recv.getRuntime().getCurrentContext(), "__jtrap", args, CallType.FUNCTIONAL, block);
+        return RuntimeHelpers.invoke(recv.getRuntime().getCurrentContext(), recv, "__jtrap", args, CallType.FUNCTIONAL, block);
     }
     
     @JRubyMethod(name = "warn", required = 1, module = true, visibility = Visibility.PRIVATE)
@@ -833,7 +852,7 @@ public class RubyKernel {
             proc = RubyProc.newProc(recv.getRuntime(), block, Block.Type.PROC);
         }
         if (args.length == 2) {
-            proc = (RubyProc)args[1].convertToType(recv.getRuntime().getProc(), 0, "to_proc", true);
+            proc = (RubyProc)TypeConverter.convertToType(args[1], recv.getRuntime().getProc(), 0, "to_proc", true);
         }
         
         recv.getRuntime().getGlobalVariables().setTraceVar(var, proc);

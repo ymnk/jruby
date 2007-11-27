@@ -1,62 +1,98 @@
 package org.jruby.runtime;
 
-import org.jruby.RubyArray;
-import org.jruby.evaluator.ASTInterpreter;
+import org.jruby.runtime.scope.ManyVarsDynamicScope;
+import org.jruby.runtime.scope.NoVarsDynamicScope;
+import org.jruby.runtime.scope.OneVarDynamicScope;
 import org.jruby.parser.BlockStaticScope;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.builtin.IRubyObject;
 
-/**
- * Represents the the dynamic portion of scoping information.  The variableValues are the
- * values of assigned local or block variables.  The staticScope identifies which sort of
- * scope this is (block or local).
- * 
- * Properties of Dynamic Scopes:
- * 1. static and dynamic scopes have the same number of names to values
- * 2. size of variables (and thus names) is determined during parsing.  So those structured do
- *    not need to change
- *
- * FIXME: When creating dynamic scopes we sometimes accidentally pass in extra parents.  This
- * is harmless (other than wasting memory), but we should not do that.  We can fix this in two
- * ways:
- * 1. Fix all callers
- * 2. Check parent that is passed in and make if new instance is local, then its parent is not local
- */
-public class DynamicScope {
-    // Our values holder (name of variables are kept in staticScope)
-    private IRubyObject[] variableValues;
-    
+public abstract class DynamicScope {
     // Static scoping information for this scope
-    private StaticScope staticScope;
+    protected StaticScope staticScope;
     
     // Captured dyanmic scopes
-    private DynamicScope parent;
+    protected DynamicScope parent;
     
     // A place to store that special hiding space that bindings need to implement things like:
     // eval("a = 1", binding); eval("p a").  All binding instances must get access to this
     // hidden shared scope.  We store it here.  This will be null if no binding has yet
     // been called.
-    private DynamicScope bindingScope;
+    protected DynamicScope evalScope;
 
-    public DynamicScope(StaticScope staticScope, DynamicScope parent) {
+    protected DynamicScope(StaticScope staticScope, DynamicScope parent) {
         this(staticScope);
         this.parent = parent;
     }
 
-    public DynamicScope(StaticScope staticScope) {
+    protected DynamicScope(StaticScope staticScope) {
         this.staticScope = staticScope;
-        
     }
-
-    private void lazy() {
-        if(variableValues == null) {
-            int size = staticScope.getNumberOfVariables();
-            variableValues = new IRubyObject[size];
+    
+    public static DynamicScope newDynamicScope(StaticScope staticScope, DynamicScope parent) {
+        switch (staticScope.getNumberOfVariables()) {
+        case 0:
+            return new NoVarsDynamicScope(staticScope, parent);
+        case 1:
+            return new OneVarDynamicScope(staticScope, parent);
+        default:
+            return new ManyVarsDynamicScope(staticScope, parent);
         }
     }
     
-    public DynamicScope cloneScope() {
-        return new DynamicScope(staticScope, parent);
+    public static DynamicScope newDynamicScope(StaticScope staticScope) {
+        return newDynamicScope(staticScope, null);
+    }
+    
+    public final DynamicScope getEvalScope() {
+        // We create one extra dynamicScope on a binding so that when we 'eval "b=1", binding' the
+        // 'b' will get put into this new dynamic scope.  The original scope does not see the new
+        // 'b' and successive evals with this binding will.  I take it having the ability to have 
+        // succesive binding evals be able to share same scope makes sense from a programmers 
+        // perspective.   One crappy outcome of this design is it requires Dynamic and Static 
+        // scopes to be mutable for this one case.
+        
+        // Note: In Ruby 1.9 all of this logic can go away since they will require explicit
+        // bindings for evals.
+        
+        // We only define one special dynamic scope per 'logical' binding.  So all bindings for
+        // the same scope should share the same dynamic scope.  This allows multiple evals with
+        // different different bindings in the same scope to see the same stuff.
+        
+        // No binding scope so we should create one
+        if (evalScope == null) {
+            // If the next scope out has the same binding scope as this scope it means
+            // we are evaling within an eval and in that case we should be sharing the same
+            // binding scope.
+            DynamicScope parent = getNextCapturedScope(); 
+            if (parent != null && parent.getEvalScope() == this) {
+                evalScope = this;
+            } else {
+                // bindings scopes must always be ManyVars scopes since evals can grow them
+                evalScope = new ManyVarsDynamicScope(new BlockStaticScope(getStaticScope()), this);
+            }
+        }
+        
+        return evalScope;
+    }
+    
+    /**
+     * Get next 'captured' scope.
+     * 
+     * @return the scope captured by this scope for implementing closures
+     *
+     */
+    public final DynamicScope getNextCapturedScope() {
+        return parent;
+    }
+
+    /**
+     * Get the static scope associated with this DynamicScope.
+     * 
+     * @return static complement to this scope
+     */
+    public final StaticScope getStaticScope() {
+        return staticScope;
     }
     
     /**
@@ -64,14 +100,22 @@ public class DynamicScope {
      * 
      * @return a list of variable names
      */
-    public String[] getAllNamesInScope() {
-        return staticScope.getAllNamesInScope(this);
+    public final String[] getAllNamesInScope() {
+        return staticScope.getAllNamesInScope();
     }
+    
+    public String toString() {
+        return toString(new StringBuffer(), "");
+    }
+    
+    public abstract void growIfNeeded();
 
-    public IRubyObject[] getValues() {
-        lazy();
-        return variableValues;
-    }
+    // Helper function to give a good view of current dynamic scope with captured scopes
+    public abstract String toString(StringBuffer buf, String indent);
+    
+    public abstract DynamicScope cloneScope();
+
+    public abstract IRubyObject[] getValues();
     
     /**
      * Get value from current scope or one of its captured scopes.
@@ -83,37 +127,27 @@ public class DynamicScope {
      * @param depth how many captured scopes down this variable should be set
      * @return the value here
      */
-    public IRubyObject getValue(int offset, int depth) {
-        if (depth > 0) {
-            return parent.getValue(offset, depth - 1);
-        }
-        lazy();
-        assert variableValues != null : "No variables in getValue for off: " + offset + ", Dep: " + depth;
-        assert offset < variableValues.length : "Index to big for getValue off: " + offset + ", Dep: " + depth + ", O: " + this;
-        // &foo are not getting set from somewhere...I want the following assert to be true though
-        //assert variableValues[offset] != null : "Getting unassigned: " + staticScope.getVariables()[offset];
-        return variableValues[offset];
-    }
+    public abstract IRubyObject getValue(int offset, int depth);
     
     /**
      * Variation of getValue that checks for nulls, returning and setting the given value (presumably nil)
      */
-    public IRubyObject getValueOrNil(int offset, int depth, IRubyObject nil) {
-        if (depth > 0) {
-            return parent.getValueOrNil(offset, depth - 1, nil);
-        }
-        lazy();
-        assert variableValues != null : "No variables in getValue for off: " + offset + ", Dep: " + depth;
-        assert offset < variableValues.length : "Index to big for getValue off: " + offset + ", Dep: " + depth + ", O: " + this;
-        // &foo are not getting set from somewhere...I want the following assert to be true though
-        //assert variableValues[offset] != null : "Getting unassigned: " + staticScope.getVariables()[offset];
-        IRubyObject value = variableValues[offset];
-        if (value == null) {
-            variableValues[offset] = nil;
-            value = nil;
-        }
-        return value;
-    }
+    public abstract IRubyObject getValueOrNil(int offset, int depth, IRubyObject nil);
+    
+    /**
+     * getValueOrNil for depth 0
+     */
+    public abstract IRubyObject getValueDepthZeroOrNil(int offset, IRubyObject nil);
+    
+    /**
+     * getValueOrNil for index 0, depth 0
+     */
+    public abstract IRubyObject getValueZeroDepthZeroOrNil(IRubyObject nil);
+    
+    /**
+     * getValueOrNil for index 1, depth 0
+     */
+    public abstract IRubyObject getValueOneDepthZeroOrNil(IRubyObject nil);
 
     /**
      * Set value in current dynamic scope or one of its captured scopes.
@@ -122,18 +156,34 @@ public class DynamicScope {
      * @param value to set
      * @param depth how many captured scopes down this variable should be set
      */
-    public void setValue(int offset, IRubyObject value, int depth) {
-        if (depth > 0) {
-            assert parent != null : "If depth > 0, then parent should not ever be null";
-            
-            parent.setValue(offset, value, depth - 1);
-        } else {
-            lazy();
-            assert offset < variableValues.length : "Setting " + offset + " to " + value + ", O: " + this; 
-            
-            variableValues[offset] = value;
-        }
-    }
+    public abstract void setValue(int offset, IRubyObject value, int depth);
+
+    /**
+     * setValue for depth zero
+     * 
+     * @param offset zero-indexed value that represents where variable lives
+     * @param value to set
+     * @param depth how many captured scopes down this variable should be set
+     */
+    public abstract void setValueDepthZero(IRubyObject value, int offset);
+
+    /**
+     * Set value in current dynamic scope or one of its captured scopes.
+     * 
+     * @param offset zero-indexed value that represents where variable lives
+     * @param value to set
+     * @param depth how many captured scopes down this variable should be set
+     */
+    public abstract void setValueZeroDepthZero(IRubyObject value);
+
+    /**
+     * Set value in current dynamic scope or one of its captured scopes.
+     * 
+     * @param offset zero-indexed value that represents where variable lives
+     * @param value to set
+     * @param depth how many captured scopes down this variable should be set
+     */
+    public abstract void setValueOneDepthZero(IRubyObject value);
 
     /**
      * Set all values which represent 'normal' parameters in a call list to this dynamic
@@ -146,142 +196,10 @@ public class DynamicScope {
      * @param values up to size specified to be mapped as ordinary parm values
      * @param size is the number of values to assign as ordinary parm values
      */
-    public void setArgValues(IRubyObject[] values, int size) {
-        lazy();
-        System.arraycopy(values, 0, variableValues, 0, size);
-    }
-    
-    public void setBlockArgValues(IRubyObject[] blockArgValues, int size) {
-        lazy();
-        System.arraycopy(blockArgValues, 0, variableValues, 0, size);
-    }
+    public abstract void setArgValues(IRubyObject[] values, int size);
 
     /**
      * Copy variable values back for ZSuper call.
      */
-    public IRubyObject[] getArgValues() {
-        // if we're not the "argument scope" for zsuper, try our parent
-        if (!staticScope.isArgumentScope()) {
-            return parent.getArgValues();
-        }
-        lazy();
-        int totalArgs = staticScope.getRequiredArgs() + staticScope.getOptionalArgs();
-        
-        // copy and splat arguments out of the scope to use for zsuper call
-        if (staticScope.getRestArg() < 0) {
-            // required and optional only
-            IRubyObject[] argValues = new IRubyObject[totalArgs];
-            System.arraycopy(variableValues, 0, argValues, 0, totalArgs);
-            
-            return argValues;
-        } else {
-            // rest arg must be splatted
-            IRubyObject restArg = getValue(staticScope.getRestArg(), 0);
-            assert restArg != null;
-            
-            // FIXME: not very efficient
-            RubyArray splattedArgs = ASTInterpreter.splatValue(restArg.getRuntime(), restArg);            
-            IRubyObject[] argValues = new IRubyObject[totalArgs + splattedArgs.size()];
-            System.arraycopy(variableValues, 0, argValues, 0, totalArgs);
-            System.arraycopy(splattedArgs.toJavaArray(), 0, argValues, totalArgs, splattedArgs.size());
-            
-            return argValues;
-        }
-    }
-
-    /**
-     * 
-     * Make a larger dynamic scope if the static scope grew.
-     * 
-     * Eval's with bindings require us to possibly change the size of the dynamic scope if
-     * things like 'eval "b = 2", binding' happens.
-     *
-     */
-    public void growIfNeeded() {
-        lazy();
-        int dynamicSize = variableValues == null ? 0: variableValues.length;
-        
-        if (staticScope.getNumberOfVariables() > dynamicSize) {
-            IRubyObject values[] = new IRubyObject[staticScope.getNumberOfVariables()];
-            
-            if (dynamicSize > 0) {
-                System.arraycopy(variableValues, 0, values, 0, dynamicSize);
-            }
-            
-            variableValues = values;
-        }
-    }
-    
-    public DynamicScope getBindingScope() {
-        return bindingScope;
-    }
-    
-    public void setBindingScope(DynamicScope bindingScope) {
-        this.bindingScope = bindingScope;
-    }
-    
-    /**
-     * Get next 'captured' scope.
-     * 
-     * @return the scope captured by this scope for implementing closures
-     *
-     */
-    public DynamicScope getNextCapturedScope() {
-        return parent;
-    }
-
-    /**
-     * Get the static scope associated with this DynamicScope.
-     * 
-     * @return static complement to this scope
-     */
-    public StaticScope getStaticScope() {
-        return staticScope;
-    }
-    
-    public String toString() {
-        return toString(new StringBuffer(), "");
-    }
-
-    // Helper function to give a good view of current dynamic scope with captured scopes
-    private String toString(StringBuffer buf, String indent) {
-        lazy();
-        buf.append(indent).append("Static Type[" + hashCode() + "]: " + 
-                (staticScope instanceof BlockStaticScope ? "block" : "local")+" [");
-        int size = staticScope.getNumberOfVariables();
-        
-        if (size != 0) {
-            String names[] = staticScope.getVariables();
-            for (int i = 0; i < size-1; i++) {
-                buf.append(names[i]).append("=");
-
-                if (variableValues[i] == null) {
-                    buf.append("null");
-                } else {
-                    buf.append(variableValues[i]);
-                }
-                
-                buf.append(",");
-            }
-            buf.append(names[size-1]).append("=");
-            
-            assert variableValues.length == names.length : "V: " + variableValues.length + 
-                " != N: " + names.length + " for " + buf;
-            
-            if (variableValues[size-1] == null) {
-                buf.append("null");
-            } else {
-                buf.append(variableValues[size-1]);
-            }
-            
-        }
-        
-        buf.append("]");
-        if (parent != null) {
-            buf.append("\n");
-            parent.toString(buf, indent + "  ");
-        }
-        
-        return buf.toString();
-    }
+    public abstract IRubyObject[] getArgValues();
 }

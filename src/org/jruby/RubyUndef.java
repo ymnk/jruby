@@ -8,6 +8,8 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.builtin.InstanceVariables;
+import org.jruby.runtime.builtin.InternalVariables;
 import org.jruby.runtime.builtin.Variable;
 
 public class RubyUndef implements IRubyObject {
@@ -23,12 +25,7 @@ public class RubyUndef implements IRubyObject {
         return null;
     }
 
-    public String asSymbol() {
-        return null;
-    }
-
-    public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, String name,
-            IRubyObject[] args, CallType callType, Block block) {
+    public String asInternedString() {
         return null;
     }
 
@@ -39,11 +36,6 @@ public class RubyUndef implements IRubyObject {
 
     public IRubyObject callMethod(ThreadContext context, int methodIndex, String name,
             IRubyObject arg) {
-        return null;
-    }
-
-    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name,
-            IRubyObject[] args) {
         return null;
     }
 
@@ -133,14 +125,6 @@ public class RubyUndef implements IRubyObject {
         return null;
     }
 
-    public IRubyObject convertToType(RubyClass targetType, int convertMethodIndex,
-            String convertMethod, boolean raiseOnError) {
-        return null;
-    }
-    public IRubyObject convertToType(RubyClass targetType, int convertMethodIndex, String convertMethod) {
-        return null;
-    }
-
     public IRubyObject convertToTypeWithCheck(RubyClass targetType, int convertMethodIndex,
             String convertMethod) {
         return null;
@@ -186,16 +170,6 @@ public class RubyUndef implements IRubyObject {
         return null;
     }
 
-    @Deprecated
-    public Map getInstanceVariables() {
-        return null;
-    }
-
-    @Deprecated
-    public Map getInstanceVariablesSnapshot() {
-        return null;
-    }
-
     public Class getJavaClass() {
         return null;
     }
@@ -229,11 +203,6 @@ public class RubyUndef implements IRubyObject {
     }
 
     public IRubyObject inspect() {
-        return null;
-    }
-
-    @Deprecated
-    public Iterator instanceVariableNames() {
         return null;
     }
 
@@ -284,25 +253,7 @@ public class RubyUndef implements IRubyObject {
         return false;
     }
 
-    @Deprecated
-    public Map safeGetInstanceVariables() {
-        return null;
-    }
-
-    @Deprecated
-    public boolean safeHasInstanceVariables() {
-        return false;
-    }
-
     public void setFrozen(boolean b) {
-    }
-
-    public IRubyObject setInstanceVariable(String string, IRubyObject rubyObject) {
-        return null;
-    }
-
-    @Deprecated
-    public void setInstanceVariables(Map instanceVariables) {
     }
 
     public void setMetaClass(RubyClass metaClass) {
@@ -318,30 +269,8 @@ public class RubyUndef implements IRubyObject {
     public int getVariableCount() {
         return 0;
     }
-
-    public boolean hasInternalVariable(String name) {
-        return false;
-    }
-
-    public boolean fastHasInternalVariable(String name) {
-        return false;
-    }
-
-    public IRubyObject getInternalVariable(String name) {
-        return null;
-    }
-
-    public IRubyObject fastGetInternalVariable(String name) {
-        return null;
-    }
-
-    public void setInternalVariable(String name, IRubyObject value) {
-    }
-
-    public void fastSetInternalVariable(String name, IRubyObject value) {
-    }
-
-    public IRubyObject removeInternalVariable(String name) {
+    
+    public InternalVariables getInternalVariables() {
         return null;
     }
     
@@ -365,31 +294,7 @@ public class RubyUndef implements IRubyObject {
         return null;
     }
     
-    public IRubyObject fastGetInstanceVariable(String name) {
-        return null;
-    }
-    
-    public boolean hasInstanceVariable(String name) {
-        return false;
-    }
-    
-    public boolean fastHasInstanceVariable(String name) {
-        return false;
-    }
-    
-    public IRubyObject fastSetInstanceVariable(String name, IRubyObject value) {
-        return null;
-    }
-    
-    public IRubyObject removeInstanceVariable(String name) {
-        return null;
-    }
-    
-    public List<Variable<IRubyObject>> getInstanceVariableList() {
-        return null;
-    }
-
-    public List<String> getInstanceVariableNameList() {
+    public InstanceVariables getInstanceVariables() {
         return null;
     }
     

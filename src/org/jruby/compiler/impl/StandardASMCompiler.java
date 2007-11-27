@@ -83,18 +83,18 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.CallSite;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.CallbackFactory;
-import org.jruby.runtime.CompiledBlock;
 import org.jruby.runtime.CompiledBlockCallback;
-import org.jruby.runtime.CompiledSharedScopeBlock;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.Frame;
 import org.jruby.runtime.MethodIndex;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.builtin.InstanceVariables;
 import org.jruby.util.ByteList;
 import org.jruby.util.CodegenUtils;
 import org.jruby.util.JRubyClassLoader;
+import org.jruby.util.JavaNameMangler;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -1183,7 +1183,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.ldc(name);
             method.swap();
 
-            invokeIRubyObject("fastSetInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class, IRubyObject.class)));
+            invokeIRubyObject("getInstanceVariables", cg.sig(InstanceVariables.class));
+            method.invokeinterface(cg.p(InstanceVariables.class), "fastSetInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class, IRubyObject.class)));
         }
 
         public void retrieveGlobalVariable(String name) {
@@ -1773,9 +1774,10 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         
         public void isInstanceVariableDefined(String name, BranchCallback trueBranch, BranchCallback falseBranch) {
             loadSelf();
+            invokeIRubyObject("getInstanceVariables", cg.sig(InstanceVariables.class));
             method.ldc(name);
             //method.invokeinterface(cg.p(IRubyObject.class), "getInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
-            method.invokeinterface(cg.p(IRubyObject.class), "fastHasInstanceVariable", cg.sig(boolean.class, cg.params(String.class)));
+            method.invokeinterface(cg.p(InstanceVariables.class), "fastHasInstanceVariable", cg.sig(boolean.class, cg.params(String.class)));
             Label trueLabel = new Label();
             Label exitLabel = new Label();
             //method.ifnonnull(trueLabel);
@@ -1922,10 +1924,9 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         }
         
         public void selfIsKindOf(Object gotoToken) {
-            loadSelf();
-            method.swap();
             method.invokevirtual(cg.p(RubyClass.class), "getRealClass", cg.sig(RubyClass.class));
-            method.invokeinterface(cg.p(IRubyObject.class), "isKindOf", cg.sig(boolean.class, cg.params(RubyModule.class)));
+            loadSelf();
+            method.invokevirtual(cg.p(RubyModule.class), "isInstance", cg.sig(boolean.class, cg.params(IRubyObject.class)));
             method.ifne((Label)gotoToken); // EQ != 0 (i.e. true)
         }
         
@@ -1955,7 +1956,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         
         public void getInstanceVariable(String name) {
             method.ldc(name);
-            method.invokeinterface(cg.p(IRubyObject.class), "fastGetInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
+            invokeIRubyObject("getInstanceVariables", cg.sig(InstanceVariables.class));
+            method.invokeinterface(cg.p(InstanceVariables.class), "fastGetInstanceVariable", cg.sig(IRubyObject.class, cg.params(String.class)));
         }
         
         public void getFrameName() {
@@ -2038,7 +2040,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
                 final CompilerCallback pathCallback, 
                 final CompilerCallback bodyCallback, 
                 final CompilerCallback receiverCallback) {
-            String methodName = "rubyclass__" + cg.cleanJavaIdentifier(name) + "__" + ++methodIndex;
+            String methodName = "rubyclass__" + JavaNameMangler.mangleMethodForCleanJavaIdentifier(name) + "__" + ++methodIndex;
 
             final ASMMethodCompiler methodCompiler = new ASMMethodCompiler(methodName, null);
             
@@ -2129,7 +2131,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         }
 
         public void defineModule(final String name, final StaticScope staticScope, final CompilerCallback pathCallback, final CompilerCallback bodyCallback) {
-            String methodName = "rubyclass__" + cg.cleanJavaIdentifier(name) + "__" + ++methodIndex;
+            String methodName = "rubyclass__" + JavaNameMangler.mangleMethodForCleanJavaIdentifier(name) + "__" + ++methodIndex;
 
             final ASMMethodCompiler methodCompiler = new ASMMethodCompiler(methodName, null);
 
@@ -2286,7 +2288,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         public void defineNewMethod(String name, StaticScope scope, CompilerCallback body, CompilerCallback args, CompilerCallback receiver, ASTInspector inspector) {
             // TODO: build arg list based on number of args, optionals, etc
             ++methodIndex;
-            String methodName = cg.cleanJavaIdentifier(name) + "__" + methodIndex;
+            String methodName = JavaNameMangler.mangleMethodForCleanJavaIdentifier(name) + "__" + methodIndex;
 
             MethodCompiler methodCompiler = startMethod(methodName, args, scope, inspector);
 
@@ -2347,7 +2349,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             loadRuntime();
             method.ldc("SystemExit");
             method.invokevirtual(cg.p(Ruby.class), "fastGetClass", cg.sig(RubyClass.class, String.class));
-            method.invokevirtual(cg.p(RubyException.class), "isKindOf", cg.sig(boolean.class, cg.params(RubyModule.class)));
+            method.swap();
+            method.invokevirtual(cg.p(RubyModule.class), "isInstance", cg.sig(boolean.class, cg.params(IRubyObject.class)));
             method.iconst_0();
             Label ifEnd = new Label();
             method.if_icmpeq(ifEnd);
@@ -2688,7 +2691,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
     }
     
     public String cacheCallSite(String name, CallType callType) {
-        String fieldName = getNewConstant(cg.ci(CallSite.class), cg.cleanJavaIdentifier(name));
+        String fieldName = getNewConstant(cg.ci(CallSite.class), JavaNameMangler.mangleMethodForCleanJavaIdentifier(name));
         
         // retrieve call adapter
         initMethod.aload(THIS);
@@ -2706,11 +2709,11 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
     }
     
     public String cachePosition(String file, int line) {
-        String cleanName = cg.cleanJavaIdentifier(file + "$" + line);
+        String cleanName = JavaNameMangler.mangleMethodForCleanJavaIdentifier(file + "$" + line);
         String fieldName = sourcePositions.get(cleanName);
         if (fieldName == null) {
             fieldName = getNewStaticConstant(cg.ci(ISourcePosition.class), cleanName);
-            sourcePositions.put(cg.cleanJavaIdentifier(file + "$" + line), fieldName);
+            sourcePositions.put(JavaNameMangler.mangleMethodForCleanJavaIdentifier(file + "$" + line), fieldName);
 
             clinitMethod.ldc(file);
             clinitMethod.ldc(line);

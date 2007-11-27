@@ -92,7 +92,7 @@ public class IOHandlerUnseekable extends IOHandlerJavaIO {
         fileno = RubyIO.getNewFileno();
     }
     
-    public IOHandlerUnseekable(Ruby runtime, int fileno) throws IOException {
+    public IOHandlerUnseekable(Ruby runtime, int fileno) throws BadDescriptorException {
         super(runtime);
         
         switch (fileno) {
@@ -112,19 +112,19 @@ public class IOHandlerUnseekable extends IOHandlerJavaIO {
             isOpen = true;
             break;
         default:
-            throw new IOException("Bad file descriptor");
+            throw new BadDescriptorException();
         }
         
         this.fileno = fileno;
     }
     
-    public IOHandlerUnseekable(Ruby runtime, int fileno, String mode) throws IOException {
+    public IOHandlerUnseekable(Ruby runtime, int fileno, String mode) throws BadDescriptorException {
         super(runtime);
 
         modes = new IOModes(runtime, mode);
         
         if (fileno < 0 || fileno > 2) {
-            throw new IOException("Bad file descriptor");
+            throw new BadDescriptorException();
         }
         
         if (modes.isReadable()) {
@@ -151,7 +151,10 @@ public class IOHandlerUnseekable extends IOHandlerJavaIO {
         }
 
         try {
-            list.append(input, Integer.MAX_VALUE);
+            final int CHUNK = 8192;
+            while (true) { // read until EOF
+                list.append(input, CHUNK);
+            }
         } catch (EOFException e) {
             if (!read) throw e;
         }

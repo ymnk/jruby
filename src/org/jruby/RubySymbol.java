@@ -95,7 +95,7 @@ public class RubySymbol extends RubyObject {
      * 
      * @return a String representation of the symbol 
      */
-    public String asSymbol() {
+    public String asInternedString() {
         return symbol;
     }
     
@@ -133,6 +133,9 @@ public class RubySymbol extends RubyObject {
 
     @JRubyMethod(name = "to_int")
     public RubyFixnum to_int() {
+        if (getRuntime().getVerbose().isTrue()) {
+            getRuntime().getWarnings().warn("treating Symbol as an integer");
+	}
         return to_i();
     }
 

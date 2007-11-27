@@ -60,6 +60,7 @@ import org.jruby.RubyProc;
 import org.jruby.RubyString;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.methods.DynamicMethod;
+import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
@@ -233,7 +234,7 @@ public class JavaClass extends JavaObject {
                 javaField = new JavaField(getRuntime(),field);
             }
             return Java.java_to_ruby(self,
-                    javaField.value(self.fastGetInstanceVariable("@java_object")),
+                    javaField.value(self.getInstanceVariables().fastGetInstanceVariable("@java_object")),
                     Block.NULL_BLOCK);
         }
         public Arity getArity() {
@@ -255,7 +256,7 @@ public class JavaClass extends JavaObject {
                 javaField = new JavaField(getRuntime(),field);
             }
             return Java.java_to_ruby(self,
-                    javaField.set_value(self.fastGetInstanceVariable("@java_object"),
+                    javaField.set_value(self.getInstanceVariables().fastGetInstanceVariable("@java_object"),
                             Java.ruby_to_java(self,args[0],Block.NULL_BLOCK)),
                     Block.NULL_BLOCK);
         }
@@ -415,7 +416,7 @@ public class JavaClass extends JavaObject {
                 args = newArgs;
             }
             IRubyObject[] convertedArgs = new IRubyObject[len+1];
-            convertedArgs[0] = self.fastGetInstanceVariable("@java_object");
+            convertedArgs[0] = self.getInstanceVariables().fastGetInstanceVariable("@java_object");
             int i = len;
             if (block.isGiven()) {
                 convertedArgs[len] = args[len - 1];
@@ -1017,12 +1018,12 @@ public class JavaClass extends JavaObject {
     }
 
     public static JavaClass for_name(IRubyObject recv, IRubyObject name) {
-        return forName(recv.getRuntime(), name.asSymbol());
+        return forName(recv.getRuntime(), name.asInternedString());
     }
     
     private static final Callback __jsend_method = new Callback() {
             public IRubyObject execute(IRubyObject self, IRubyObject[] args, Block block) {
-                String name = args[0].asSymbol();
+                String name = args[0].asInternedString();
                 
                 DynamicMethod method = self.getMetaClass().searchMethod(name);
                 int v = method.getArity().getValue();
@@ -1031,9 +1032,10 @@ public class JavaClass extends JavaObject {
                 System.arraycopy(args, 1, newArgs, 0, newArgs.length);
 
                 if(v < 0 || v == (newArgs.length)) {
-                    return self.callMethod(self.getRuntime().getCurrentContext(), name, newArgs, CallType.FUNCTIONAL, block);
+                    return RuntimeHelpers.invoke(self.getRuntime().getCurrentContext(), self, name, newArgs, CallType.FUNCTIONAL, block);
                 } else {
-                    return self.callMethod(self.getRuntime().getCurrentContext(),self.getMetaClass().getSuperClass(), name, newArgs, CallType.SUPER, block);
+                    RubyClass superClass = self.getMetaClass().getSuperClass();
+                    return RuntimeHelpers.invokeAs(self.getRuntime().getCurrentContext(), superClass, self, name, newArgs, CallType.SUPER, block);
                 }
             }
 
@@ -1147,13 +1149,13 @@ public class JavaClass extends JavaObject {
     }
 
 	public JavaMethod java_method(IRubyObject[] args) throws ClassNotFoundException {
-        String methodName = args[0].asSymbol();
+        String methodName = args[0].asInternedString();
         Class[] argumentTypes = buildArgumentTypes(args);
         return JavaMethod.create(getRuntime(), javaClass(), methodName, argumentTypes);
     }
 
     public JavaMethod declared_method(IRubyObject[] args) throws ClassNotFoundException {
-        String methodName = args[0].asSymbol();
+        String methodName = args[0].asInternedString();
         Class[] argumentTypes = buildArgumentTypes(args);
         return JavaMethod.createDeclared(getRuntime(), javaClass(), methodName, argumentTypes);
     }
@@ -1243,7 +1245,7 @@ public class JavaClass extends JavaObject {
     private Class[] buildClassArgs(IRubyObject[] args) {
         Class[] parameterTypes = new Class[args.length];
         for (int i = 0; i < args.length; i++) {
-            String name = args[i].asSymbol();
+            String name = args[i].asInternedString();
             parameterTypes[i] = getRuntime().getJavaSupport().loadJavaClass(name);
         }
         return parameterTypes;
@@ -1299,7 +1301,7 @@ public class JavaClass extends JavaObject {
 	}
 
 	public JavaField field(IRubyObject name) {
-		String stringName = name.asSymbol();
+		String stringName = name.asInternedString();
         try {
             Field field = javaClass().getField(stringName);
 			return new JavaField(getRuntime(),field);
@@ -1309,7 +1311,7 @@ public class JavaClass extends JavaObject {
     }
 
 	public JavaField declared_field(IRubyObject name) {
-		String stringName = name.asSymbol();
+		String stringName = name.asInternedString();
         try {
             Field field = javaClass().getDeclaredField(stringName);
 			return new JavaField(getRuntime(),field);

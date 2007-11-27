@@ -55,6 +55,7 @@ import org.jruby.util.Sprintf;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Frame;
 import org.jruby.runtime.Visibility;
+import org.jruby.util.TypeConverter;
 
 import org.joni.Option;
 import org.joni.Regex;
@@ -1062,7 +1063,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         if(args.length == 0) {
             return newRegexp(recv.getRuntime(),"(?!)",0,null);
         } else if(args.length == 1) {
-            IRubyObject v = args[0].convertToTypeWithCheck(recv.getRuntime().getRegexp(), 0, "to_regexp");
+            IRubyObject v = TypeConverter.convertToTypeWithCheck(args[0], recv.getRuntime().getRegexp(), 0, "to_regexp");
             if(!v.isNil()) {
                 return v;
             } else {
@@ -1078,7 +1079,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
                 if(0 < i) {
                     source.cat(PIPE);
                 }
-                IRubyObject v = args[i].convertToTypeWithCheck(recv.getRuntime().getRegexp(), 0, "to_regexp");
+                IRubyObject v = TypeConverter.convertToTypeWithCheck(args[i], recv.getRuntime().getRegexp(), 0, "to_regexp");
                 if(!v.isNil()) {
                     if(!((RubyRegexp)v).kcode_default) {
                         if(kcode == null) {

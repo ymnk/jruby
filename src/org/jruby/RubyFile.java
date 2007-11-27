@@ -43,8 +43,8 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import org.jruby.anno.JRubyMethod;
 
+import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
@@ -62,6 +62,7 @@ import org.jruby.util.IOHandlerUnseekable;
 import org.jruby.util.IOModes;
 import org.jruby.util.JRubyFile;
 import org.jruby.util.IOHandler.InvalidValueException;
+import org.jruby.util.TypeConverter;
 
 /**
  * Ruby File class equivalent in java.
@@ -253,7 +254,14 @@ public class RubyFile extends RubyIO {
         } catch (DirectoryAsFileException e) {
             throw getRuntime().newErrnoEISDirError();
         } catch (FileNotFoundException e) {
-        	throw getRuntime().newErrnoENOENTError();
+            // FNFException can be thrown in both cases, when the file
+            // is not found, or when permission is denied.
+            if (new File(newPath).exists()) {
+                throw getRuntime().newErrnoEACCESError(
+                        "Permission denied - " + newPath);
+            }
+            throw getRuntime().newErrnoENOENTError(
+                    "File not found - " + newPath);
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
 		}
@@ -357,7 +365,7 @@ public class RubyFile extends RubyIO {
             throw getRuntime().newArgumentError(0, 1);
         }
         else if (args.length < 3) {
-            IRubyObject fd = args[0].convertToTypeWithCheck(getRuntime().getFixnum(), MethodIndex.TO_INT, "to_int");
+            IRubyObject fd = TypeConverter.convertToTypeWithCheck(args[0], getRuntime().getFixnum(), MethodIndex.TO_INT, "to_int");
             if (!fd.isNil()) {
                 args[0] = fd;
                 return super.initialize(args, block);
@@ -960,21 +968,24 @@ public class RubyFile extends RubyIO {
         Arity.checkArgumentCount(runtime, args, 1, -1);
         ThreadContext tc = runtime.getCurrentContext();
         
-        RubyString pathString = RubyString.stringValue(args[0]);
-        runtime.checkSafeString(pathString);
-        String path = pathString.toString();
-        
-        IOModes modes =
-                args.length >= 2 ? getModes(runtime, args[1]) : new IOModes(runtime, IOModes.RDONLY);
-        RubyFile file = new RubyFile(runtime, (RubyClass) recv);
-        
-        RubyInteger fileMode =
-                args.length >= 3 ? args[2].convertToInteger() : null;
-        
-        file.openInternal(path, modes);
-        
-        if (fileMode != null) {
-            chmod(recv, new IRubyObject[] {fileMode, pathString});
+        RubyFile file;
+
+        if (args[0] instanceof RubyInteger) { // open with file descriptor
+            file = new RubyFile(runtime, (RubyClass) recv);
+            file.initialize(args, Block.NULL_BLOCK);            
+        } else {
+            RubyString pathString = RubyString.stringValue(args[0]);
+            runtime.checkSafeString(pathString);
+            String path = pathString.toString();
+
+            IOModes modes = args.length >= 2 ? getModes(runtime, args[1]) : new IOModes(runtime, IOModes.RDONLY);
+            file = new RubyFile(runtime, (RubyClass) recv);
+
+            RubyInteger fileMode = args.length >= 3 ? args[2].convertToInteger() : null;
+
+            file.openInternal(path, modes);
+
+            if (fileMode != null) chmod(recv, new IRubyObject[] {fileMode, pathString});
         }
         
         if (tryToYield && block.isGiven()) {
@@ -1081,7 +1092,7 @@ public class RubyFile extends RubyIO {
             throw runtime.newErrnoEINVALError("invalid argument: " + filename);
         }
         
-        IRubyObject[] args = new IRubyObject[] { filename, runtime.newString("w+") };
+        IRubyObject[] args = new IRubyObject[] { filename, runtime.newString("r+") };
         RubyFile file = (RubyFile) open(recv, args, false, null);
         file.truncate(newLength);
         file.close();

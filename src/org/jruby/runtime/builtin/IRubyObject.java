@@ -42,11 +42,9 @@ import org.jruby.RubyClass;
 import org.jruby.RubyFloat;
 import org.jruby.RubyHash;
 import org.jruby.RubyInteger;
-import org.jruby.RubyModule;
 import org.jruby.RubyProc;
 import org.jruby.RubyString;
 import org.jruby.runtime.Block;
-import org.jruby.runtime.CallType;
 import org.jruby.runtime.ThreadContext;
 
 /** Object is the parent class of all classes in Ruby. Its methods are
@@ -58,29 +56,14 @@ public interface IRubyObject {
      */
     public static final IRubyObject[] NULL_ARRAY = new IRubyObject[0];
     
-    /**
-     * Return the ClassIndex value for the native type this object was
-     * constructed from. Particularly useful for determining marshalling
-     * format. All instances of subclasses of Hash, for example
-     * are of Java type RubyHash, and so should utilize RubyHash marshalling
-     * logic in addition to user-defined class marshalling logic.
-     *
-     * @return the ClassIndex of the native type this object was constructed from
-     */
-    int getNativeTypeIndex();
-    
     public IRubyObject callSuper(ThreadContext context, IRubyObject[] args, Block block);
 
     public IRubyObject callMethod(ThreadContext context, String name);
     public IRubyObject callMethod(ThreadContext context, String name, IRubyObject arg);
     public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args);
     public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, Block block);
-    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, CallType callType, Block block);
     public IRubyObject callMethod(ThreadContext context, int methodIndex, String name);
     public IRubyObject callMethod(ThreadContext context, int methodIndex, String name, IRubyObject arg);
-    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name, IRubyObject[] args);
-    public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, String name, IRubyObject[] args, CallType callType, Block block);
-    public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, int methodIndex, String name, IRubyObject[] args, CallType callType, Block block);
     
     /**
      * RubyMethod isNil.
@@ -107,6 +90,13 @@ public interface IRubyObject {
     void setTaint(boolean b);
     
     /**
+     * Infect this object using the taint of another object
+     * @param obj
+     * @return
+     */
+    IRubyObject infectBy(IRubyObject obj);
+    
+    /**
      * RubyMethod isFrozen.
      * @return boolean
      */
@@ -123,20 +113,6 @@ public interface IRubyObject {
      * @return
      */
     boolean isImmediate();
-    
-    /**
-     * RubyMethod isKindOf.
-     * @param rubyClass
-     * @return boolean
-     */
-    boolean isKindOf(RubyModule rubyClass);
-    
-    /**
-     * Infect this object using the taint of another object
-     * @param obj
-     * @return
-     */
-    IRubyObject infectBy(IRubyObject obj);
     
     /**
      * RubyMethod getRubyClass.
@@ -180,7 +156,7 @@ public interface IRubyObject {
      *
      * @return String the symbol name
      */
-    String asSymbol();
+    String asInternedString();
     
     /** rb_obj_as_string
      * @return
@@ -217,35 +193,6 @@ public interface IRubyObject {
      * @return
      */
     RubyString convertToString();
-    
-    /**
-     * Converts this object to type 'targetType' using 'convertMethod' method (MRI: convert_type).
-     *
-     * @param targetType is the type we are trying to convert to
-     * @param convertMethod is the method to be called to try and convert to targeType
-     * @param raiseOnError will throw an Error if conversion does not work
-     * @return the converted value
-     */
-    IRubyObject convertToType(RubyClass targetType, int convertMethodIndex, String convertMethod, boolean raiseOnError);
-
-    /**
-     * Converts this object to type 'targetType' using 'convertMethod' method and raises TypeError exception on failure (MRI: rb_convert_type).
-     *
-     * @param targetType is the type we are trying to convert to
-     * @param convertMethod is the method to be called to try and convert to targeType
-     * @return the converted value
-     */    
-    IRubyObject convertToType(RubyClass targetType, int convertMethodIndex, String convertMethod);    
-
-    /**
-     * Higher level conversion utility similar to convertToType but it can throw an
-     * additional TypeError during conversion (MRI: rb_check_convert_type).
-     *
-     * @param targetType is the type we are trying to convert to
-     * @param convertMethod is the method to be called to try and convert to targeType
-     * @return the converted value
-     */
-    IRubyObject convertToTypeWithCheck(RubyClass targetType, int convertMethodIndex, String convertMethod);
     
     /**
      *
@@ -365,96 +312,14 @@ public interface IRubyObject {
     //
     // INSTANCE VARIABLE METHODS
     //
-
-    boolean hasInstanceVariable(String name);
-    boolean fastHasInstanceVariable(String internedName);
     
-    IRubyObject getInstanceVariable(String name);
-    IRubyObject fastGetInstanceVariable(String internedName);
-    
-    IRubyObject setInstanceVariable(String name, IRubyObject value);
-    IRubyObject fastSetInstanceVariable(String internedName, IRubyObject value);
-
-    IRubyObject removeInstanceVariable(String name);
-
-    List<Variable<IRubyObject>> getInstanceVariableList();
-
-    List<String> getInstanceVariableNameList();
+    InstanceVariables getInstanceVariables();
 
     //
     // INTERNAL VARIABLE METHODS
     //
 
-    /**
-     * Returns true if object has the named internal variable.  Use only
-     * for internal variables (not ivar/cvar/constant).
-     * 
-     * @param name the name of an internal variable
-     * @return true if object has the named internal variable.
-     */
-    boolean hasInternalVariable(String name);
-    
-    /**
-     * Returns true if object has the named internal variable.  Use only
-     * for internal variables (not ivar/cvar/constant). The supplied
-     * name <em>must</em> have been previously interned.
-     * 
-     * @param internedName the interned name of an internal variable
-     * @return true if object has the named internal variable, else false
-     */
-    boolean fastHasInternalVariable(String internedName);
-
-    /**
-     * Returns the named internal variable if present, else null.  Use only
-     * for internal variables (not ivar/cvar/constant).
-     * 
-     * @param name the name of an internal variable
-     * @return the named internal variable if present, else null
-     */
-    IRubyObject getInternalVariable(String name);
-    
-    /**
-     * Returns the named internal variable if present, else null.  Use only
-     * for internal variables (not ivar/cvar/constant). The supplied
-     * name <em>must</em> have been previously interned.
-     * 
-     * @param internedName the interned name of an internal variable
-     * @return he named internal variable if present, else null
-     */
-    IRubyObject fastGetInternalVariable(String internedName);
-
-    /**
-     * Sets the named internal variable to the specified value.  Use only
-     * for internal variables (not ivar/cvar/constant).
-     * 
-     * @param name the name of an internal variable
-     * @param value the value to be set
-     */
-    void setInternalVariable(String name, IRubyObject value);
-    
-    /**
-     * Sets the named internal variable to the specified value.  Use only
-     * for internal variables (not ivar/cvar/constant). The supplied
-     * name <em>must</em> have been previously interned.
-     * 
-     * @param internedName the interned name of an internal variable
-     * @param value the value to be set
-     */
-    void fastSetInternalVariable(String internedName, IRubyObject value);
-
-    /**
-     * Removes the named internal variable, if present, returning its
-     * value.  Use only for internal variables (not ivar/cvar/constant).
-     * 
-     * @param name the name of the variable to remove
-     * @return the value of the remove variable, if present; else null
-     */
-    IRubyObject removeInternalVariable(String name);
-
-    /**
-     * @return only internal variables (NOT ivar/cvar/constant)
-     */
-    List<Variable<IRubyObject>> getInternalVariableList();
+    InternalVariables getInternalVariables();
 
     /**
      * @return a list of all variable names (ivar/cvar/constant/internal)

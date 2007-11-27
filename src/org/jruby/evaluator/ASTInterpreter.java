@@ -160,6 +160,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 import org.jruby.runtime.Binding;
 import org.jruby.runtime.InterpretedBlock;
+import org.jruby.util.TypeConverter;
 
 public class ASTInterpreter {
     public static IRubyObject eval(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block block) {
@@ -201,16 +202,18 @@ public class ASTInterpreter {
         }
 
         Binding binding = ((RubyBinding)scope).getBinding();
+        DynamicScope evalScope = binding.getDynamicScope().getEvalScope();
+        
         // FIXME:  This determine module is in a strange location and should somehow be in block
-        binding.getDynamicScope().getStaticScope().determineModule();
+        evalScope.getStaticScope().determineModule();
 
         try {
             // Binding provided for scope, use it
             context.preEvalWithBinding(binding);
-            IRubyObject newSelf = context.getFrameSelf();
+            IRubyObject newSelf = binding.getSelf();
             RubyString source = src.convertToString();
             Node node = 
-                runtime.parseEval(source.getByteList(), file, binding.getDynamicScope(), lineNumber);
+                runtime.parseEval(source.getByteList(), file, evalScope, lineNumber);
 
             return eval(runtime, context, node, newSelf, binding.getFrame().getBlock());
         } catch (JumpException.BreakJump bj) {
@@ -241,8 +244,12 @@ public class ASTInterpreter {
 
         // no binding, just eval in "current" frame (caller's frame)
         RubyString source = src.convertToString();
+        
+        DynamicScope evalScope = context.getCurrentScope().getEvalScope();
+        evalScope.getStaticScope().determineModule();
+        
         try {
-            Node node = runtime.parseEval(source.getByteList(), file, context.getCurrentScope(), 0);
+            Node node = runtime.parseEval(source.getByteList(), file, evalScope, 0);
             
             return ASTInterpreter.eval(runtime, context, node, self, Block.NULL_BLOCK);
         } catch (JumpException.BreakJump bj) {
@@ -553,7 +560,7 @@ public class ASTInterpreter {
         if (value instanceof RubyArray) return value;
 
         if (value.respondsTo("to_ary")) {
-            return value.convertToType(runtime.getArray(), MethodIndex.TO_A, "to_ary", false);
+            return TypeConverter.convertToType(value, runtime.getArray(), MethodIndex.TO_A, "to_ary", false);
         }
 
         return runtime.newArray(value);
@@ -1221,14 +1228,14 @@ public class ASTInterpreter {
         InstAsgnNode iVisited = (InstAsgnNode) node;
    
         IRubyObject result = evalInternal(runtime,context, iVisited.getValueNode(), self, aBlock);
-        self.fastSetInstanceVariable(iVisited.getName(), result);
+        self.getInstanceVariables().fastSetInstanceVariable(iVisited.getName(), result);
    
         return result;
     }
 
     private static IRubyObject instVarNode(Ruby runtime, Node node, IRubyObject self) {
         InstVarNode iVisited = (InstVarNode) node;
-        IRubyObject variable = self.fastGetInstanceVariable(iVisited.getName());
+        IRubyObject variable = self.getInstanceVariables().fastGetInstanceVariable(iVisited.getName());
    
         if (variable != null) return variable;
         
@@ -1410,7 +1417,7 @@ public class ASTInterpreter {
    
         IRubyObject[] args = setupArgs(runtime, context, iVisited.getArgsNode(), self, aBlock);
    
-        IRubyObject firstValue = receiver.callMethod(context, MethodIndex.AREF, "[]", args);
+        IRubyObject firstValue = RuntimeHelpers.invoke(context, receiver, MethodIndex.AREF, "[]", args);
    
         if (iVisited.getOperatorName() == "||") {
             if (firstValue.isTrue()) {
@@ -1430,7 +1437,7 @@ public class ASTInterpreter {
         IRubyObject[] expandedArgs = new IRubyObject[args.length + 1];
         System.arraycopy(args, 0, expandedArgs, 0, args.length);
         expandedArgs[expandedArgs.length - 1] = firstValue;
-        return receiver.callMethod(context, MethodIndex.ASET, "[]=", expandedArgs);
+        return RuntimeHelpers.invoke(context, receiver, MethodIndex.ASET, "[]=", expandedArgs);
     }
 
     private static IRubyObject orNode(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block aBlock) {
@@ -1458,13 +1465,13 @@ public class ASTInterpreter {
     private static IRubyObject preExeNode(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block aBlock) {
         PreExeNode iVisited = (PreExeNode) node;
         
-        DynamicScope scope = new DynamicScope(iVisited.getScope());
+        DynamicScope scope = DynamicScope.newDynamicScope(iVisited.getScope());
         // Each root node has a top-level scope that we need to push
         context.preScopedBody(scope);
 
         // FIXME: I use a for block to implement END node because we need a proc which captures
         // its enclosing scope.   ForBlock now represents these node and should be renamed.
-        Block block = InterpretedBlock.newInterpretedClosure(context, iVisited, context.getCurrentScope(), self);
+        Block block = InterpretedBlock.newInterpretedClosure(context, iVisited, self);
         
         block.yield(context, null);
         
@@ -1525,7 +1532,7 @@ public class ASTInterpreter {
                 // get fixed at the same time we address bug #1296484.
                 runtime.getGlobalVariables().set("$!", raisedException);
 
-                if (raisedException.isKindOf(runtime.fastGetClass("SystemExit"))) {
+                if (runtime.fastGetClass("SystemExit").isInstance(raisedException)) {
                     throw raiseJump;
                 }
 
@@ -1596,7 +1603,7 @@ public class ASTInterpreter {
         // since serialization cannot serialize an eval (which is the only thing
         // which is capable of having a non-empty dynamic scope).
         if (scope == null) {
-            scope = new DynamicScope(iVisited.getStaticScope());
+            scope = DynamicScope.newDynamicScope(iVisited.getStaticScope());
         }
         
         StaticScope staticScope = scope.getStaticScope();
@@ -1758,17 +1765,17 @@ public class ASTInterpreter {
                     evalInternal(runtime,context, iVisited.getBodyNode(), self, aBlock);
                     break loop;
                 } catch (RaiseException re) {
-                    if (re.getException().isKindOf(runtime.fastGetClass("LocalJumpError"))) {
+                    if (runtime.fastGetClass("LocalJumpError").isInstance(re.getException())) {
                         RubyLocalJumpError jumpError = (RubyLocalJumpError)re.getException();
                         
                         IRubyObject reason = jumpError.reason();
                         
                         // admittedly inefficient
-                        if (reason.asSymbol().equals("break")) {
+                        if (reason.asInternedString().equals("break")) {
                             return jumpError.exit_value();
-                        } else if (reason.asSymbol().equals("next")) {
+                        } else if (reason.asInternedString().equals("next")) {
                             break loop;
-                        } else if (reason.asSymbol().equals("redo")) {
+                        } else if (reason.asInternedString().equals("redo")) {
                             continue;
                         }
                     }
@@ -1887,8 +1894,7 @@ public class ASTInterpreter {
             
             // Create block for this iter node
             // FIXME: We shouldn't use the current scope if it's not actually from the same hierarchy of static scopes
-            return InterpretedBlock.newInterpretedClosure(context, iterNode.getBlockBody(), 
-                    new DynamicScope(scope, context.getCurrentScope()), self);
+            return InterpretedBlock.newInterpretedClosure(context, iterNode.getBlockBody(), self);
         } else if (blockNode instanceof BlockPassNode) {
             BlockPassNode blockPassNode = (BlockPassNode) blockNode;
             IRubyObject proc = evalInternal(runtime,context, blockPassNode.getBodyNode(), self, currentBlock);
@@ -1939,7 +1945,7 @@ public class ASTInterpreter {
                     Visibility visibility = method.getVisibility();
 
                     if (visibility != Visibility.PRIVATE && 
-                            (visibility != Visibility.PROTECTED || self.isKindOf(metaClass.getRealClass()))) {
+                            (visibility != Visibility.PROTECTED || metaClass.getRealClass().isInstance(self))) {
                         if (metaClass.isMethodBound(iVisited.getName(), false)) {
                             return getArgumentDefinition(runtime,context, iVisited.getArgsNode(), "assignment", self, aBlock);
                         }
@@ -1969,7 +1975,7 @@ public class ASTInterpreter {
                     Visibility visibility = method.getVisibility();
 
                     if (visibility != Visibility.PRIVATE && 
-                            (visibility != Visibility.PROTECTED || self.isKindOf(metaClass.getRealClass()))) {
+                            (visibility != Visibility.PROTECTED || metaClass.getRealClass().isInstance(self))) {
                         if (metaClass.isMethodBound(iVisited.getName(), false)) {
                             return getArgumentDefinition(runtime, context, iVisited.getArgsNode(), "method", self, aBlock);
                         }
@@ -2047,7 +2053,7 @@ public class ASTInterpreter {
             }
             return null;
         case INSTVARNODE:
-            if (self.fastHasInstanceVariable(((InstVarNode) node).getName())) {
+            if (self.getInstanceVariables().fastHasInstanceVariable(((InstVarNode) node).getName())) {
                 return "instance-variable";
             }
             return null;

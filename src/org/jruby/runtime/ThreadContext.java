@@ -35,6 +35,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
+import org.jruby.runtime.scope.ManyVarsDynamicScope;
 import java.util.Collection;
 
 import org.jruby.Ruby;
@@ -121,7 +122,7 @@ public final class ThreadContext {
         // TOPLEVEL self and a few others want a top-level scope.  We create this one right
         // away and then pass it into top-level parse so it ends up being the top level.
         StaticScope topStaticScope = new LocalStaticScope(null);
-        pushScope(new DynamicScope(topStaticScope, null));
+        pushScope(new ManyVarsDynamicScope(topStaticScope, null));
             
         for (int i = 0; i < frameStack.length; i++) {
             frameStack[i] = new Frame();
@@ -619,7 +620,7 @@ public final class ThreadContext {
         getCurrentFrame().setVisibility(Visibility.PUBLIC);
         StaticScope staticScope = new LocalStaticScope(getCurrentScope().getStaticScope(), scopeNames);
         staticScope.setModule(type);
-        pushScope(new DynamicScope(staticScope, null));
+        pushScope(new ManyVarsDynamicScope(staticScope, null));
     }
     
     public void postCompiledClass() {
@@ -629,7 +630,7 @@ public final class ThreadContext {
     }
     
     public void preScopeNode(StaticScope staticScope) {
-        pushScope(new DynamicScope(staticScope, getCurrentScope()));
+        pushScope(DynamicScope.newDynamicScope(staticScope, getCurrentScope()));
     }
 
     public void postScopeNode() {
@@ -640,7 +641,7 @@ public final class ThreadContext {
         pushRubyClass(type);
         pushFrameCopy();
         getCurrentFrame().setVisibility(Visibility.PUBLIC);
-        pushScope(new DynamicScope(staticScope, null));
+        pushScope(DynamicScope.newDynamicScope(staticScope, null));
     }
     
     public void postClassEval() {
@@ -679,7 +680,7 @@ public final class ThreadContext {
             implementationClass = clazz;
         }
         pushCallFrame(clazz, name, self, block, jumpTarget);
-        pushScope(new DynamicScope(staticScope));
+        pushScope(DynamicScope.newDynamicScope(staticScope));
         pushRubyClass(implementationClass);
     }
     
@@ -707,7 +708,7 @@ public final class ThreadContext {
         if (implementationClass == null) {
             implementationClass = clazz;
         }
-        pushScope(new DynamicScope(staticScope));
+        pushScope(DynamicScope.newDynamicScope(staticScope));
         pushRubyClass(implementationClass);
     }
     
@@ -748,7 +749,7 @@ public final class ThreadContext {
         DynamicScope scope = getCurrentScope();
         StaticScope sScope = new BlockStaticScope(scope.getStaticScope());
         sScope.setModule(executeUnderClass);
-        pushScope(new DynamicScope(sScope, scope));
+        pushScope(DynamicScope.newDynamicScope(sScope, scope));
         pushCallFrame(frame.getKlazz(), frame.getName(), frame.getSelf(), block, frame.getJumpTarget());
         getCurrentFrame().setVisibility(getPreviousFrame().getVisibility());
     }
@@ -795,10 +796,32 @@ public final class ThreadContext {
         pushRubyClass((klass != null) ? klass : binding.getKlass());
     }
     
+    public void preYieldSpecificBlockNEW(Binding binding, StaticScope scope, RubyModule klass) {
+        pushFrame(binding.getFrame());
+        getCurrentFrame().setVisibility(binding.getVisibility());
+        // new scope for this invocation of the block, based on parent scope
+        pushScope(DynamicScope.newDynamicScope(scope, binding.getDynamicScope()));
+        pushRubyClass((klass != null) ? klass : binding.getKlass());
+    }
+    
     public void preYieldLightBlock(Binding binding, RubyModule klass) {
         pushFrame(binding.getFrame());
         getCurrentFrame().setVisibility(binding.getVisibility());
         pushScope(binding.getDynamicScope());
+        pushRubyClass((klass != null) ? klass : binding.getKlass());
+    }
+    
+    public void preYieldLightBlockNEW(Binding binding, DynamicScope emptyScope, RubyModule klass) {
+        pushFrame(binding.getFrame());
+        getCurrentFrame().setVisibility(binding.getVisibility());
+        // just push the same empty scope, since we won't use one
+        pushScope(emptyScope);
+        pushRubyClass((klass != null) ? klass : binding.getKlass());
+    }
+    
+    public void preYieldNoScope(Binding binding, RubyModule klass) {
+        pushFrame(binding.getFrame());
+        getCurrentFrame().setVisibility(binding.getVisibility());
         pushRubyClass((klass != null) ? klass : binding.getKlass());
     }
     
@@ -824,6 +847,11 @@ public final class ThreadContext {
     
     public void postYieldLight(Binding binding) {
         popScope();
+        popFrameReal();
+        popRubyClass();
+    }
+    
+    public void postYieldNoScope() {
         popFrameReal();
         popRubyClass();
     }

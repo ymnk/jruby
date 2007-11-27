@@ -30,6 +30,7 @@ import org.jruby.parser.LocalStaticScope;
 import org.jruby.parser.ReOptions;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.Binding;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.CompiledBlock;
@@ -39,10 +40,12 @@ import org.jruby.runtime.CompiledSharedScopeBlock;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.MethodFactory;
 import org.jruby.runtime.MethodIndex;
+import org.jruby.runtime.scope.OneVarDynamicScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
+import org.jruby.util.TypeConverter;
 
 /**
  * Helper methods which are called by the compiler.  Note: These will show no consumers, but
@@ -61,7 +64,7 @@ public class RuntimeHelpers {
                     context,
                     self,
                     Arity.createArity(arity),
-                    new DynamicScope(staticScope, context.getCurrentScope()),
+                    staticScope,
                     callback,
                     hasMultipleArgsHead,
                     argsNodeType);
@@ -70,7 +73,7 @@ public class RuntimeHelpers {
                     context,
                     self,
                     Arity.createArity(arity),
-                    new DynamicScope(staticScope, context.getCurrentScope()),
+                    staticScope,
                     callback,
                     hasMultipleArgsHead,
                     argsNodeType);
@@ -82,10 +85,9 @@ public class RuntimeHelpers {
             new BlockStaticScope(context.getCurrentScope().getStaticScope(), staticScopeNames);
         staticScope.determineModule();
         
-        context.preScopedBody(new DynamicScope(staticScope, context.getCurrentScope()));
+        context.preScopedBody(DynamicScope.newDynamicScope(staticScope, context.getCurrentScope()));
         
-        Block block = CompiledBlock.newCompiledClosure(context, self, Arity.createArity(0), 
-                context.getCurrentScope(), callback, false, Block.ZERO_ARGS);
+        Block block = CompiledBlock.newCompiledClosure(context, self, Arity.createArity(0), staticScope, callback, false, Block.ZERO_ARGS);
         
         block.yield(context, null);
         
@@ -255,10 +257,10 @@ public class RuntimeHelpers {
      * NOTE: THIS IS NOT THE SAME AS THE SWITCHVALUE VERSIONS.
      */
     public static IRubyObject compilerCallMethodWithIndex(ThreadContext context, IRubyObject receiver, int methodIndex, String name, IRubyObject[] args, IRubyObject caller, CallType callType, Block block) {
-        RubyModule module = receiver.getMetaClass();
+        RubyClass clazz = receiver.getMetaClass();
         
-        if (module.index != 0) {
-            return receiver.callMethod(context, module, methodIndex, name, args, callType, block);
+        if (clazz.index != 0) {
+            return clazz.invoke(context, receiver, methodIndex, name, args, callType, block);
         }
         
         return compilerCallMethod(context, receiver, name, args, caller, callType, block);
@@ -313,6 +315,40 @@ public class RuntimeHelpers {
         newArgs[0] = context.getRuntime().newSymbol(name);
 
         return receiver.callMethod(context, "method_missing", newArgs, block);
+    }
+
+    public static IRubyObject invoke(ThreadContext context, IRubyObject self, String name) {
+        return RuntimeHelpers.invoke(context, self, name, IRubyObject.NULL_ARRAY, null, Block.NULL_BLOCK);
+    }
+    public static IRubyObject invoke(ThreadContext context, IRubyObject self, String name, IRubyObject arg) {
+        return RuntimeHelpers.invoke(context, self, name, new IRubyObject[] { arg }, CallType.FUNCTIONAL, Block.NULL_BLOCK);
+    }
+    public static IRubyObject invoke(ThreadContext context, IRubyObject self, String name, IRubyObject[] args) {
+        return RuntimeHelpers.invoke(context, self, name, args, CallType.FUNCTIONAL, Block.NULL_BLOCK);
+    }
+    public static IRubyObject invoke(ThreadContext context, IRubyObject self, String name, IRubyObject[] args, Block block) {
+        return RuntimeHelpers.invoke(context, self, name, args, CallType.FUNCTIONAL, block);
+    }
+    public static IRubyObject invoke(ThreadContext context, IRubyObject self, int methodIndex, String name) {
+        return RuntimeHelpers.invoke(context, self, methodIndex, name, IRubyObject.NULL_ARRAY, null, Block.NULL_BLOCK);
+    }
+    public static IRubyObject invoke(ThreadContext context, IRubyObject self, int methodIndex, String name, IRubyObject arg) {
+        return RuntimeHelpers.invoke(context, self, methodIndex,name,new IRubyObject[]{arg},CallType.FUNCTIONAL, Block.NULL_BLOCK);
+    }
+    public static IRubyObject invoke(ThreadContext context, IRubyObject self, int methodIndex, String name, IRubyObject[] args) {
+        return RuntimeHelpers.invoke(context, self, methodIndex,name,args,CallType.FUNCTIONAL, Block.NULL_BLOCK);
+    }
+    
+    public static IRubyObject invoke(ThreadContext context, IRubyObject self, int methodIndex, String name, IRubyObject[] args, CallType callType, Block block) {
+        return self.getMetaClass().invoke(context, self, methodIndex, name, args, callType, block);
+    }
+    
+    public static IRubyObject invoke(ThreadContext context, IRubyObject self, String name, IRubyObject[] args, CallType callType, Block block) {
+        return self.getMetaClass().invoke(context, self, name, args, callType, block);
+    }
+    
+    public static IRubyObject invokeAs(ThreadContext context, RubyClass asClass, IRubyObject self, String name, IRubyObject[] args, CallType callType, Block block) {
+        return asClass.invoke(context, self, name, args, callType, block);
     }
 
     public static RubyArray ensureRubyArray(IRubyObject value) {
@@ -445,12 +481,12 @@ public class RuntimeHelpers {
     public static String getLocalJumpTypeOrRethrow(RaiseException re) {
         RubyException exception = re.getException();
         Ruby runtime = exception.getRuntime();
-        if (exception.isKindOf(runtime.fastGetClass("LocalJumpError"))) {
+        if (runtime.fastGetClass("LocalJumpError").isInstance(exception)) {
             RubyLocalJumpError jumpError = (RubyLocalJumpError)re.getException();
 
             IRubyObject reason = jumpError.reason();
 
-            return reason.asSymbol();
+            return reason.asInternedString();
         }
 
         throw re;
@@ -485,7 +521,7 @@ public class RuntimeHelpers {
 
         // If not already a proc then we should try and make it one.
         if (!(proc instanceof RubyProc)) {
-            proc = proc.convertToType(runtime.getProc(), 0, "to_proc", false);
+            proc = TypeConverter.convertToType(proc, runtime.getProc(), 0, "to_proc", false);
 
             if (!(proc instanceof RubyProc)) {
                 throw runtime.newTypeError("wrong argument type "
@@ -588,7 +624,7 @@ public class RuntimeHelpers {
     
     public static IRubyObject isExceptionHandled(RubyException currentException, IRubyObject[] exceptions, Ruby runtime, ThreadContext context, IRubyObject self) {
         for (int i = 0; i < exceptions.length; i++) {
-            if (!exceptions[i].isKindOf(runtime.getModule())) {
+            if (!runtime.getModule().isInstance(exceptions[i])) {
                 throw runtime.newTypeError("class or module required for rescue clause");
             }
             IRubyObject result = exceptions[i].callMethod(context, "===", currentException);
@@ -733,7 +769,7 @@ public class RuntimeHelpers {
     }
     
     public static IRubyObject getInstanceVariable(Ruby runtime, IRubyObject self, String name) {
-        IRubyObject result = self.getInstanceVariable(name);
+        IRubyObject result = self.getInstanceVariables().getInstanceVariable(name);
         
         if (result != null) return result;
         
@@ -744,7 +780,7 @@ public class RuntimeHelpers {
     
     public static IRubyObject fastGetInstanceVariable(Ruby runtime, IRubyObject self, String internedName) {
         IRubyObject result;
-        if ((result = self.fastGetInstanceVariable(internedName)) != null) return result;
+        if ((result = self.getInstanceVariables().fastGetInstanceVariable(internedName)) != null) return result;
         
         runtime.getWarnings().warning("instance variable " + internedName + " not initialized");
         
@@ -764,7 +800,7 @@ public class RuntimeHelpers {
     public static void preLoad(ThreadContext context, String[] varNames) {
         StaticScope staticScope = new LocalStaticScope(context.getCurrentScope().getStaticScope(), varNames);
         staticScope.setModule(context.getRuntime().getObject());
-        DynamicScope scope = new DynamicScope(staticScope);
+        DynamicScope scope = DynamicScope.newDynamicScope(staticScope);
         
         // Each root node has a top-level scope that we need to push
         context.preScopedBody(scope);
