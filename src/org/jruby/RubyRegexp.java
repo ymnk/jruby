@@ -464,7 +464,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         Region regs = new Region();
         int range;
         ByteList bl = str.getByteList();
-        final int _pos = pos;
+        int _pos = pos;
         final Ruby runtime = getRuntime();
         
         Frame currentFrame = runtime.getCurrentContext().getCurrentFrame();
@@ -476,6 +476,10 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         rb_reg_check(this);
                 
         if(reverse) {
+            if(_pos == bl.realSize) {
+                _pos--;
+            }
+
             range = -_pos;
         } else {
             range = bl.realSize - _pos;
@@ -522,10 +526,6 @@ public class RubyRegexp extends RubyObject implements ReOptions {
 
         return result;
     }
-
-
-
-
 
     /** rb_reg_match
      * 
