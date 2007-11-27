@@ -270,7 +270,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
 
     private final Regex make_regexp(ByteList s, int start, int len, int flags, Encoding enc) {
         try {
-            return new Regex(s.bytes,start,len,flags,enc,Syntax.DEFAULT,new RubyWarnings(getRuntime()));
+            return new Regex(s.bytes,start,start+len,flags,enc,Syntax.DEFAULT,new RubyWarnings(getRuntime()));
         } catch(Exception e) {
             rb_reg_raise(s.bytes,start,len,e.getMessage(),flags);
         }
@@ -526,6 +526,10 @@ public class RubyRegexp extends RubyObject implements ReOptions {
 
         return result;
     }
+
+
+
+
 
     /** rb_reg_match
      * 
