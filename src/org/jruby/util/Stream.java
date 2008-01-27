@@ -34,8 +34,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.FileChannel;
 
-import org.jruby.Ruby;
-import org.jruby.RubyIO.ChannelDescriptor;
+import org.jruby.util.io.ChannelDescriptor;
 
 /**
  */
@@ -67,8 +66,6 @@ public interface Stream {
 
     public void setSync(boolean sync);
 
-    public void reset(IOModes subsetModes) throws IOException, InvalidValueException, BadDescriptorException, PipeException;
-
     public abstract ByteList fgets(ByteList separatorString) throws IOException, BadDescriptorException, EOFException;
     public abstract ByteList readall() throws IOException, BadDescriptorException, EOFException;
 
@@ -86,10 +83,8 @@ public interface Stream {
     public abstract ByteList read(int number) throws IOException, BadDescriptorException, EOFException;
     public abstract int write(ByteList buf) throws IOException, BadDescriptorException;
     
-    public abstract void fclose() throws IOException, BadDescriptorException;
-    public abstract void fflush() throws IOException, BadDescriptorException;
-
-    public void closeWrite() throws IOException, BadDescriptorException;
+    public abstract void fclose() throws IOException;
+    public abstract int fflush() throws IOException, BadDescriptorException;
     
     /**
      * <p>Flush and sync all writes to the filesystem.</p>
@@ -126,7 +121,7 @@ public interface Stream {
      * @throws PipeException 
      * @throws InvalidValueException 
      */
-    public void fseek(long offset, int type) throws IOException, PipeException, InvalidValueException, BadDescriptorException;
+    public void fseek(long offset, int type) throws IOException, InvalidValueException, PipeException;
     public void ftruncate(long newLength) throws IOException, PipeException;
     
     /**
@@ -143,7 +138,8 @@ public interface Stream {
      */
     public void waitUntilReady() throws IOException, InterruptedException;
 
-    public boolean hasPendingBuffered();
+    public boolean readDataBuffered();
+    public boolean writeDataBuffered();
     
     public InputStream newInputStream();
     

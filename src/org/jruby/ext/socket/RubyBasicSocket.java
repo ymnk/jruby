@@ -28,6 +28,7 @@
 package org.jruby.ext.socket;
 
 import java.io.EOFException;
+import java.io.FileDescriptor;
 import java.io.IOException;
 import java.nio.channels.Channel;
 import java.nio.channels.SocketChannel;
@@ -38,6 +39,8 @@ import java.net.ServerSocket;
 import java.net.DatagramSocket;
 import java.net.SocketAddress;
 import java.net.InetSocketAddress;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.jruby.Ruby;
 import org.jruby.RubyBoolean;
 import org.jruby.RubyClass;
@@ -49,6 +52,8 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.Stream;
 import org.jruby.util.ChannelStream;
+import org.jruby.util.Stream.InvalidValueException;
+import org.jruby.util.io.ChannelDescriptor;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -85,23 +90,23 @@ public class RubyBasicSocket extends RubyIO {
 
     protected void setChannel(Channel c) {
         this.socketChannel = c;
+        
         try {
-            openFile.setMainStream(new ChannelStream(getRuntime(), new ChannelDescriptor(socketChannel, getNewFileno())));
+            openFile.setMainStream(new ChannelStream(getRuntime(), new ChannelDescriptor(socketChannel, getNewFileno(), new FileDescriptor())));
             openFile.getMainStream().setSync(true);
-    	} catch (IOException e) {
-            throw getRuntime().newIOError(e.getMessage());
+    	} catch (InvalidValueException ex) {
+            throw getRuntime().newErrnoEINVALError();
         }
-        registerIOHandler(openFile.getMainStream());
-        openFile.setModes(openFile.getMainStream().getModes());
+        
+        registerDescriptor(openFile.getMainStream().getDescriptor());
+        openFile.setMode(openFile.getMainStream().getModes().getOpenFileFlags());
     }
 
     @Override
     public IRubyObject close_write() {
         try {
             ((SocketChannel)this.socketChannel).socket().shutdownOutput();
-            openFile.getMainStream().closeWrite();
-        } catch (Stream.BadDescriptorException bde) {
-            throw getRuntime().newErrnoEBADFError();
+            openFile.getMainStream().fclose();
     	} catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
         }

@@ -112,6 +112,7 @@ import org.jruby.util.KCode;
 import org.jruby.util.NormalizedFile;
 import org.jruby.util.SafePropertyAccessor;
 import org.jruby.util.collections.WeakHashSet;
+import org.jruby.util.io.ChannelDescriptor;
 
 /**
  * The Ruby object represents the top-level of a JRuby "instance" in a given VM.
@@ -2373,8 +2374,8 @@ public final class Ruby {
         return objectSpace;
     }
 
-    public Map<Integer, WeakReference<Stream>> getIoHandlers() {
-        return ioHandlers;
+    public Map<Integer, WeakReference<ChannelDescriptor>> getDescriptors() {
+        return descriptors;
     }
 
     public long incrementRandomSeedSequence() {
@@ -2527,7 +2528,7 @@ public final class Ruby {
     private ObjectSpace objectSpace = new ObjectSpace();
 
     private final RubySymbol.SymbolTable symbolTable = new RubySymbol.SymbolTable(this);
-    private Map<Integer, WeakReference<Stream>> ioHandlers = new ConcurrentHashMap<Integer, WeakReference<Stream>>();
+    private Map<Integer, WeakReference<ChannelDescriptor>> descriptors = new ConcurrentHashMap<Integer, WeakReference<ChannelDescriptor>>();
     private long randomSeed = 0;
     private long randomSeedSequence = 0;
     private Random random = new Random();

@@ -35,7 +35,13 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.jruby.util.Stream.BadDescriptorException;
+import org.jruby.util.Stream.PipeException;
+import org.jruby.util.io.ChannelDescriptor;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -61,6 +67,7 @@ import org.jruby.util.IOModes;
 import org.jruby.util.JRubyFile;
 import org.jruby.util.Stream.InvalidValueException;
 import org.jruby.util.TypeConverter;
+import org.jruby.util.io.ChannelDescriptor.FileExistsException;
 import org.jruby.util.io.NullWritableChannel;
 
 /**
@@ -106,12 +113,12 @@ public class RubyFile extends RubyIO {
         super(runtime, runtime.getFile());
         this.path = path;
         try {
-            this.openFile.setMainStream(new ChannelStream(runtime, new ChannelDescriptor(Channels.newChannel(in), getNewFileno())));
-        } catch (IOException e) {
-            throw runtime.newIOError(e.getMessage());
+            this.openFile.setMainStream(new ChannelStream(runtime, new ChannelDescriptor(Channels.newChannel(in), getNewFileno(), new FileDescriptor())));
+        } catch (InvalidValueException ex) {
+            throw runtime.newErrnoEINVALError();
         }
-        this.openFile.setModes(openFile.getMainStream().getModes());
-        registerIOHandler(openFile.getMainStream());
+        this.openFile.setMode(openFile.getMainStream().getModes().getOpenFileFlags());
+        registerDescriptor(openFile.getMainStream().getDescriptor());
     }
 
     private static ObjectAllocator FILE_ALLOCATOR = new ObjectAllocator() {
@@ -216,12 +223,13 @@ public class RubyFile extends RubyIO {
     
     public void openInternal(String newPath, IOModes newModes) {
         this.path = newPath;
-        this.openFile.setModes(newModes);
+        this.openFile.setMode(newModes.getOpenFileFlags());
         
         try {
             if (newPath.equals("/dev/null")) {
                 Channel nullChannel = new NullWritableChannel();
-                openFile.setMainStream(new ChannelStream(getRuntime(), new ChannelDescriptor(nullChannel, getNewFileno()), newModes));
+                openFile.setMainStream(
+                        new ChannelStream(getRuntime(), new ChannelDescriptor(nullChannel, getNewFileno(), new FileDescriptor()), newModes));
             } else if(newPath.startsWith("file:")) {
                 String filePath = path.substring(5, path.indexOf("!"));
                 String internalPath = path.substring(path.indexOf("!") + 2);
@@ -242,14 +250,13 @@ public class RubyFile extends RubyIO {
                 }
 
                 InputStream is = jf.getInputStream(zf);
-                openFile.setMainStream(new ChannelStream(getRuntime(), new ChannelDescriptor(Channels.newChannel(is), getNewFileno())));
+                openFile.setMainStream(
+                        new ChannelStream(getRuntime(), new ChannelDescriptor(Channels.newChannel(is), getNewFileno(), new FileDescriptor())));
             } else {
                 openFile.setMainStream(ChannelStream.fopen(getRuntime(), newPath, newModes));
             }
             
-            registerIOHandler(openFile.getMainStream());
-        } catch (Stream.BadDescriptorException bde) {
-            throw getRuntime().newErrnoEBADFError();
+            registerDescriptor(openFile.getMainStream().getDescriptor());
         } catch (Stream.PipeException e) {
             throw getRuntime().newErrnoEPIPEError();
         } catch (InvalidValueException e) {
@@ -366,10 +373,11 @@ public class RubyFile extends RubyIO {
 
     @JRubyMethod(required = 1, optional = 2, frame = true, visibility = Visibility.PRIVATE)
     public IRubyObject initialize(IRubyObject[] args, Block block) {
-        if (args.length == 0) {
-            throw getRuntime().newArgumentError(0, 1);
+        if (openFile == null) {
+            throw getRuntime().newRuntimeError("reinitializing File");
         }
-        else if (args.length < 3) {
+        
+        if (args.length < 0 && args.length < 3) {
             IRubyObject fd = TypeConverter.convertToTypeWithCheck(args[0], getRuntime().getFixnum(), MethodIndex.TO_INT, "to_int");
             if (!fd.isNil()) {
                 args[0] = fd;
@@ -377,23 +385,173 @@ public class RubyFile extends RubyIO {
             }
         }
 
+        return openFile(args);
+    }
+    
+    private IRubyObject openFile(IRubyObject args[]) {
         IRubyObject filename = args[0].convertToString();
         getRuntime().checkSafeString(filename);
+        
         path = filename.toString();
-        openFile.setModes(args.length > 1 ? getModes(getRuntime(), args[1]) : new IOModes(getRuntime(), IOModes.RDONLY));
+        
+        String modeString;
+        int mode = OpenFile.READABLE;
+        int perm;
+        
+        try {
+            if ((args.length > 1 && args[1] instanceof RubyFixnum) || (args.length > 2 && !args[2].isNil())) {
+                if (args[1] instanceof RubyFixnum) {
+                    mode = RubyNumeric.num2int(args[1]);
+                } else {
+                    modeString = args[0].convertToString().toString();
+                    mode = getIOModes(getRuntime(), modeString).getOpenFileFlags();
+                }
+                if (args.length >= 2 && !args[2].isNil()) {
+                    perm = RubyNumeric.num2int(args[2]);
+                } else {
+                    perm = 438; // 0666
+                }
 
-        // One of the few places where handler may be null.
-        // If handler is not null, it indicates that this object
-        // is being reused.
-        if (openFile.getMainStream() != null) {
-            close();
-        }
-        openInternal(path,openFile.getModes());
-
-        if (block.isGiven()) {
-            // getRuby().getRuntime().warn("File::new does not take block; use File::open instead");
-        }
+                sysopenInternal(path, mode, perm);
+            } else {
+                modeString = "r";
+                if (args.length > 1) {
+                    if (!args[1].isNil()) {
+                        modeString = args[1].convertToString().toString();
+                    }
+                }
+                openInternal(path, modeString);
+            }
+        } catch (InvalidValueException ex) {
+            throw getRuntime().newErrnoEINVALError();
+        } finally {}
+        
         return this;
+    }
+    
+    private void sysopenInternal(String path, int mode, int perm) throws InvalidValueException {
+        openFile = new OpenFile();
+        
+        openFile.setPath(path);
+        openFile.setMode(mode);
+        
+        ChannelDescriptor descriptor = sysopen(path, mode, perm);
+        openFile.setMainStream(fdopen(descriptor, mode));
+        
+        registerDescriptor(descriptor);
+    }
+    
+    private void openInternal(String path, String modeString) throws InvalidValueException {
+        openFile = new OpenFile();
+
+        openFile.setMode(getIOModes(getRuntime(), modeString).getOpenFileFlags());
+        openFile.setPath(path);
+        openFile.setMainStream(fopen(path, modeString));
+        
+        registerDescriptor(openFile.getMainStream().getDescriptor());
+    }
+    
+    private ChannelDescriptor sysopen(String path, int mode, int perm) throws InvalidValueException {
+        try {
+            ChannelDescriptor descriptor = ChannelDescriptor.open(
+                    getRuntime().getCurrentDirectory(),
+                    path,
+                    OpenFile.getModeAsIOModes(getRuntime(), mode),
+                    perm);
+
+            // TODO: check if too many open files, GC and try again
+
+            return descriptor;
+        } catch (FileNotFoundException fnfe) {
+            throw getRuntime().newErrnoENOENTError();
+        } catch (DirectoryAsFileException dafe) {
+            throw getRuntime().newErrnoEISDirError();
+        } catch (ChannelDescriptor.FileExistsException fee) {
+            throw getRuntime().newErrnoEEXISTError("file exists: " + path);
+        } catch (IOException ioe) {
+            throw getRuntime().newIOErrorFromException(ioe);
+        }
+    }
+    
+    private Stream fopen(String path, String modeString) {
+        try {
+            Stream stream = ChannelStream.fopen(
+                    getRuntime(),
+                    path,
+                    getIOModes(getRuntime(), modeString));
+            
+            if (stream == null) {
+                // TODO
+    //            if (errno == EMFILE || errno == ENFILE) {
+    //                rb_gc();
+    //                file = fopen(fname, mode);
+    //            }
+    //            if (!file) {
+    //                rb_sys_fail(fname);
+    //            }
+            }
+
+            // Do we need to be in SETVBUF mode for buffering to make sense? This comes up elsewhere.
+    //    #ifdef USE_SETVBUF
+    //        if (setvbuf(file, NULL, _IOFBF, 0) != 0)
+    //            rb_warn("setvbuf() can't be honoured for %s", fname);
+    //    #endif
+    //    #ifdef __human68k__
+    //        fmode(file, _IOTEXT);
+    //    #endif
+            return stream;
+        } catch (FileNotFoundException ex) {
+            throw getRuntime().newErrnoENOENTError();
+        } catch (DirectoryAsFileException ex) {
+            throw getRuntime().newErrnoEISDirError();
+        } catch (FileExistsException ex) {
+            throw getRuntime().newErrnoEEXISTError(path);
+        } catch (IOException ex) {
+            throw getRuntime().newIOErrorFromException(ex);
+        } catch (InvalidValueException ex) {
+            throw getRuntime().newErrnoEINVALError();
+        } catch (PipeException ex) {
+            throw getRuntime().newErrnoEPIPEError();
+        }
+    }
+    
+    private Stream fdopen(ChannelDescriptor descriptor, int mode) throws InvalidValueException {
+        Stream file = ChannelStream.fdopen(
+                getRuntime(),
+                descriptor,
+                OpenFile.getModeAsIOModes(getRuntime(), mode));
+        if (file == null) {
+            // TODO: GC and try again if max files
+//    #if defined(sun)
+//            if (errno == 0 || errno == EMFILE || errno == ENFILE) {
+//    #else
+//            if (errno == EMFILE || errno == ENFILE) {
+//    #endif
+//                rb_gc();
+//    #if defined(sun)
+//                errno = 0;
+//    #endif
+//                file = fdopen(fd, mode);
+//            }
+            if (file == null) {
+                // TODO: set errno and fail
+//    #ifdef _WIN32
+//                if (errno == 0) errno = EINVAL;
+//    #endif
+//    #if defined(sun)
+//                if (errno == 0) errno = EMFILE;
+//    #endif
+//                rb_sys_fail(0);
+            }
+        }
+
+        // Do we need to be in SETVBUF mode for buffering to make sense? This comes up elsewhere.
+//    #ifdef USE_SETVBUF
+//        if (setvbuf(file, NULL, _IOFBF, 0) != 0)
+//            rb_warn("setvbuf() can't be honoured (fd=%d)", fd);
+//    #endif
+        
+        return file;
     }
 
     @JRubyMethod(required = 1)
@@ -490,15 +648,15 @@ public class RubyFile extends RubyIO {
     }
 
     public String toString() {
-        return "RubyFile(" + path + ", " + openFile.getModes() + ", " + openFile.getMainStream().getDescriptor().getFileno() + ")";
+        return "RubyFile(" + path + ", " + openFile.getMode() + ", " + openFile.getMainStream().getDescriptor().getFileno() + ")";
     }
 
     // TODO: This is also defined in the MetaClass too...Consolidate somewhere.
-    private static IOModes getModes(Ruby runtime, IRubyObject object) {
+    private static IOModes getModes(Ruby runtime, IRubyObject object) throws InvalidValueException {
         if (object instanceof RubyString) {
-            return new IOModes(runtime, ((RubyString) object).toString());
+            return getIOModes(runtime, ((RubyString) object).toString());
         } else if (object instanceof RubyFixnum) {
-            return new IOModes(runtime, ((RubyFixnum) object).getLongValue());
+            return new IOModes(((RubyFixnum) object).getLongValue());
         }
 
         throw runtime.newTypeError("Invalid type for modes");
@@ -1088,11 +1246,6 @@ public class RubyFile extends RubyIO {
         return getLastModified(recv.getRuntime(), filename.convertToString().toString());
     }
     
-    @JRubyMethod(name = "open", required = 1, optional = 2, frame = true, meta = true)
-    public static IRubyObject open(IRubyObject recv, IRubyObject[] args, Block block) {
-        return open(recv, args, true, block);
-    }
-    
     public static IRubyObject open(IRubyObject recv, IRubyObject[] args, boolean tryToYield, Block block) {
         Ruby runtime = recv.getRuntime();
         ThreadContext tc = runtime.getCurrentContext();
@@ -1107,7 +1260,12 @@ public class RubyFile extends RubyIO {
             runtime.checkSafeString(pathString);
             String path = pathString.toString();
 
-            IOModes modes = args.length >= 2 ? getModes(runtime, args[1]) : new IOModes(runtime, IOModes.RDONLY);
+            IOModes modes;
+            try {
+                modes = args.length >= 2 ? getModes(runtime, args[1]) : new IOModes(IOModes.RDONLY);
+            } catch (InvalidValueException ex) {
+                throw runtime.newErrnoEINVALError();
+            }
             file = new RubyFile(runtime, (RubyClass) recv);
 
             RubyInteger fileMode = args.length >= 3 ? args[2].convertToInteger() : null;

@@ -37,6 +37,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.FileDescriptor;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -53,7 +54,8 @@ import org.jruby.Finalizable;
 import org.jruby.Ruby;
 import org.jruby.RubyIO;
 import org.jruby.util.Stream.BadDescriptorException;
-import org.jruby.util.io.SplitChannel;
+import org.jruby.util.io.ChannelDescriptor;
+import org.jruby.util.io.ChannelDescriptor.FileExistsException;
 
 /**
  * <p>This file implements a seekable IO file.</p>
@@ -64,20 +66,20 @@ public class ChannelStream implements Stream, Finalizable {
     private Ruby runtime;
     protected IOModes modes;
     protected FileDescriptor fileDescriptor = null;
-    protected boolean isOpen = false;
+    protected boolean isOpen = true;
     protected boolean sync = false;
     
     protected ByteBuffer buffer; // r/w buffer
     protected boolean reading; // are we reading or writing?
-    private RubyIO.ChannelDescriptor descriptor;
+    private ChannelDescriptor descriptor;
     private boolean blocking = true;
     protected int ungotc = -1;
 
-    public ChannelStream(Ruby runtime, RubyIO.ChannelDescriptor descriptor, IOModes modes, FileDescriptor fileDescriptor) throws IOException {
+    public ChannelStream(Ruby runtime, ChannelDescriptor descriptor, IOModes modes, FileDescriptor fileDescriptor) throws InvalidValueException {
+        descriptor.checkNewModes(modes);
+        
         this.runtime = runtime;
         this.descriptor = descriptor;
-        this.isOpen = true;
-        // TODO: Confirm modes correspond to the available modes on the channel
         this.modes = modes;
         this.buffer = ByteBuffer.allocate(BUFSIZE);
         buffer.flip();
@@ -85,46 +87,25 @@ public class ChannelStream implements Stream, Finalizable {
         this.fileDescriptor = fileDescriptor;
     }
 
-    public ChannelStream(Ruby runtime, RubyIO.ChannelDescriptor descriptor) throws IOException {
-        this(runtime, descriptor, (FileDescriptor) null);
+    public ChannelStream(Ruby runtime, ChannelDescriptor descriptor) {
+        this(runtime, descriptor, descriptor.getFileDescriptor());
     }
 
-    public ChannelStream(Ruby runtime, RubyIO.ChannelDescriptor descriptor, FileDescriptor fileDescriptor) throws IOException {
+    public ChannelStream(Ruby runtime, ChannelDescriptor descriptor, FileDescriptor fileDescriptor) {
         this.runtime = runtime;
-        String mode = "";
         this.descriptor = descriptor;
-        if (descriptor.getChannel() instanceof ReadableByteChannel) {
-            mode += "r";
-            isOpen = true;
-        }
-        if (descriptor.getChannel() instanceof WritableByteChannel) {
-            mode += "w";
-            isOpen = true;
-        }
-        if ("rw".equals(mode)) {
-            modes = new IOModes(runtime, IOModes.RDWR);
-            isOpen = true;
-        } else {
-            if (!isOpen) {
-                // Neither stream exists?
-                // throw new IOException("Opening nothing?");
-	        // Hack to cover the ServerSocketChannel case
-                mode = "r";
-                isOpen = true;
-            }
-            modes = new IOModes(runtime, mode);
-        }
+        this.modes = descriptor.getOriginalModes();
         this.fileDescriptor = fileDescriptor;
         buffer = ByteBuffer.allocate(BUFSIZE);
         buffer.flip();
         this.reading = true;
     }
 
-    public ChannelStream(Ruby runtime, RubyIO.ChannelDescriptor descriptor, IOModes modes) throws IOException {
+    public ChannelStream(Ruby runtime, ChannelDescriptor descriptor, IOModes modes) throws InvalidValueException {
+        descriptor.checkNewModes(modes);
+        
         this.runtime = runtime;
         this.descriptor = descriptor;
-        this.isOpen = true;
-        // TODO: Confirm modes correspond to the available modes on the channel
         this.modes = modes;
         buffer = ByteBuffer.allocate(BUFSIZE);
         buffer.flip();
@@ -150,18 +131,12 @@ public class ChannelStream implements Stream, Finalizable {
     public boolean isWritable() {
         return modes.isWritable();
     }
-
-    public void checkOpen() throws BadDescriptorException {
-        if (!isOpen) throw new BadDescriptorException();
-    }
     
-    public void checkReadable() throws IOException, BadDescriptorException {
-        if (!isOpen) throw new BadDescriptorException();
+    public void checkReadable() throws IOException {
         if (!modes.isReadable()) throw new IOException("not opened for reading");
     }
 
-    public void checkWritable() throws IOException, BadDescriptorException {
-        if (!isOpen) throw new BadDescriptorException();
+    public void checkWritable() throws IOException {
         if (!modes.isWritable()) throw new IOException("not opened for writing");
     }
 
@@ -181,12 +156,6 @@ public class ChannelStream implements Stream, Finalizable {
         this.sync = sync;
     }
 
-    public void reset(IOModes subsetModes) throws IOException, InvalidValueException, BadDescriptorException, PipeException {
-        checkPermissionsSubsetOf(subsetModes);
-        
-        resetByModes(subsetModes);
-    }
-
     /**
      * Implement IO#wait as per io/wait in MRI.
      * waits until input available or timed out and returns self, or nil when EOF reached.
@@ -198,28 +167,13 @@ public class ChannelStream implements Stream, Finalizable {
             Thread.sleep(10);
         }
     }
-
-    public boolean hasPendingBuffered() {
-        return false;
+    
+    public boolean readDataBuffered() {
+        return reading && buffer.position() > 0;
     }
     
-    public static ByteList sysread(int number, ReadableByteChannel channel) throws IOException {
-        ByteBuffer buffer = ByteBuffer.allocate(number);
-        int bytes_read = 0;
-        bytes_read = channel.read(buffer);
-        if (bytes_read < 0) {
-            throw new EOFException();
-        }
-
-        byte[] ret;
-        if (buffer.hasRemaining()) {
-            buffer.flip();
-            ret = new byte[buffer.remaining()];
-            buffer.get(ret);
-        } else {
-            ret = buffer.array();
-        }
-        return new ByteList(ret,false);
+    public boolean writeDataBuffered() {
+        return !reading && buffer.hasRemaining();
     }
     
     public static int syswrite(ByteList buf, WritableByteChannel channel) throws IOException {
@@ -322,17 +276,9 @@ public class ChannelStream implements Stream, Finalizable {
             long left = channel.size() - channel.position();
             if (left == 0) return null;
 
-            try {
-                return read((int) left);
-            } catch (BadDescriptorException e) {
-                throw new IOException(e.getMessage()); // Ugh! But why rewrite the same code?
-            }
+            return read((int) left);
         } else {
-            try {
-                checkReadable();
-            } catch (BadDescriptorException bde) {
-                throw new IOException(bde.getMessage());
-            }
+            checkReadable();
 
             ByteList byteList = new ByteList();
             ByteList read = fread(BUFSIZE);
@@ -353,7 +299,7 @@ public class ChannelStream implements Stream, Finalizable {
      * 
      * @see org.jruby.util.IOHandler#close()
      */
-    public synchronized void fclose() throws IOException, BadDescriptorException {
+    public synchronized void fclose() throws IOException {
         close(false); // not closing from finalise
     }
     
@@ -363,16 +309,13 @@ public class ChannelStream implements Stream, Finalizable {
      * @throws IOException 
      * @throws BadDescriptorException
      */
-    private void close(boolean finalizing) throws IOException, BadDescriptorException {
+    private void close(boolean finalizing) throws IOException {
         if (descriptor.isSeekable()) {
-            checkOpen();
             flushWrite();
 
             isOpen = false;
             descriptor.getChannel().close();
         } else {
-            if (!isOpen()) throw new BadDescriptorException();
-
             isOpen = false;
             flushWrite();
             descriptor.getChannel().close();
@@ -385,9 +328,14 @@ public class ChannelStream implements Stream, Finalizable {
      * @throws BadDescriptorException 
      * @see org.jruby.util.IOHandler#flush()
      */
-    public synchronized void fflush() throws IOException, BadDescriptorException {
+    public synchronized int fflush() throws IOException, BadDescriptorException {
         checkWritable();
-        flushWrite();
+        try {
+            flushWrite();
+        } catch (EOFException eof) {
+            return -1;
+        }
+        return 0;
     }
     
     /**
@@ -453,8 +401,7 @@ public class ChannelStream implements Stream, Finalizable {
      * @throws IOException 
      * @see org.jruby.util.IOHandler#pos()
      */
-    public synchronized long fgetpos() throws IOException, BadDescriptorException {
-        checkOpen();
+    public synchronized long fgetpos() throws IOException {
         // Correct position for read / write buffering (we could invalidate, but expensive)
         int offset = (reading) ? - buffer.remaining() : buffer.position();
         FileChannel fileChannel = (FileChannel)descriptor.getChannel();
@@ -487,8 +434,7 @@ public class ChannelStream implements Stream, Finalizable {
      * @throws InvalidValueException 
      * @see org.jruby.util.IOHandler#seek(long, int)
      */
-    public synchronized void fseek(long offset, int type) throws IOException, InvalidValueException, PipeException, BadDescriptorException {
-        checkOpen();
+    public synchronized void fseek(long offset, int type) throws IOException, InvalidValueException, PipeException {
         if (descriptor.getChannel() instanceof FileChannel) {
             invalidateBuffer();
             FileChannel fileChannel = (FileChannel)descriptor.getChannel();
@@ -580,12 +526,16 @@ public class ChannelStream implements Stream, Finalizable {
         resetForWrite();
     }
 
-    public synchronized ByteList read(int number) throws IOException, BadDescriptorException {
-        checkOpen();
+    public synchronized ByteList read(int number) throws IOException {
         checkReadable();
         ensureReadNonBuffered();
         
-        return sysread(number, (ReadableByteChannel)descriptor.getChannel());
+        ByteList byteList = new ByteList(number);
+        
+        // TODO this should entry into error handling somewhere
+        int bytesRead = descriptor.read(number, byteList);
+        
+        return byteList;
     }
     
     /**
@@ -614,8 +564,7 @@ public class ChannelStream implements Stream, Finalizable {
         return syswrite(c, (WritableByteChannel)descriptor.getChannel());
     }
 
-    private ByteList bufferedRead(int number) throws IOException, BadDescriptorException {
-        checkOpen();
+    private ByteList bufferedRead(int number) throws IOException {
         checkReadable();
         ensureRead();
         
@@ -745,7 +694,8 @@ public class ChannelStream implements Stream, Finalizable {
      */
     public void finalize() {
         try {
-            if (descriptor.isSeekable() && isOpen) close(true); // close without removing from finalizers
+            // FIXME: I got a bunch of NPEs when I didn't check for nulls here...HOW?!
+            if (descriptor != null && descriptor.isSeekable() && isOpen) close(true); // close without removing from finalizers
         } catch (Exception e) { // What else could we do?
             e.printStackTrace();
         }
@@ -830,7 +780,7 @@ public class ChannelStream implements Stream, Finalizable {
         }
     }
     
-    public RubyIO.ChannelDescriptor getDescriptor() {
+    public ChannelDescriptor getDescriptor() {
         return descriptor;
     }
     
@@ -878,7 +828,7 @@ public class ChannelStream implements Stream, Finalizable {
 
         if (modes.shouldTruncate()) file.setLength(0L);
 
-        descriptor.setChannel(file.getChannel());
+        descriptor = new ChannelDescriptor(file.getChannel(), RubyIO.getNewFileno(), modes, file.getFD());
         
         isOpen = true;
         
@@ -887,44 +837,21 @@ public class ChannelStream implements Stream, Finalizable {
         if (modes.isAppendable()) fseek(0, SEEK_END);
     }
     
-    public static Stream fopen(Ruby runtime, String path, IOModes modes) throws DirectoryAsFileException, IOException, PipeException, InvalidValueException, BadDescriptorException {
+    public static Stream fopen(Ruby runtime, String path, IOModes modes) throws FileNotFoundException, DirectoryAsFileException, FileExistsException, IOException, InvalidValueException, PipeException {
         String cwd = runtime.getCurrentDirectory();
-        JRubyFile theFile = JRubyFile.create(cwd,path);
-
-        if (theFile.isDirectory() && modes.isWritable()) throw new DirectoryAsFileException();
         
-        if (modes.isCreate()) {
-            if (theFile.exists() && modes.isExclusive()) {
-                throw runtime.newErrnoEEXISTError("File exists - " + path);
-            }
-            theFile.createNewFile();
-        } else {
-            if (!theFile.exists()) {
-                throw runtime.newErrnoENOENTError("file not found - " + path);
-            }
-        }
-
-        // We always open this rw since we can only open it r or rw.
-        RandomAccessFile file = new RandomAccessFile(theFile, modes.javaMode());
-
-        if (modes.shouldTruncate()) file.setLength(0L);
-
-        RubyIO.ChannelDescriptor descriptor = new RubyIO.ChannelDescriptor(file.getChannel(), RubyIO.getNewFileno());
+        ChannelDescriptor descriptor = ChannelDescriptor.open(cwd, path, modes, -1);
         
-        Stream handler = new ChannelStream(runtime, descriptor, modes, file.getFD());
+        Stream stream = fdopen(runtime, descriptor, modes);
         
-        if (modes.isAppendable()) handler.fseek(0, Stream.SEEK_END);
+        if (modes.isAppendable()) stream.fseek(0, Stream.SEEK_END);
+        
+        return stream;
+    }
+    
+    public static Stream fdopen(Ruby runtime, ChannelDescriptor descriptor, IOModes modes) throws InvalidValueException {
+        Stream handler = new ChannelStream(runtime, descriptor, modes, descriptor.getFileDescriptor());
         
         return handler;
-    }
-
-    public synchronized void closeWrite() throws IOException, BadDescriptorException {
-        checkOpen();
-        flushWrite();
-        
-        if (descriptor.getChannel() instanceof SplitChannel) {
-            // split channels have separate read/write, so we *can* close write
-            ((SplitChannel)descriptor.getChannel()).closeWrite();
-        }
     }
 }

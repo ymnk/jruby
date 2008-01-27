@@ -33,46 +33,42 @@
 package org.jruby.util;
 
 import org.jruby.Ruby;
+import org.jruby.RubyIO.OpenFile;
+import org.jruby.util.Stream.InvalidValueException;
 
 /**
  * @author enebo
  *
  */
 public class IOModes implements Cloneable {
-    public static final int RDONLY = 0;
-    public static final int WRONLY = 1;
-    public static final int RDWR = 2;
-    public static final int CREAT = 64;
-    public static final int EXCL = 128;
-    public static final int NOCTTY = 256;
-    public static final int TRUNC = 512;
-    public static final int APPEND = 1024;
-    public static final int NONBLOCK = 2048;
-    public static final int BINARY = 4096;
+    public static final int RDONLY = 0x0000;
+    public static final int WRONLY = 0x0001;
+    public static final int RDWR = 0x0002;
+    public static final int CREAT = 0x0100;
+    public static final int EXCL = 0x0400;
+    public static final int NOCTTY = 256; // what is this?
+    public static final int TRUNC = 0x0200;
+    public static final int APPEND = 0x0008;
+    public static final int NONBLOCK = 0x0004;
+    public static final int BINARY = 0x8000;
+    public static final int ACCMODE = 0x10000;
     
-    private Ruby runtime;
     private int modes;
     
-    public IOModes(Ruby runtime) {
-    	modes = 0;
-        this.runtime = runtime;
+    public IOModes() {
+    	modes = RDONLY;
     }
     
-    public IOModes(Ruby runtime, String modesString) {
-    	this(runtime, convertModesStringToModesInt(runtime, modesString));
-    }
-    
-    public IOModes(Ruby runtime, long modes) {
+    public IOModes(long modes) throws InvalidValueException {
     	// TODO: Ruby does not seem to care about invalid numeric mode values
     	// I am not sure if ruby overflows here also...
         
         if (isReadOnly(modes) && ((modes & APPEND) != 0)) {
             // MRI 1.8 behavior: this combination of flags is not allowed
-            throw runtime.newErrnoEINVALError("invalid argument");
+            throw new Stream.InvalidValueException();
         }
 
         this.modes = (int)modes;
-        this.runtime = runtime;
     }
     
     public String javaMode() {
@@ -89,7 +85,7 @@ public class IOModes implements Cloneable {
     }
 
     public boolean isBinary() {
-        return (modes & BINARY) == BINARY;
+        return (modes & BINARY) != 0;
     }
     
     public boolean isCreate() {
@@ -113,12 +109,15 @@ public class IOModes implements Cloneable {
     }
 
     // TODO: Make sure all open flags are added to this check.
-    public void checkSubsetOf(IOModes superset) {
+    public boolean checkSubsetOf(IOModes superset) {
         if ((!superset.isReadable() && isReadable()) ||
             (!superset.isWritable() && isWritable()) ||
             !superset.isAppendable() && isAppendable()) {
-            throw runtime.newErrnoEINVALError("bad permissions");
+            
+            return false;
         }
+        
+        return true;
     }
     
     // TODO: Make this more intelligible value
@@ -126,47 +125,31 @@ public class IOModes implements Cloneable {
         return ""+modes;
     }
     
-    public static int convertModesStringToModesInt(Ruby runtime, 
-    		String modesString) {
-    	int modes = 0;
-    	
-        if (modesString.length() == 0) {
-            throw runtime.newArgumentError("illegal access mode");
+    public int getOpenFileFlags() {
+        int flags = 0;
+
+        switch (modes & (RDONLY|WRONLY|RDWR)) {
+          case RDONLY:
+            flags = OpenFile.READABLE;
+            break;
+          case WRONLY:
+            flags = OpenFile.WRITABLE;
+            break;
+          case RDWR:
+            flags = OpenFile.READWRITE;
+            break;
         }
 
-        switch (modesString.charAt(0)) {
-        case 'r' :
-            modes |= RDONLY;
-            break;
-        case 'a' :
-            modes |= APPEND;
-            modes |= WRONLY;
-            modes |= CREAT;
-            break;
-        case 'w' :
-            modes |= WRONLY;
-            modes |= TRUNC;
-            modes |= CREAT;
-            break;
-        default :
-            throw runtime.newArgumentError("illegal access mode " + modes);
+        if ((modes & APPEND) != 0) {
+            flags |= OpenFile.APPEND;
         }
-
-        if (modesString.length() > 1) {
-            int i = modesString.charAt(1) == 'b' ? 2 : 1;
-
-            if (modesString.length() > i) {
-                if (modesString.charAt(i) == '+') {
-                    modes |= RDWR;
-                } else {
-                    throw runtime.newArgumentError("illegal access mode " + modes);
-                }
-            }
-            if (i == 2) {
-                modes |= BINARY;
-            }
-
+        if ((modes & CREAT) != 0) {
+            flags |= OpenFile.CREATE;
         }
-    	return modes;
+        if ((modes & BINARY) == BINARY) {
+            flags |= OpenFile.BINMODE;
+        }
+        
+        return flags;
     }
 }
