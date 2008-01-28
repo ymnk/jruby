@@ -116,7 +116,7 @@ public class RubyTCPSocket extends RubyIPSocket {
         try {
             return block.yield(recv.getRuntime().getCurrentContext(), sock);
         } finally {
-            if (sock.isOpen()) sock.close();
+            if (sock.openFile.isOpen()) sock.close();
         }
     }
 

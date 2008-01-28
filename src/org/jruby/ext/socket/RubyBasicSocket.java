@@ -52,6 +52,7 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.Stream;
 import org.jruby.util.ChannelStream;
+import org.jruby.util.Stream.BadDescriptorException;
 import org.jruby.util.Stream.InvalidValueException;
 import org.jruby.util.io.ChannelDescriptor;
 
@@ -107,7 +108,9 @@ public class RubyBasicSocket extends RubyIO {
         try {
             ((SocketChannel)this.socketChannel).socket().shutdownOutput();
             openFile.getMainStream().fclose();
-    	} catch (IOException e) {
+        } catch (BadDescriptorException ex) {
+            throw getRuntime().newErrnoEBADFError();
+        } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
         }
         return getRuntime().getNil();

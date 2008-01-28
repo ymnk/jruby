@@ -65,6 +65,7 @@ import org.jruby.util.Stream;
 import org.jruby.util.ChannelStream;
 import org.jruby.util.IOModes;
 import org.jruby.util.JRubyFile;
+import org.jruby.util.SafePropertyAccessor;
 import org.jruby.util.Stream.InvalidValueException;
 import org.jruby.util.TypeConverter;
 import org.jruby.util.io.ChannelDescriptor.FileExistsException;
@@ -225,12 +226,14 @@ public class RubyFile extends RubyIO {
         this.path = newPath;
         this.openFile.setMode(newModes.getOpenFileFlags());
         
+        // Ruby code frequently uses a platform check to choose "NUL:" on windows
+        // but since that check doesn't work well on JRuby, we help it out
+        if ("/dev/null".equals(path) || SafePropertyAccessor.getProperty("os.name").contains("Windows")) {
+            path = "NUL:";
+        }
+        
         try {
-            if (newPath.equals("/dev/null")) {
-                Channel nullChannel = new NullWritableChannel();
-                openFile.setMainStream(
-                        new ChannelStream(getRuntime(), new ChannelDescriptor(nullChannel, getNewFileno(), new FileDescriptor()), newModes));
-            } else if(newPath.startsWith("file:")) {
+            if(newPath.startsWith("file:")) {
                 String filePath = path.substring(5, path.indexOf("!"));
                 String internalPath = path.substring(path.indexOf("!") + 2);
 
@@ -666,7 +669,7 @@ public class RubyFile extends RubyIO {
     public IRubyObject inspect() {
         StringBuffer val = new StringBuffer();
         val.append("#<File:").append(path);
-        if(!isOpen()) {
+        if(openFile.isOpen()) {
             val.append(" (closed)");
         }
         val.append(">");
@@ -1279,7 +1282,7 @@ public class RubyFile extends RubyIO {
             try {
                 return block.yield(tc, file);
             } finally {
-                if (file.isOpen()) {
+                if (file.openFile.isOpen()) {
                     file.close();
                 }
             }

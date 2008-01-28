@@ -11,16 +11,21 @@ import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.jar.JarFile;
+import static java.util.logging.Logger.getLogger;
 import java.util.zip.ZipEntry;
 import org.jruby.RubyIO;
 import org.jruby.util.ByteList;
 import org.jruby.util.DirectoryAsFileException;
 import org.jruby.util.IOModes;
 import org.jruby.util.JRubyFile;
+import org.jruby.util.Stream.BadDescriptorException;
 import org.jruby.util.Stream.InvalidValueException;
 
 public class ChannelDescriptor {
+    private static final boolean DEBUG = true;
+    
     public static final int RDONLY = 0x0000;
     public static final int WRONLY = 0x0001;
     public static final int RDWR = 0x0002;
@@ -37,17 +42,55 @@ public class ChannelDescriptor {
     private final int fileno;
     private final FileDescriptor fileDescriptor;
     private final IOModes originalModes;
-
-    public ChannelDescriptor(Channel channel, int fileno, IOModes originalModes, FileDescriptor fileDescriptor) {
-        super();
+    private AtomicInteger refCounter;
+    
+    private ChannelDescriptor(Channel channel, int fileno, IOModes originalModes, FileDescriptor fileDescriptor, AtomicInteger refCounter) {
+        this.refCounter = refCounter;
         this.channel = channel;
         this.fileno = fileno;
-        this.fileDescriptor = fileDescriptor;
         this.originalModes = originalModes;
+        this.fileDescriptor = fileDescriptor;
+    }
+
+    public ChannelDescriptor(Channel channel, int fileno, IOModes originalModes, FileDescriptor fileDescriptor) {
+        this(channel, fileno, originalModes, fileDescriptor, new AtomicInteger(1));
     }
     
     public ChannelDescriptor(Channel channel, int fileno, FileDescriptor fileDescriptor) throws InvalidValueException {
         this(channel, fileno, getModesFromChannel(channel), fileDescriptor);
+    }
+    
+    /**
+     * Mimics the libs dup(2) function, returning a new descriptor that references
+     * the same open channel.
+     * 
+     * @return A duplicate ChannelDescriptor based on this one
+     */
+    public ChannelDescriptor dup() {
+        synchronized (refCounter) {
+            refCounter.incrementAndGet();
+
+            if (DEBUG) getLogger("ChannelDescriptor").info("Reopen fileno " + fileno + ", refs now: " + refCounter.get());
+
+            return new ChannelDescriptor(channel, RubyIO.getNewFileno(), originalModes, fileDescriptor, refCounter);
+        }
+    }
+    
+    /**
+     * Mimics the libs dup2(2) function, returning a new descriptor that references
+     * the same open channel but with a specified fileno.
+     * 
+     * @param fileno The fileno to use for the new descriptor
+     * @return A duplicate ChannelDescriptor based on this one
+     */
+    public ChannelDescriptor dup2(int fileno) {
+        synchronized (refCounter) {
+            refCounter.incrementAndGet();
+
+            if (DEBUG) getLogger("ChannelDescriptor").info("Reopen fileno " + fileno + ", refs now: " + refCounter.get());
+
+            return new ChannelDescriptor(channel, fileno, originalModes, fileDescriptor, refCounter);
+        }
     }
     
     public static IOModes getModesFromChannel(Channel channel) throws InvalidValueException {
@@ -86,12 +129,18 @@ public class ChannelDescriptor {
     public boolean isWritable() {
         return channel instanceof WritableByteChannel;
     }
+    
+    public void checkOpen() throws BadDescriptorException {
+        if (!channel.isOpen()) {
+            throw new BadDescriptorException();
+        }
+    }
 
-    public int read(int number, ByteList byteList) throws IOException {
-        ReadableByteChannel readChannel = (ReadableByteChannel) channel;
+    public int read(int number, ByteList byteList) throws IOException, BadDescriptorException {
+        checkOpen();
+        
         ByteBuffer buffer = ByteBuffer.allocate(number);
-        int bytesRead = 0;
-        bytesRead = readChannel.read(buffer);
+        int bytesRead = read(buffer);
 
         byte[] ret;
         if (buffer.hasRemaining()) {
@@ -105,8 +154,20 @@ public class ChannelDescriptor {
 
         return bytesRead;
     }
+
+    public int read(ByteBuffer buffer) throws IOException, BadDescriptorException {
+        checkOpen();
+        
+        ReadableByteChannel readChannel = (ReadableByteChannel) channel;
+        int bytesRead = 0;
+        bytesRead = readChannel.read(buffer);
+
+        return bytesRead;
+    }
     
-    public int write(ByteList buf) throws IOException {
+    public int write(ByteList buf) throws IOException, BadDescriptorException {
+        checkOpen();
+        
         WritableByteChannel writeChannel = (WritableByteChannel)channel;
         
         return writeChannel.write(ByteBuffer.wrap(buf.unsafeBytes(), buf.begin(), buf.length()));
@@ -163,12 +224,35 @@ public class ChannelDescriptor {
         }
     }
     
+    public void close() throws BadDescriptorException, IOException {
+        synchronized (refCounter) {
+            // if refcount is at or below zero, we're no longer valid
+            if (refCounter.get() <= 0) {
+                throw new BadDescriptorException();
+            }
+
+            // if channel is already closed, we're no longer valid
+            if (!channel.isOpen()) {
+                throw new BadDescriptorException();
+            }
+
+            // otherwise decrement and possibly close as normal
+            int count = refCounter.decrementAndGet();
+
+            if (DEBUG) getLogger("ChannelDescriptor").info("Descriptor for fileno " + fileno + " refs: " + count);
+
+            if (count <= 0) {
+                channel.close();
+            }
+        }
+    }
+    
     public IOModes getOriginalModes() {
         return originalModes;
     }
     
     public void checkNewModes(IOModes newModes) throws InvalidValueException {
-        if (!originalModes.checkSubsetOf(newModes)) {
+        if (!newModes.isSubsetOf(originalModes)) {
             throw new InvalidValueException();
         }
     }

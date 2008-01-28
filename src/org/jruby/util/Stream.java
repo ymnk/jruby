@@ -83,7 +83,7 @@ public interface Stream {
     public abstract ByteList read(int number) throws IOException, BadDescriptorException, EOFException;
     public abstract int write(ByteList buf) throws IOException, BadDescriptorException;
     
-    public abstract void fclose() throws IOException;
+    public abstract void fclose() throws IOException, BadDescriptorException;
     public abstract int fflush() throws IOException, BadDescriptorException;
     
     /**

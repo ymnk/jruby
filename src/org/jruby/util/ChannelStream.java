@@ -50,6 +50,9 @@ import java.nio.channels.IllegalBlockingModeException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import static java.util.logging.Logger.getLogger;
 import org.jruby.Finalizable;
 import org.jruby.Ruby;
 import org.jruby.RubyIO;
@@ -61,6 +64,7 @@ import org.jruby.util.io.ChannelDescriptor.FileExistsException;
  * <p>This file implements a seekable IO file.</p>
  */
 public class ChannelStream implements Stream, Finalizable {
+    private final static boolean DEBUG = true;
     private final static int BUFSIZE = 16 * 1024;
     
     private Ruby runtime;
@@ -85,6 +89,8 @@ public class ChannelStream implements Stream, Finalizable {
         buffer.flip();
         this.reading = true;
         this.fileDescriptor = fileDescriptor;
+        
+        // this constructor is used by fdopen, so we don't increment descriptor ref count
     }
 
     public ChannelStream(Ruby runtime, ChannelDescriptor descriptor) {
@@ -141,7 +147,7 @@ public class ChannelStream implements Stream, Finalizable {
     }
 
     public void checkPermissionsSubsetOf(IOModes subsetModes) {
-        subsetModes.checkSubsetOf(modes);
+        subsetModes.isSubsetOf(modes);
     }
     
     public IOModes getModes() {
@@ -299,7 +305,7 @@ public class ChannelStream implements Stream, Finalizable {
      * 
      * @see org.jruby.util.IOHandler#close()
      */
-    public synchronized void fclose() throws IOException {
+    public synchronized void fclose() throws IOException, BadDescriptorException {
         close(false); // not closing from finalise
     }
     
@@ -309,17 +315,30 @@ public class ChannelStream implements Stream, Finalizable {
      * @throws IOException 
      * @throws BadDescriptorException
      */
-    private void close(boolean finalizing) throws IOException {
-        if (descriptor.isSeekable()) {
-            flushWrite();
+    private void close(boolean finalizing) throws IOException, BadDescriptorException {
+        flushWrite();
 
-            isOpen = false;
-            descriptor.getChannel().close();
-        } else {
-            isOpen = false;
-            flushWrite();
-            descriptor.getChannel().close();
-            if (!finalizing) getRuntime().removeInternalFinalizer(this);
+        isOpen = false;
+        descriptor.close();
+
+        if (DEBUG) getLogger("ChannelStream").info("Descriptor for fileno " + descriptor.getFileno() + " closed by stream");
+        
+        if (!finalizing) getRuntime().removeInternalFinalizer(this);
+    }
+    
+    /**
+     * Internal close, to safely work for finalizing.
+     * @param finalizing true if this is in a finalizing context
+     * @throws IOException 
+     * @throws BadDescriptorException
+     */
+    private void closeForFinalize() {
+        try {
+            close(true);
+        } catch (BadDescriptorException ex) {
+            // silence
+        } catch (IOException ex) {
+            // silence
         }
     }
 
@@ -526,7 +545,7 @@ public class ChannelStream implements Stream, Finalizable {
         resetForWrite();
     }
 
-    public synchronized ByteList read(int number) throws IOException {
+    public synchronized ByteList read(int number) throws IOException, BadDescriptorException {
         checkReadable();
         ensureReadNonBuffered();
         
@@ -591,12 +610,12 @@ public class ChannelStream implements Stream, Finalizable {
         return result;
     }
     
-    private int bufferedRead() throws IOException {
+    private int bufferedRead() throws IOException, BadDescriptorException {
         ensureRead();
         
         if (!buffer.hasRemaining()) {
             buffer.clear();
-            int read = ((ReadableByteChannel)descriptor.getChannel()).read(buffer);
+            int read = descriptor.read(buffer);
             buffer.flip();
             
             if (read == -1) return -1;
@@ -693,12 +712,8 @@ public class ChannelStream implements Stream, Finalizable {
      * Ensure close (especially flush) when we're finished with
      */
     public void finalize() {
-        try {
-            // FIXME: I got a bunch of NPEs when I didn't check for nulls here...HOW?!
-            if (descriptor != null && descriptor.isSeekable() && isOpen) close(true); // close without removing from finalizers
-        } catch (Exception e) { // What else could we do?
-            e.printStackTrace();
-        }
+        // FIXME: I got a bunch of NPEs when I didn't check for nulls here...HOW?!
+        if (descriptor != null && descriptor.isSeekable() && isOpen) closeForFinalize(); // close without removing from finalizers
     }
     
     public int ready() throws IOException {
@@ -766,8 +781,10 @@ public class ChannelStream implements Stream, Finalizable {
         }
     }
 
-    public synchronized int read() throws IOException {
+    public synchronized int read() throws IOException, BadDescriptorException {
         try {
+            descriptor.checkOpen();
+            
             if (ungotc >= 0) {
                 int c = ungotc;
                 ungotc = -1;

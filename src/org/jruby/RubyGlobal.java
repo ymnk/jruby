@@ -516,9 +516,7 @@ public class RubyGlobal {
             if (value == get()) {
                 return value;
             }
-            if (value instanceof RubyIO) {
-                ((RubyIO) value).checkReadable();
-            }
+            
             return super.set(value);
         }
     }
@@ -534,7 +532,6 @@ public class RubyGlobal {
             }
             if (value instanceof RubyIO) {
                 RubyIO io = (RubyIO)value;
-                io.checkWriteable();
                 
                 // HACK: in order to have stdout/err act like ttys and flush always,
                 // we set anything assigned to stdout/stderr to sync

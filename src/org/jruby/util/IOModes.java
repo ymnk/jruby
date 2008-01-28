@@ -109,7 +109,7 @@ public class IOModes implements Cloneable {
     }
 
     // TODO: Make sure all open flags are added to this check.
-    public boolean checkSubsetOf(IOModes superset) {
+    public boolean isSubsetOf(IOModes superset) {
         if ((!superset.isReadable() && isReadable()) ||
             (!superset.isWritable() && isWritable()) ||
             !superset.isAppendable() && isAppendable()) {
