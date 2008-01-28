@@ -291,7 +291,7 @@ public class RubyIO extends RubyObject {
             return process;
         }
 
-        public void setPid(Process process) {
+        public void setProcess(Process process) {
             this.process = process;
         }
 
@@ -570,27 +570,51 @@ public class RubyIO extends RubyObject {
         registerDescriptor(openFile.getMainStream().getDescriptor());
     }
 
-    public RubyIO(Ruby runtime, Process process) {
+    public RubyIO(Ruby runtime, Process process, IOModes modes) {
     	super(runtime, runtime.getIO());
         
         openFile = new OpenFile();
         
-        openFile.setMode(OpenFile.READWRITE);
+        openFile.setMode(modes.getOpenFileFlags() | OpenFile.SYNC);
+        openFile.setProcess(process);
 
         try {
+            InputStream pipeIn = process.getInputStream();
             ChannelDescriptor main = new ChannelDescriptor(
-                    Channels.newChannel(process.getInputStream()),
+                    Channels.newChannel(pipeIn),
                     getNewFileno(),
                     new FileDescriptor());
+            
+            OutputStream pipeOut = process.getOutputStream();
             ChannelDescriptor pipe = new ChannelDescriptor(
-                    Channels.newChannel(process.getOutputStream()),
+                    Channels.newChannel(pipeOut),
                     getNewFileno(),
                     new FileDescriptor());
-            openFile.setMainStream(new ChannelStream(getRuntime(), main));
-            openFile.setPipeStream(new ChannelStream(getRuntime(), pipe));
+            
+            if (!openFile.isReadable()) {
+                main.close();
+                pipeIn.close();
+            } else {
+                openFile.setMainStream(new ChannelStream(getRuntime(), main));
+            }
+            
+            if (!openFile.isWritable()) {
+                pipe.close();
+                pipeOut.close();
+            } else {
+                if (openFile.getMainStream() != null) {
+                    openFile.setPipeStream(new ChannelStream(getRuntime(), pipe));
+                } else {
+                    openFile.setMainStream(new ChannelStream(getRuntime(), pipe));
+                }
+            }
             
             registerDescriptor(main);
             registerDescriptor(pipe);
+        } catch (BadDescriptorException ex) {
+            throw getRuntime().newErrnoEBADFError();
+        } catch (IOException ex) {
+            throw getRuntime().newIOErrorFromException(ex);
         } catch (InvalidValueException e) {
             throw getRuntime().newErrnoEINVALError();
         }
@@ -742,7 +766,7 @@ public class RubyIO extends RubyObject {
                 }
 
                 selfFile.setMode(originalFile.getMode());
-                selfFile.setPid(originalFile.getProcess());
+                selfFile.setProcess(originalFile.getProcess());
                 selfFile.setLineNumber(originalFile.getLineNumber());
                 selfFile.setPath(originalFile.getPath());
                 selfFile.setFinalizer(originalFile.getFinalizer());
@@ -1007,9 +1031,15 @@ public class RubyIO extends RubyObject {
         String mode = null;
         IOModes modes;
         
-        int newFileno = RubyNumeric.fix2int(args[0]);
+        int fileno = RubyNumeric.fix2int(args[0]);
         
         try {
+            ChannelDescriptor descriptor = getDescriptorByFileno(fileno);
+            
+            if (descriptor == null) {
+                throw getRuntime().newErrnoEBADFError();
+            }
+            
             if (argCount == 2) {
                 if (args[1] instanceof RubyFixnum) {
                     modes = new IOModes(RubyFixnum.fix2long(args[1]));
@@ -1025,12 +1055,13 @@ public class RubyIO extends RubyObject {
     //	flags = O_RDONLY;
     //#endif
                 // use original modes
-                modes = getDescriptorByFileno(newFileno).getOriginalModes();
+                
+                modes = descriptor.getOriginalModes();
             }
 
             openFile.setMode(modes.getOpenFileFlags());
         
-            openFile.setMainStream(fdopen(newFileno, modes));
+            openFile.setMainStream(fdopen(descriptor, modes));
         } catch (InvalidValueException ive) {
             throw getRuntime().newErrnoEINVALError();
         }
@@ -1038,13 +1069,14 @@ public class RubyIO extends RubyObject {
         return this;
     }
     
-    protected Stream fdopen(int fileno, IOModes modes) throws InvalidValueException {
+    protected Stream fdopen(ChannelDescriptor existingDescriptor, IOModes modes) throws InvalidValueException {
         // See if we already have this descriptor open.
         // If so then we can mostly share the handler (keep open
         // file, but possibly change the mode).
-        ChannelDescriptor existingDescriptor = getDescriptorByFileno(fileno);
         
         if (existingDescriptor == null) {
+            // redundant, done above as well
+            
             // this seems unlikely to happen unless it's a totally bogus fileno
             // ...so do we even need to bother trying to create one?
             
@@ -1083,7 +1115,9 @@ public class RubyIO extends RubyObject {
             try {
                 return block.yield(runtime.getCurrentContext(), io);
             } finally {
-                io.close();
+                if (io.openFile.isOpen()) {
+                    io.close();
+                }
             }
         }
 
@@ -1534,7 +1568,7 @@ public class RubyIO extends RubyObject {
     public IRubyObject initialize_copy(IRubyObject original){
         if (this == original) return this;
 
-        RubyIO originalIO = (RubyIO) original;
+        RubyIO originalIO = (RubyIO) TypeConverter.convertToTypeWithCheck(original, getRuntime().getIO(), MethodIndex.TO_IO, "to_io");
         
         OpenFile originalFile = originalIO.openFile;
         OpenFile newFile = openFile;
@@ -1550,34 +1584,50 @@ public class RubyIO extends RubyObject {
             }
 
             newFile.setMode(originalFile.getMode());
-            newFile.setPid(originalFile.getProcess());
+            newFile.setProcess(originalFile.getProcess());
             newFile.setLineNumber(originalFile.getLineNumber());
             newFile.setPath(originalFile.getPath());
-
-            // Two pos pointers?  
-            // http://blade.nagaokaut.ac.jp/ruby/ruby-talk/81513
-            // So if I understand this correctly, the descriptor level stuff
-            // shares things like position, but the higher level stuff uses
-            // a different set of libc functions (FILE*), which does not share
-            // position.  Our current implementation implements our higher 
-            // level operations on top of our 'sys' versions.  So we could in
-            // fact share everything.  Unfortunately, we want to clone ruby's
-            // behavior (i.e. show how this interface bleeds their 
-            // implementation). So our best bet, is to just create a yet another
-            // copy of the handler.  In fact, ruby 1.8 must do this as the cloned
-            // resource is in fact a different fileno.  What is clone for again?        
-
-            // FIXME: Missing step here is to clone the channel, which we can't do at present.
-            // Ruby dup's the original file descriptor and then opens it into a new FILE structure
-            // This would be roughly equivalent to us duping the original channel and inserting it
-            // into a new IOHandler. We may be able to get away with just preserving the shared
-            // channel (keeping it open until all referencing handlers have closed it) since
-            // at least one platform appears to share position between the two
+            newFile.setFinalizer(originalFile.getFinalizer());
             
-//            ChannelDescriptor descriptor =
-//                    new ChannelDescriptor(originalFile.getMainStream().getDescriptor().getChannel(), getNewFileno(), new FileDescriptor());
+            IOModes modes;
+            if (newFile.isReadable()) {
+                if (newFile.isWritable()) {
+                    if (newFile.getPipeStream() != null) {
+                        modes = new IOModes(IOModes.RDONLY);
+                    } else {
+                        modes = new IOModes(IOModes.RDWR);
+                    }
+                } else {
+                    modes = new IOModes(IOModes.RDONLY);
+                }
+            } else {
+                if (newFile.isWritable()) {
+                    modes = new IOModes(IOModes.WRONLY);
+                } else {
+                    modes = originalFile.getModeAsIOModes(getRuntime());
+                }
+            }
+            
             ChannelDescriptor descriptor = originalFile.getMainStream().getDescriptor().dup();
-            openFile.setMainStream(new ChannelStream(getRuntime(), descriptor));
+
+            openFile.setMainStream(ChannelStream.fdopen(getRuntime(), descriptor, modes));
+            
+            // TODO: the rest of this...seeking to same position is unnecessary since we share a channel
+            // but some of this may be needed?
+            
+//    fseeko(fptr->f, ftello(orig->f), SEEK_SET);
+//    if (orig->f2) {
+//	if (fileno(orig->f) != fileno(orig->f2)) {
+//	    fd = ruby_dup(fileno(orig->f2));
+//	}
+//	fptr->f2 = rb_fdopen(fd, "w");
+//	fseeko(fptr->f2, ftello(orig->f2), SEEK_SET);
+//    }
+//    if (fptr->mode & FMODE_BINMODE) {
+//	rb_io_binmode(dest);
+//    }
+            
+            // Register the new descriptor
             registerDescriptor(openFile.getMainStream().getDescriptor());
         } catch (IOException ex) {
             throw getRuntime().newIOError("could not init copy: " + ex);
@@ -1646,7 +1696,8 @@ public class RubyIO extends RubyObject {
         
         if (openFile.getProcess() != null) {
             try {
-                openFile.getProcess().waitFor();
+                IRubyObject processResult = RubyProcess.RubyStatus.newProcessStatus(getRuntime(), (openFile.getProcess().waitFor() * 256));
+                getRuntime().getGlobalVariables().set("$?", processResult);
             } catch (InterruptedException ie) {
                 // TODO: do something here?
             }
@@ -1662,7 +1713,7 @@ public class RubyIO extends RubyObject {
                 throw getRuntime().newSecurityError("Insecure: can't close");
             }
             
-            if (openFile.getPipeStream() == null && openFile.isWritable()) {
+            if (openFile.getPipeStream() == null && openFile.isReadable()) {
                 throw getRuntime().newIOError("closing non-duplex IO for writing");
             }
             
@@ -1689,17 +1740,17 @@ public class RubyIO extends RubyObject {
                 throw getRuntime().newSecurityError("Insecure: can't close");
             }
             
-            if (openFile.getPipeStream() == null && openFile.isReadable()) {
-                throw getRuntime().newIOError("closing non-duplex IO for writing");
+            if (openFile.getPipeStream() == null && openFile.isWritable()) {
+                throw getRuntime().newIOError("closing non-duplex IO for reading");
             }
             
             if (openFile.getPipeStream() == null) {
                 close();
             } else{
                 openFile.getMainStream().fclose();
+                openFile.setMode(openFile.getMode() & ~OpenFile.READABLE);
                 openFile.setMainStream(openFile.getPipeStream());
                 openFile.setPipeStream(null);
-                openFile.setMode(openFile.getMode() & ~OpenFile.READABLE);
                 // TODO
                 // n is result of fclose; but perhaps having a SysError below is enough?
                 // if (n != 0) rb_sys_fail(fptr->path);
@@ -2497,47 +2548,60 @@ public class RubyIO extends RubyObject {
    
     @JRubyMethod(name = "readlines", required = 1, optional = 1, meta = true)
     public static RubyArray readlines(IRubyObject recv, IRubyObject[] args, Block block) {
-       int count = args.length;
-       
-       IRubyObject[] fileArguments = new IRubyObject[] {args[0]};
-       IRubyObject[] separatorArguments = count >= 2 ? new IRubyObject[]{args[1]} : IRubyObject.NULL_ARRAY;
-       RubyIO file = (RubyIO) RubyKernel.open(recv, fileArguments, block);
-       try {
-           return file.readlines(separatorArguments);
-       } finally {
-           file.close();
-       }
-   }
+        int count = args.length;
+
+        IRubyObject[] fileArguments = new IRubyObject[]{args[0]};
+        IRubyObject[] separatorArguments = count >= 2 ? new IRubyObject[]{args[1]} : IRubyObject.NULL_ARRAY;
+        RubyIO file = (RubyIO) RubyKernel.open(recv, fileArguments, block);
+        try {
+            return file.readlines(separatorArguments);
+        } finally {
+            file.close();
+        }
+    }
    
     //XXX Hacked incomplete popen implementation to make
     @JRubyMethod(name = "popen", required = 1, optional = 1, meta = true)
     public static IRubyObject popen(IRubyObject recv, IRubyObject[] args, Block block) {
-       Ruby runtime = recv.getRuntime();
-       IRubyObject cmdObj = args[0].convertToString();
-       runtime.checkSafeString(cmdObj);
-       
-       try {
-           Process process = new ShellLauncher(runtime).run(cmdObj);            
-           RubyIO io = new RubyIO(runtime, process);
-           
-           if (block.isGiven()) {
-               try {
-                   return block.yield(runtime.getCurrentContext(), io);
-               } finally {
-//                   if (io.isOpen()) {
-//                       io.close();
-//                   }
-                   runtime.getGlobalVariables().set("$?",  RubyProcess.RubyStatus.newProcessStatus(runtime, (process.waitFor() * 256)));
-               }
-           }
-           return io;
-       } catch (IOException e) {
-           throw runtime.newIOErrorFromException(e);
-       } catch (InterruptedException e) {
-           throw runtime.newThreadError("unexpected interrupt");
-       }
-   }
-   
+        Ruby runtime = recv.getRuntime();
+        int mode;
+
+        try {
+            if (args.length == 1) {
+                mode = IOModes.RDONLY;
+            } else if (args[1] instanceof RubyFixnum) {
+                mode = RubyFixnum.num2int(args[1]);
+            } else {
+                mode = getIOModesIntFromString(runtime, args[1].convertToString().toString());
+            }
+
+            IOModes modes = new IOModes(mode);
+            IRubyObject cmdObj = args[0].convertToString();
+            runtime.checkSafeString(cmdObj);
+        
+            Process process = new ShellLauncher(runtime).run(cmdObj);
+            RubyIO io = new RubyIO(runtime, process, modes);
+
+            if (block.isGiven()) {
+                try {
+                    return block.yield(runtime.getCurrentContext(), io);
+                } finally {
+                    if (io.openFile.isOpen()) {
+                        io.close();
+                    }
+                    runtime.getGlobalVariables().set("$?", RubyProcess.RubyStatus.newProcessStatus(runtime, (process.waitFor() * 256)));
+                }
+            }
+            return io;
+        } catch (InvalidValueException ex) {
+            throw runtime.newErrnoEINVALError();
+        } catch (IOException e) {
+            throw runtime.newIOErrorFromException(e);
+        } catch (InterruptedException e) {
+            throw runtime.newThreadError("unexpected interrupt");
+        }
+    }
+
     // NIO based pipe
     @JRubyMethod(name = "pipe", meta = true)
     public static IRubyObject pipe(IRubyObject recv) throws Exception {

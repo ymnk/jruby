@@ -50,8 +50,6 @@ import java.nio.channels.IllegalBlockingModeException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.WritableByteChannel;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import static java.util.logging.Logger.getLogger;
 import org.jruby.Finalizable;
 import org.jruby.Ruby;
@@ -64,7 +62,7 @@ import org.jruby.util.io.ChannelDescriptor.FileExistsException;
  * <p>This file implements a seekable IO file.</p>
  */
 public class ChannelStream implements Stream, Finalizable {
-    private final static boolean DEBUG = true;
+    private final static boolean DEBUG = false;
     private final static int BUFSIZE = 16 * 1024;
     
     private Ruby runtime;

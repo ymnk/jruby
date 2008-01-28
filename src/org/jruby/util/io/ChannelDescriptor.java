@@ -24,7 +24,7 @@ import org.jruby.util.Stream.BadDescriptorException;
 import org.jruby.util.Stream.InvalidValueException;
 
 public class ChannelDescriptor {
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
     
     public static final int RDONLY = 0x0000;
     public static final int WRONLY = 0x0001;
@@ -70,9 +70,11 @@ public class ChannelDescriptor {
         synchronized (refCounter) {
             refCounter.incrementAndGet();
 
-            if (DEBUG) getLogger("ChannelDescriptor").info("Reopen fileno " + fileno + ", refs now: " + refCounter.get());
+            int newFileno = RubyIO.getNewFileno();
+            
+            if (DEBUG) getLogger("ChannelDescriptor").info("Reopen fileno " + newFileno + ", refs now: " + refCounter.get());
 
-            return new ChannelDescriptor(channel, RubyIO.getNewFileno(), originalModes, fileDescriptor, refCounter);
+            return new ChannelDescriptor(channel, newFileno, originalModes, fileDescriptor, refCounter);
         }
     }
     
