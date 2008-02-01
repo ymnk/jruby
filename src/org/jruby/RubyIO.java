@@ -2596,11 +2596,17 @@ public class RubyIO extends RubyObject {
     // NIO based pipe
     @JRubyMethod(name = "pipe", meta = true)
     public static IRubyObject pipe(IRubyObject recv) throws Exception {
+        // TODO: This isn't an exact port of MRI's pipe behavior, so revisit
        Ruby runtime = recv.getRuntime();
        Pipe pipe = Pipe.open();
+       
+       RubyIO source = new RubyIO(runtime, pipe.source());
+       RubyIO sink = new RubyIO(runtime, pipe.sink());
+       
+       sink.openFile.mainStream.setSync(true);
        return runtime.newArrayNoCopy(new IRubyObject[]{
-           new RubyIO(runtime, pipe.source()),
-           new RubyIO(runtime, pipe.sink())
+           source,
+           sink
        });
    }
    

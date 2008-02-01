@@ -205,6 +205,10 @@ public class ChannelStream implements Stream, Finalizable {
         final ByteList separator = (separatorString == PARAGRAPH_DELIMETER) ?
             PARAGRAPH_SEPARATOR : separatorString;
 
+        if (feof()) {
+            return null;
+        }
+        
         int c = read();
         
         if (c == -1) {
@@ -453,7 +457,12 @@ public class ChannelStream implements Stream, Finalizable {
      */
     public synchronized void fseek(long offset, int type) throws IOException, InvalidValueException, PipeException {
         if (descriptor.getChannel() instanceof FileChannel) {
-            invalidateBuffer();
+            if (reading) {
+                buffer.clear();
+                buffer.flip();
+            } else {
+                flushWrite();
+            }
             FileChannel fileChannel = (FileChannel)descriptor.getChannel();
             try {
                 switch (type) {
