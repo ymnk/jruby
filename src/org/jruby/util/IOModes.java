@@ -52,6 +52,7 @@ public class IOModes implements Cloneable {
     public static final int NONBLOCK = 0x0004;
     public static final int BINARY = 0x8000;
     public static final int ACCMODE = 0x10000;
+    public static final int NOT_ACCMODE = 0x1111;
     
     private int modes;
     
@@ -128,16 +129,13 @@ public class IOModes implements Cloneable {
     public int getOpenFileFlags() {
         int flags = 0;
 
-        switch (modes & (RDONLY|WRONLY|RDWR)) {
-          case RDONLY:
+        int readWrite = modes & 3;
+        if (readWrite == 0) {
             flags = OpenFile.READABLE;
-            break;
-          case WRONLY:
+        } else if (readWrite == WRONLY) {
             flags = OpenFile.WRITABLE;
-            break;
-          case RDWR:
+        } else {
             flags = OpenFile.READWRITE;
-            break;
         }
 
         if ((modes & APPEND) != 0) {

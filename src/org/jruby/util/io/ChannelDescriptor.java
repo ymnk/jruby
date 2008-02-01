@@ -38,7 +38,7 @@ public class ChannelDescriptor {
     public static final int BINARY = 0x8000;
     public static final int ACCMODE = 0x10000;
     
-    private final Channel channel;
+    private Channel channel;
     private final int fileno;
     private final FileDescriptor fileDescriptor;
     private final IOModes originalModes;
@@ -79,7 +79,17 @@ public class ChannelDescriptor {
     }
     
     /**
-     * Mimics the libs dup2(2) function, returning a new descriptor that references
+     * Mimics the libc dup2(2) function for a "file descriptor" that's already
+     * open.
+     * 
+     * @param other The descriptor into which we should dup this one
+     */
+    public void dup2(ChannelDescriptor other) {
+        other.channel = channel;
+    }
+    
+    /**
+     * Mimics the libc dup2(2) function, returning a new descriptor that references
      * the same open channel but with a specified fileno.
      * 
      * @param fileno The fileno to use for the new descriptor
@@ -132,8 +142,12 @@ public class ChannelDescriptor {
         return channel instanceof WritableByteChannel;
     }
     
+    public boolean isOpen() {
+        return channel.isOpen();
+    }
+    
     public void checkOpen() throws BadDescriptorException {
-        if (!channel.isOpen()) {
+        if (!isOpen()) {
             throw new BadDescriptorException();
         }
     }

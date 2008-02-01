@@ -52,6 +52,8 @@ public interface Stream {
     
     public ChannelDescriptor getDescriptor();
     
+    public void setDescriptor(ChannelDescriptor descriptor);
+    
     public abstract FileChannel getFileChannel();
     
     public boolean isOpen();

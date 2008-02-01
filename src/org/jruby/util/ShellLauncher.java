@@ -202,7 +202,7 @@ public class ShellLauncher {
             ScriptThreadProcess ipScript = new ScriptThreadProcess(newargs, getCurrentEnv(), pwd);
             ipScript.start();
             aProcess = ipScript;
-        } else if (rawArgs.length == 1 && shouldRunInShell(shell, args)) {
+         } else {
             // execute command with sh -c
             // this does shell expansion of wildcards
             String[] argArray = new String[3];
@@ -210,9 +210,7 @@ public class ShellLauncher {
             argArray[0] = shell;
             argArray[1] = shell.endsWith("sh") ? "-c" : "/c";
             argArray[2] = cmdline;
-            aProcess = Runtime.getRuntime().exec(argArray, getCurrentEnv(), pwd);
-        } else {
-            aProcess = Runtime.getRuntime().exec(args, getCurrentEnv(), pwd);        
+            aProcess = Runtime.getRuntime().exec(argArray, getCurrentEnv(), pwd);      
         }
         return aProcess;
     }
