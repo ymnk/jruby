@@ -56,7 +56,7 @@ public class IOWaitLibrary implements Library {
         try {
             OpenFile openFile = io.getOpenFile();
             ChannelDescriptor descriptor = openFile.getMainStream().getDescriptor();
-            if (!descriptor.isOpen() || !openFile.getMainStream().isReadable() || openFile.getMainStream().feof()) {
+            if (!descriptor.isOpen() || !openFile.getMainStream().getModes().isReadable() || openFile.getMainStream().feof()) {
                 return obj.getRuntime().getFalse();
             }
 

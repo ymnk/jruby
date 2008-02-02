@@ -297,7 +297,9 @@ public class RubyFile extends RubyIO {
 
     @JRubyMethod(required = 1)
     public IRubyObject flock(IRubyObject lockingConstant) {
-        FileChannel fileChannel = openFile.getMainStream().getFileChannel();
+        assert openFile.getMainStream().getDescriptor().isSeekable();
+        
+        FileChannel fileChannel = (FileChannel)openFile.getMainStream().getDescriptor().getChannel();
         int lockMode = RubyNumeric.num2int(lockingConstant);
 
         try {

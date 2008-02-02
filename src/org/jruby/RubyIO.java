@@ -1240,7 +1240,7 @@ public class RubyIO extends RubyObject {
 
     @JRubyMethod(name = {"tty?", "isatty"})
     public RubyBoolean tty_p() {
-        return getRuntime().newBoolean(getRuntime().getPosix().isatty(openFile.getMainStream().getFD()));
+        return getRuntime().newBoolean(getRuntime().getPosix().isatty(openFile.getMainStream().getDescriptor().getFileDescriptor()));
     }
     
     @JRubyMethod(name = "initialize_copy", required = 1)
@@ -1973,7 +1973,7 @@ public class RubyIO extends RubyObject {
     
     @JRubyMethod
     public IRubyObject stat() {
-        return getRuntime().newFileStat(openFile.getMainStream().getFD());
+        return getRuntime().newFileStat(openFile.getMainStream().getDescriptor().getFileDescriptor());
     }
 
     /** 

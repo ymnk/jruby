@@ -28,13 +28,11 @@
 package org.jruby.util.io;
 
 import java.io.EOFException;
-import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.FileChannel;
 import org.jruby.util.ByteList;
-import org.jruby.util.io.ModeFlags;
 
 /**
  */
@@ -47,20 +45,10 @@ public interface Stream {
     public static final ByteList PARAGRAPH_DELIMETER = ByteList.create("PARAGRPH_DELIM_MRK_ER");
     
     public static final ByteList PARAGRAPH_SEPARATOR = ByteList.create("\n\n");
-
-    public FileDescriptor getFD();
     
     public ChannelDescriptor getDescriptor();
     
-    public void setDescriptor(ChannelDescriptor descriptor);
-    
-    public abstract FileChannel getFileChannel();
-    
     public void clearerr();
-
-    public boolean isReadable();
-
-    public boolean isWritable();
     
     public ModeFlags getModes();
     
@@ -83,7 +71,6 @@ public interface Stream {
     public abstract void fputc(int c) throws IOException, BadDescriptorException;
     
     public abstract ByteList read(int number) throws IOException, BadDescriptorException, EOFException;
-    public abstract int write(ByteList buf) throws IOException, BadDescriptorException;
     
     public abstract void fclose() throws IOException, BadDescriptorException;
     public abstract int fflush() throws IOException, BadDescriptorException;
