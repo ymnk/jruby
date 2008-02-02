@@ -190,6 +190,17 @@ public class ChannelDescriptor {
         return writeChannel.write(ByteBuffer.wrap(buf.unsafeBytes(), buf.begin(), buf.length()));
     }
     
+    public int write(int c) throws IOException, BadDescriptorException {
+        checkOpen();
+        
+        WritableByteChannel writeChannel = (WritableByteChannel)channel;
+        
+        ByteBuffer buf = ByteBuffer.allocate(1);
+        buf.put(0, (byte)c);
+        
+        return writeChannel.write(buf);
+    }
+    
     public static ChannelDescriptor open(String cwd, String path, IOModes modes, int perm) throws FileNotFoundException, DirectoryAsFileException, FileExistsException, IOException {
         // FIXME: Do something with permissions
         

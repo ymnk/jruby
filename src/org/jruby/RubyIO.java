@@ -2590,38 +2590,4 @@ public class RubyIO extends RubyObject {
            sink
        });
    }
-   
-    /**
-     * returns non-nil if input available without blocking, false if EOF or not open/readable, otherwise nil.
-     */
-    public IRubyObject ready() {
-       try {
-           if (!openFile.mainStream.isOpen() || !openFile.mainStream.isReadable() || openFile.getMainStream().feof()) {
-               return getRuntime().getFalse();
-           }
-
-           int avail = openFile.getMainStream().ready();
-           if (avail > 0) {
-               return getRuntime().newFixnum(avail);
-           } 
-       } catch (Exception anyEx) {
-           return getRuntime().getFalse();
-       }
-       return getRuntime().getNil();
-   }
-   
-    /**
-     * waits until input available or timed out and returns self, or nil when EOF reached.
-     */
-    public IRubyObject io_wait() {
-       try {
-           if (openFile.getMainStream().feof()) {
-               return getRuntime().getNil();
-           }
-            openFile.getMainStream().waitUntilReady();
-       } catch (Exception anyEx) {
-           return getRuntime().getNil();
-       }
-       return this;
-   }
 }
