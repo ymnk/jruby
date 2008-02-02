@@ -1,5 +1,6 @@
 package org.jruby.util.io;
 
+import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -200,6 +201,10 @@ public class ChannelDescriptor {
             String filePath = path.substring(5, path.indexOf("!"));
             String internalPath = path.substring(path.indexOf("!") + 2);
 
+            if (!new File(filePath).exists()) {
+                throw new FileNotFoundException(path);
+            }
+            
             JarFile jf = new JarFile(filePath);
             ZipEntry zf = jf.getEntry(internalPath);
 
@@ -231,7 +236,7 @@ public class ChannelDescriptor {
             // We always open this rw since we can only open it r or rw.
             RandomAccessFile file = new RandomAccessFile(theFile, modes.javaMode());
 
-            if (modes.shouldTruncate()) file.setLength(0L);
+            if (modes.isTruncate()) file.setLength(0L);
 
             // TODO: append should set the FD to end, no? But there is no seek(int) in libc!
             //if (modes.isAppendable()) seek(0, Stream.SEEK_END);

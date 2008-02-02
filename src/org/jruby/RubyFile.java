@@ -380,7 +380,7 @@ public class RubyFile extends RubyIO {
             throw getRuntime().newRuntimeError("reinitializing File");
         }
         
-        if (args.length < 0 && args.length < 3) {
+        if (args.length > 0 && args.length < 3) {
             IRubyObject fd = TypeConverter.convertToTypeWithCheck(args[0], getRuntime().getFixnum(), MethodIndex.TO_INT, "to_int");
             if (!fd.isNil()) {
                 args[0] = fd;
@@ -432,14 +432,14 @@ public class RubyFile extends RubyIO {
         return this;
     }
     
-    private void sysopenInternal(String path, IOModes mode, int perm) throws InvalidValueException {
+    private void sysopenInternal(String path, IOModes modes, int perm) throws InvalidValueException {
         openFile = new OpenFile();
         
         openFile.setPath(path);
-        openFile.setMode(mode.getOpenFileFlags());
+        openFile.setMode(modes.getOpenFileFlags());
         
-        ChannelDescriptor descriptor = sysopen(path, mode.getOpenFileFlags(), perm);
-        openFile.setMainStream(fdopen(descriptor, mode));
+        ChannelDescriptor descriptor = sysopen(path, modes, perm);
+        openFile.setMainStream(fdopen(descriptor, modes));
         
         registerDescriptor(descriptor);
     }
@@ -454,12 +454,12 @@ public class RubyFile extends RubyIO {
         registerDescriptor(openFile.getMainStream().getDescriptor());
     }
     
-    private ChannelDescriptor sysopen(String path, int mode, int perm) throws InvalidValueException {
+    private ChannelDescriptor sysopen(String path, IOModes modes, int perm) throws InvalidValueException {
         try {
             ChannelDescriptor descriptor = ChannelDescriptor.open(
                     getRuntime().getCurrentDirectory(),
                     path,
-                    OpenFile.getModeAsIOModes(getRuntime(), mode),
+                    modes,
                     perm);
 
             // TODO: check if too many open files, GC and try again
@@ -516,45 +516,6 @@ public class RubyFile extends RubyIO {
         } catch (PipeException ex) {
             throw getRuntime().newErrnoEPIPEError();
         }
-    }
-    
-    private Stream fdopen(ChannelDescriptor descriptor, int mode) throws InvalidValueException {
-        Stream file = ChannelStream.fdopen(
-                getRuntime(),
-                descriptor,
-                OpenFile.getModeAsIOModes(getRuntime(), mode));
-        if (file == null) {
-            // TODO: GC and try again if max files
-//    #if defined(sun)
-//            if (errno == 0 || errno == EMFILE || errno == ENFILE) {
-//    #else
-//            if (errno == EMFILE || errno == ENFILE) {
-//    #endif
-//                rb_gc();
-//    #if defined(sun)
-//                errno = 0;
-//    #endif
-//                file = fdopen(fd, mode);
-//            }
-            if (file == null) {
-                // TODO: set errno and fail
-//    #ifdef _WIN32
-//                if (errno == 0) errno = EINVAL;
-//    #endif
-//    #if defined(sun)
-//                if (errno == 0) errno = EMFILE;
-//    #endif
-//                rb_sys_fail(0);
-            }
-        }
-
-        // Do we need to be in SETVBUF mode for buffering to make sense? This comes up elsewhere.
-//    #ifdef USE_SETVBUF
-//        if (setvbuf(file, NULL, _IOFBF, 0) != 0)
-//            rb_warn("setvbuf() can't be honoured (fd=%d)", fd);
-//    #endif
-        
-        return file;
     }
 
     @JRubyMethod(required = 1)

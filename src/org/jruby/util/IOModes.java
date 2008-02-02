@@ -73,7 +73,12 @@ public class IOModes implements Cloneable {
     
     public String javaMode() {
         // Do not open as 'rw' by default since a file with read-only permissions will fail on 'rw'
-        return (isWritable() || shouldTruncate()) ? "rw" : "r";
+        if (isWritable() || isCreate() || isTruncate()) {
+            // Java requires "w" for creating a file that does not exist
+            return "rw";
+        } else {
+            return "r";
+        }
     }
     
     private static boolean isReadOnly(long modes) {
@@ -104,7 +109,7 @@ public class IOModes implements Cloneable {
     	return (modes & APPEND) != 0;
     }
 
-    public boolean shouldTruncate() {
+    public boolean isTruncate() {
     	return (modes & TRUNC) != 0;
     }
 
@@ -129,7 +134,7 @@ public class IOModes implements Cloneable {
         int flags = 0;
 
         int readWrite = modes & 3;
-        if (readWrite == 0) {
+        if (readWrite == RDONLY) {
             flags = OpenFile.READABLE;
         } else if (readWrite == WRONLY) {
             flags = OpenFile.WRITABLE;

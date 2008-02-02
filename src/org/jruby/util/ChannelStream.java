@@ -865,7 +865,7 @@ public class ChannelStream implements Stream, Finalizable {
         // We always open this rw since we can only open it r or rw.
         RandomAccessFile file = new RandomAccessFile(theFile, modes.javaMode());
 
-        if (modes.shouldTruncate()) file.setLength(0L);
+        if (modes.isTruncate()) file.setLength(0L);
 
         descriptor = new ChannelDescriptor(file.getChannel(), descriptor.getFileno(), modes, file.getFD());
         

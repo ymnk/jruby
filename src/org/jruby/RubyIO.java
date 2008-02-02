@@ -180,14 +180,6 @@ public class RubyIO extends RubyObject {
             return null;
         }
         
-        public IOModes getModeAsIOModes(Ruby runtime) throws InvalidValueException {
-            return getModeAsIOModes(runtime, mode);
-        }
-        
-        public static IOModes getModeAsIOModes(Ruby runtime, int mode) throws InvalidValueException {
-            return new IOModes(getIOModesIntFromString(runtime, getStringFromMode(mode)));
-        }
-        
         public void checkReadable(Ruby runtime) throws IOException, BadDescriptorException, PipeException, InvalidValueException {
             checkClosed(runtime);
             
@@ -1578,7 +1570,7 @@ public class RubyIO extends RubyObject {
                 if (newFile.isWritable()) {
                     modes = new IOModes(IOModes.WRONLY);
                 } else {
-                    modes = originalFile.getModeAsIOModes(getRuntime());
+                    modes = originalFile.getMainStream().getModes();
                 }
             }
             
