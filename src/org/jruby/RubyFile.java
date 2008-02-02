@@ -35,6 +35,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import org.jruby.util.io.OpenFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jruby.util.Stream.BadDescriptorException;

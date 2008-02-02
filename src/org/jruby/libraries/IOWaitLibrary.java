@@ -34,6 +34,7 @@ import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.load.Library;
 import org.jruby.util.io.ChannelDescriptor;
+import org.jruby.util.io.OpenFile;
 
 /**
  * @author Nick Sieger
@@ -53,7 +54,7 @@ public class IOWaitLibrary implements Library {
     public static IRubyObject ready(IRubyObject obj) {
         RubyIO io = (RubyIO)obj;
         try {
-            RubyIO.OpenFile openFile = io.getOpenFile();
+            OpenFile openFile = io.getOpenFile();
             ChannelDescriptor descriptor = openFile.getMainStream().getDescriptor();
             if (!descriptor.isOpen() || !openFile.getMainStream().isReadable() || openFile.getMainStream().feof()) {
                 return obj.getRuntime().getFalse();
@@ -75,7 +76,7 @@ public class IOWaitLibrary implements Library {
     public static IRubyObject io_wait(IRubyObject obj) {
         RubyIO io = (RubyIO)obj;
         try {
-            RubyIO.OpenFile openFile = io.getOpenFile();
+            OpenFile openFile = io.getOpenFile();
             ChannelDescriptor descriptor = openFile.getMainStream().getDescriptor();
             if (openFile.getMainStream().feof()) {
                 return obj.getRuntime().getNil();
