@@ -741,6 +741,13 @@ public class ChannelStream implements Stream, Finalizable {
 
     public synchronized ByteList fread(int number) throws IOException, BadDescriptorException {
         try {
+            if (number == 0) {
+                if (eof) {
+                    return null;
+                } else {
+                    return new ByteList(0);
+                }
+            }
 
             if (ungotc >= 0) {
                 ByteList buf2 = bufferedRead(number - 1);

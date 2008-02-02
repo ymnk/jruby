@@ -35,6 +35,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import org.jruby.util.io.STDIO;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -173,9 +174,9 @@ public class RubyGlobal {
 
         runtime.defineVariable(new BacktraceGlobalVariable(runtime, "$@"));
 
-        IRubyObject stdin = new RubyIO(runtime, RubyIO.STDIO.IN);
-        IRubyObject stdout = new RubyIO(runtime, RubyIO.STDIO.OUT);
-        IRubyObject stderr = new RubyIO(runtime, RubyIO.STDIO.ERR);
+        IRubyObject stdin = new RubyIO(runtime, STDIO.IN);
+        IRubyObject stdout = new RubyIO(runtime, STDIO.OUT);
+        IRubyObject stderr = new RubyIO(runtime, STDIO.ERR);
 
         runtime.defineVariable(new InputGlobalVariable(runtime, "$stdin", stdin));
 

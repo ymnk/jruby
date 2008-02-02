@@ -35,8 +35,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.jruby.util.io.STDIO;
 import org.jruby.util.io.OpenFile;
 import org.jruby.util.io.ChannelDescriptor;
 import java.io.EOFException;
@@ -81,25 +80,6 @@ import org.jruby.util.ChannelStream;
  * @author jpetersen
  */
 public class RubyIO extends RubyObject {
-    public enum STDIO {
-        IN, OUT, ERR;
-        
-        public int fileno() {
-            switch (this) {
-            case IN: return 0;
-            case OUT: return 1;
-            case ERR: return 2;
-            default: throw new RuntimeException();
-            }
-        }
-        
-        public static boolean isSTDIO(int fileno) {
-            if (fileno >= 0 && fileno <= 2) return true;
-            
-            return false;
-        }
-    }
-    
     protected OpenFile openFile;
     
     public void registerDescriptor(ChannelDescriptor descriptor) {
@@ -1757,10 +1737,6 @@ public class RubyIO extends RubyObject {
         RubyString str = null;
 //        ByteList buffer = null;
         if (args.length == 1 || args[1].isNil()) {
-            if (length == 0) {
-                return RubyString.newStringShared(getRuntime(), ByteList.EMPTY_BYTELIST);
-            }
-
 //            buffer = new ByteList(length);
 //            str = RubyString.newString(getRuntime(), buffer);
         } else {
@@ -1784,10 +1760,7 @@ public class RubyIO extends RubyObject {
             // TODO: Ruby locks the string here
 
             // READ_CHECK from MRI io.c
-            if (openFile.getMainStream().readDataBuffered()) {
-                // TODO: thread wait fd stuff
-                // TODO: checkClosed? see rb_io_check_closed in io.c
-            }
+            readCheck(openFile.getMainStream());
 
             // TODO: check buffer length again?
     //        if (RSTRING(str)->len != len) {
@@ -1802,7 +1775,8 @@ public class RubyIO extends RubyObject {
 
             // TODO: change this to check number read into buffer once that's working
     //        if (read == 0) {
-            if (newBuffer.length() == 0) {
+            
+            if (newBuffer == null || newBuffer.length() == 0) {
                 if (openFile.getMainStream() == null) {
                     return getRuntime().getNil();
                 }
@@ -1814,19 +1788,26 @@ public class RubyIO extends RubyObject {
 
                 if (length > 0) {
                     // I think this is only partly correct; sys fail based on errno in Ruby
-                    if (newBuffer.length() == 0 && length > 0) {
-                        throw getRuntime().newEOFError();
-                    }
+                    throw getRuntime().newEOFError();
                 }
             }
 
 
             // TODO: Ruby truncates string to specific size here, but our bytelist should handle this already?
 
+            // FIXME: I don't like the null checks here
             if (str == null) {
-                str = RubyString.newString(getRuntime(), newBuffer);
+                if (newBuffer == null) {
+                    str = getRuntime().newString();
+                } else {
+                    str = RubyString.newString(getRuntime(), newBuffer);
+                }
             } else {
-                str.setValue(newBuffer);
+                if (newBuffer == null) {
+                    str.setValue(ByteList.EMPTY_BYTELIST.dup());
+                } else {
+                    str.setValue(newBuffer);
+                }
             }
             str.setTaint(true);
 
@@ -1856,8 +1837,7 @@ public class RubyIO extends RubyObject {
         
         // READ_CHECK from MRI io.c
         if (openFile.getMainStream().readDataBuffered()) {
-            // TODO: thread wait fd stuff
-            // TODO: checkClosed? see rb_io_check_closed in io.c
+            openFile.checkClosed(getRuntime());
         }
         
         ByteList newBuffer = openFile.getMainStream().readall();
