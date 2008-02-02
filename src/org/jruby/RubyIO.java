@@ -35,6 +35,11 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import java.io.FileNotFoundException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.jruby.util.io.DirectoryAsFileException;
+import org.jruby.util.io.FileExistsException;
 import org.jruby.util.io.STDIO;
 import org.jruby.util.io.OpenFile;
 import org.jruby.util.io.ChannelDescriptor;
@@ -66,14 +71,14 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
-import org.jruby.util.Stream;
-import org.jruby.util.Stream.InvalidValueException;
-import org.jruby.util.Stream.PipeException;
-import org.jruby.util.IOModes;
+import org.jruby.util.io.Stream;
+import org.jruby.util.io.ModeFlags;
 import org.jruby.util.ShellLauncher;
 import org.jruby.util.TypeConverter;
-import org.jruby.util.Stream.BadDescriptorException;
-import org.jruby.util.ChannelStream;
+import org.jruby.util.io.BadDescriptorException;
+import org.jruby.util.io.ChannelStream;
+import org.jruby.util.io.InvalidValueException;
+import org.jruby.util.io.PipeException;
 
 /**
  * 
@@ -177,7 +182,7 @@ public class RubyIO extends RubyObject {
         registerDescriptor(openFile.getMainStream().getDescriptor());
     }
 
-    public RubyIO(Ruby runtime, Process process, IOModes modes) {
+    public RubyIO(Ruby runtime, Process process, ModeFlags modes) {
     	super(runtime, runtime.getIO());
         
         openFile = new OpenFile();
@@ -238,14 +243,14 @@ public class RubyIO extends RubyObject {
                 openFile.setMainStream(
                         new ChannelStream(
                             runtime, 
-                            new ChannelDescriptor(Channels.newChannel(runtime.getIn()), 0, new IOModes(IOModes.RDONLY), FileDescriptor.in),
+                            new ChannelDescriptor(Channels.newChannel(runtime.getIn()), 0, new ModeFlags(ModeFlags.RDONLY), FileDescriptor.in),
                             FileDescriptor.in));
                 break;
             case OUT:
                 openFile.setMainStream(
                         new ChannelStream(
                             runtime, 
-                            new ChannelDescriptor(Channels.newChannel(runtime.getOut()), 1, new IOModes(IOModes.WRONLY | IOModes.APPEND), FileDescriptor.out),
+                            new ChannelDescriptor(Channels.newChannel(runtime.getOut()), 1, new ModeFlags(ModeFlags.WRONLY | ModeFlags.APPEND), FileDescriptor.out),
                             FileDescriptor.out));
                 openFile.getMainStream().setSync(true);
                 break;
@@ -253,7 +258,7 @@ public class RubyIO extends RubyObject {
                 openFile.setMainStream(
                         new ChannelStream(
                             runtime, 
-                            new ChannelDescriptor(Channels.newChannel(runtime.getErr()), 2, new IOModes(IOModes.WRONLY | IOModes.APPEND), FileDescriptor.out), 
+                            new ChannelDescriptor(Channels.newChannel(runtime.getErr()), 2, new ModeFlags(ModeFlags.WRONLY | ModeFlags.APPEND), FileDescriptor.out), 
                             FileDescriptor.err));
                 openFile.getMainStream().setSync(true);
                 break;
@@ -395,7 +400,7 @@ public class RubyIO extends RubyObject {
                         //fptr->mode &= (m & FMODE_READABLE) ? ~FMODE_READABLE : ~FMODE_WRITABLE;
 
                         if (pipeFile != null) {
-                            selfFile.setMainStream(ChannelStream.fdopen(getRuntime(), originalDescriptor, new IOModes()));
+                            selfFile.setMainStream(ChannelStream.fdopen(getRuntime(), originalDescriptor, new ModeFlags()));
                             selfFile.setPipeStream(pipeFile);
                         } else {
                             selfFile.setMainStream(
@@ -462,7 +467,7 @@ public class RubyIO extends RubyObject {
             }
             
             try {
-                IOModes modes;
+                ModeFlags modes;
                 if (args.length > 1) {
                     IRubyObject modeString = args[1].convertToString();
                     modes = getIOModes(getRuntime(), modeString.toString());
@@ -483,7 +488,11 @@ public class RubyIO extends RubyObject {
                 openFile.setPath(path);
             
                 if (openFile.getMainStream() == null) {
-                    openFile.setMainStream(ChannelStream.fopen(getRuntime(), path, modes));
+                    try {
+                        openFile.setMainStream(ChannelStream.fopen(getRuntime(), path, modes));
+                    } catch (FileExistsException fee) {
+                        throw getRuntime().newErrnoEEXISTError(path);
+                    }
                     
                     registerDescriptor(openFile.getMainStream().getDescriptor());
                     if (openFile.getPipeStream() != null) {
@@ -509,7 +518,7 @@ public class RubyIO extends RubyObject {
                 throw getRuntime().newIOErrorFromException(ex);
             } catch (BadDescriptorException ex) {
                 throw getRuntime().newErrnoEBADFError();
-            } catch (Stream.InvalidValueException e) {
+            } catch (InvalidValueException e) {
             	throw getRuntime().newErrnoEINVALError();
             }
         }
@@ -518,8 +527,8 @@ public class RubyIO extends RubyObject {
         return this;
     }
     
-    public static IOModes getIOModes(Ruby runtime, String modesString) throws InvalidValueException {
-        return new IOModes(getIOModesIntFromString(runtime, modesString));
+    public static ModeFlags getIOModes(Ruby runtime, String modesString) throws InvalidValueException {
+        return new ModeFlags(getIOModesIntFromString(runtime, modesString));
     }
         
     public static int getIOModesIntFromString(Ruby runtime, String modesString) {
@@ -532,13 +541,13 @@ public class RubyIO extends RubyObject {
 
         switch (modesString.charAt(0)) {
         case 'r' :
-            modes |= IOModes.RDONLY;
+            modes |= ModeFlags.RDONLY;
             break;
         case 'a' :
-            modes |= IOModes.APPEND | IOModes.WRONLY | IOModes.CREAT;
+            modes |= ModeFlags.APPEND | ModeFlags.WRONLY | ModeFlags.CREAT;
             break;
         case 'w' :
-            modes |= IOModes.WRONLY | IOModes.TRUNC | IOModes.CREAT;
+            modes |= ModeFlags.WRONLY | ModeFlags.TRUNC | ModeFlags.CREAT;
             break;
         default :
             throw runtime.newArgumentError("illegal access mode " + modes);
@@ -547,10 +556,10 @@ public class RubyIO extends RubyObject {
         for (int n = 1; n < length; n++) {
             switch (modesString.charAt(n)) {
             case 'b':
-                modes |= IOModes.BINARY;
+                modes |= ModeFlags.BINARY;
                 break;
             case '+':
-                modes = (modes & ~IOModes.ACCMODE) | IOModes.RDWR;
+                modes = (modes & ~ModeFlags.ACCMODE) | ModeFlags.RDWR;
                 break;
             default:
                 throw runtime.newArgumentError("illegal access mode " + modes);
@@ -609,7 +618,7 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newErrnoEINVALError();
         } catch (EOFException e) {
             return getRuntime().getNil();
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
@@ -632,7 +641,7 @@ public class RubyIO extends RubyObject {
     @JRubyMethod(name = "initialize", required = 1, optional = 1, frame = true, visibility = Visibility.PRIVATE)
     public IRubyObject initialize(IRubyObject[] args, Block unusedBlock) {
         int argCount = args.length;
-        IOModes modes;
+        ModeFlags modes;
         
         int fileno = RubyNumeric.fix2int(args[0]);
         
@@ -647,7 +656,7 @@ public class RubyIO extends RubyObject {
             
             if (argCount == 2) {
                 if (args[1] instanceof RubyFixnum) {
-                    modes = new IOModes(RubyFixnum.fix2long(args[1]));
+                    modes = new ModeFlags(RubyFixnum.fix2long(args[1]));
                 } else {
                     modes = getIOModes(getRuntime(), (args[1].convertToString().toString()));
                 }
@@ -668,7 +677,7 @@ public class RubyIO extends RubyObject {
         return this;
     }
     
-    protected Stream fdopen(ChannelDescriptor existingDescriptor, IOModes modes) throws InvalidValueException {
+    protected Stream fdopen(ChannelDescriptor existingDescriptor, ModeFlags modes) throws InvalidValueException {
         // See if we already have this descriptor open.
         // If so then we can mostly share the handler (keep open
         // file, but possibly change the mode).
@@ -770,7 +779,7 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newErrnoEINVALError();
         } catch (PipeException ex) {
             throw getRuntime().newErrnoEPIPEError();
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (IOException e) {
             e.printStackTrace();
@@ -977,7 +986,7 @@ public class RubyIO extends RubyObject {
             return getRuntime().newFixnum(openFile.getMainStream().fgetpos());
         } catch (BadDescriptorException bde) {
             throw getRuntime().newErrnoEBADFError();
-        } catch (Stream.PipeException e) {
+        } catch (PipeException e) {
             throw getRuntime().newErrnoESPIPEError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
@@ -994,9 +1003,9 @@ public class RubyIO extends RubyObject {
         
         try {
             openFile.getMainStream().fseek(offset, Stream.SEEK_SET);
-        } catch (Stream.InvalidValueException e) {
+        } catch (InvalidValueException e) {
             throw getRuntime().newErrnoEINVALError();
-        } catch (Stream.PipeException e) {
+        } catch (PipeException e) {
             throw getRuntime().newErrnoESPIPEError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
@@ -1063,7 +1072,7 @@ public class RubyIO extends RubyObject {
 
         try {
             openFile.getMainStream().fputc(c);
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             return RubyFixnum.zero(getRuntime());
         } catch (IOException e) {
             return RubyFixnum.zero(getRuntime());
@@ -1087,9 +1096,9 @@ public class RubyIO extends RubyObject {
             openFile.seek(offset, whence);
         } catch (BadDescriptorException ex) {
             throw getRuntime().newErrnoEBADFError();
-        } catch (Stream.InvalidValueException e) {
+        } catch (InvalidValueException e) {
             throw getRuntime().newErrnoEINVALError();
-        } catch (Stream.PipeException e) {
+        } catch (PipeException e) {
             throw getRuntime().newErrnoESPIPEError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
@@ -1122,9 +1131,9 @@ public class RubyIO extends RubyObject {
             openFile.getMainStream().getDescriptor().lseek(offset, whence);
         } catch (BadDescriptorException ex) {
             throw getRuntime().newErrnoEBADFError();
-        } catch (Stream.InvalidValueException e) {
+        } catch (InvalidValueException e) {
             throw getRuntime().newErrnoEINVALError();
-        } catch (Stream.PipeException e) {
+        } catch (PipeException e) {
             throw getRuntime().newErrnoESPIPEError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
@@ -1145,9 +1154,9 @@ public class RubyIO extends RubyObject {
 //            if (io == current_file) {
 //                gets_lineno -= fptr->lineno;
 //            }
-        } catch (Stream.InvalidValueException e) {
+        } catch (InvalidValueException e) {
             throw getRuntime().newErrnoEINVALError();
-        } catch (Stream.PipeException e) {
+        } catch (PipeException e) {
             throw getRuntime().newErrnoESPIPEError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
@@ -1171,7 +1180,7 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newErrnoEPIPEError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         }
 
@@ -1222,7 +1231,7 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newErrnoEPIPEError();
         } catch (InvalidValueException ex) {
             throw getRuntime().newErrnoEINVALError();
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
@@ -1259,20 +1268,20 @@ public class RubyIO extends RubyObject {
             newFile.setPath(originalFile.getPath());
             newFile.setFinalizer(originalFile.getFinalizer());
             
-            IOModes modes;
+            ModeFlags modes;
             if (newFile.isReadable()) {
                 if (newFile.isWritable()) {
                     if (newFile.getPipeStream() != null) {
-                        modes = new IOModes(IOModes.RDONLY);
+                        modes = new ModeFlags(ModeFlags.RDONLY);
                     } else {
-                        modes = new IOModes(IOModes.RDWR);
+                        modes = new ModeFlags(ModeFlags.RDWR);
                     }
                 } else {
-                    modes = new IOModes(IOModes.RDONLY);
+                    modes = new ModeFlags(ModeFlags.RDONLY);
                 }
             } else {
                 if (newFile.isWritable()) {
-                    modes = new IOModes(IOModes.WRONLY);
+                    modes = new ModeFlags(ModeFlags.WRONLY);
                 } else {
                     modes = originalFile.getMainStream().getModes();
                 }
@@ -1440,7 +1449,7 @@ public class RubyIO extends RubyObject {
     public RubyIO flush() {
         try { 
             openFile.getMainStream().fflush();
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
@@ -1479,7 +1488,7 @@ public class RubyIO extends RubyObject {
         if (realCmd == 1L) {  // cmd is F_SETFL
             boolean block = true;
             
-            if ((realArg & IOModes.NONBLOCK) == IOModes.NONBLOCK) {
+            if ((realArg & ModeFlags.NONBLOCK) == ModeFlags.NONBLOCK) {
                 block = false;
             }
 
@@ -1579,7 +1588,7 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newErrnoEPIPEError();
         } catch (InvalidValueException ex) {
             throw getRuntime().newErrnoEINVALError();
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (EOFException e) {
             throw getRuntime().newEOFError();
@@ -1621,7 +1630,7 @@ public class RubyIO extends RubyObject {
             } 
 
             return strbuf;
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (EOFException e) {
             return getRuntime().getNil();
@@ -1681,11 +1690,11 @@ public class RubyIO extends RubyObject {
             str.setTaint(true);
             
             return str;
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
-        } catch (Stream.InvalidValueException e) {
+        } catch (InvalidValueException e) {
             throw getRuntime().newErrnoEINVALError();
-        } catch (Stream.PipeException e) {
+        } catch (PipeException e) {
             throw getRuntime().newErrnoEPIPEError();
         } catch (EOFException e) {
             throw getRuntime().newEOFError();
@@ -2004,7 +2013,7 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newErrnoEPIPEError();
         } catch (InvalidValueException ex) {
             throw getRuntime().newErrnoEINVALError();
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (EOFException e) {
             return getRuntime().getNil();
@@ -2285,14 +2294,14 @@ public class RubyIO extends RubyObject {
 
         try {
             if (args.length == 1) {
-                mode = IOModes.RDONLY;
+                mode = ModeFlags.RDONLY;
             } else if (args[1] instanceof RubyFixnum) {
                 mode = RubyFixnum.num2int(args[1]);
             } else {
                 mode = getIOModesIntFromString(runtime, args[1].convertToString().toString());
             }
 
-            IOModes modes = new IOModes(mode);
+            ModeFlags modes = new ModeFlags(mode);
             IRubyObject cmdObj = args[0].convertToString();
             runtime.checkSafeString(cmdObj);
         

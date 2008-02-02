@@ -50,9 +50,9 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.IOModes;
-import org.jruby.util.Stream.InvalidValueException;
+import org.jruby.util.io.ModeFlags;
 import org.jruby.util.io.ChannelDescriptor;
+import org.jruby.util.io.InvalidValueException;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -98,7 +98,7 @@ public class RubyTCPServer extends RubyTCPSocket {
             ssc = ServerSocketChannel.open();
             socket_address = new InetSocketAddress(addr, RubyNumeric.fix2int(port));
             ssc.socket().bind(socket_address);
-            initSocket(new ChannelDescriptor(ssc, RubyIO.getNewFileno(), new IOModes(IOModes.RDWR), new FileDescriptor()));
+            initSocket(new ChannelDescriptor(ssc, RubyIO.getNewFileno(), new ModeFlags(ModeFlags.RDWR), new FileDescriptor()));
         } catch (InvalidValueException ex) {
             throw getRuntime().newErrnoEINVALError();
         } catch(UnknownHostException e) {
@@ -132,7 +132,7 @@ public class RubyTCPServer extends RubyTCPSocket {
                 } else {
                     try {
                         // otherwise one key has been selected (ours) so we get the channel and hand it off
-                        socket.initSocket(new ChannelDescriptor(ssc.accept(), RubyIO.getNewFileno(), new IOModes(IOModes.RDWR), new FileDescriptor()));
+                        socket.initSocket(new ChannelDescriptor(ssc.accept(), RubyIO.getNewFileno(), new ModeFlags(ModeFlags.RDWR), new FileDescriptor()));
                     } catch (InvalidValueException ex) {
                         throw getRuntime().newErrnoEINVALError();
                     }
@@ -166,7 +166,7 @@ public class RubyTCPServer extends RubyTCPSocket {
             } else {
                 try {
                     // otherwise one key has been selected (ours) so we get the channel and hand it off
-                    socket.initSocket(new ChannelDescriptor(ssc.accept(), RubyIO.getNewFileno(), new IOModes(IOModes.RDWR), new FileDescriptor()));
+                    socket.initSocket(new ChannelDescriptor(ssc.accept(), RubyIO.getNewFileno(), new ModeFlags(ModeFlags.RDWR), new FileDescriptor()));
                 } catch (InvalidValueException ex) {
                     throw getRuntime().newErrnoEINVALError();
                 }

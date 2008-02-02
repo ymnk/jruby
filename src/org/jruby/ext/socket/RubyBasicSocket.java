@@ -28,7 +28,6 @@
 package org.jruby.ext.socket;
 
 import java.io.EOFException;
-import java.io.FileDescriptor;
 import java.io.IOException;
 import java.nio.channels.Channel;
 import java.nio.channels.SocketChannel;
@@ -39,8 +38,6 @@ import java.net.ServerSocket;
 import java.net.DatagramSocket;
 import java.net.SocketAddress;
 import java.net.InetSocketAddress;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.jruby.util.io.OpenFile;
 import org.jruby.Ruby;
 import org.jruby.RubyBoolean;
@@ -51,11 +48,9 @@ import org.jruby.RubyString;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.Stream;
-import org.jruby.util.ChannelStream;
-import org.jruby.util.IOModes;
-import org.jruby.util.Stream.BadDescriptorException;
-import org.jruby.util.Stream.InvalidValueException;
+import org.jruby.util.io.BadDescriptorException;
+import org.jruby.util.io.ChannelStream;
+import org.jruby.util.io.ModeFlags;
 import org.jruby.util.io.ChannelDescriptor;
 
 /**
@@ -93,11 +88,10 @@ public class RubyBasicSocket extends RubyIO {
         openFile = new OpenFile();
         
         try {
-            openFile.setMainStream(ChannelStream.fdopen(getRuntime(), descriptor, new IOModes(IOModes.RDONLY)));
-            openFile.setPipeStream(ChannelStream.fdopen(getRuntime(), descriptor, new IOModes(IOModes.WRONLY)));
+            openFile.setMainStream(ChannelStream.fdopen(getRuntime(), descriptor, new ModeFlags(ModeFlags.RDONLY)));
+            openFile.setPipeStream(ChannelStream.fdopen(getRuntime(), descriptor, new ModeFlags(ModeFlags.WRONLY)));
             openFile.getPipeStream().setSync(true);
-        } catch (InvalidValueException ex) {
-            ex.printStackTrace();
+        } catch (org.jruby.util.io.InvalidValueException ex) {
             throw getRuntime().newErrnoEINVALError();
         }
         openFile.setMode(OpenFile.READWRITE | OpenFile.SYNC);
@@ -123,7 +117,7 @@ public class RubyBasicSocket extends RubyIO {
     public IRubyObject recv(IRubyObject[] args) {
         try {
             return RubyString.newString(getRuntime(), openFile.getMainStream().read(RubyNumeric.fix2int(args[0])));
-        } catch (Stream.BadDescriptorException e) {
+        } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (EOFException e) {
             // recv returns nil on EOF

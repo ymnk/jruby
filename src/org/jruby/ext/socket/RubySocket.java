@@ -52,9 +52,9 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.load.Library;
 import org.jruby.util.ByteList;
-import org.jruby.util.IOModes;
-import org.jruby.util.Stream.InvalidValueException;
+import org.jruby.util.io.ModeFlags;
 import org.jruby.util.io.ChannelDescriptor;
+import org.jruby.util.io.InvalidValueException;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
@@ -252,10 +252,10 @@ public class RubySocket extends RubyBasicSocket {
         
             if(soType == SOCK_STREAM) {
                 SocketChannel channel = SocketChannel.open();
-                initSocket(new ChannelDescriptor(channel, RubyIO.getNewFileno(), new IOModes(IOModes.RDWR), new FileDescriptor()));
+                initSocket(new ChannelDescriptor(channel, RubyIO.getNewFileno(), new ModeFlags(ModeFlags.RDWR), new FileDescriptor()));
             } else if(soType == SOCK_DGRAM) {
                 DatagramChannel channel = DatagramChannel.open();
-                initSocket(new ChannelDescriptor(channel, RubyIO.getNewFileno(), new IOModes(IOModes.RDWR), new FileDescriptor()));
+                initSocket(new ChannelDescriptor(channel, RubyIO.getNewFileno(), new ModeFlags(ModeFlags.RDWR), new FileDescriptor()));
             }
         } catch (InvalidValueException ex) {
             throw getRuntime().newErrnoEINVALError();

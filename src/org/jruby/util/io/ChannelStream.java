@@ -31,7 +31,7 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.util;
+package org.jruby.util.io;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -49,14 +49,12 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.IllegalBlockingModeException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectableChannel;
-import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
 import static java.util.logging.Logger.getLogger;
 import org.jruby.Finalizable;
 import org.jruby.Ruby;
-import org.jruby.util.Stream.BadDescriptorException;
-import org.jruby.util.io.ChannelDescriptor;
-import org.jruby.util.io.ChannelDescriptor.FileExistsException;
+import org.jruby.util.ByteList;
+import org.jruby.util.JRubyFile;
 
 /**
  * <p>This file implements a seekable IO file.</p>
@@ -66,7 +64,7 @@ public class ChannelStream implements Stream, Finalizable {
     private final static int BUFSIZE = 16 * 1024;
     
     private Ruby runtime;
-    protected IOModes modes;
+    protected ModeFlags modes;
     protected FileDescriptor fileDescriptor = null;
     protected boolean sync = false;
     
@@ -76,7 +74,7 @@ public class ChannelStream implements Stream, Finalizable {
     private boolean blocking = true;
     protected int ungotc = -1;
 
-    public ChannelStream(Ruby runtime, ChannelDescriptor descriptor, IOModes modes, FileDescriptor fileDescriptor) throws InvalidValueException {
+    public ChannelStream(Ruby runtime, ChannelDescriptor descriptor, ModeFlags modes, FileDescriptor fileDescriptor) throws InvalidValueException {
         descriptor.checkNewModes(modes);
         
         this.runtime = runtime;
@@ -104,7 +102,7 @@ public class ChannelStream implements Stream, Finalizable {
         this.reading = true;
     }
 
-    public ChannelStream(Ruby runtime, ChannelDescriptor descriptor, IOModes modes) throws InvalidValueException {
+    public ChannelStream(Ruby runtime, ChannelDescriptor descriptor, ModeFlags modes) throws InvalidValueException {
         descriptor.checkNewModes(modes);
         
         this.runtime = runtime;
@@ -139,11 +137,11 @@ public class ChannelStream implements Stream, Finalizable {
         if (!modes.isWritable()) throw new IOException("not opened for writing");
     }
 
-    public void checkPermissionsSubsetOf(IOModes subsetModes) {
+    public void checkPermissionsSubsetOf(ModeFlags subsetModes) {
         subsetModes.isSubsetOf(modes);
     }
     
-    public IOModes getModes() {
+    public ModeFlags getModes() {
     	return modes;
     }
     
@@ -468,7 +466,7 @@ public class ChannelStream implements Stream, Finalizable {
                 throw new InvalidValueException();
             }
         } else {
-            throw new Stream.PipeException();
+            throw new PipeException();
         }
     }
 
@@ -824,7 +822,7 @@ public class ChannelStream implements Stream, Finalizable {
         return blocking;
     }
 
-    public synchronized void freopen(String path, IOModes modes) throws DirectoryAsFileException, IOException, InvalidValueException, PipeException, BadDescriptorException {
+    public synchronized void freopen(String path, ModeFlags modes) throws DirectoryAsFileException, IOException, InvalidValueException, PipeException, BadDescriptorException {
         // flush first
         flushWrite();
         
@@ -850,7 +848,7 @@ public class ChannelStream implements Stream, Finalizable {
         }
 
         // We always open this rw since we can only open it r or rw.
-        RandomAccessFile file = new RandomAccessFile(theFile, modes.javaMode());
+        RandomAccessFile file = new RandomAccessFile(theFile, modes.toJavaModeString());
 
         if (modes.isTruncate()) file.setLength(0L);
 
@@ -861,7 +859,7 @@ public class ChannelStream implements Stream, Finalizable {
         if (modes.isAppendable()) fseek(0, SEEK_END);
     }
     
-    public static Stream fopen(Ruby runtime, String path, IOModes modes) throws FileNotFoundException, DirectoryAsFileException, FileExistsException, IOException, InvalidValueException, PipeException {
+    public static Stream fopen(Ruby runtime, String path, ModeFlags modes) throws FileNotFoundException, DirectoryAsFileException, FileExistsException, IOException, InvalidValueException, PipeException {
         String cwd = runtime.getCurrentDirectory();
         
         ChannelDescriptor descriptor = ChannelDescriptor.open(cwd, path, modes, -1);
@@ -873,7 +871,7 @@ public class ChannelStream implements Stream, Finalizable {
         return stream;
     }
     
-    public static Stream fdopen(Ruby runtime, ChannelDescriptor descriptor, IOModes modes) throws InvalidValueException {
+    public static Stream fdopen(Ruby runtime, ChannelDescriptor descriptor, ModeFlags modes) throws InvalidValueException {
         Stream handler = new ChannelStream(runtime, descriptor, modes, descriptor.getFileDescriptor());
         
         return handler;

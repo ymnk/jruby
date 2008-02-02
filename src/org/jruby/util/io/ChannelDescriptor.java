@@ -18,12 +18,7 @@ import static java.util.logging.Logger.getLogger;
 import java.util.zip.ZipEntry;
 import org.jruby.RubyIO;
 import org.jruby.util.ByteList;
-import org.jruby.util.DirectoryAsFileException;
-import org.jruby.util.IOModes;
 import org.jruby.util.JRubyFile;
-import org.jruby.util.Stream;
-import org.jruby.util.Stream.BadDescriptorException;
-import org.jruby.util.Stream.InvalidValueException;
 
 public class ChannelDescriptor {
     private static final boolean DEBUG = false;
@@ -43,10 +38,10 @@ public class ChannelDescriptor {
     private Channel channel;
     private final int fileno;
     private final FileDescriptor fileDescriptor;
-    private final IOModes originalModes;
+    private final ModeFlags originalModes;
     private AtomicInteger refCounter;
     
-    private ChannelDescriptor(Channel channel, int fileno, IOModes originalModes, FileDescriptor fileDescriptor, AtomicInteger refCounter) {
+    private ChannelDescriptor(Channel channel, int fileno, ModeFlags originalModes, FileDescriptor fileDescriptor, AtomicInteger refCounter) {
         this.refCounter = refCounter;
         this.channel = channel;
         this.fileno = fileno;
@@ -54,7 +49,7 @@ public class ChannelDescriptor {
         this.fileDescriptor = fileDescriptor;
     }
 
-    public ChannelDescriptor(Channel channel, int fileno, IOModes originalModes, FileDescriptor fileDescriptor) {
+    public ChannelDescriptor(Channel channel, int fileno, ModeFlags originalModes, FileDescriptor fileDescriptor) {
         this(channel, fileno, originalModes, fileDescriptor, new AtomicInteger(1));
     }
     
@@ -136,7 +131,7 @@ public class ChannelDescriptor {
             throw new BadDescriptorException();
         }
     }
-    public void lseek(long offset, int type) throws IOException, InvalidValueException, Stream.PipeException, BadDescriptorException {
+    public void lseek(long offset, int type) throws IOException, InvalidValueException, PipeException, BadDescriptorException {
         if (channel instanceof FileChannel) {
             checkOpen();
             
@@ -157,7 +152,7 @@ public class ChannelDescriptor {
                 throw new InvalidValueException();
             }
         } else {
-            throw new Stream.PipeException();
+            throw new PipeException();
         }
     }
 
@@ -209,7 +204,7 @@ public class ChannelDescriptor {
         return writeChannel.write(buf);
     }
     
-    public static ChannelDescriptor open(String cwd, String path, IOModes modes, int perm) throws FileNotFoundException, DirectoryAsFileException, FileExistsException, IOException {
+    public static ChannelDescriptor open(String cwd, String path, ModeFlags modes, int perm) throws FileNotFoundException, DirectoryAsFileException, FileExistsException, IOException {
         // FIXME: Do something with permissions
         
         if (path.equals("/dev/null")) {
@@ -253,7 +248,7 @@ public class ChannelDescriptor {
             }
 
             // We always open this rw since we can only open it r or rw.
-            RandomAccessFile file = new RandomAccessFile(theFile, modes.javaMode());
+            RandomAccessFile file = new RandomAccessFile(theFile, modes.toJavaModeString());
 
             if (modes.isTruncate()) file.setLength(0L);
 
@@ -287,34 +282,28 @@ public class ChannelDescriptor {
         }
     }
     
-    public IOModes getOriginalModes() {
+    public ModeFlags getOriginalModes() {
         return originalModes;
     }
     
-    public void checkNewModes(IOModes newModes) throws InvalidValueException {
+    public void checkNewModes(ModeFlags newModes) throws InvalidValueException {
         if (!newModes.isSubsetOf(originalModes)) {
             throw new InvalidValueException();
         }
     }
     
-    public static class FileExistsException extends IOException {
-        public FileExistsException(String path) {
-            super("file exists: " + path);
-        }
-    }
-    
-    private static IOModes getModesFromChannel(Channel channel) throws InvalidValueException {
-        IOModes modes;
+    private static ModeFlags getModesFromChannel(Channel channel) throws InvalidValueException {
+        ModeFlags modes;
         if (channel instanceof ReadableByteChannel) {
             if (channel instanceof WritableByteChannel) {
-                modes = new IOModes(RDWR);
+                modes = new ModeFlags(RDWR);
             }
-            modes = new IOModes(RDONLY);
+            modes = new ModeFlags(RDONLY);
         } else if (channel instanceof WritableByteChannel) {
-            modes = new IOModes(WRONLY);
+            modes = new ModeFlags(WRONLY);
         } else {
             // FIXME: I don't like this
-            modes = new IOModes(RDWR);
+            modes = new ModeFlags(RDWR);
         }
         
         return modes;

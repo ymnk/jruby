@@ -40,8 +40,6 @@ import java.net.UnknownHostException;
 
 import java.nio.channels.SocketChannel;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyIO;
@@ -52,9 +50,9 @@ import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.IOModes;
-import org.jruby.util.Stream.InvalidValueException;
+import org.jruby.util.io.ModeFlags;
 import org.jruby.util.io.ChannelDescriptor;
+import org.jruby.util.io.InvalidValueException;
 
 public class RubyTCPSocket extends RubyIPSocket {
     static void createTCPSocket(Ruby runtime) {
@@ -105,7 +103,7 @@ public class RubyTCPSocket extends RubyIPSocket {
                 socket.connect(new InetSocketAddress(InetAddress.getByName(remoteHost), remotePort));
             }
             channel.finishConnect();
-            initSocket(new ChannelDescriptor(channel, RubyIO.getNewFileno(), new IOModes(IOModes.RDWR), new FileDescriptor()));
+            initSocket(new ChannelDescriptor(channel, RubyIO.getNewFileno(), new ModeFlags(ModeFlags.RDWR), new FileDescriptor()));
         } catch (InvalidValueException ex) {
             throw getRuntime().newErrnoEINVALError();
         } catch(ConnectException e) {

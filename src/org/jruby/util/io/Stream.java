@@ -25,7 +25,7 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.util;
+package org.jruby.util.io;
 
 import java.io.EOFException;
 import java.io.FileDescriptor;
@@ -33,8 +33,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.FileChannel;
-
-import org.jruby.util.io.ChannelDescriptor;
+import org.jruby.util.ByteList;
+import org.jruby.util.io.ModeFlags;
 
 /**
  */
@@ -62,7 +62,7 @@ public interface Stream {
 
     public boolean isWritable();
     
-    public IOModes getModes();
+    public ModeFlags getModes();
     
     public boolean isSync();
 
@@ -149,15 +149,5 @@ public interface Stream {
     
     public void setBlocking(boolean blocking) throws IOException;
     
-    public void freopen(String path, IOModes modes) throws DirectoryAsFileException, IOException, InvalidValueException, PipeException, BadDescriptorException;
-    
-    public class PipeException extends Exception {
-		private static final long serialVersionUID = 1L;
-    }
-    public class BadDescriptorException extends Exception {
-		private static final long serialVersionUID = 1L;
-    }
-    public class InvalidValueException extends Exception {
-		private static final long serialVersionUID = 1L;
-    }
+    public void freopen(String path, ModeFlags modes) throws DirectoryAsFileException, IOException, InvalidValueException, PipeException, BadDescriptorException;
 }

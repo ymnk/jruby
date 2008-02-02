@@ -36,10 +36,6 @@
 package org.jruby;
 
 import org.jruby.util.io.OpenFile;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.jruby.util.Stream.BadDescriptorException;
-import org.jruby.util.Stream.PipeException;
 import org.jruby.util.io.ChannelDescriptor;
 import java.io.File;
 import java.io.FileDescriptor;
@@ -47,7 +43,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
-import java.nio.channels.Channel;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -61,16 +56,16 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
-import org.jruby.util.DirectoryAsFileException;
-import org.jruby.util.Stream;
-import org.jruby.util.ChannelStream;
-import org.jruby.util.IOModes;
+import org.jruby.util.io.DirectoryAsFileException;
+import org.jruby.util.io.Stream;
+import org.jruby.util.io.ChannelStream;
+import org.jruby.util.io.ModeFlags;
 import org.jruby.util.JRubyFile;
 import org.jruby.util.SafePropertyAccessor;
-import org.jruby.util.Stream.InvalidValueException;
 import org.jruby.util.TypeConverter;
-import org.jruby.util.io.ChannelDescriptor.FileExistsException;
-import org.jruby.util.io.NullWritableChannel;
+import org.jruby.util.io.FileExistsException;
+import org.jruby.util.io.InvalidValueException;
+import org.jruby.util.io.PipeException;
 
 /**
  * Ruby File class equivalent in java.
@@ -164,7 +159,7 @@ public class RubyFile extends RubyIO {
         // TODO: These were missing, so we're not handling them elsewhere?
         // FIXME: The old value, 32786, didn't match what IOModes expected, so I reference
         // the constant here. THIS MAY NOT BE THE CORRECT VALUE.
-        fileClass.fastSetConstant("BINARY", runtime.newFixnum(IOModes.BINARY));
+        fileClass.fastSetConstant("BINARY", runtime.newFixnum(ModeFlags.BINARY));
         fileClass.fastSetConstant("FNM_NOESCAPE", runtime.newFixnum(FNM_NOESCAPE));
         fileClass.fastSetConstant("FNM_CASEFOLD", runtime.newFixnum(FNM_CASEFOLD));
         fileClass.fastSetConstant("FNM_SYSCASE", runtime.newFixnum(FNM_CASEFOLD));
@@ -172,15 +167,15 @@ public class RubyFile extends RubyIO {
         fileClass.fastSetConstant("FNM_PATHNAME", runtime.newFixnum(FNM_PATHNAME));
         
         // Create constants for open flags
-        fileClass.fastSetConstant("RDONLY", runtime.newFixnum(IOModes.RDONLY));
-        fileClass.fastSetConstant("WRONLY", runtime.newFixnum(IOModes.WRONLY));
-        fileClass.fastSetConstant("RDWR", runtime.newFixnum(IOModes.RDWR));
-        fileClass.fastSetConstant("CREAT", runtime.newFixnum(IOModes.CREAT));
-        fileClass.fastSetConstant("EXCL", runtime.newFixnum(IOModes.EXCL));
-        fileClass.fastSetConstant("NOCTTY", runtime.newFixnum(IOModes.NOCTTY));
-        fileClass.fastSetConstant("TRUNC", runtime.newFixnum(IOModes.TRUNC));
-        fileClass.fastSetConstant("APPEND", runtime.newFixnum(IOModes.APPEND));
-        fileClass.fastSetConstant("NONBLOCK", runtime.newFixnum(IOModes.NONBLOCK));
+        fileClass.fastSetConstant("RDONLY", runtime.newFixnum(ModeFlags.RDONLY));
+        fileClass.fastSetConstant("WRONLY", runtime.newFixnum(ModeFlags.WRONLY));
+        fileClass.fastSetConstant("RDWR", runtime.newFixnum(ModeFlags.RDWR));
+        fileClass.fastSetConstant("CREAT", runtime.newFixnum(ModeFlags.CREAT));
+        fileClass.fastSetConstant("EXCL", runtime.newFixnum(ModeFlags.EXCL));
+        fileClass.fastSetConstant("NOCTTY", runtime.newFixnum(ModeFlags.NOCTTY));
+        fileClass.fastSetConstant("TRUNC", runtime.newFixnum(ModeFlags.TRUNC));
+        fileClass.fastSetConstant("APPEND", runtime.newFixnum(ModeFlags.APPEND));
+        fileClass.fastSetConstant("NONBLOCK", runtime.newFixnum(ModeFlags.NONBLOCK));
         
         // Create constants for flock
         fileClass.fastSetConstant("LOCK_SH", runtime.newFixnum(RubyFile.LOCK_SH));
@@ -199,15 +194,15 @@ public class RubyFile extends RubyIO {
         constants.fastSetConstant("FNM_PATHNAME", runtime.newFixnum(2));
         
         // Create constants for open flags
-        constants.fastSetConstant("RDONLY", runtime.newFixnum(IOModes.RDONLY));
-        constants.fastSetConstant("WRONLY", runtime.newFixnum(IOModes.WRONLY));
-        constants.fastSetConstant("RDWR", runtime.newFixnum(IOModes.RDWR));
-        constants.fastSetConstant("CREAT", runtime.newFixnum(IOModes.CREAT));
-        constants.fastSetConstant("EXCL", runtime.newFixnum(IOModes.EXCL));
-        constants.fastSetConstant("NOCTTY", runtime.newFixnum(IOModes.NOCTTY));
-        constants.fastSetConstant("TRUNC", runtime.newFixnum(IOModes.TRUNC));
-        constants.fastSetConstant("APPEND", runtime.newFixnum(IOModes.APPEND));
-        constants.fastSetConstant("NONBLOCK", runtime.newFixnum(IOModes.NONBLOCK));
+        constants.fastSetConstant("RDONLY", runtime.newFixnum(ModeFlags.RDONLY));
+        constants.fastSetConstant("WRONLY", runtime.newFixnum(ModeFlags.WRONLY));
+        constants.fastSetConstant("RDWR", runtime.newFixnum(ModeFlags.RDWR));
+        constants.fastSetConstant("CREAT", runtime.newFixnum(ModeFlags.CREAT));
+        constants.fastSetConstant("EXCL", runtime.newFixnum(ModeFlags.EXCL));
+        constants.fastSetConstant("NOCTTY", runtime.newFixnum(ModeFlags.NOCTTY));
+        constants.fastSetConstant("TRUNC", runtime.newFixnum(ModeFlags.TRUNC));
+        constants.fastSetConstant("APPEND", runtime.newFixnum(ModeFlags.APPEND));
+        constants.fastSetConstant("NONBLOCK", runtime.newFixnum(ModeFlags.NONBLOCK));
         
         // Create constants for flock
         constants.fastSetConstant("LOCK_SH", runtime.newFixnum(RubyFile.LOCK_SH));
@@ -223,7 +218,7 @@ public class RubyFile extends RubyIO {
         return fileClass;
     }
     
-    public void openInternal(String newPath, IOModes newModes) {
+    public void openInternal(String newPath, ModeFlags newModes) {
         this.path = newPath;
         this.openFile.setMode(newModes.getOpenFileFlags());
         
@@ -257,11 +252,15 @@ public class RubyFile extends RubyIO {
                 openFile.setMainStream(
                         new ChannelStream(getRuntime(), new ChannelDescriptor(Channels.newChannel(is), getNewFileno(), new FileDescriptor())));
             } else {
-                openFile.setMainStream(ChannelStream.fopen(getRuntime(), newPath, newModes));
+                try {
+                    openFile.setMainStream(ChannelStream.fopen(getRuntime(), newPath, newModes));
+                } catch (FileExistsException fee) {
+                    throw getRuntime().newErrnoEEXISTError(fee.getMessage());
+                }
             }
             
             registerDescriptor(openFile.getMainStream().getDescriptor());
-        } catch (Stream.PipeException e) {
+        } catch (PipeException e) {
             throw getRuntime().newErrnoEPIPEError();
         } catch (InvalidValueException e) {
             throw getRuntime().newErrnoEINVALError();
@@ -399,13 +398,13 @@ public class RubyFile extends RubyIO {
         path = filename.toString();
         
         String modeString;
-        IOModes modes;
+        ModeFlags modes;
         int perm;
         
         try {
             if ((args.length > 1 && args[1] instanceof RubyFixnum) || (args.length > 2 && !args[2].isNil())) {
                 if (args[1] instanceof RubyFixnum) {
-                    modes = new IOModes(RubyNumeric.num2int(args[1]));
+                    modes = new ModeFlags(RubyNumeric.num2int(args[1]));
                 } else {
                     modeString = args[1].convertToString().toString();
                     modes = getIOModes(getRuntime(), modeString);
@@ -433,7 +432,7 @@ public class RubyFile extends RubyIO {
         return this;
     }
     
-    private void sysopenInternal(String path, IOModes modes, int perm) throws InvalidValueException {
+    private void sysopenInternal(String path, ModeFlags modes, int perm) throws InvalidValueException {
         openFile = new OpenFile();
         
         openFile.setPath(path);
@@ -455,7 +454,7 @@ public class RubyFile extends RubyIO {
         registerDescriptor(openFile.getMainStream().getDescriptor());
     }
     
-    private ChannelDescriptor sysopen(String path, IOModes modes, int perm) throws InvalidValueException {
+    private ChannelDescriptor sysopen(String path, ModeFlags modes, int perm) throws InvalidValueException {
         try {
             ChannelDescriptor descriptor = ChannelDescriptor.open(
                     getRuntime().getCurrentDirectory(),
@@ -470,7 +469,7 @@ public class RubyFile extends RubyIO {
             throw getRuntime().newErrnoENOENTError();
         } catch (DirectoryAsFileException dafe) {
             throw getRuntime().newErrnoEISDirError();
-        } catch (ChannelDescriptor.FileExistsException fee) {
+        } catch (FileExistsException fee) {
             throw getRuntime().newErrnoEEXISTError("file exists: " + path);
         } catch (IOException ioe) {
             throw getRuntime().newIOErrorFromException(ioe);
@@ -603,7 +602,7 @@ public class RubyFile extends RubyIO {
         }
         try {
             openFile.getMainStream().ftruncate(newLength.getLongValue());
-        } catch (Stream.PipeException e) {
+        } catch (PipeException e) {
             throw getRuntime().newErrnoESPIPEError();
         } catch (IOException e) {
             // Should we do anything?
@@ -617,11 +616,11 @@ public class RubyFile extends RubyIO {
     }
 
     // TODO: This is also defined in the MetaClass too...Consolidate somewhere.
-    private static IOModes getModes(Ruby runtime, IRubyObject object) throws InvalidValueException {
+    private static ModeFlags getModes(Ruby runtime, IRubyObject object) throws InvalidValueException {
         if (object instanceof RubyString) {
             return getIOModes(runtime, ((RubyString) object).toString());
         } else if (object instanceof RubyFixnum) {
-            return new IOModes(((RubyFixnum) object).getLongValue());
+            return new ModeFlags(((RubyFixnum) object).getLongValue());
         }
 
         throw runtime.newTypeError("Invalid type for modes");
@@ -1225,9 +1224,9 @@ public class RubyFile extends RubyIO {
             runtime.checkSafeString(pathString);
             String path = pathString.toString();
 
-            IOModes modes;
+            ModeFlags modes;
             try {
-                modes = args.length >= 2 ? getModes(runtime, args[1]) : new IOModes(IOModes.RDONLY);
+                modes = args.length >= 2 ? getModes(runtime, args[1]) : new ModeFlags(ModeFlags.RDONLY);
             } catch (InvalidValueException ex) {
                 throw runtime.newErrnoEINVALError();
             }

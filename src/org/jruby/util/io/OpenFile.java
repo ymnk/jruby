@@ -2,10 +2,6 @@ package org.jruby.util.io;
 
 import java.io.IOException;
 import org.jruby.Ruby;
-import org.jruby.util.Stream;
-import org.jruby.util.Stream.BadDescriptorException;
-import org.jruby.util.Stream.InvalidValueException;
-import org.jruby.util.Stream.PipeException;
 
 public class OpenFile {
 

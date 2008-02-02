@@ -48,8 +48,7 @@ import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
-import org.jruby.util.IOModes;
-import org.jruby.util.Stream.InvalidValueException;
+import org.jruby.util.io.ModeFlags;
 import org.jruby.util.io.ChannelDescriptor;
 
 /**
@@ -86,11 +85,12 @@ public class RubyUDPSocket extends RubyIPSocket {
         super(runtime, type);
     }
 
+    @Override
     public IRubyObject initialize() {
         try {
             DatagramChannel channel = DatagramChannel.open();
-            initSocket(new ChannelDescriptor(channel, RubyIO.getNewFileno(), new IOModes(IOModes.RDWR), new FileDescriptor()));
-        } catch (InvalidValueException ex) {
+            initSocket(new ChannelDescriptor(channel, RubyIO.getNewFileno(), new ModeFlags(ModeFlags.RDWR), new FileDescriptor()));
+        } catch (org.jruby.util.io.InvalidValueException ex) {
             throw getRuntime().newErrnoEINVALError();
         } catch (ConnectException e) {
             throw getRuntime().newErrnoECONNREFUSEDError();
