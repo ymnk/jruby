@@ -206,6 +206,8 @@ public class ChannelStream implements Stream, Finalizable {
         final ByteList separator = (separatorString == PARAGRAPH_DELIMETER) ?
             PARAGRAPH_SEPARATOR : separatorString;
 
+        descriptor.checkOpen();
+        
         if (feof()) {
             return null;
         }
@@ -319,14 +321,16 @@ public class ChannelStream implements Stream, Finalizable {
      * @throws BadDescriptorException
      */
     private void close(boolean finalizing) throws IOException, BadDescriptorException {
-        flushWrite();
+        try {
+            flushWrite();
 
-        isOpen = false;
-        descriptor.close();
+            isOpen = false;
+            descriptor.close();
 
-        if (DEBUG) getLogger("ChannelStream").info("Descriptor for fileno " + descriptor.getFileno() + " closed by stream");
-        
-        if (!finalizing) getRuntime().removeInternalFinalizer(this);
+            if (DEBUG) getLogger("ChannelStream").info("Descriptor for fileno " + descriptor.getFileno() + " closed by stream");
+        } finally {
+            if (!finalizing) getRuntime().removeInternalFinalizer(this);
+        }
     }
     
     /**

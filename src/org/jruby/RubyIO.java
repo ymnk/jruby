@@ -342,7 +342,7 @@ public class RubyIO extends RubyObject {
                         // make sure the pipe stream is set to null
                         pipeStream = null;
                     }
-    //                f2 = fileno(fptr->f2);
+                    // TODO: loop like this for flush
     //                while (n2 = 0, fflush(fptr->f2) < 0) {
     //                    n2 = errno;
     //                    if (!rb_io_wait_writable(f2)) {
@@ -350,10 +350,6 @@ public class RubyIO extends RubyObject {
     //                    }
     //                    if (!fptr->f2) break;
     //                }
-    //                if (fclose(fptr->f2) < 0 && n2 == 0) {
-    //                    n2 = errno;
-    //                }
-    //                fptr->f2 = 0;
                 }
 
                 if (mainStream != null) {
@@ -371,25 +367,17 @@ public class RubyIO extends RubyObject {
         //                    }
                         }
                         mainStream.fclose();
-                        // TODO: logic as shown here for errno? Maybe our propagated exceptions are enough
-        //                if (fclose(fptr->f) < 0 && n1 == 0) {
-        //                    n1 = errno;
-        //                }
                     } catch (BadDescriptorException bde) {
                         if (main == pipe) {
                             // we ignore, since we've already closed it and we're happy
+                        } else {
+                            throw bde;
                         }
                     } finally {
                         // make sure the main stream is set to null
                         mainStream = null;
                     }
                 }
-                
-                // TODO: handle cases where the streams can't be flushed/closed?
-    //            if (!noraise && (n1 || n2)) {
-    //                errno = (n1 ? n1 : n2);
-    //                rb_sys_fail(fptr->path);
-    //            }
             } catch (IOException ex) {
                 if (raise) {
                     throw runtime.newIOErrorFromException(ex);
@@ -398,7 +386,7 @@ public class RubyIO extends RubyObject {
                 if (raise) {
                     throw runtime.newErrnoEBADFError();
                 }
-            } finally {}
+            }
         }
     }
     

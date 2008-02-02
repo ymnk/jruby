@@ -398,24 +398,24 @@ public class RubyFile extends RubyIO {
         path = filename.toString();
         
         String modeString;
-        int mode = OpenFile.READABLE;
+        IOModes modes;
         int perm;
         
         try {
             if ((args.length > 1 && args[1] instanceof RubyFixnum) || (args.length > 2 && !args[2].isNil())) {
                 if (args[1] instanceof RubyFixnum) {
-                    mode = RubyNumeric.num2int(args[1]);
+                    modes = new IOModes(RubyNumeric.num2int(args[1]));
                 } else {
                     modeString = args[0].convertToString().toString();
-                    mode = getIOModes(getRuntime(), modeString).getOpenFileFlags();
+                    modes = getIOModes(getRuntime(), modeString);
                 }
-                if (args.length >= 2 && !args[2].isNil()) {
+                if (args.length > 2 && !args[2].isNil()) {
                     perm = RubyNumeric.num2int(args[2]);
                 } else {
                     perm = 438; // 0666
                 }
 
-                sysopenInternal(path, mode, perm);
+                sysopenInternal(path, modes, perm);
             } else {
                 modeString = "r";
                 if (args.length > 1) {
@@ -432,13 +432,13 @@ public class RubyFile extends RubyIO {
         return this;
     }
     
-    private void sysopenInternal(String path, int mode, int perm) throws InvalidValueException {
+    private void sysopenInternal(String path, IOModes mode, int perm) throws InvalidValueException {
         openFile = new OpenFile();
         
         openFile.setPath(path);
-        openFile.setMode(mode);
+        openFile.setMode(mode.getOpenFileFlags());
         
-        ChannelDescriptor descriptor = sysopen(path, mode, perm);
+        ChannelDescriptor descriptor = sysopen(path, mode.getOpenFileFlags(), perm);
         openFile.setMainStream(fdopen(descriptor, mode));
         
         registerDescriptor(descriptor);
