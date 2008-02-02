@@ -361,11 +361,7 @@ public class RubyIO extends RubyObject {
                 }
 
                 if (selfFile.isWritable()) {
-                    if (selfFile.getPipeStream() != null) {
-                        selfFile.getPipeStream().fflush();
-                    } else {
-                        selfFile.getMainStream().fflush();
-                    }
+                    selfFile.getWriteStream().fflush();
                 }
 
                 selfFile.setMode(originalFile.getMode());
@@ -1173,7 +1169,7 @@ public class RubyIO extends RubyObject {
         try {
             openFile.checkWritable(getRuntime());
         
-            openFile.getMainStream().sync();
+            openFile.getWriteStream().sync();
         } catch (InvalidValueException ex) {
             throw getRuntime().newErrnoEINVALError();
         } catch (PipeException ex) {
@@ -1448,7 +1444,7 @@ public class RubyIO extends RubyObject {
     @JRubyMethod(name = "flush")
     public RubyIO flush() {
         try { 
-            openFile.getMainStream().fflush();
+            openFile.getWriteStream().fflush();
         } catch (BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (IOException e) {

@@ -100,8 +100,8 @@ public class RubyBasicSocket extends RubyIO {
     @Override
     public IRubyObject close_write() {
         try {
-            ((SocketChannel)openFile.getMainStream().getDescriptor().getChannel()).socket().shutdownOutput();
-            openFile.getMainStream().fclose();
+            ((SocketChannel)openFile.getWriteStream().getDescriptor().getChannel()).socket().shutdownOutput();
+            openFile.getWriteStream().fclose();
         } catch (BadDescriptorException ex) {
             throw getRuntime().newErrnoEBADFError();
         } catch (IOException e) {
