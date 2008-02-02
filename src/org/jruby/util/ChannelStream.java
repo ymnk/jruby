@@ -390,34 +390,38 @@ public class ChannelStream implements Stream, Finalizable {
     public synchronized boolean feof() throws IOException, BadDescriptorException {
         checkReadable();
         
-        if (eof) return true;
-        
-        if (reading && buffer.hasRemaining()) return false;
-        
-        if (descriptor.isSeekable()) {
-            FileChannel fileChannel = (FileChannel)descriptor.getChannel();
-            return (fileChannel.size() == fileChannel.position());
-        } else if (descriptor.getChannel() instanceof SocketChannel) {
-            return false;
+        if (eof) {
+            return true;
         } else {
-            checkReadable();
-            ensureRead();
-
-            if (ungotc > 0) {
-                return false;
-            }
-            // TODO: this is new to replace what's below
-            ungotc = read();
-            if (ungotc == -1) {
-                eof = true;
-                return true;
-            }
-            // FIXME: this was here before; need a better way?
-//            if (fillInBuffer() < 0) {
-//                return true;
-//            }
             return false;
         }
+//        
+//        if (reading && buffer.hasRemaining()) return false;
+//        
+//        if (descriptor.isSeekable()) {
+//            FileChannel fileChannel = (FileChannel)descriptor.getChannel();
+//            return (fileChannel.size() == fileChannel.position());
+//        } else if (descriptor.getChannel() instanceof SocketChannel) {
+//            return false;
+//        } else {
+//            checkReadable();
+//            ensureRead();
+//
+//            if (ungotc > 0) {
+//                return false;
+//            }
+//            // TODO: this is new to replace what's below
+//            ungotc = read();
+//            if (ungotc == -1) {
+//                eof = true;
+//                return true;
+//            }
+//            // FIXME: this was here before; need a better way?
+////            if (fillInBuffer() < 0) {
+////                return true;
+////            }
+//            return false;
+//        }
     }
     
     /**
@@ -758,6 +762,7 @@ public class ChannelStream implements Stream, Finalizable {
 
             return bufferedRead(number);
         } catch (EOFException e) {
+            eof = true;
             return null;
         }
     }

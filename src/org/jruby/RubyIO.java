@@ -1782,7 +1782,11 @@ public class RubyIO extends RubyObject {
                 }
 
                 if (openFile.getMainStream().feof()) {
-                    // TODO: resize the buffer string to zero
+                    // truncate buffer string to zero, if provided
+                    if (str != null) {
+                        str.setValue(ByteList.EMPTY_BYTELIST.dup());
+                    }
+                
                     return getRuntime().getNil();
                 }
 
@@ -1830,7 +1834,7 @@ public class RubyIO extends RubyObject {
         
         RubyString str = null;
         if (buffer instanceof RubyString) {
-            str = (RubyString)str;
+            str = (RubyString)buffer;
         }
         
         // TODO: ruby locks the string here
