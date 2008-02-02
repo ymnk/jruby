@@ -21,6 +21,7 @@ import org.jruby.util.ByteList;
 import org.jruby.util.DirectoryAsFileException;
 import org.jruby.util.IOModes;
 import org.jruby.util.JRubyFile;
+import org.jruby.util.Stream;
 import org.jruby.util.Stream.BadDescriptorException;
 import org.jruby.util.Stream.InvalidValueException;
 
@@ -133,6 +134,30 @@ public class ChannelDescriptor {
     public void checkOpen() throws BadDescriptorException {
         if (!isOpen()) {
             throw new BadDescriptorException();
+        }
+    }
+    public void lseek(long offset, int type) throws IOException, InvalidValueException, Stream.PipeException, BadDescriptorException {
+        if (channel instanceof FileChannel) {
+            checkOpen();
+            
+            FileChannel fileChannel = (FileChannel)channel;
+            try {
+                switch (type) {
+                case Stream.SEEK_SET:
+                    fileChannel.position(offset);
+                    break;
+                case Stream.SEEK_CUR:
+                    fileChannel.position(fileChannel.position() + offset);
+                    break;
+                case Stream.SEEK_END:
+                    fileChannel.position(fileChannel.size() + offset);
+                    break;
+                }
+            } catch (IllegalArgumentException e) {
+                throw new InvalidValueException();
+            }
+        } else {
+            throw new Stream.PipeException();
         }
     }
 

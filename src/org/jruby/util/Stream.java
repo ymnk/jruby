@@ -55,6 +55,8 @@ public interface Stream {
     public void setDescriptor(ChannelDescriptor descriptor);
     
     public abstract FileChannel getFileChannel();
+    
+    public void clearerr();
 
     public boolean isReadable();
 
@@ -112,8 +114,6 @@ public interface Stream {
      * 
      */
     public long fgetpos() throws IOException, PipeException, BadDescriptorException;
-    
-    public void rewind() throws IOException, PipeException, InvalidValueException, BadDescriptorException;
     
     /**
      * <p>Perform a seek based on pos().  </p> 

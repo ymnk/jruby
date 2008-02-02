@@ -35,6 +35,8 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.jruby.util.io.OpenFile;
 import org.jruby.util.io.ChannelDescriptor;
 import java.io.EOFException;
@@ -394,6 +396,8 @@ public class RubyIO extends RubyObject {
                 if (selfDescriptor.getChannel() != originalDescriptor.getChannel()) {
                     // check if we're a stdio IO, and ensure we're not badly mutilated
                     if (selfDescriptor.getFileno() >=0 && selfDescriptor.getFileno() <= 2) {
+                        selfFile.getMainStream().clearerr();
+                        
                         // dup2 new fd into self to preserve fileno and references to it
                         originalDescriptor.dup2(selfDescriptor);
                         
@@ -1018,6 +1022,8 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newIOError(e.getMessage());
         }
         
+        openFile.getMainStream().clearerr();
+        
         return (RubyFixnum) newPosition;
     }
     
@@ -1109,15 +1115,56 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newIOError(e.getMessage());
         }
         
+        openFile.getMainStream().clearerr();
+        
+        return RubyFixnum.zero(getRuntime());
+    }
+    
+    // This was a getOpt with one mandatory arg, but it did not work
+    // so I am parsing it for now.
+    @JRubyMethod(name = "sysseek", required = 1, optional = 1)
+    public RubyFixnum sysseek(IRubyObject[] args) {
+        long offset = RubyNumeric.num2long(args[0]);
+        int whence = Stream.SEEK_SET;
+        
+        if (args.length > 1) {
+            whence = RubyNumeric.fix2int(args[1].convertToInteger());
+        }
+        
+        try {
+            if (openFile.isReadable() && openFile.isReadBuffered()) {
+                throw getRuntime().newIOError("sysseek for buffered IO");
+            }
+            if (openFile.isWritable() && openFile.isWriteBuffered()) {
+                getRuntime().getWarnings().warn("sysseek for buffered IO");
+            }
+            
+            openFile.getMainStream().getDescriptor().lseek(offset, whence);
+        } catch (BadDescriptorException ex) {
+            throw getRuntime().newErrnoEBADFError();
+        } catch (Stream.InvalidValueException e) {
+            throw getRuntime().newErrnoEINVALError();
+        } catch (Stream.PipeException e) {
+            throw getRuntime().newErrnoESPIPEError();
+        } catch (IOException e) {
+            throw getRuntime().newIOError(e.getMessage());
+        }
+        
+        openFile.getMainStream().clearerr();
+        
         return RubyFixnum.zero(getRuntime());
     }
 
     @JRubyMethod(name = "rewind")
     public RubyFixnum rewind() {
         try {
-            openFile.getMainStream().rewind();
-        } catch (BadDescriptorException bde) {
-            throw getRuntime().newErrnoEBADFError();
+            openFile.getMainStream().fseek(0L, Stream.SEEK_SET);
+            openFile.getMainStream().clearerr();
+            
+            // TODO: This is some goofy global file value from MRI..what to do?
+//            if (io == current_file) {
+//                gets_lineno -= fptr->lineno;
+//            }
         } catch (Stream.InvalidValueException e) {
             throw getRuntime().newErrnoEINVALError();
         } catch (Stream.PipeException e) {
@@ -1165,8 +1212,36 @@ public class RubyIO extends RubyObject {
     @JRubyMethod(name = {"eof?", "eof"})
     public RubyBoolean eof_p() {
         try {
-            boolean isEOF = openFile.getMainStream().feof(); 
-            return isEOF ? getRuntime().getTrue() : getRuntime().getFalse();
+            openFile.checkReadable(getRuntime());
+            
+            if (openFile.getMainStream().feof()) {
+                return getRuntime().getTrue();
+            }
+            
+            if (openFile.getMainStream().readDataBuffered()) {
+                return getRuntime().getFalse();
+            }
+            
+            // TODO: READ_CHECK from MRI
+            
+            openFile.getMainStream().clearerr();
+            
+            int c = openFile.getMainStream().fgetc();
+            
+            if (c != -1) {
+                openFile.getMainStream().ungetc(c);
+                return getRuntime().getFalse();
+            }
+            
+            openFile.checkClosed(getRuntime());
+            
+            openFile.getMainStream().clearerr();
+            
+            return getRuntime().getTrue();
+        } catch (PipeException ex) {
+            throw getRuntime().newErrnoEPIPEError();
+        } catch (InvalidValueException ex) {
+            throw getRuntime().newErrnoEINVALError();
         } catch (Stream.BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (IOException e) {
@@ -1502,17 +1577,24 @@ public class RubyIO extends RubyObject {
             openFile.checkReadable(getRuntime());
 
             Stream stream = openFile.getMainStream();
-
-            if (!stream.readDataBuffered()) {
-                openFile.checkClosed(getRuntime());
-            }
+            
+            readCheck(stream);
+            stream.clearerr();
         
             int c = openFile.getMainStream().fgetc();
-        
-            return c == -1 ? getRuntime().getNil() : getRuntime().newFixnum(c);
             
-            // TODO: if EOF, clear error, try to wait until file is readable again
-            // if that also fails, raise appropriate system errorno
+            if (c == -1) {
+                // TODO: check for ferror, clear it, and try once more up above readCheck
+//                if (ferror(f)) {
+//                    clearerr(f);
+//                    if (!rb_io_wait_readable(fileno(f)))
+//                        rb_sys_fail(fptr->path);
+//                    goto retry;
+//                }
+                return getRuntime().getNil();
+            }
+        
+            return getRuntime().newFixnum(c);
         } catch (PipeException ex) {
             throw getRuntime().newErrnoEPIPEError();
         } catch (InvalidValueException ex) {
@@ -1523,6 +1605,12 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newEOFError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
+        }
+    }
+    
+    private void readCheck(Stream stream) {
+        if (!stream.readDataBuffered()) {
+            openFile.checkClosed(getRuntime());
         }
     }
     
@@ -1901,13 +1989,37 @@ public class RubyIO extends RubyObject {
     @JRubyMethod(name = "each_byte", frame = true)
     public IRubyObject each_byte(Block block) {
     	try {
-            ThreadContext context = getRuntime().getCurrentContext();
-            for (int c = openFile.getMainStream().fgetc(); c != -1; c = openFile.getMainStream().fgetc()) {
+            Ruby runtime = getRuntime();
+            ThreadContext context = runtime.getCurrentContext();
+            while (true) {
+                openFile.checkReadable(runtime);
+                
+                // TODO: READ_CHECK from MRI
+                
+                int c = openFile.getMainStream().fgetc();
+                
+                if (c == -1) {
+                    // TODO: check for error, clear it, and wait until readable before trying once more
+//                    if (ferror(f)) {
+//                        clearerr(f);
+//                        if (!rb_io_wait_readable(fileno(f)))
+//                            rb_sys_fail(fptr->path);
+//                        continue;
+//                    }
+                    break;
+                }
+                
                 assert c < 256;
                 block.yield(context, getRuntime().newFixnum(c));
             }
 
-            return getRuntime().getNil();
+            // TODO: one more check for error
+//            if (ferror(f)) rb_sys_fail(fptr->path);
+            return this;
+        } catch (PipeException ex) {
+            throw getRuntime().newErrnoEPIPEError();
+        } catch (InvalidValueException ex) {
+            throw getRuntime().newErrnoEINVALError();
         } catch (Stream.BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (EOFException e) {

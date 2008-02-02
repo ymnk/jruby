@@ -264,7 +264,10 @@ public class ChannelStream implements Stream, Finalizable {
             invalidateBuffer();
             FileChannel channel = (FileChannel)descriptor.getChannel();
             long left = channel.size() - channel.position();
-            if (left == 0) return null;
+            if (left == 0) {
+                eof = true;
+                return null;
+            }
 
             return read((int) left);
         } else {
@@ -272,6 +275,11 @@ public class ChannelStream implements Stream, Finalizable {
 
             ByteList byteList = new ByteList();
             ByteList read = fread(BUFSIZE);
+            
+            if (read == null) {
+                eof = true;
+                return byteList;
+            }
 
             while (read != null) {
                 byteList.append(read);
@@ -368,6 +376,12 @@ public class ChannelStream implements Stream, Finalizable {
         return new BufferedOutputStream(Channels.newOutputStream((WritableByteChannel)descriptor.getChannel()));
     }
     
+    private boolean eof = false;
+    
+    public void clearerr() {
+        eof = false;
+    }
+    
     /**
      * @throws IOException 
      * @throws BadDescriptorException 
@@ -375,6 +389,8 @@ public class ChannelStream implements Stream, Finalizable {
      */
     public synchronized boolean feof() throws IOException, BadDescriptorException {
         checkReadable();
+        
+        if (eof) return true;
         
         if (reading && buffer.hasRemaining()) return false;
         
@@ -393,6 +409,7 @@ public class ChannelStream implements Stream, Finalizable {
             // TODO: this is new to replace what's below
             ungotc = read();
             if (ungotc == -1) {
+                eof = true;
                 return true;
             }
             // FIXME: this was here before; need a better way?
@@ -412,27 +429,6 @@ public class ChannelStream implements Stream, Finalizable {
         int offset = (reading) ? - buffer.remaining() : buffer.position();
         FileChannel fileChannel = (FileChannel)descriptor.getChannel();
         return fileChannel.position() + offset;
-    }
-    
-    public synchronized void resetByModes(IOModes newModes) throws IOException, InvalidValueException, PipeException, BadDescriptorException {
-        if (descriptor.getChannel() instanceof FileChannel) {
-            if (newModes.isAppendable()) {
-                fseek(0L, SEEK_END);
-            } else if (newModes.isWritable()) {
-                try {
-                    rewind();
-                } catch(PipeException e) {} // don't throw
-            }
-        }
-    }
-
-    /**
-     * @throws IOException 
-     * @throws InvalidValueException 
-     * @see org.jruby.util.IOHandler#rewind()
-     */
-    public void rewind() throws IOException, InvalidValueException, PipeException, BadDescriptorException {
-        fseek(0, SEEK_SET);
     }
     
     /**
