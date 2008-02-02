@@ -29,6 +29,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ext.socket;
 
+import java.io.FileDescriptor;
 import java.io.IOException;
 
 import java.net.ConnectException;
@@ -39,8 +40,11 @@ import java.net.UnknownHostException;
 
 import java.nio.channels.SocketChannel;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
+import org.jruby.RubyIO;
 import org.jruby.RubyNumeric;
 import org.jruby.RubyString;
 import org.jruby.runtime.Arity;
@@ -48,6 +52,9 @@ import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.IOModes;
+import org.jruby.util.Stream.InvalidValueException;
+import org.jruby.util.io.ChannelDescriptor;
 
 public class RubyTCPSocket extends RubyIPSocket {
     static void createTCPSocket(Ruby runtime) {
@@ -98,7 +105,9 @@ public class RubyTCPSocket extends RubyIPSocket {
                 socket.connect(new InetSocketAddress(InetAddress.getByName(remoteHost), remotePort));
             }
             channel.finishConnect();
-            setChannel(channel);
+            initSocket(new ChannelDescriptor(channel, RubyIO.getNewFileno(), new IOModes(IOModes.RDWR), new FileDescriptor()));
+        } catch (InvalidValueException ex) {
+            throw getRuntime().newErrnoEINVALError();
         } catch(ConnectException e) {
             throw getRuntime().newErrnoECONNREFUSEDError();
         } catch(UnknownHostException e) {

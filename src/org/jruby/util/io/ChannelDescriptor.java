@@ -116,7 +116,7 @@ public class ChannelDescriptor {
             modes = new IOModes(WRONLY);
         } else {
             // FIXME: I don't like this
-            modes = new IOModes();
+            modes = new IOModes(RDWR);
         }
         
         return modes;

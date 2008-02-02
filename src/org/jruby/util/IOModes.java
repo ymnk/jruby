@@ -32,7 +32,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.util;
 
-import org.jruby.Ruby;
 import org.jruby.RubyIO.OpenFile;
 import org.jruby.util.Stream.InvalidValueException;
 

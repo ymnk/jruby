@@ -52,6 +52,7 @@ import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.Stream;
 import org.jruby.util.ChannelStream;
+import org.jruby.util.IOModes;
 import org.jruby.util.Stream.BadDescriptorException;
 import org.jruby.util.Stream.InvalidValueException;
 import org.jruby.util.io.ChannelDescriptor;
@@ -88,19 +89,19 @@ public class RubyBasicSocket extends RubyIO {
     public RubyBasicSocket(Ruby runtime, RubyClass type) {
         super(runtime, type);
     }
-
-    protected void setChannel(Channel c) {
-        this.socketChannel = c;
+    
+    protected void initSocket(ChannelDescriptor descriptor) {
+        openFile = new OpenFile();
         
         try {
-            openFile.setMainStream(new ChannelStream(getRuntime(), new ChannelDescriptor(socketChannel, getNewFileno(), new FileDescriptor())));
-            openFile.getMainStream().setSync(true);
-    	} catch (InvalidValueException ex) {
+            openFile.setMainStream(ChannelStream.fdopen(getRuntime(), descriptor, new IOModes(IOModes.RDONLY)));
+            openFile.setPipeStream(ChannelStream.fdopen(getRuntime(), descriptor, new IOModes(IOModes.WRONLY)));
+            openFile.getPipeStream().setSync(true);
+        } catch (InvalidValueException ex) {
+            ex.printStackTrace();
             throw getRuntime().newErrnoEINVALError();
         }
-        
-        registerDescriptor(openFile.getMainStream().getDescriptor());
-        openFile.setMode(openFile.getMainStream().getModes().getOpenFileFlags());
+        openFile.setMode(OpenFile.READWRITE | OpenFile.SYNC);
     }
 
     @Override

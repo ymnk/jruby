@@ -49,6 +49,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.IllegalBlockingModeException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectableChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
 import static java.util.logging.Logger.getLogger;
 import org.jruby.Finalizable;
@@ -398,6 +399,8 @@ public class ChannelStream implements Stream, Finalizable {
         if (descriptor.isSeekable()) {
             FileChannel fileChannel = (FileChannel)descriptor.getChannel();
             return (fileChannel.size() == fileChannel.position());
+        } else if (descriptor.getChannel() instanceof SocketChannel) {
+            return false;
         } else {
             checkReadable();
             ensureRead();

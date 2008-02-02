@@ -375,12 +375,13 @@ public class RubyIO extends RubyObject {
         //                if (fclose(fptr->f) < 0 && n1 == 0) {
         //                    n1 = errno;
         //                }
+                    } catch (BadDescriptorException bde) {
+                        if (main == pipe) {
+                            // we ignore, since we've already closed it and we're happy
+                        }
                     } finally {
                         // make sure the main stream is set to null
                         mainStream = null;
-        //                if (n1 == EBADF && f1 == f2) {
-        //                    n1 = 0;
-        //                }
                     }
                 }
                 
