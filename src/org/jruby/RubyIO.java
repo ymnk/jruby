@@ -1070,7 +1070,7 @@ public class RubyIO extends RubyObject {
         }
     }
 
-    @JRubyMethod(name = "open", required = 1, optional = 1, frame = true, meta = true)
+    @JRubyMethod(name = "open", required = 1, optional = 2, frame = true, meta = true)
     public static IRubyObject open(IRubyObject recv, IRubyObject[] args, Block block) {
         Ruby runtime = recv.getRuntime();
         RubyClass klass = (RubyClass)recv;

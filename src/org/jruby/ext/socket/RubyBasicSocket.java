@@ -84,8 +84,6 @@ public class RubyBasicSocket extends RubyIO {
         rb_cBasicSocket.getMetaClass().defineFastMethod("do_not_reverse_lookup=", cfact.getFastSingletonMethod("set_do_not_reverse_lookup", IRubyObject.class));
     }
 
-    protected Channel socketChannel;
-
     public RubyBasicSocket(Ruby runtime, RubyClass type) {
         super(runtime, type);
     }
@@ -107,7 +105,7 @@ public class RubyBasicSocket extends RubyIO {
     @Override
     public IRubyObject close_write() {
         try {
-            ((SocketChannel)this.socketChannel).socket().shutdownOutput();
+            ((SocketChannel)openFile.getMainStream().getDescriptor().getChannel()).socket().shutdownOutput();
             openFile.getMainStream().fclose();
         } catch (BadDescriptorException ex) {
             throw getRuntime().newErrnoEBADFError();
@@ -141,6 +139,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     protected InetSocketAddress getLocalSocket() {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if (socketChannel instanceof SocketChannel) {
             return (InetSocketAddress)((SocketChannel)socketChannel).socket().getLocalSocketAddress();
         } else if (socketChannel instanceof ServerSocketChannel) {
@@ -151,6 +150,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     protected InetSocketAddress getRemoteSocket() {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(socketChannel instanceof SocketChannel) {
             return (InetSocketAddress)((SocketChannel)socketChannel).socket().getRemoteSocketAddress();
         } else {
@@ -159,6 +159,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private Socket asSocket() {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(!(socketChannel instanceof SocketChannel)) {
             throw getRuntime().newErrnoENOPROTOOPTError();
         }
@@ -167,6 +168,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private ServerSocket asServerSocket() {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(!(socketChannel instanceof ServerSocketChannel)) {
             throw getRuntime().newErrnoENOPROTOOPTError();
         }
@@ -175,6 +177,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private DatagramSocket asDatagramSocket() {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(!(socketChannel instanceof DatagramChannel)) {
             throw getRuntime().newErrnoENOPROTOOPTError();
         }
@@ -183,28 +186,33 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private IRubyObject getBroadcast() throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         return trueFalse((socketChannel instanceof DatagramChannel) ? asDatagramSocket().getBroadcast() : false);
     }
 
     private void setBroadcast(IRubyObject val) throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(socketChannel instanceof DatagramChannel) {
             asDatagramSocket().setBroadcast(asBoolean(val));
         }
     }
 
     private void setKeepAlive(IRubyObject val) throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(socketChannel instanceof SocketChannel) {
             asSocket().setKeepAlive(asBoolean(val));
         }
     }
 
     private void setReuseAddr(IRubyObject val) throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(socketChannel instanceof ServerSocketChannel) {
             asServerSocket().setReuseAddress(asBoolean(val));
         }
     }
 
     private void setRcvBuf(IRubyObject val) throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(socketChannel instanceof SocketChannel) {
             asSocket().setReceiveBufferSize(asNumber(val));
         } else if(socketChannel instanceof ServerSocketChannel) {
@@ -215,6 +223,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private void setTimeout(IRubyObject val) throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(socketChannel instanceof SocketChannel) {
             asSocket().setSoTimeout(asNumber(val));
         } else if(socketChannel instanceof ServerSocketChannel) {
@@ -225,6 +234,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private void setSndBuf(IRubyObject val) throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(socketChannel instanceof SocketChannel) {
             asSocket().setSendBufferSize(asNumber(val));
         } else if(socketChannel instanceof DatagramChannel) {
@@ -233,6 +243,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private void setLinger(IRubyObject val) throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(socketChannel instanceof SocketChannel) {
             if(val instanceof RubyBoolean && !val.isTrue()) {
                 asSocket().setSoLinger(false, 0);
@@ -248,6 +259,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private void setOOBInline(IRubyObject val) throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         if(socketChannel instanceof SocketChannel) {
             asSocket().setOOBInline(asBoolean(val));
         }
@@ -282,24 +294,28 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private IRubyObject getKeepAlive() throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         return trueFalse(
                          (socketChannel instanceof SocketChannel) ? asSocket().getKeepAlive() : false
                          );
     }
 
     private IRubyObject getLinger() throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         return number(
                       (socketChannel instanceof SocketChannel) ? asSocket().getSoLinger() : 0
                       );
     }
 
     private IRubyObject getOOBInline() throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         return trueFalse(
                          (socketChannel instanceof SocketChannel) ? asSocket().getOOBInline() : false
                          );
     }
 
     private IRubyObject getRcvBuf() throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         return number(
                       (socketChannel instanceof SocketChannel) ? asSocket().getReceiveBufferSize() : 
                       ((socketChannel instanceof ServerSocketChannel) ? asServerSocket().getReceiveBufferSize() : 
@@ -308,6 +324,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private IRubyObject getSndBuf() throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         return number(
                       (socketChannel instanceof SocketChannel) ? asSocket().getSendBufferSize() : 
                       ((socketChannel instanceof DatagramChannel) ? asDatagramSocket().getSendBufferSize() : 0)
@@ -315,12 +332,14 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private IRubyObject getReuseAddr() throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         return trueFalse(
                          (socketChannel instanceof ServerSocketChannel) ? asServerSocket().getReuseAddress() : false
                          );
     }
 
     private IRubyObject getTimeout() throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         return number(
                       (socketChannel instanceof SocketChannel) ? asSocket().getSoTimeout() : 
                       ((socketChannel instanceof ServerSocketChannel) ? asServerSocket().getSoTimeout() : 
@@ -333,6 +352,7 @@ public class RubyBasicSocket extends RubyIO {
     }
 
     private IRubyObject getSoType() throws IOException {
+        Channel socketChannel = openFile.getMainStream().getDescriptor().getChannel();
         return number(
                       (socketChannel instanceof SocketChannel) ? RubySocket.SOCK_STREAM : 
                       ((socketChannel instanceof ServerSocketChannel) ? RubySocket.SOCK_STREAM : 

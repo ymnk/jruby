@@ -105,23 +105,6 @@ public class ChannelDescriptor {
             return new ChannelDescriptor(channel, fileno, originalModes, fileDescriptor, refCounter);
         }
     }
-    
-    public static IOModes getModesFromChannel(Channel channel) throws InvalidValueException {
-        IOModes modes;
-        if (channel instanceof ReadableByteChannel) {
-            if (channel instanceof WritableByteChannel) {
-                modes = new IOModes(RDWR);
-            }
-            modes = new IOModes(RDONLY);
-        } else if (channel instanceof WritableByteChannel) {
-            modes = new IOModes(WRONLY);
-        } else {
-            // FIXME: I don't like this
-            modes = new IOModes(RDWR);
-        }
-        
-        return modes;
-    }
 
     public int getFileno() {
         return fileno;
@@ -293,5 +276,22 @@ public class ChannelDescriptor {
         public FileExistsException(String path) {
             super("file exists: " + path);
         }
+    }
+    
+    private static IOModes getModesFromChannel(Channel channel) throws InvalidValueException {
+        IOModes modes;
+        if (channel instanceof ReadableByteChannel) {
+            if (channel instanceof WritableByteChannel) {
+                modes = new IOModes(RDWR);
+            }
+            modes = new IOModes(RDONLY);
+        } else if (channel instanceof WritableByteChannel) {
+            modes = new IOModes(WRONLY);
+        } else {
+            // FIXME: I don't like this
+            modes = new IOModes(RDWR);
+        }
+        
+        return modes;
     }
 }

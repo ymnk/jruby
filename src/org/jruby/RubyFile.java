@@ -406,7 +406,7 @@ public class RubyFile extends RubyIO {
                 if (args[1] instanceof RubyFixnum) {
                     modes = new IOModes(RubyNumeric.num2int(args[1]));
                 } else {
-                    modeString = args[0].convertToString().toString();
+                    modeString = args[1].convertToString().toString();
                     modes = getIOModes(getRuntime(), modeString);
                 }
                 if (args.length > 2 && !args[2].isNil()) {
