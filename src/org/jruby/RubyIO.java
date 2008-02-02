@@ -35,10 +35,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import java.io.FileNotFoundException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.jruby.util.io.DirectoryAsFileException;
+import static java.lang.System.out;
 import org.jruby.util.io.FileExistsException;
 import org.jruby.util.io.STDIO;
 import org.jruby.util.io.OpenFile;
@@ -286,10 +283,11 @@ public class RubyIO extends RubyObject {
         RubyClass ioClass = runtime.defineClass("IO", runtime.getObject(), IO_ALLOCATOR);
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyIO.class);   
         ioClass.kindOf = new RubyModule.KindOf() {
-                public boolean isKindOf(IRubyObject obj, RubyModule type) {
-                    return obj instanceof RubyIO;
-                }
-            };
+            @Override
+            public boolean isKindOf(IRubyObject obj, RubyModule type) {
+                return obj instanceof RubyIO;
+            }
+        };
 
         ioClass.includeModule(runtime.getEnumerable());
         
@@ -905,11 +903,9 @@ public class RubyIO extends RubyObject {
      * 
      */
     @JRubyMethod(name = "<<", required = 1)
-    public IRubyObject op_concat(IRubyObject anObject) {
+    public IRubyObject op_append(IRubyObject anObject) {
         // Claims conversion is done via 'to_s' in docs.
-        IRubyObject strObject = anObject.callMethod(getRuntime().getCurrentContext(), MethodIndex.TO_S, "to_s");
-
-        write(strObject);
+        callMethod(getRuntime().getCurrentContext(), "write", anObject);
         
         return this; 
     }
@@ -1240,6 +1236,7 @@ public class RubyIO extends RubyObject {
     }
     
     @JRubyMethod(name = "initialize_copy", required = 1)
+    @Override
     public IRubyObject initialize_copy(IRubyObject original){
         if (this == original) return this;
 
@@ -1497,37 +1494,47 @@ public class RubyIO extends RubyObject {
         
         return getRuntime().newFixnum(0);
     }
+    
+    private static final ByteList NIL_BYTELIST = ByteList.create("nil");
+    private static final ByteList RECURSIVE_BYTELIST = ByteList.create("[...]");
 
     @JRubyMethod(name = "puts", rest = true)
     public IRubyObject puts(IRubyObject[] args) {
     	ThreadContext context = getRuntime().getCurrentContext();
         
+        assert getRuntime().getGlobalVariables().getDefaultSeparator() instanceof RubyString;
+        RubyString separator = (RubyString)getRuntime().getGlobalVariables().getDefaultSeparator();
+        
         if (args.length == 0) {
-            callMethod(context, "write", getRuntime().newString("\n"));
+            write(context, separator.getByteList());
             return getRuntime().getNil();
         }
 
         for (int i = 0; i < args.length; i++) {
-            String line;
+            ByteList line;
             
             if (args[i].isNil()) {
-                line = "nil";
+                line = NIL_BYTELIST;
             } else if (getRuntime().isInspecting(args[i])) {
-                line = "[...]";
+                line = RECURSIVE_BYTELIST;
             } else if (args[i] instanceof RubyArray) {
                 inspectPuts((RubyArray) args[i]);
                 continue;
             } else {
-                line = args[i].toString();
+                line = args[i].asString().getByteList();
             }
             
-            callMethod(context, "write", getRuntime().newString(line));
+            write(context, line);
             
-            if (!line.endsWith("\n")) {
-                callMethod(context, "write", getRuntime().newString("\n"));
+            if (line.length() == 0 || !line.endsWith(separator.getByteList())) {
+                write(context, separator.getByteList());
             }
         }
         return getRuntime().getNil();
+    }
+    
+    protected void write(ThreadContext context, ByteList byteList) {
+        callMethod(context, "write", getRuntime().newStringShared(byteList));
     }
     
     private IRubyObject inspectPuts(RubyArray array) {
@@ -2062,6 +2069,7 @@ public class RubyIO extends RubyObject {
     	return this;
     }
 
+    @Override
     public String toString() {
         return "RubyIO(" + openFile.getMode() + ", " + openFile.getMainStream().getDescriptor().getFileno() + ")";
     }

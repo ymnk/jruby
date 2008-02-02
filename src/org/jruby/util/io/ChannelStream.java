@@ -160,6 +160,7 @@ public class ChannelStream implements Stream, Finalizable {
 
     public synchronized ByteList fgets(ByteList separatorString) throws IOException, BadDescriptorException {
         checkReadable();
+        ensureRead();
 
         if (separatorString == null) {
             return readall();
@@ -560,7 +561,7 @@ public class ChannelStream implements Stream, Finalizable {
             int read = descriptor.read(buffer);
             buffer.flip();
             
-            if (read == -1) return -1;
+            if (read <= 0) return -1;
         }
         return buffer.get() & 0xFF;
     }
