@@ -640,6 +640,10 @@ public class RubyIO extends RubyObject {
         registerDescriptor(openFile.getMainStream().getDescriptor());        
     }
     
+    public OpenFile getOpenFile() {
+        return openFile;
+    }
+    
     private static ObjectAllocator IO_ALLOCATOR = new ObjectAllocator() {
         public IRubyObject allocate(Ruby runtime, RubyClass klass) {
             return new RubyIO(runtime, klass);
