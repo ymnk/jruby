@@ -561,7 +561,10 @@ public class ChannelStream implements Stream, Finalizable {
             int read = descriptor.read(buffer);
             buffer.flip();
             
-            if (read <= 0) return -1;
+            if (read <= 0) {
+                eof = true;
+                return -1;
+            }
         }
         return buffer.get() & 0xFF;
     }
@@ -675,13 +678,19 @@ public class ChannelStream implements Stream, Finalizable {
     }
 
     public synchronized int fgetc() throws IOException, BadDescriptorException {
+        if (eof) {
+            return -1;
+        }
+        
         checkReadable();
 
         int c = read();
 
         if (c == -1) {
+            eof = true;
             return c;
         }
+        
         return c & 0xff;
     }
 
@@ -739,7 +748,8 @@ public class ChannelStream implements Stream, Finalizable {
             }
 
             return bufferedRead();
-        } catch (EOFException eof) {
+        } catch (EOFException e) {
+            eof = true;
             return -1;
         }
     }

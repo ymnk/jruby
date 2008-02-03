@@ -581,31 +581,89 @@ public class RubyIO extends RubyObject {
         return separator;
     }
 
-    /** Read a line.
-     * 
-     */
-    // TODO: Most things loop over this and always pass it the same arguments
-    // meaning they are an invariant of the loop.  Think about fixing this.
-    public IRubyObject getline(IRubyObject[] args) {
-        return getline(getSeparatorForGets(args));
-    }
-
     public IRubyObject getline(ByteList separator) {
         try {
             openFile.checkReadable(getRuntime());
-        
-            ByteList newLine = openFile.getMainStream().fgets(separator);
-
-            if (newLine != null) {
-                openFile.setLineNumber(openFile.getLineNumber() + 1);
-                getRuntime().getGlobalVariables().set("$.", getRuntime().newFixnum(openFile.getLineNumber()));
-                RubyString result = RubyString.newString(getRuntime(), newLine);
-                result.taint();
-
-                return result;
+            boolean isParagraph = separator == Stream.PARAGRAPH_DELIMETER;
+            
+            if (isParagraph) {
+                swallow('\n');
             }
-		    
-            return getRuntime().getNil();
+            
+            if (separator == null) {
+                IRubyObject str = readAll(null);
+                if (((RubyString)str).getByteList().length() == 0) {
+                    return getRuntime().getNil();
+                }
+                return str;
+            } else if (separator.length() == 1) {
+                return getlineFast(separator.get(0));
+            } else {
+                Stream readStream = openFile.getMainStream();
+                int c = -1;
+                int newline = separator.get(separator.length() - 1);
+
+                ByteList buf = new ByteList(1024);
+                boolean update = false;
+                
+                while (true) {
+                    do {
+                        readCheck(readStream);
+                        readStream.clearerr();
+
+                        try {
+                            c = readStream.fgetc();
+                        } catch (EOFException e) {
+                            c = -1;
+                        }
+
+                        if (c == -1) {
+                            // TODO: clear error, wait for it to become readable
+                            if (c == -1) {
+                                if (update) {
+                                    return RubyString.newString(getRuntime(), buf);
+                                }
+                                break;
+                            }
+                        }
+                        
+                        buf.append(c);
+            
+                        update = true;
+                    } while (c != newline); // loop until we see the nth separator char
+                    
+                    // if we hit EOF, we're done
+                    if (c == -1) {
+                        break;
+                    }
+                    
+                    // if we've found the last char of the separator,
+                    // and we've found at least as many characters as separator length,
+                    // and the last n characters of our buffer match the separator, we're done
+                    if (c == newline && buf.length() >= separator.length() &&
+                            0 == ByteList.memcmp(buf.unsafeBytes(), buf.begin + buf.realSize - separator.length(), separator.unsafeBytes(), separator.begin, separator.realSize)) {
+                        break;
+                    }
+                }
+                
+                if (isParagraph) {
+                    if (c != -1) {
+                        swallow('\n');
+                    }
+                }
+                
+                if (!update) {
+                    return getRuntime().getNil();
+                } else {
+                    openFile.setLineNumber(openFile.getLineNumber() + 1);
+                    // this is for a range check, near as I can tell
+                    RubyNumeric.int2fix(getRuntime(), openFile.getLineNumber());
+                    RubyString str = RubyString.newString(getRuntime(), buf);
+                    str.setTaint(true);
+
+                    return str;
+                }
+            }
         } catch (PipeException ex) {
             throw getRuntime().newErrnoEPIPEError();
         } catch (InvalidValueException ex) {
@@ -616,6 +674,71 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newErrnoEBADFError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
+        }
+    }
+    
+    protected boolean swallow(int term) throws IOException, BadDescriptorException {
+        Stream readStream = openFile.getMainStream();
+        int c;
+        
+        do {
+            readCheck(readStream);
+            
+            try {
+                c = readStream.fgetc();
+            } catch (EOFException e) {
+                c = -1;
+            }
+            
+            if (c != term) {
+                return true;
+            }
+        } while (c != -1);
+        
+        return false;
+    }
+    
+    public IRubyObject getlineFast(int delim) throws IOException, BadDescriptorException {
+        Stream readStream = openFile.getMainStream();
+        int c = -1;
+
+        ByteList buf = new ByteList(1024);
+        boolean update = false;
+        do {
+            readCheck(readStream);
+            readStream.clearerr();
+
+            try {
+                c = readStream.fgetc();
+            } catch (EOFException e) {
+                c = -1;
+            }
+
+            if (c == -1) {
+                // TODO: clear error, wait for it to become readable
+                if (c == -1) {
+                    if (update) {
+                        return RubyString.newString(getRuntime(), buf);
+                    }
+                    break;
+                }
+            }
+            
+            buf.append(c);
+            
+            update = true;
+        } while (c != delim);
+
+        if (!update) {
+            return getRuntime().getNil();
+        } else {
+            openFile.setLineNumber(openFile.getLineNumber() + 1);
+            // this is for a range check, near as I can tell
+            RubyNumeric.int2fix(getRuntime(), openFile.getLineNumber());
+            RubyString str = RubyString.newString(getRuntime(), buf);
+            str.setTaint(true);
+
+            return str;
         }
     }
     // IO class methods.
@@ -1456,7 +1579,9 @@ public class RubyIO extends RubyObject {
      */
     @JRubyMethod(name = "gets", optional = 1)
     public IRubyObject gets(IRubyObject[] args) {
-        IRubyObject result = getline(args);
+        ByteList separator = getSeparatorForGets(args);
+        
+        IRubyObject result = getline(separator);
 
         if (!result.isNil()) getRuntime().getCurrentContext().getCurrentFrame().setLastLine(result);
 
