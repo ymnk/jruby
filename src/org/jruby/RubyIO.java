@@ -315,15 +315,15 @@ public class RubyIO extends RubyObject {
     }
 
     public OutputStream getOutStream() {
-        return openFile.getMainStream().newOutputStream();
+        return getOpenFileChecked().getMainStream().newOutputStream();
     }
 
     public InputStream getInStream() {
-        return openFile.getMainStream().newInputStream();
+        return getOpenFileChecked().getMainStream().newInputStream();
     }
 
     public Channel getChannel() {
-        if (openFile.getMainStream() instanceof ChannelStream) {
+        if (getOpenFileChecked().getMainStream() instanceof ChannelStream) {
             return ((ChannelStream) openFile.getMainStream()).getDescriptor().getChannel();
         } else {
             return null;
@@ -331,7 +331,7 @@ public class RubyIO extends RubyObject {
     }
     
     public Stream getHandler() {
-        return openFile.getMainStream();
+        return getOpenFileChecked().getMainStream();
     }
 
     @JRubyMethod(name = "reopen", required = 1, optional = 1)
@@ -1446,7 +1446,7 @@ public class RubyIO extends RubyObject {
             
             ChannelDescriptor descriptor = originalFile.getMainStream().getDescriptor().dup();
 
-            openFile.setMainStream(ChannelStream.fdopen(getRuntime(), descriptor, modes));
+            newFile.setMainStream(ChannelStream.fdopen(getRuntime(), descriptor, modes));
             
             // TODO: the rest of this...seeking to same position is unnecessary since we share a channel
             // but some of this may be needed?
@@ -1464,7 +1464,7 @@ public class RubyIO extends RubyObject {
 //    }
             
             // Register the new descriptor
-            registerDescriptor(openFile.getMainStream().getDescriptor());
+            registerDescriptor(newFile.getMainStream().getDescriptor());
         } catch (IOException ex) {
             throw getRuntime().newIOError("could not init copy: " + ex);
         } catch (BadDescriptorException ex) {
@@ -1635,31 +1635,62 @@ public class RubyIO extends RubyObject {
 
     public boolean getBlocking() {
         return ((ChannelStream) openFile.getMainStream()).isBlocking();
-     }
+    }
 
     @JRubyMethod(name = "fcntl", required = 2)
-    public IRubyObject fcntl(IRubyObject cmd, IRubyObject arg) throws IOException {
+    public IRubyObject fcntl(IRubyObject cmd, IRubyObject arg) {
+        // TODO: This version differs from ioctl by checking whether fcntl exists
+        // and raising notimplemented if it doesn't; perhaps no difference for us?
+        return ctl(cmd, arg);
+    }
+
+    @JRubyMethod(name = "ioctl", required = 1, optional = 1)
+    public IRubyObject ioctl(IRubyObject[] args) {
+        IRubyObject cmd = args[0];
+        IRubyObject arg;
+        
+        if (args.length == 2) {
+            arg = args[1];
+        } else {
+            arg = getRuntime().getNil();
+        }
+        
+        return ctl(cmd, arg);
+    }
+
+    public IRubyObject ctl(IRubyObject cmd, IRubyObject arg) {
         long realCmd = cmd.convertToInteger().getLongValue();
+        long nArg = 0;
         
         // FIXME: Arg may also be true, false, and nil and still be valid.  Strangely enough, 
         // protocol conversion is not happening in Ruby on this arg?
-        if (!(arg instanceof RubyNumeric)) return getRuntime().newFixnum(0);
+        if (arg.isNil() || arg == getRuntime().getFalse()) {
+            nArg = 0;
+        } else if (arg instanceof RubyFixnum) {
+            nArg = RubyFixnum.fix2long(arg);
+        } else if (arg == getRuntime().getTrue()) {
+            nArg = 1;
+        } else {
+            throw getRuntime().newNotImplementedError("JRuby does not support string for second fcntl/ioctl argument yet");
+        }
         
-        long realArg = ((RubyNumeric)arg).getLongValue();
+        OpenFile myOpenFile = getOpenFileChecked();
 
         // Fixme: Only F_SETFL is current supported
         if (realCmd == 1L) {  // cmd is F_SETFL
             boolean block = true;
             
-            if ((realArg & ModeFlags.NONBLOCK) == ModeFlags.NONBLOCK) {
+            if ((nArg & ModeFlags.NONBLOCK) == ModeFlags.NONBLOCK) {
                 block = false;
             }
 
             try {
-                openFile.getMainStream().setBlocking(block);
+                myOpenFile.getMainStream().setBlocking(block);
             } catch (IOException e) {
                 throw getRuntime().newIOError(e.getMessage());
             }
+        } else {
+            throw getRuntime().newNotImplementedError("JRuby only supports F_SETFL for fcntl/ioctl currently");
         }
         
         return getRuntime().newFixnum(0);
@@ -2153,7 +2184,7 @@ public class RubyIO extends RubyObject {
     
     @JRubyMethod
     public IRubyObject stat() {
-        return getRuntime().newFileStat(openFile.getMainStream().getDescriptor().getFileDescriptor());
+        return getRuntime().newFileStat(getOpenFileChecked().getMainStream().getDescriptor().getFileDescriptor());
     }
 
     /** 
