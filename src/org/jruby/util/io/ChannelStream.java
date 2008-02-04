@@ -377,6 +377,14 @@ public class ChannelStream implements Stream, Finalizable {
         if (eof) {
             return true;
         } else {
+            if (ungotc > 0) {
+                return false;
+            }
+            ungotc = read();
+            if (ungotc == -1) {
+                eof = true;
+                return true;
+            }
             return false;
         }
 //        
