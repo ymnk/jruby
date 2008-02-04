@@ -586,6 +586,8 @@ public class RubyIO extends RubyObject {
         try {
             openFile.checkReadable(getRuntime());
             boolean isParagraph = separator == Stream.PARAGRAPH_DELIMETER;
+            separator = (separator == Stream.PARAGRAPH_DELIMETER) ?
+                    Stream.PARAGRAPH_SEPARATOR : separator;
             
             if (isParagraph) {
                 swallow('\n');
@@ -692,6 +694,7 @@ public class RubyIO extends RubyObject {
             }
             
             if (c != term) {
+                readStream.ungetc(c);
                 return true;
             }
         } while (c != -1);
