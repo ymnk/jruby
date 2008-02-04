@@ -1364,7 +1364,7 @@ public class RubyIO extends RubyObject {
                 return getRuntime().getFalse();
             }
             
-            // TODO: READ_CHECK from MRI
+            readCheck(myOpenFile.getMainStream());
             
             myOpenFile.getMainStream().clearerr();
             

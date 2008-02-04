@@ -151,11 +151,11 @@ public class ChannelStream implements Stream, Finalizable {
     }
     
     public boolean readDataBuffered() {
-        return reading && buffer.position() > 0;
+        return reading && buffer.hasRemaining();
     }
     
     public boolean writeDataBuffered() {
-        return !reading && buffer.hasRemaining();
+        return !reading && buffer.position() > 0;
     }
 
     public synchronized ByteList fgets(ByteList separatorString) throws IOException, BadDescriptorException {
