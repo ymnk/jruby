@@ -1810,16 +1810,17 @@ public class RubyIO extends RubyObject {
             // TODO: Ruby locks the string here
             
             getRuntime().getCurrentContext().getThread().beforeBlockingCall();
+            openFile.checkClosed(getRuntime());
+            
+            // TODO: Ruby re-checks that the buffer string hasn't been modified
             
             int bytesRead = openFile.getMainStream().getDescriptor().read(len, str.getByteList());
             
             // TODO: Ruby unlocks the string here
             
-            // TODO: Ruby fails with rb_sys_fail if number of bytes read is -1
-            
             // TODO: Ruby truncates string to specific size here, but our bytelist should handle this already?
             
-            if (bytesRead == 0 && len > 0) {
+            if (bytesRead == -1 || (bytesRead == 0 && len > 0)) {
                 throw getRuntime().newEOFError();
             }
             
