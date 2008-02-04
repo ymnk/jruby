@@ -1238,6 +1238,7 @@ public class RubyIO extends RubyObject {
     @JRubyMethod(name = "sysseek", required = 1, optional = 1)
     public RubyFixnum sysseek(IRubyObject[] args) {
         long offset = RubyNumeric.num2long(args[0]);
+        long pos;
         int whence = Stream.SEEK_SET;
         
         if (args.length > 1) {
@@ -1254,7 +1255,7 @@ public class RubyIO extends RubyObject {
                         "sysseek for buffered IO");
             }
             
-            openFile.getMainStream().getDescriptor().lseek(offset, whence);
+            pos = openFile.getMainStream().getDescriptor().lseek(offset, whence);
         } catch (BadDescriptorException ex) {
             throw getRuntime().newErrnoEBADFError();
         } catch (InvalidValueException e) {
@@ -1267,7 +1268,7 @@ public class RubyIO extends RubyObject {
         
         openFile.getMainStream().clearerr();
         
-        return RubyFixnum.zero(getRuntime());
+        return getRuntime().newFixnum(pos);
     }
 
     @JRubyMethod(name = "rewind")

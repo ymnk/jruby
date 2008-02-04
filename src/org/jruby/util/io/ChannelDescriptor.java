@@ -296,26 +296,32 @@ public class ChannelDescriptor {
      * @throws org.jruby.util.io.PipeException If the target channel is not seekable
      * @throws org.jruby.util.io.BadDescriptorException If the target channel is
      * already closed.
+     * @return the new offset into the FileChannel.
      */
-    public void lseek(long offset, int whence) throws IOException, InvalidValueException, PipeException, BadDescriptorException {
+    public long lseek(long offset, int whence) throws IOException, InvalidValueException, PipeException, BadDescriptorException {
         if (channel instanceof FileChannel) {
             checkOpen();
             
             FileChannel fileChannel = (FileChannel)channel;
             try {
+                long pos;
                 switch (whence) {
                 case Stream.SEEK_SET:
-                    fileChannel.position(offset);
+                    pos = offset;
+                    fileChannel.position(pos);
                     break;
                 case Stream.SEEK_CUR:
-                    fileChannel.position(fileChannel.position() + offset);
+                    pos = fileChannel.position() + offset;
+                    fileChannel.position(pos);
                     break;
                 case Stream.SEEK_END:
-                    fileChannel.position(fileChannel.size() + offset);
+                    pos = fileChannel.size() + offset;
+                    fileChannel.position(pos);
                     break;
                 default:
                     throw new InvalidValueException();
                 }
+                return pos;
             } catch (IllegalArgumentException e) {
                 throw new InvalidValueException();
             }
