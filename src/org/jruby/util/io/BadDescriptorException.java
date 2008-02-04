@@ -1,5 +1,5 @@
 /*
- ***** BEGIN LICENSE BLOCK *****
+ **** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -12,7 +12,7 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
- * Copyright (C) 2007 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2008 The JRuby Community <www.jruby.org>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -26,9 +26,8 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.util;
+package org.jruby.util.io;
 
-import java.io.IOException;
+public class BadDescriptorException extends Exception {
 
-public class DirectoryAsFileException extends IOException {
 }

@@ -25,17 +25,14 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.util;
+package org.jruby.util.io;
 
 import java.io.EOFException;
-import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.FileChannel;
-
-import org.jruby.Ruby;
-import org.jruby.RubyIO.ChannelDescriptor;
+import org.jruby.util.ByteList;
 
 /**
  */
@@ -48,26 +45,16 @@ public interface Stream {
     public static final ByteList PARAGRAPH_DELIMETER = ByteList.create("PARAGRPH_DELIM_MRK_ER");
     
     public static final ByteList PARAGRAPH_SEPARATOR = ByteList.create("\n\n");
-
-    public FileDescriptor getFD();
     
     public ChannelDescriptor getDescriptor();
     
-    public abstract FileChannel getFileChannel();
+    public void clearerr();
     
-    public boolean isOpen();
-
-    public boolean isReadable();
-
-    public boolean isWritable();
-    
-    public IOModes getModes();
+    public ModeFlags getModes();
     
     public boolean isSync();
 
     public void setSync(boolean sync);
-
-    public void reset(IOModes subsetModes) throws IOException, InvalidValueException, BadDescriptorException, PipeException;
 
     public abstract ByteList fgets(ByteList separatorString) throws IOException, BadDescriptorException, EOFException;
     public abstract ByteList readall() throws IOException, BadDescriptorException, EOFException;
@@ -84,12 +71,9 @@ public interface Stream {
     public abstract void fputc(int c) throws IOException, BadDescriptorException;
     
     public abstract ByteList read(int number) throws IOException, BadDescriptorException, EOFException;
-    public abstract int write(ByteList buf) throws IOException, BadDescriptorException;
     
     public abstract void fclose() throws IOException, BadDescriptorException;
-    public abstract void fflush() throws IOException, BadDescriptorException;
-
-    public void closeWrite() throws IOException, BadDescriptorException;
+    public abstract int fflush() throws IOException, BadDescriptorException;
     
     /**
      * <p>Flush and sync all writes to the filesystem.</p>
@@ -118,15 +102,13 @@ public interface Stream {
      */
     public long fgetpos() throws IOException, PipeException, BadDescriptorException;
     
-    public void rewind() throws IOException, PipeException, InvalidValueException, BadDescriptorException;
-    
     /**
      * <p>Perform a seek based on pos().  </p> 
      * @throws IOException 
      * @throws PipeException 
      * @throws InvalidValueException 
      */
-    public void fseek(long offset, int type) throws IOException, PipeException, InvalidValueException, BadDescriptorException;
+    public void fseek(long offset, int type) throws IOException, InvalidValueException, PipeException;
     public void ftruncate(long newLength) throws IOException, PipeException;
     
     /**
@@ -143,7 +125,8 @@ public interface Stream {
      */
     public void waitUntilReady() throws IOException, InterruptedException;
 
-    public boolean hasPendingBuffered();
+    public boolean readDataBuffered();
+    public boolean writeDataBuffered();
     
     public InputStream newInputStream();
     
@@ -153,15 +136,5 @@ public interface Stream {
     
     public void setBlocking(boolean blocking) throws IOException;
     
-    public void freopen(String path, IOModes modes) throws DirectoryAsFileException, IOException, InvalidValueException, PipeException, BadDescriptorException;
-    
-    public class PipeException extends Exception {
-		private static final long serialVersionUID = 1L;
-    }
-    public class BadDescriptorException extends Exception {
-		private static final long serialVersionUID = 1L;
-    }
-    public class InvalidValueException extends Exception {
-		private static final long serialVersionUID = 1L;
-    }
+    public void freopen(String path, ModeFlags modes) throws DirectoryAsFileException, IOException, InvalidValueException, PipeException, BadDescriptorException;
 }
