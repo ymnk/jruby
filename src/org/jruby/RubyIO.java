@@ -922,6 +922,12 @@ public class RubyIO extends RubyObject {
         }
     }
     
+    @JRubyMethod(name = "write_nonblock", required = 1)
+    public IRubyObject write_nonblock(IRubyObject obj) {
+        // TODO: Obviously, we're not doing a non-blocking write here
+        return write(obj);
+    }
+    
     /** io_write
      * 
      */
@@ -1918,6 +1924,12 @@ public class RubyIO extends RubyObject {
     	} finally {
             getRuntime().getCurrentContext().getThread().afterBlockingCall();
         }
+    }
+    
+    @JRubyMethod(name = "read_nonblock", required = 1, optional = 1)
+    public IRubyObject read_nonblock(IRubyObject[] args) {
+        // TODO: Obviously, we're not doing a nonblocking read here...
+        return read(args);
     }
     
     @JRubyMethod(name = "read", optional = 2)
