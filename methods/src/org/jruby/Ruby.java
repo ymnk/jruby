@@ -63,6 +63,8 @@ import java.util.Vector;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.jruby.ast.Node;
 import org.jruby.ast.executable.RubiniusRunner;
@@ -110,7 +112,6 @@ import org.jruby.util.IOOutputStream;
 import org.jruby.util.JRubyClassLoader;
 import org.jruby.util.JavaNameMangler;
 import org.jruby.util.KCode;
-import org.jruby.util.NormalizedFile;
 import org.jruby.util.SafePropertyAccessor;
 import org.jruby.util.collections.WeakHashSet;
 import org.jruby.util.io.ChannelDescriptor;
@@ -2511,8 +2512,12 @@ public final class Ruby {
     public Set<Script> getJittedMethods() {
         return jittedMethods;
     }
+    
+    public Lock getGlobalMethodWriteLock() {
+        return globalMethodWriteLock;
+    }
 
-    private CacheMap cacheMap = new CacheMap();
+    private CacheMap cacheMap = new CacheMap(this);
     private ThreadService threadService;
     private Hashtable<Object, Object> runtimeInformation;
     
@@ -2660,4 +2665,7 @@ public final class Ruby {
 
     // mutex that controls modifications of internal finalizers
     private final Object internalFinalizersMutex = new Object();
+    
+    // global lock to control writes to method maps and/or CacheMap
+    private final ReentrantLock globalMethodWriteLock = new ReentrantLock();
 }

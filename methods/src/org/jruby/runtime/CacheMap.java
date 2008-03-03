@@ -31,9 +31,11 @@ import java.util.WeakHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
 
 import org.jruby.util.collections.WeakHashSet;
 import org.jruby.internal.runtime.methods.DynamicMethod;
+import org.jruby.Ruby;
 import org.jruby.RubyModule;
 
 /**
@@ -56,22 +58,32 @@ public class CacheMap {
         public void removeCachedMethod();
     }
     private final Map<DynamicMethod, Set<CacheSite>> mappings = new WeakHashMap<DynamicMethod, Set<CacheSite>>();
+    private final Ruby runtime;
     
+    public CacheMap(Ruby runtime) {
+        this.runtime = runtime;
+    }
     /**
      * Add another class to the list of classes which are caching the method.
      *
      * @param method which is cached
      * @param module which is caching method
      */
-    public synchronized void add(DynamicMethod method, CacheSite site) {
-        Set<CacheSite> siteList = mappings.get(method);
-        
-        if (siteList == null) {
-            siteList = new WeakHashSet<CacheSite>();
-            mappings.put(method, siteList);
-        }
+    public void add(DynamicMethod method, CacheSite site) {
+        Lock methodWriteLock = runtime.getGlobalMethodWriteLock();
+        methodWriteLock.lock();
+        try {
+            Set<CacheSite> siteList = mappings.get(method);
 
-        siteList.add(site);
+            if (siteList == null) {
+                siteList = new WeakHashSet<CacheSite>();
+                mappings.put(method, siteList);
+            }
+
+            siteList.add(site);
+        } finally {
+            methodWriteLock.unlock();
+        }
     }
     
     /**
@@ -79,39 +91,55 @@ public class CacheMap {
      * 
      * @param method to remove all caches of
      */
-    public synchronized void remove(DynamicMethod method) {
-        Set<CacheSite> siteList = mappings.remove(method);
-        
-        // Removed method has never been used so it has not been cached
-        if (siteList == null) {
-            return;
-        }
-        for(Iterator<CacheSite> iter = siteList.iterator(); iter.hasNext();) {
-            CacheSite site = iter.next();
-            if (site != null) {
-                site.removeCachedMethod();
+    public void remove(DynamicMethod method) {
+        // we'll normally already hold the lock when called,
+        // but it doesn't hurt (performance) to double-check
+        Lock methodWriteLock = runtime.getGlobalMethodWriteLock();
+        methodWriteLock.lock();
+        try {
+            Set<CacheSite> siteList = mappings.remove(method);
+
+            // Removed method has never been used so it has not been cached
+            if (siteList == null) {
+                return;
             }
+            for(Iterator<CacheSite> iter = siteList.iterator(); iter.hasNext();) {
+                CacheSite site = iter.next();
+                if (site != null) {
+                    site.removeCachedMethod();
+                }
+            }
+        } finally {
+            methodWriteLock.unlock();
         }
     }
     
     /**
      * Remove method caches for all methods in a module 
      */
-    public synchronized void moduleIncluded(RubyModule targetModule, RubyModule includedModule) {
-        for (String methodName : includedModule.getMethods().keySet()) {
+    public void moduleIncluded(RubyModule targetModule, RubyModule includedModule) {
+        // we'll normally already hold the lock when called,
+        // but it doesn't hurt (performance) to double-check
+        Lock methodWriteLock = runtime.getGlobalMethodWriteLock();
+        methodWriteLock.lock();
+        try {
+            for (String methodName : includedModule.getMethods().keySet()) {
 
-            for(RubyModule current = targetModule; current != null; current = current.getSuperClass()) {
-                if (current == includedModule) continue;
-                DynamicMethod method = current.getMethods().get(methodName);
-                if (method != null) {
-                    Set<CacheSite> adapters = mappings.remove(method);
-                    if (adapters != null) {
-                        for(CacheSite adapter : adapters) {
-                            adapter.removeCachedMethod();
+                for(RubyModule current = targetModule; current != null; current = current.getSuperClass()) {
+                    if (current == includedModule) continue;
+                    DynamicMethod method = current.getMethods().get(methodName);
+                    if (method != null) {
+                        Set<CacheSite> adapters = mappings.remove(method);
+                        if (adapters != null) {
+                            for(CacheSite adapter : adapters) {
+                                adapter.removeCachedMethod();
+                            }
                         }
                     }
                 }
             }
+        } finally {
+            methodWriteLock.unlock();
         }
     }
 }

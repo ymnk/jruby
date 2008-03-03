@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.jruby.anno.JRubyMethod;
@@ -307,7 +308,9 @@ public class RubyModule extends RubyObject {
     
 
     // note that addMethod now does its own put, so any change made to
-    // functionality here should be made there as well 
+    // functionality here should be made there as well
+    //
+    // MUST be called under global write lock
     private void putMethod(String name, DynamicMethod method) {
         // FIXME: kinda hacky...flush STI here
         dispatcher.clearIndex(MethodIndex.getIndex(name));
@@ -412,7 +415,7 @@ public class RubyModule extends RubyObject {
      * 
      * @param arg The module to include
      */
-    public synchronized void includeModule(IRubyObject arg) {
+    public void includeModule(IRubyObject arg) {
         assert arg != null;
 
         testFrozen("module");
@@ -654,56 +657,62 @@ public class RubyModule extends RubyObject {
 
     // TODO: Consider a better way of synchronizing 
     public void addMethod(String name, DynamicMethod method) {
-        if (this == getRuntime().getObject()) {
-            getRuntime().secure(4);
+        Ruby runtime = getRuntime();
+        if (this == runtime.getObject()) {
+            runtime.secure(4);
         }
 
-        if (getRuntime().getSafeLevel() >= 4 && !isTaint()) {
-            throw getRuntime().newSecurityError("Insecure: can't define method");
+        if (runtime.getSafeLevel() >= 4 && !isTaint()) {
+            throw runtime.newSecurityError("Insecure: can't define method");
         }
         testFrozen("class/module");
 
-        // We can safely reference methods here instead of doing getMethods() since if we
-        // are adding we are not using a IncludedModuleWrapper.
-        synchronized(getMethods()) {
+        Lock methodWriteLock = runtime.getGlobalMethodWriteLock();
+        methodWriteLock.lock();
+        try {
             // If we add a method which already is cached in this class, then we should update the 
             // cachemap so it stays up to date.
             DynamicMethod existingMethod = getMethods().put(name, method);
             if (existingMethod != null) {
-                getRuntime().getCacheMap().remove(existingMethod);
+                runtime.getCacheMap().remove(existingMethod);
             }
             // note: duplicating functionality from putMethod, since we
             // remove/put atomically here
             dispatcher.clearIndex(MethodIndex.getIndex(name));
+        } finally {
+            methodWriteLock.unlock();
         }
     }
 
     public void removeMethod(String name) {
-        if (this == getRuntime().getObject()) {
-            getRuntime().secure(4);
+        Ruby runtime = getRuntime();
+        if (this == runtime.getObject()) {
+            runtime.secure(4);
         }
-        if (getRuntime().getSafeLevel() >= 4 && !isTaint()) {
+        if (runtime.getSafeLevel() >= 4 && !isTaint()) {
             throw getRuntime().newSecurityError("Insecure: can't remove method");
         }
         testFrozen("class/module");
 
-        // We can safely reference methods here instead of doing getMethods() since if we
-        // are adding we are not using a IncludedModuleWrapper.
-        synchronized(getMethods()) {
-            DynamicMethod method = (DynamicMethod) getMethods().remove(name);
+        Lock methodWriteLock = runtime.getGlobalMethodWriteLock();
+        methodWriteLock.lock();
+        try {
+            DynamicMethod method = getMethods().remove(name);
             if (method == null) {
                 throw getRuntime().newNameError("method '" + name + "' not defined in " + getName(), name);
             }
-            
-            getRuntime().getCacheMap().remove(method);
+
+            runtime.getCacheMap().remove(method);
+        } finally {
+            methodWriteLock.unlock();
         }
-        
+
         if(isSingleton()){
             IRubyObject singleton = ((MetaClass)this).getAttached(); 
-            singleton.callMethod(getRuntime().getCurrentContext(), "singleton_method_removed", getRuntime().newSymbol(name));
+            singleton.callMethod(runtime.getCurrentContext(), "singleton_method_removed", runtime.newSymbol(name));
         }else{
-            callMethod(getRuntime().getCurrentContext(), "method_removed", getRuntime().newSymbol(name));
-    }
+            callMethod(runtime.getCurrentContext(), "method_removed", runtime.newSymbol(name));
+        }
     }
 
     /**
@@ -715,7 +724,7 @@ public class RubyModule extends RubyObject {
     public DynamicMethod searchMethod(String name) {
         for (RubyModule searchModule = this; searchModule != null; searchModule = searchModule.getSuperClass()) {
             // See if current class has method or if it has been cached here already
-            DynamicMethod method = (DynamicMethod) searchModule.getMethods().get(name);
+            DynamicMethod method = searchModule.getMethods().get(name);
 
             if (method != null) {
                 return method;
@@ -732,7 +741,7 @@ public class RubyModule extends RubyObject {
      * @return The method, or UndefinedMethod if not found
      */
     public DynamicMethod retrieveMethod(String name) {
-        return (DynamicMethod)getMethods().get(name);
+        return getMethods().get(name);
     }
 
     /**
@@ -791,7 +800,7 @@ public class RubyModule extends RubyObject {
     /** rb_alias
      *
      */
-    public synchronized void defineAlias(String name, String oldName) {
+    public void defineAlias(String name, String oldName) {
         testFrozen("module");
         if (oldName.equals(name)) {
             return;
@@ -800,54 +809,66 @@ public class RubyModule extends RubyObject {
         if (this == runtime.getObject()) {
             runtime.secure(4);
         }
-        DynamicMethod method = searchMethod(oldName);
-        DynamicMethod oldMethod = searchMethod(name);
-        if (method.isUndefined()) {
-            if (isModule()) {
-                method = runtime.getObject().searchMethod(oldName);
-            }
-
-            if (method.isUndefined()) {
-                throw runtime.newNameError("undefined method `" + oldName + "' for " +
-                        (isModule() ? "module" : "class") + " `" + getName() + "'", oldName);
-            }
-        }
         CacheMap cacheMap = runtime.getCacheMap();
-        cacheMap.remove(method);
-        cacheMap.remove(oldMethod);
-        if (oldMethod != oldMethod.getRealMethod()) {
-            cacheMap.remove(oldMethod.getRealMethod());
-        }
-        putMethod(name, new AliasMethod(this, method, oldName));
-    }
-
-    public synchronized void defineAliases(List<String> aliases, String oldName) {
-        testFrozen("module");
-        Ruby runtime = getRuntime();
-        if (this == runtime.getObject()) {
-            runtime.secure(4);
-        }
-        DynamicMethod method = searchMethod(oldName);
-        if (method.isUndefined()) {
-            if (isModule()) {
-                method = runtime.getObject().searchMethod(oldName);
-            }
-
-            if (method.isUndefined()) {
-                throw runtime.newNameError("undefined method `" + oldName + "' for " +
-                        (isModule() ? "module" : "class") + " `" + getName() + "'", oldName);
-            }
-        }
-        CacheMap cacheMap = runtime.getCacheMap();
-        cacheMap.remove(method);
-        for (String name: aliases) {
-            if (oldName.equals(name)) continue;
+        Lock methodWriteLock = runtime.getGlobalMethodWriteLock();
+        methodWriteLock.lock();
+        try {
+            DynamicMethod method = searchMethod(oldName);
             DynamicMethod oldMethod = searchMethod(name);
+            if (method.isUndefined()) {
+                if (isModule()) {
+                    method = runtime.getObject().searchMethod(oldName);
+                }
+
+                if (method.isUndefined()) {
+                    throw runtime.newNameError("undefined method `" + oldName + "' for " +
+                            (isModule() ? "module" : "class") + " `" + getName() + "'", oldName);
+                }
+            }
+            cacheMap.remove(method);
             cacheMap.remove(oldMethod);
             if (oldMethod != oldMethod.getRealMethod()) {
                 cacheMap.remove(oldMethod.getRealMethod());
             }
             putMethod(name, new AliasMethod(this, method, oldName));
+        } finally {
+            methodWriteLock.unlock();
+        }
+    }
+
+    public void defineAliases(List<String> aliases, String oldName) {
+        testFrozen("module");
+        Ruby runtime = getRuntime();
+        if (this == runtime.getObject()) {
+            runtime.secure(4);
+        }
+        CacheMap cacheMap = runtime.getCacheMap();
+        Lock methodWriteLock = runtime.getGlobalMethodWriteLock();
+        methodWriteLock.lock();
+        try {
+            DynamicMethod method = searchMethod(oldName);
+            if (method.isUndefined()) {
+                if (isModule()) {
+                    method = runtime.getObject().searchMethod(oldName);
+                }
+
+                if (method.isUndefined()) {
+                    throw runtime.newNameError("undefined method `" + oldName + "' for " +
+                            (isModule() ? "module" : "class") + " `" + getName() + "'", oldName);
+                }
+            }
+            cacheMap.remove(method);
+            for (String name: aliases) {
+                if (oldName.equals(name)) continue;
+                DynamicMethod oldMethod = searchMethod(name);
+                cacheMap.remove(oldMethod);
+                if (oldMethod != oldMethod.getRealMethod()) {
+                    cacheMap.remove(oldMethod.getRealMethod());
+                }
+                putMethod(name, new AliasMethod(this, method, oldName));
+            }
+        } finally {
+            methodWriteLock.unlock();
         }
     }
 
@@ -1724,47 +1745,56 @@ public class RubyModule extends RubyObject {
     }
 
     private void doIncludeModule(RubyModule includedModule) {
+        Ruby runtime = getRuntime();
+        CacheMap cacheMap = runtime.getCacheMap();
         boolean skip = false;
 
         RubyModule currentModule = this;
-        while (includedModule != null) {
 
-            if (getNonIncludedClass() == includedModule.getNonIncludedClass()) {
-                throw getRuntime().newArgumentError("cyclic include detected");
-            }
+        Lock methodWriteLock = runtime.getGlobalMethodWriteLock();
+        methodWriteLock.lock();
+        try {
+            while (includedModule != null) {
 
-            boolean superclassSeen = false;
-
-            // scan class hierarchy for module
-            for (RubyModule superClass = this.getSuperClass(); superClass != null; superClass = superClass.getSuperClass()) {
-                if (superClass instanceof IncludedModuleWrapper) {
-                    if (superClass.getNonIncludedClass() == includedModule.getNonIncludedClass()) {
-                        if (!superclassSeen) {
-                            currentModule = superClass;
-                        }
-                        skip = true;
-                        break;
-                    }
-                } else {
-                    superclassSeen = true;
+                if (getNonIncludedClass() == includedModule.getNonIncludedClass()) {
+                    throw runtime.newArgumentError("cyclic include detected");
                 }
+
+                boolean superclassSeen = false;
+
+                // scan class hierarchy for module
+                for (RubyModule superClass = this.getSuperClass(); superClass != null; superClass = superClass.getSuperClass()) {
+                    if (superClass instanceof IncludedModuleWrapper) {
+                        if (superClass.getNonIncludedClass() == includedModule.getNonIncludedClass()) {
+                            if (!superclassSeen) {
+                                currentModule = superClass;
+                            }
+                            skip = true;
+                            break;
+                        }
+                    } else {
+                        superclassSeen = true;
+                    }
+                }
+
+                if (!skip) {
+
+                    // blow away caches for any methods that are redefined by module
+                    cacheMap.moduleIncluded(currentModule, includedModule);
+
+                    // In the current logic, if we get here we know that module is not an
+                    // IncludedModuleWrapper, so there's no need to fish out the delegate. But just
+                    // in case the logic should change later, let's do it anyway:
+                    currentModule.setSuperClass(new IncludedModuleWrapper(getRuntime(), currentModule.getSuperClass(),
+                            includedModule.getNonIncludedClass()));
+                    currentModule = currentModule.getSuperClass();
+                }
+
+                includedModule = includedModule.getSuperClass();
+                skip = false;
             }
-
-            if (!skip) {
-
-                // blow away caches for any methods that are redefined by module
-                getRuntime().getCacheMap().moduleIncluded(currentModule, includedModule);
-                
-                // In the current logic, if we get here we know that module is not an
-                // IncludedModuleWrapper, so there's no need to fish out the delegate. But just
-                // in case the logic should change later, let's do it anyway:
-                currentModule.setSuperClass(new IncludedModuleWrapper(getRuntime(), currentModule.getSuperClass(),
-                        includedModule.getNonIncludedClass()));
-                currentModule = currentModule.getSuperClass();
-            }
-
-            includedModule = includedModule.getSuperClass();
-            skip = false;
+        } finally {
+            methodWriteLock.unlock();
         }
     }
 

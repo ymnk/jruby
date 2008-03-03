@@ -28,6 +28,9 @@
 
 package org.jruby.runtime;
 
+import java.util.concurrent.locks.Lock;
+
+import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyFixnum;
 import org.jruby.exceptions.JumpException;
@@ -44,6 +47,7 @@ public abstract class CallSite {
     public final String methodName;
     protected final CallType callType;
     private static int callCount = 0;
+    
     
     public CallSite(int methodID, String methodName, CallType callType) {
         this.methodID = methodID;
@@ -64,167 +68,155 @@ public abstract class CallSite {
     public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, Block block);
     public abstract IRubyObject call(ThreadContext context, IRubyObject self, IRubyObject[] args, Block block);
 
+    private static class ImmutableMethodAndType {
+        // note that final is required for correct synchronization
+        final DynamicMethod method;
+        final RubyClass type;
+
+        ImmutableMethodAndType(DynamicMethod method, RubyClass type) {
+            this.method = method;
+            this.type = type;
+        }
+    }
+    
+    private static class WrappedMethod {
+        DynamicMethod method;
+        boolean valid;
+        
+        WrappedMethod(DynamicMethod method, boolean valid) {
+            this.method = method;
+            this.valid = valid;
+        }
+    }
+    
     public static class InlineCachingCallSite extends CallSite implements CacheMap.CacheSite {
-        DynamicMethod cachedMethod;
-        RubyClass cachedType;
+        // note that volatile is required for correct synchronization
+        volatile ImmutableMethodAndType cachedMethodAndType;
         
         public InlineCachingCallSite(String methodName, CallType callType) {
             super(MethodIndex.getIndex(methodName), methodName, callType);
         }
         
         protected IRubyObject cacheAndCall(RubyClass selfType, Block block, IRubyObject[] args, ThreadContext context, IRubyObject self) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, args, context.getFrameSelf(), callType, block);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName, args, block);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName, args, block);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, args, context.getFrameSelf(), callType, block);
         }
 
         protected IRubyObject cacheAndCall(RubyClass selfType, IRubyObject[] args, ThreadContext context, IRubyObject self) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, args, context.getFrameSelf(), callType, Block.NULL_BLOCK);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName, args);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName, args);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, args, context.getFrameSelf(), callType, Block.NULL_BLOCK);
         }
 
         protected IRubyObject cacheAndCall(RubyClass selfType, ThreadContext context, IRubyObject self) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, IRubyObject.NULL_ARRAY, context.getFrameSelf(), callType, Block.NULL_BLOCK);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, IRubyObject.NULL_ARRAY, context.getFrameSelf(), callType, Block.NULL_BLOCK);
         }
 
         protected IRubyObject cacheAndCall(RubyClass selfType, Block block, ThreadContext context, IRubyObject self) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, IRubyObject.NULL_ARRAY, context.getFrameSelf(), callType, block);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName, block);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName, block);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, IRubyObject.NULL_ARRAY, context.getFrameSelf(), callType, block);
         }
 
         protected IRubyObject cacheAndCall(RubyClass selfType, ThreadContext context, IRubyObject self, IRubyObject arg) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, new IRubyObject[] {arg}, context.getFrameSelf(), callType, Block.NULL_BLOCK);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName, arg);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName, arg);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, new IRubyObject[] {arg}, context.getFrameSelf(), callType, Block.NULL_BLOCK);
         }
 
         protected IRubyObject cacheAndCall(RubyClass selfType, Block block, ThreadContext context, IRubyObject self, IRubyObject arg) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, new IRubyObject[] {arg}, context.getFrameSelf(), callType, block);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName, arg, block);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName, arg, block);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, new IRubyObject[] {arg}, context.getFrameSelf(), callType, block);
         }
 
         protected IRubyObject cacheAndCall(RubyClass selfType, ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, new IRubyObject[] {arg1,arg2}, context.getFrameSelf(), callType, Block.NULL_BLOCK);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName, arg1, arg2);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName, arg1, arg2);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, new IRubyObject[] {arg1,arg2}, context.getFrameSelf(), callType, Block.NULL_BLOCK);
         }
 
         protected IRubyObject cacheAndCall(RubyClass selfType, Block block, ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, new IRubyObject[] {arg1,arg2}, context.getFrameSelf(), callType, block);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName, arg1, arg2, block);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName, arg1, arg2, block);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, new IRubyObject[] {arg1,arg2}, context.getFrameSelf(), callType, block);
         }
 
         protected IRubyObject cacheAndCall(RubyClass selfType, ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, new IRubyObject[] {arg1,arg2,arg3}, context.getFrameSelf(), callType, Block.NULL_BLOCK);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName, arg1, arg2, arg3);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName, arg1, arg2, arg3);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, new IRubyObject[] {arg1,arg2,arg3}, context.getFrameSelf(), callType, Block.NULL_BLOCK);
         }
 
         protected IRubyObject cacheAndCall(RubyClass selfType, Block block, ThreadContext context, IRubyObject self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3) {
-            DynamicMethod method = selfType.searchMethod(methodName);
+            WrappedMethod wrapped = searchAndCache(selfType, context);
 
-            if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
-                return RuntimeHelpers.callMethodMissing(context, self, method, methodName, new IRubyObject[] {arg1,arg2,arg3}, context.getFrameSelf(), callType, block);
+            if (wrapped.valid) {
+                return wrapped.method.call(context, self, selfType, methodName, arg1, arg2, arg3, block);
             }
 
-            cachedMethod = method;
-            cachedType = selfType;
-
-            selfType.getRuntime().getCacheMap().add(method, this);
-
-            return method.call(context, self, selfType, methodName, arg1, arg2, arg3, block);
+            return RuntimeHelpers.callMethodMissing(context, self, wrapped.method, methodName, new IRubyObject[] {arg1,arg2,arg3}, context.getFrameSelf(), callType, block);
+        }
+        
+        private WrappedMethod searchAndCache(RubyClass selfType, ThreadContext context) {
+            Ruby runtime = context.getRuntime();
+            Lock methodWriteLock = runtime.getGlobalMethodWriteLock();
+            methodWriteLock.lock();
+            try {
+                DynamicMethod method = selfType.searchMethod(methodName);
+                if (method.isUndefined() || (!methodName.equals("method_missing") && !method.isCallableFrom(context.getFrameSelf(), callType))) {
+                    cachedMethodAndType = null; // write-volatile
+                    return new WrappedMethod(method, false);
+                }
+                cachedMethodAndType = new ImmutableMethodAndType(method, selfType); // write-volatile
+                runtime.getCacheMap().add(method, this);
+                return new WrappedMethod(method, true);
+            } finally {
+                methodWriteLock.unlock();
+            }
         }
         
         public void removeCachedMethod() {
-            cachedType = null;
-            cachedMethod = null;
+            cachedMethodAndType = null;
         }
         
         private void pollThreadEvents(ThreadContext context) {
@@ -235,9 +227,10 @@ public abstract class CallSite {
             pollThreadEvents(context);
 
             RubyClass selfType = self.getMetaClass();
+            ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
             
-            if (cachedType == selfType && cachedMethod != null) {
-                return cachedMethod.call(context, self, selfType, methodName, args);
+            if (cached != null && cached.type == selfType) {
+                return cached.method.call(context, self, selfType, methodName, args);
             }
 
             return cacheAndCall(selfType, args, context, self);
@@ -248,9 +241,10 @@ public abstract class CallSite {
 
             try {
                 RubyClass selfType = self.getMetaClass();
+                ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
 
-                if (cachedType == selfType && cachedMethod != null) {
-                    return cachedMethod.call(context, self, selfType, methodName, args, block);
+                if (cached != null && cached.type == selfType) {
+                    return cached.method.call(context, self, selfType, methodName, args, block);
                 }
 
                 return cacheAndCall(selfType, block, args, context, self);
@@ -267,9 +261,10 @@ public abstract class CallSite {
             pollThreadEvents(context);
 
             RubyClass selfType = self.getMetaClass();
+            ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
 
-            if (cachedType == selfType && cachedMethod != null) {
-                return cachedMethod.call(context, self, selfType, methodName);
+            if (cached != null && cached.type == selfType) {
+                return cached.method.call(context, self, selfType, methodName);
             }
 
             return cacheAndCall(selfType, context, self);
@@ -280,9 +275,10 @@ public abstract class CallSite {
 
             try {
                 RubyClass selfType = self.getMetaClass();
+                ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
 
-                if (cachedType == selfType && cachedMethod != null) {
-                    return cachedMethod.call(context, self, selfType, methodName, block);
+                if (cached != null && cached.type == selfType) {
+                    return cached.method.call(context, self, selfType, methodName, block);
                 }
 
                 return cacheAndCall(selfType, block, context, self);
@@ -299,9 +295,10 @@ public abstract class CallSite {
             pollThreadEvents(context);
 
             RubyClass selfType = self.getMetaClass();
+            ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
 
-            if (cachedType == selfType && cachedMethod != null) {
-                return cachedMethod.call(context, self, selfType, methodName, arg1);
+            if (cached != null && cached.type == selfType) {
+                return cached.method.call(context, self, selfType, methodName, arg1);
             }
 
             return cacheAndCall(selfType, context, self, arg1);
@@ -312,9 +309,10 @@ public abstract class CallSite {
 
             try {
                 RubyClass selfType = self.getMetaClass();
+                ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
 
-                if (cachedType == selfType && cachedMethod != null) {
-                    return cachedMethod.call(context, self, selfType, methodName, arg1, block);
+                if (cached != null && cached.type == selfType) {
+                    return cached.method.call(context, self, selfType, methodName, arg1, block);
                 }
 
                 return cacheAndCall(selfType, block, context, self, arg1);
@@ -331,9 +329,10 @@ public abstract class CallSite {
             pollThreadEvents(context);
 
             RubyClass selfType = self.getMetaClass();
+            ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
 
-            if (cachedType == selfType && cachedMethod != null) {
-                return cachedMethod.call(context, self, selfType, methodName, arg1, arg2);
+            if (cached != null && cached.type == selfType) {
+                return cached.method.call(context, self, selfType, methodName, arg1, arg2);
             }
 
             return cacheAndCall(selfType, context, self, arg1, arg2);
@@ -344,9 +343,10 @@ public abstract class CallSite {
 
             try {
                 RubyClass selfType = self.getMetaClass();
+                ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
 
-                if (cachedType == selfType && cachedMethod != null) {
-                    return cachedMethod.call(context, self, selfType, methodName, arg1, arg2, block);
+                if (cached != null && cached.type == selfType) {
+                    return cached.method.call(context, self, selfType, methodName, arg1, arg2, block);
                 }
 
                 return cacheAndCall(selfType, block, context, self, arg1, arg2);
@@ -363,9 +363,10 @@ public abstract class CallSite {
             pollThreadEvents(context);
 
             RubyClass selfType = self.getMetaClass();
+            ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
 
-            if (cachedType == selfType && cachedMethod != null) {
-                return cachedMethod.call(context, self, selfType, methodName, arg1, arg2, arg3);
+            if (cached != null && cached.type == selfType) {
+                return cached.method.call(context, self, selfType, methodName, arg1, arg2, arg3);
             }
 
             return cacheAndCall(selfType, context, self, arg1, arg2, arg3);
@@ -376,9 +377,10 @@ public abstract class CallSite {
 
             try {
                 RubyClass selfType = self.getMetaClass();
+                ImmutableMethodAndType cached = cachedMethodAndType; // read-volatile
 
-                if (cachedType == selfType && cachedMethod != null) {
-                    return cachedMethod.call(context, self, selfType, methodName, arg1, arg2, arg3, block);
+                if (cached != null && cached.type == selfType) {
+                    return cached.method.call(context, self, selfType, methodName, arg1, arg2, arg3, block);
                 }
 
                 return cacheAndCall(selfType, block, context, self, arg1, arg2, arg3);
