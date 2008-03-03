@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry excluding="**/CVS/*" kind="src" path="test"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="build_lib/jna.jar"/>
+	<classpathentry kind="lib" path="build_lib/junit.jar"/>
+	<classpathentry kind="lib" path="build_lib/jline-0.9.93.jar"/>
+	<classpathentry kind="lib" path="lib/bsf.jar"/>
+	<classpathentry kind="lib" path="build_lib/asm-util-3.0.jar"/>
+	<classpathentry kind="lib" path="build_lib/asm-commons-3.0.jar"/>
+	<classpathentry kind="lib" path="build_lib/asm-3.0.jar"/>
+	<classpathentry kind="lib" path="build_lib/asm-tree-3.0.jar"/>
+	<classpathentry kind="lib" path="build_lib/asm-analysis-3.0.jar"/>
+	<classpathentry kind="lib" path="build_lib/joni.jar"/>
+	<classpathentry kind="lib" path="build_lib/joda-time-1.5.1.jar"/>
+	<classpathentry kind="output" path="build/classes/jruby"/>
+</classpath>

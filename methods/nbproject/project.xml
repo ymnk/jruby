@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://www.netbeans.org/ns/project/1">
+    <type>org.netbeans.modules.ant.freeform</type>
+    <configuration>
+        <general-data xmlns="http://www.netbeans.org/ns/freeform-project/1">
+            <!-- Do not use Project Properties customizer when editing this file manually. -->
+            <name>JRuby trunk</name>
+            <properties>
+                <property-file>build.properties</property-file>
+                <property-file>default.build.properties</property-file>
+            </properties>
+            <folders>
+                <source-folder>
+                    <label>Sources</label>
+                    <type>java</type>
+                    <location>${src.dir}</location>
+                </source-folder>
+                <source-folder>
+                    <label>Tests</label>
+                    <type>java</type>
+                    <location>${test.dir}</location>
+                </source-folder>
+            </folders>
+            <ide-actions>
+                <action name="build">
+                    <target>jar</target>
+                </action>
+                <action name="clean">
+                    <target>clean</target>
+                </action>
+                <action name="javadoc">
+                    <target>create-apidocs</target>
+                </action>
+                <action name="test">
+                    <target>test</target>
+                </action>
+                <action name="rebuild">
+                    <target>clean</target>
+                    <target>jar</target>
+                </action>
+                <action name="debug">
+                    <target>debug-nb</target>
+                </action>
+                <action name="run">
+                    <target>run</target>
+                </action>
+            </ide-actions>
+            <export>
+                <type>folder</type>
+                <location>${jruby.classes.dir}</location>
+                <build-target>jar</build-target>
+            </export>
+            <export>
+                <type>jar</type>
+                <location>${lib.dir}/jruby.jar</location>
+                <build-target>jar</build-target>
+            </export>
+            <export>
+                <type>folder</type>
+                <location>${test.classes.dir}</location>
+                <build-target>jar</build-target>
+            </export>
+            <view>
+                <items>
+                    <source-folder style="packages">
+                        <label>Sources</label>
+                        <location>${src.dir}</location>
+                    </source-folder>
+                    <source-folder style="packages">
+                        <label>Tests</label>
+                        <location>${test.dir}</location>
+                    </source-folder>
+                    <source-file>
+                        <location>build.xml</location>
+                    </source-file>
+                </items>
+                <context-menu>
+                    <ide-action name="build"/>
+                    <ide-action name="rebuild"/>
+                    <ide-action name="clean"/>
+                    <ide-action name="javadoc"/>
+                    <ide-action name="run"/>
+                    <ide-action name="test"/>
+                    <ide-action name="debug"/>
+                </context-menu>
+            </view>
+            <subprojects/>
+        </general-data>
+        <java-data xmlns="http://www.netbeans.org/ns/freeform-project-java/2">
+            <compilation-unit>
+                <package-root>${src.dir}</package-root>
+                <classpath mode="compile">lib/bsf.jar:build_lib/junit.jar:build_lib/jline-0.9.93.jar:build_lib/asm-3.0.jar:build_lib/asm-commons-3.0.jar:build_lib/asm-util-3.0.jar:build_lib/jna.jar:build_lib/nailgun-0.7.1.jar:build_lib/joni.jar:build_lib/joda-time-1.5.1.jar</classpath>
+                <built-to>${jruby.classes.dir}</built-to>
+                <built-to>${lib.dir}/jruby.jar</built-to>
+                <javadoc-built-to>${api.docs.dir}</javadoc-built-to>
+                <source-level>1.5</source-level>
+            </compilation-unit>
+            <compilation-unit>
+                <package-root>${test.dir}</package-root>
+                <unit-tests/>
+                <classpath mode="compile">lib/bsf.jar:build/classes/jruby:build_lib/junit.jar:build_lib/asm-3.0.jar:build_lib/joda-time-1.5.1.jar</classpath>
+                <built-to>${test.classes.dir}</built-to>
+                <source-level>1.5</source-level>
+            </compilation-unit>
+        </java-data>
+    </configuration>
+</project>
