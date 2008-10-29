@@ -114,12 +114,16 @@ public class RubyClass extends RubyModule {
         this.allocator = allocator;
     }
 
-    @JRubyMethod(name = "allocate")
     public IRubyObject allocate() {
         if (superClass == null) throw runtime.newTypeError("can't instantiate uninitialized class");
         IRubyObject obj = allocator.allocate(runtime, this);
         if (obj.getMetaClass().getRealClass() != getRealClass()) throw runtime.newTypeError("wrong instance allocation");
         return obj;
+    }
+
+    @JRubyMethod(name = "allocate")
+    public IRubyObject rbAllocate() {
+        return new RubyObject(runtime, this);
     }
 
     public CallSite[] getBaseCallSites() {

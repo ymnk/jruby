@@ -76,22 +76,45 @@ public class HashNode extends Node {
     
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
-        RubyHash hash = RubyHash.newHash(runtime);
-        
+        if (runtime.getInstanceConfig().isRubiniusKernelEnabled()) {
+            return rbxInterpret(runtime, context, self, aBlock);
+        } else {
+            RubyHash hash = RubyHash.newHash(runtime);
+
+            ListNode listNode = this.listNode;
+            if (listNode != null) {
+                int size = listNode.size();
+
+                for (int i = 0; i < size;) {
+                    // insert all nodes in sequence, hash them in the final instruction
+                    // KEY
+                    IRubyObject key = listNode.get(i++).interpret(runtime, context, self, aBlock);
+                    IRubyObject value = listNode.get(i++).interpret(runtime, context, self, aBlock);
+
+                    hash.fastASet(key, value);
+                }
+            }
+
+            return hash;
+        }
+    }
+
+    public IRubyObject rbxInterpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         ListNode listNode = this.listNode;
+        IRubyObject hash = runtime.getHash().newInstance(context, IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
+        
         if (listNode != null) {
             int size = listNode.size();
-   
+
             for (int i = 0; i < size;) {
                 // insert all nodes in sequence, hash them in the final instruction
                 // KEY
-                IRubyObject key = listNode.get(i++).interpret(runtime, context, self, aBlock);
-                IRubyObject value = listNode.get(i++).interpret(runtime, context, self, aBlock);
-   
-                hash.fastASet(key, value);
+                hash.getMetaClass().finvoke(context, hash, "[]=",
+                    listNode.get(i++).interpret(runtime, context, self, aBlock),
+                    listNode.get(i++).interpret(runtime, context, self, aBlock));
             }
         }
-      
+        
         return hash;
     }
 }

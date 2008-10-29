@@ -168,6 +168,7 @@ public class RubyInstanceConfig {
     private boolean shouldCheckSyntax = false;
     private String inputFieldSeparator = null;
     private boolean managementEnabled = true;
+    public static boolean rubiniusKernelEnabled = false;
 
     private int safeLevel = 0;
 
@@ -399,7 +400,8 @@ public class RubyInstanceConfig {
                 .append("  +C              force compilation of all scripts before they are run (except eval)\n")
                 .append("  -y              read a YARV-compiled Ruby script and run that (EXPERIMENTAL)\n")
                 .append("  -Y              compile a Ruby script into YARV bytecodes and run this (EXPERIMENTAL)\n")
-                .append("  -R              read a Rubinius-compiled Ruby script and run that (EXPERIMENTAL)\n");
+                .append("  -R              read a Rubinius-compiled Ruby script and run that (EXPERIMENTAL)\n")
+                .append("  -Rk             use the Rubinius implementations of core classes (Rubinius kernel)");
 
         return sb.toString();
     }
@@ -910,6 +912,8 @@ public class RubyInstanceConfig {
                         yarvCompile = true;
                     } else if (extendedOption.equals("-R")) {
                         rubinius = true;
+                    } else if (extendedOption.equals("-Rk")) {
+                        rubiniusKernelEnabled = true;
                     } else {
                         MainExitException mee =
                                 new MainExitException(1, "jruby: invalid extended option " + extendedOption + " (-X will list valid options)\n");
@@ -1177,6 +1181,10 @@ public class RubyInstanceConfig {
 
     public boolean isRubiniusEnabled() {
         return rubinius;
+    }
+
+    public boolean isRubiniusKernelEnabled() {
+        return rubiniusKernelEnabled;
     }
 
     public boolean isYARVCompileEnabled() {

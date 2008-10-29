@@ -43,6 +43,7 @@ import static org.jruby.RubyEnumerator.enumeratorize;
 import java.io.IOException;
 import java.util.AbstractCollection;
 import java.util.AbstractSet;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
@@ -173,7 +174,7 @@ public class RubyHash extends RubyObject implements Map {
      */
     public static final RubyHash newHash(Ruby runtime, Map valueMap, IRubyObject defaultValue) {
         assert defaultValue != null;
-
+        
         return new RubyHash(runtime, valueMap, defaultValue);
     }
 

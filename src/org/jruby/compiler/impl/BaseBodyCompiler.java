@@ -481,9 +481,22 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     }
 
     public void createNewHash(Object elements, ArrayCallback callback, int keyCount) {
-        loadRuntime();
+        if (RubyInstanceConfig.rubiniusKernelEnabled) {
+            loadThreadContext();
+            invokeUtilityMethod("constructRubiniusHash", sig(IRubyObject.class, ThreadContext.class));
 
-        if (keyCount <= RuntimeHelpers.MAX_SPECIFIC_ARITY_HASH) {
+            for (int i = 0; i < keyCount; i++) {
+                method.dup();
+                loadThreadContext();
+                method.swap();
+                method.ldc("[]=");
+                callback.nextValue(this, elements, i);
+                invokeUtilityMethod("invoke", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, String.class, IRubyObject.class, IRubyObject.class));
+                method.pop();
+            }
+        } else if (keyCount <= RuntimeHelpers.MAX_SPECIFIC_ARITY_HASH) {
+            loadRuntime();
+            
             // we have a specific-arity method we can use to construct, so use that
             for (int i = 0; i < keyCount; i++) {
                 callback.nextValue(this, elements, i);
@@ -491,6 +504,8 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
             invokeUtilityMethod("constructHash", sig(RubyHash.class, params(Ruby.class, IRubyObject.class, keyCount * 2)));
         } else {
+            loadRuntime();
+            
             method.invokestatic(p(RubyHash.class), "newHash", sig(RubyHash.class, params(Ruby.class)));
 
             for (int i = 0; i < keyCount; i++) {

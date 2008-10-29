@@ -939,6 +939,32 @@ public final class Ruby {
 
         // initialize builtin libraries
         initBuiltins();
+
+        // If loading Rubinius kernel, load it now
+        if (config.isRubiniusKernelEnabled()) {
+            // pull in the Type module
+            loadService.require("jruby/type");
+
+            // preparations for bootstrapping
+            objectClass.defineAlias("set_instance_variable", "instance_variable_set");
+            objectClass.defineConstant("Tuple", arrayClass);
+            objectClass.deleteConstant("Hash");
+            objectClass.deleteConstant("NIL");
+            objectClass.deleteConstant("TRUE");
+            objectClass.deleteConstant("FALSE");
+
+            // bootstrap
+            objectClass.defineConstant("MAIN", topSelf);
+            loadService.require("rubinius/kernel/bootstrap/hash.rb");
+
+            // common
+            loadService.require("rubinius/kernel/common/misc.rb");
+            loadService.require("rubinius/kernel/common/hash.rb");
+
+            // re-init class references and set up Rubinius allocators
+            hashClass = getClass("Hash");
+            hashClass.setAllocator(ObjectAllocator.RUBINIUS_ALLOCATOR);
+        }
         
         // Require in all libraries specified on command line
         for (String scriptName : config.requiredLibraries()) {

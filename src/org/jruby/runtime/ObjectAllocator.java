@@ -25,4 +25,10 @@ public interface ObjectAllocator {
             throw runtime.newTypeError("allocator undefined for " + klass.getName());
         }
     };
+
+    public static final ObjectAllocator RUBINIUS_ALLOCATOR = new ObjectAllocator() {
+        public IRubyObject allocate(Ruby runtime, RubyClass klazz) {
+            return klazz.getMetaClass().finvoke(runtime.getCurrentContext(), klazz, "allocate");
+        }
+    };
 }

@@ -908,6 +908,10 @@ public class RuntimeHelpers {
     public static String[] constructStringArray(String one, String two, String three, String four, String five, String six, String seven, String eight, String nine, String ten) {
         return new String[] {one, two, three, four, five, six, seven, eight, nine, ten};
     }
+
+    public static IRubyObject constructRubiniusHash(ThreadContext context) {
+        return context.getRuntime().getHash().newInstance(context, IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
+    }
     
     public static final int MAX_SPECIFIC_ARITY_HASH = 3;
     
