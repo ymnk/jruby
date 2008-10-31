@@ -70,14 +70,14 @@ import org.jruby.util.ByteList;
 import org.jruby.util.Numeric;
 
 /**
- *  1.9 complex.c as of revision: 19531
+ *  1.9 complex.c as of revision: 20011
  */
 
 @JRubyClass(name = "Complex", parent = "Numeric")
 public class RubyComplex extends RubyNumeric {
 
     public static RubyClass createComplexClass(Ruby runtime) {
-        RubyClass complexc = runtime.defineClass("Complex", runtime.getNumeric(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        RubyClass complexc = runtime.defineClass("Complex", runtime.getNumeric(), COMPLEX_ALLOCATOR);
         runtime.setComplex(complexc);
 
         complexc.index = ClassIndex.COMPLEX;
@@ -104,6 +104,13 @@ public class RubyComplex extends RubyNumeric {
 
         return complexc;
     }
+
+    private static ObjectAllocator COMPLEX_ALLOCATOR = new ObjectAllocator() {
+        public IRubyObject allocate(Ruby runtime, RubyClass klass) {
+            RubyFixnum zero = RubyFixnum.zero(runtime);
+            return new RubyComplex(runtime, klass, zero, zero);
+        }
+    };
 
     /** internal
      * 
@@ -282,12 +289,13 @@ public class RubyComplex extends RubyNumeric {
     /** nucomp_s_canonicalize_internal
      * 
      */
-    private static final boolean CL_CANON = true;
+    private static final boolean CL_CANON = Numeric.CANON;
+    private static boolean canonicalization = false;
     private static IRubyObject canonicalizeInternal(ThreadContext context, IRubyObject clazz, IRubyObject real, IRubyObject image) {
         if (Numeric.CANON) {
             if (f_zero_p(context, image) &&
                     (!CL_CANON || k_exact_p(image)) &&
-                    ((RubyModule)clazz).fastHasConstant("Unify"))
+                    canonicalization)
                     return real;
         }
         if (f_real_p(context, real).isTrue() &&

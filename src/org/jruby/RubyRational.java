@@ -67,14 +67,14 @@ import org.jruby.util.ByteList;
 import org.jruby.util.Numeric;
 
 /**
- *  1.9 rational.c as of revision: 19531
+ *  1.9 rational.c as of revision: 20011
  */
 
 @JRubyClass(name = "Rational", parent = "Numeric", include = "Precision")
 public class RubyRational extends RubyNumeric {
     
     public static RubyClass createRationalClass(Ruby runtime) {
-        RubyClass rationalc = runtime.defineClass("Rational", runtime.getNumeric(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        RubyClass rationalc = runtime.defineClass("Rational", runtime.getNumeric(), RATIONAL_ALLOCATOR);
         runtime.setRational(rationalc);
 
         rationalc.index = ClassIndex.RATIONAL;
@@ -92,6 +92,13 @@ public class RubyRational extends RubyNumeric {
 
         return rationalc;
     }
+
+    private static ObjectAllocator RATIONAL_ALLOCATOR = new ObjectAllocator() {
+        public IRubyObject allocate(Ruby runtime, RubyClass klass) {
+            RubyFixnum zero = RubyFixnum.zero(runtime);
+            return new RubyRational(runtime, klass, zero, zero);
+        }
+    };
 
     /** internal
      * 
@@ -237,6 +244,7 @@ public class RubyRational extends RubyNumeric {
     /** nurat_s_canonicalize_internal
      * 
      */
+    private static boolean canonicalization = false;
     private static IRubyObject canonicalizeInternal(ThreadContext context, IRubyObject clazz, IRubyObject num, IRubyObject den) {
         Ruby runtime = context.getRuntime();
         IRubyObject res = f_cmp(context, den, RubyFixnum.zero(runtime));
@@ -252,7 +260,7 @@ public class RubyRational extends RubyNumeric {
         den = f_idiv(context, den, gcd);
 
         if (Numeric.CANON) {
-            if (f_one_p(context, den) && ((RubyModule)clazz).fastHasConstant("Unify")) return num;
+            if (f_one_p(context, den) && canonicalization) return num;
         }
 
         return new RubyRational(context.getRuntime(), clazz, num, den);
@@ -272,7 +280,7 @@ public class RubyRational extends RubyNumeric {
         }        
 
         if (Numeric.CANON) {
-            if (f_one_p(context, den) && ((RubyModule)clazz).fastHasConstant("Unify")) return num;
+            if (f_one_p(context, den) && canonicalization) return num;
         }
 
         return new RubyRational(context.getRuntime(), clazz, num, den);
