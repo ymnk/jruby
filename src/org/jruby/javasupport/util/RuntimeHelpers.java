@@ -3,6 +3,7 @@ package org.jruby.javasupport.util;
 import org.jruby.MetaClass;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
+import org.jruby.RubyBasicObject;
 import org.jruby.RubyBoolean;
 import org.jruby.RubyClass;
 import org.jruby.RubyException;
@@ -1647,5 +1648,9 @@ public class RuntimeHelpers {
         Ruby runtime = context.getRuntime();
         if (a == b) return runtime.getTrue();
         return a.callMethod(context, "==", b);
+    }
+
+    public static RubyClass getMetaClass(IRubyObject self) {
+        return self.getMetaClass();
     }
 }

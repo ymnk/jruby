@@ -34,8 +34,8 @@ package org.jruby;
 
 import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyClass;
-import org.jruby.javasupport.JavaUtil;
 import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.False;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -45,7 +45,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author  jpetersen
  */
 @JRubyClass(name="NilClass")
-public class RubyNil extends RubyObject {
+public class RubyNil extends RubyObject implements False {
     public RubyNil(Ruby runtime) {
         super(runtime, runtime.getNilClass(), false, false);
         flags |= NIL_F | FALSE_F;

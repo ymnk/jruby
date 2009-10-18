@@ -47,11 +47,23 @@ import org.jruby.runtime.marshal.MarshalStream;
 @JRubyClass(name={"TrueClass", "FalseClass"})
 public class RubyBoolean extends RubyObject {
     
-    public RubyBoolean(Ruby runtime, boolean value) {
+    protected RubyBoolean(Ruby runtime, boolean value) {
         super(runtime, (value ? runtime.getTrueClass() : runtime.getFalseClass()), // Don't initialize with class
                 false, false); // Don't put in object space and don't taint
 
         if (!value) flags = FALSE_F;
+    }
+
+    public static class TrueBoolean extends RubyBoolean {
+        public TrueBoolean(Ruby runtime) {
+            super(runtime, true);
+        }
+    }
+
+    public static class FalseBoolean extends RubyBoolean implements org.jruby.runtime.False {
+        public FalseBoolean(Ruby runtime) {
+            super(runtime, false);
+        }
     }
     
     @Override
@@ -79,7 +91,7 @@ public class RubyBoolean extends RubyObject {
         runtime.setFalseClass(falseClass);
         falseClass.index = ClassIndex.FALSE;
         
-        falseClass.defineAnnotatedMethods(False.class);
+        falseClass.defineAnnotatedMethods(FalseMethods.class);
         
         falseClass.getMetaClass().undefineMethod("new");
         
@@ -91,7 +103,7 @@ public class RubyBoolean extends RubyObject {
         runtime.setTrueClass(trueClass);
         trueClass.index = ClassIndex.TRUE;
         
-        trueClass.defineAnnotatedMethods(True.class);
+        trueClass.defineAnnotatedMethods(TrueMethods.class);
         
         trueClass.getMetaClass().undefineMethod("new");
         
@@ -102,7 +114,7 @@ public class RubyBoolean extends RubyObject {
         return value ? runtime.getTrue() : runtime.getFalse();
     }
     
-    public static class False {
+    public static class FalseMethods {
         @JRubyMethod(name = "&")
         public static IRubyObject false_and(IRubyObject f, IRubyObject oth) {
             return f;
@@ -124,7 +136,7 @@ public class RubyBoolean extends RubyObject {
         }
     }
     
-    public static class True {
+    public static class TrueMethods {
         @JRubyMethod(name = "&")
         public static IRubyObject true_and(IRubyObject t, IRubyObject oth) {
             return oth.isTrue() ? t : t.getRuntime().getFalse();

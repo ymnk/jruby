@@ -1847,7 +1847,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     }
 
     public void metaclass() {
-        invokeIRubyObject("getMetaClass", sig(RubyClass.class));
+        invokeUtilityMethod("getMetaClass", sig(RubyClass.class, IRubyObject.class));
     }
 
     public void aprintln() {

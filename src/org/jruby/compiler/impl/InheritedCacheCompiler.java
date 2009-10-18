@@ -92,10 +92,10 @@ public class InheritedCacheCompiler implements CacheCompiler {
         method.loadThis();
         if (callSiteCount < AbstractScript.NUMBERED_CALLSITE_COUNT) {
             // use numbered access method
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getCallSite" + callSiteCount, sig(CallSite.class));
+            method.method.invokestatic(p(AbstractScript.class), "getCallSite" + callSiteCount, sig(CallSite.class, AbstractScript.class));
         } else {
             method.method.pushInt(callSiteCount);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getCallSite", sig(CallSite.class, int.class));
+            method.method.invokestatic(p(AbstractScript.class), "getCallSite", sig(CallSite.class, AbstractScript.class, int.class));
         }
 
         // add name to call site list
@@ -400,11 +400,11 @@ public class InheritedCacheCompiler implements CacheCompiler {
 
         if (inheritedMethodCount < AbstractScript.NUMBERED_METHOD_COUNT) {
             method.method.ldc(methodName);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getMethod" + inheritedMethodCount, sig(DynamicMethod.class, ThreadContext.class, IRubyObject.class, String.class));
+            method.method.invokestatic(p(AbstractScript.class), "getMethod" + inheritedMethodCount, sig(DynamicMethod.class, AbstractScript.class, ThreadContext.class, IRubyObject.class, String.class));
         } else {
             method.method.pushInt(inheritedMethodCount);
             method.method.ldc(methodName);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getMethod", sig(DynamicMethod.class, ThreadContext.class, IRubyObject.class, int.class, String.class));
+            method.method.invokestatic(p(AbstractScript.class), "getMethod", sig(DynamicMethod.class, AbstractScript.class, ThreadContext.class, IRubyObject.class, int.class, String.class));
         }
 
         inheritedMethodCount++;
@@ -417,11 +417,11 @@ public class InheritedCacheCompiler implements CacheCompiler {
 
         if (inheritedMethodCount < AbstractScript.NUMBERED_METHOD_COUNT) {
             method.method.ldc(methodName);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getMethod" + inheritedMethodCount, sig(DynamicMethod.class, ThreadContext.class, IRubyObject.class, String.class));
+            method.method.invokestatic(p(AbstractScript.class), "getMethod" + inheritedMethodCount, sig(DynamicMethod.class, AbstractScript.class, ThreadContext.class, IRubyObject.class, String.class));
         } else {
             method.method.pushInt(inheritedMethodCount);
             method.method.ldc(methodName);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getMethod", sig(DynamicMethod.class, ThreadContext.class, IRubyObject.class, int.class, String.class));
+            method.method.invokestatic(p(AbstractScript.class), "getMethod", sig(DynamicMethod.class, AbstractScript.class, ThreadContext.class, IRubyObject.class, int.class, String.class));
         }
 
         inheritedMethodCount++;

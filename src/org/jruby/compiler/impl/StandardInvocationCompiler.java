@@ -30,6 +30,7 @@ package org.jruby.compiler.impl;
 import org.jruby.RubyClass;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyModule;
+import org.jruby.ast.executable.AbstractScript;
 import org.jruby.compiler.ArgumentsCallback;
 import org.jruby.compiler.BodyCompiler;
 import org.jruby.compiler.CompilerCallback;
@@ -41,8 +42,11 @@ import org.jruby.runtime.CallSite;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.CodegenUtils;
+import org.jruby.util.JavaNameMangler;
 import static org.jruby.util.CodegenUtils.*;
 import org.objectweb.asm.Label;
+import org.objectweb.asm.Opcodes;
 
 /**
  *
@@ -378,25 +382,7 @@ public class StandardInvocationCompiler implements InvocationCompiler {
     }
 
     public void invokeBinaryFixnumRHS(String name, CompilerCallback receiverCallback, long fixnum) {
-        methodCompiler.getScriptCompiler().getCacheCompiler().cacheCallSite(methodCompiler, name, CallType.NORMAL);
-        methodCompiler.loadThreadContext(); // [adapter, tc]
-
-        // for visibility checking without requiring frame self
-        // TODO: don't bother passing when fcall or vcall, and adjust callsite appropriately
-        methodCompiler.loadSelf();
-
-        if (receiverCallback != null) {
-            receiverCallback.call(methodCompiler);
-        } else {
-            methodCompiler.loadSelf();
-        }
-
-        method.ldc(fixnum);
-
-        String signature = sig(IRubyObject.class, params(ThreadContext.class, IRubyObject.class, IRubyObject.class, long.class));
-        String callSiteMethod = "call";
-
-        method.invokevirtual(p(CallSite.class), callSiteMethod, signature);
+        createInvokerMethodJ(name, receiverCallback, fixnum);
     }
     
     public void invokeDynamic(String name, CompilerCallback receiverCallback, ArgumentsCallback argsCallback, CallType callType, CompilerCallback closureArg, boolean iterator) {
@@ -409,14 +395,14 @@ public class StandardInvocationCompiler implements InvocationCompiler {
                     invokeDynamicSelfNoBlockSpecificArity(name, argsCallback);
                     return;
                 }
-//            } else if (callType == CallType.NORMAL) {
-//                if (argsCallback == null) {
-//                    invokeDynamicNoBlockZero(name, receiverCallback);
-//                    return;
-//                } else if (argsCallback.getArity() >= 1 && argsCallback.getArity() <= 3) {
-//                    invokeDynamicNoBlockSpecificArity(name, receiverCallback, argsCallback);
-//                    return;
-//                }
+            } else if (callType == CallType.NORMAL) {
+                if (argsCallback == null) {
+                    invokeDynamicNoBlockZero(name, receiverCallback);
+                    return;
+                } else if (argsCallback.getArity() >= 1 && argsCallback.getArity() <= 3) {
+                    invokeDynamicNoBlockSpecificArity(name, receiverCallback, argsCallback);
+                    return;
+                }
             }
         }
         methodCompiler.getScriptCompiler().getCacheCompiler().cacheCallSite(methodCompiler, name, callType);
@@ -501,73 +487,126 @@ public class StandardInvocationCompiler implements InvocationCompiler {
     }
 
     public void invokeDynamicSelfNoBlockZero(String name) {
-        methodCompiler.getScriptCompiler().getCacheCompiler().cacheMethod(methodCompiler, name);
-        methodCompiler.loadThreadContext();
-        methodCompiler.loadSelf();
-        method.dup();
-        method.invokeinterface(p(IRubyObject.class), "getMetaClass", sig(RubyClass.class));
-        method.ldc(name);
-        method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class));
+        createInvokerMethod(name, null, null);
     }
 
     public void invokeDynamicSelfNoBlockSpecificArity(String name, ArgumentsCallback argsCallback) {
+        createInvokerMethod(name, null, argsCallback);
+    }
+
+    public void invokeDynamicNoBlockZero(String name, CompilerCallback receiverCallback) {
+        createInvokerMethod(name, receiverCallback, null);
+    }
+
+    public void invokeDynamicNoBlockSpecificArity(String name, CompilerCallback receiverCallback, ArgumentsCallback argsCallback) {
+        createInvokerMethod(name, receiverCallback, argsCallback);
+    }
+
+    private void createInvokerMethod(String name, CompilerCallback receiverCallback, ArgumentsCallback argsCallback) {
+        String synMethName = JavaNameMangler.mangleStringForCleanJavaIdentifier(name) + (long)(Math.random() * Integer.MAX_VALUE);
+        String className = methodCompiler.getScriptCompiler().getClassname();
+        String classDesc = "L" + className + ";";
+        String signature = null;
+        if (argsCallback == null) {
+            signature = sig(IRubyObject.class, classDesc, ThreadContext.class, IRubyObject.class);
+        } else {
+            switch (argsCallback.getArity()) {
+            case 1:
+                signature = sig(IRubyObject.class, classDesc, ThreadContext.class, IRubyObject.class, IRubyObject.class);
+                break;
+            case 2:
+                signature = sig(IRubyObject.class, classDesc, ThreadContext.class, IRubyObject.class, IRubyObject.class, IRubyObject.class);
+                break;
+            case 3:
+                signature = sig(IRubyObject.class, classDesc, ThreadContext.class, IRubyObject.class, IRubyObject.class, IRubyObject.class, IRubyObject.class);
+                break;
+            }
+        }
+        
+        SkinnyMethodAdapter oldMethod = method;
+        methodCompiler.method = new SkinnyMethodAdapter(methodCompiler.getScriptCompiler().getClassVisitor().visitMethod(
+                Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, synMethName, signature, null, null));
+        method = methodCompiler.method;
         methodCompiler.getScriptCompiler().getCacheCompiler().cacheMethod(methodCompiler, name);
         methodCompiler.loadThreadContext();
         methodCompiler.loadSelf();
         method.dup();
-        method.invokeinterface(p(IRubyObject.class), "getMetaClass", sig(RubyClass.class));
+        methodCompiler.metaclass();
         method.ldc(name);
-        argsCallback.call(methodCompiler);
-        switch (argsCallback.getArity()) {
-        case 1:
-            method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class));
-            break;
-        case 2:
-            method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class));
-            break;
-        case 3:
-            method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class, IRubyObject.class));
-            break;
+        if (argsCallback == null) {
+            method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class));
+        } else {
+            switch (argsCallback.getArity()) {
+            case 1:
+                method.aload(3);
+                method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class));
+                break;
+            case 2:
+                method.aload(3);
+                method.aload(4);
+                method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class));
+                break;
+            case 3:
+                method.aload(3);
+                method.aload(4);
+                method.aload(5);
+                method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class, IRubyObject.class));
+                break;
+            }
         }
+        method.areturn();
+        method.end();
+
+        method = oldMethod;
+        methodCompiler.method = oldMethod;
+
+        // invoke synthetic dispatch method
+        methodCompiler.loadThis();
+        methodCompiler.loadThreadContext();
+        if (receiverCallback == null) {
+            methodCompiler.loadSelf();
+        } else {
+            receiverCallback.call(methodCompiler);
+        }
+        if (argsCallback != null) argsCallback.call(methodCompiler);
+        method.invokestatic(className, synMethName, signature);
     }
 
-    public void invokeDynamicNoBlockZero(String name, CompilerCallback receiverCallback) {
-        receiverCallback.call(methodCompiler);
-        int recv = methodCompiler.getVariableCompiler().grabTempLocal();
-        method.astore(recv);
-        methodCompiler.getScriptCompiler().getCacheCompiler().cacheMethod(methodCompiler, name, recv);
-        methodCompiler.loadThreadContext();
-        method.aload(recv);
-        methodCompiler.getVariableCompiler().releaseTempLocal();
-        method.dup();
-        method.invokeinterface(p(IRubyObject.class), "getMetaClass", sig(RubyClass.class));
-        method.ldc(name);
-        method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class));
-    }
+    private void createInvokerMethodJ(String name, CompilerCallback receiverCallback, long fixnum) {
+        String synMethName = JavaNameMangler.mangleStringForCleanJavaIdentifier(name) + (long)(Math.random() * Integer.MAX_VALUE);
+        String className = methodCompiler.getScriptCompiler().getClassname();
+        String classDesc = "L" + className + ";";
+        String signature = sig(IRubyObject.class, classDesc, ThreadContext.class, IRubyObject.class);
 
-    public void invokeDynamicNoBlockSpecificArity(String name, CompilerCallback receiverCallback, ArgumentsCallback argsCallback) {
-        receiverCallback.call(methodCompiler);
-        int recv = methodCompiler.getVariableCompiler().grabTempLocal();
-        method.astore(recv);
-        methodCompiler.getScriptCompiler().getCacheCompiler().cacheMethod(methodCompiler, name, recv);
-        methodCompiler.loadThreadContext();
-        method.aload(recv);
-        methodCompiler.getVariableCompiler().releaseTempLocal();
+        SkinnyMethodAdapter oldMethod = method;
+        methodCompiler.method = new SkinnyMethodAdapter(methodCompiler.getScriptCompiler().getClassVisitor().visitMethod(
+                Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, synMethName, signature, null, null));
+        method = methodCompiler.method;
+        methodCompiler.getScriptCompiler().getCacheCompiler().cacheCallSite(methodCompiler, name, CallType.NORMAL);
+        methodCompiler.loadThreadContext(); // [adapter, tc]
+
+        // for visibility checking without requiring frame self
+        // TODO: don't bother passing when fcall or vcall, and adjust callsite appropriately
+        methodCompiler.loadSelf();
+        // actual receiver
         method.dup();
-        method.invokeinterface(p(IRubyObject.class), "getMetaClass", sig(RubyClass.class));
-        method.ldc(name);
-        argsCallback.call(methodCompiler);
-        switch (argsCallback.getArity()) {
-        case 1:
-            method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class));
-            break;
-        case 2:
-            method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class));
-            break;
-        case 3:
-            method.invokevirtual(p(DynamicMethod.class), "call", sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class, IRubyObject.class));
-            break;
-        }
+
+        method.ldc(fixnum);
+
+        String callSiteMethod = "call";
+
+        method.invokevirtual(p(CallSite.class), callSiteMethod, sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, IRubyObject.class, long.class));
+        method.areturn();
+        method.end();
+
+        method = oldMethod;
+        methodCompiler.method = oldMethod;
+
+        // invoke synthetic dispatch method
+        methodCompiler.loadThis();
+        methodCompiler.loadThreadContext();
+        receiverCallback.call(methodCompiler);
+        method.invokestatic(className, synMethName, signature);
     }
 
     public void invokeOpAsgnWithOr(String attrName, String attrAsgnName, CompilerCallback receiverCallback, ArgumentsCallback argsCallback) {

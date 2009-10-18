@@ -449,17 +449,17 @@ public abstract class AbstractScript implements Script {
 
     public static final int NUMBERED_CALLSITE_COUNT = 10;
 
-    public final CallSite getCallSite(int i) {return runtimeCache.callSites[i];}
-    public final CallSite getCallSite0() {return runtimeCache.callSites[0];}
-    public final CallSite getCallSite1() {return runtimeCache.callSites[1];}
-    public final CallSite getCallSite2() {return runtimeCache.callSites[2];}
-    public final CallSite getCallSite3() {return runtimeCache.callSites[3];}
-    public final CallSite getCallSite4() {return runtimeCache.callSites[4];}
-    public final CallSite getCallSite5() {return runtimeCache.callSites[5];}
-    public final CallSite getCallSite6() {return runtimeCache.callSites[6];}
-    public final CallSite getCallSite7() {return runtimeCache.callSites[7];}
-    public final CallSite getCallSite8() {return runtimeCache.callSites[8];}
-    public final CallSite getCallSite9() {return runtimeCache.callSites[9];}
+    protected static final CallSite getCallSite(AbstractScript script, int i) {return script.runtimeCache.callSites[i];}
+    protected static final CallSite getCallSite0(AbstractScript script) {return script.runtimeCache.callSites[0];}
+    protected static final CallSite getCallSite1(AbstractScript script) {return script.runtimeCache.callSites[1];}
+    protected static final CallSite getCallSite2(AbstractScript script) {return script.runtimeCache.callSites[2];}
+    protected static final CallSite getCallSite3(AbstractScript script) {return script.runtimeCache.callSites[3];}
+    protected static final CallSite getCallSite4(AbstractScript script) {return script.runtimeCache.callSites[4];}
+    protected static final CallSite getCallSite5(AbstractScript script) {return script.runtimeCache.callSites[5];}
+    protected static final CallSite getCallSite6(AbstractScript script) {return script.runtimeCache.callSites[6];}
+    protected static final CallSite getCallSite7(AbstractScript script) {return script.runtimeCache.callSites[7];}
+    protected static final CallSite getCallSite8(AbstractScript script) {return script.runtimeCache.callSites[8];}
+    protected static final CallSite getCallSite9(AbstractScript script) {return script.runtimeCache.callSites[9];}
 
     public static final int NUMBERED_BLOCKBODY_COUNT = 10;
 
@@ -630,38 +630,60 @@ public abstract class AbstractScript implements Script {
 
     public static final int NUMBERED_METHOD_COUNT = 10;
 
-    protected DynamicMethod getMethod(ThreadContext context, IRubyObject self, int i, String methodName) {
-        return runtimeCache. getMethod(context, self, i, methodName);
+
+    private static DynamicMethod getMethodDirect(CacheEntry[] methodCache, ThreadContext context, IRubyObject self, int index, String methodName) {
+        RubyClass selfType = pollAndGetClass(context, self);
+        CacheEntry myCache = getCacheEntryDirect(methodCache, index);
+        if (myCache.typeOk(selfType)) {
+            return myCache.method;
+        }
+        return cacheAndGet(methodCache, context, selfType, index, methodName);
     }
-    protected DynamicMethod getMethod0(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 0, methodName);
+
+    private static DynamicMethod cacheAndGet(CacheEntry[] methodCache, ThreadContext context, RubyClass selfType, int index, String methodName) {
+        CacheEntry entry = selfType.searchWithCache(methodName);
+        DynamicMethod method = entry.method;
+        if (method.isUndefined()) {
+            return RuntimeHelpers.selectMethodMissing(context, selfType, method.getVisibility(), methodName, CallType.FUNCTIONAL);
+        }
+        methodCache[index] = entry;
+        return method;
     }
-    protected DynamicMethod getMethod1(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 1, methodName);
+    private static CacheEntry getCacheEntryDirect(CacheEntry[] methodCache, int index) {
+        return methodCache[index];
     }
-    protected DynamicMethod getMethod2(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 2, methodName);
+    protected static DynamicMethod getMethod(AbstractScript script, ThreadContext context, IRubyObject self, int i, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, i, methodName);
     }
-    protected DynamicMethod getMethod3(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 3, methodName);
+    protected static DynamicMethod getMethod0(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 0, methodName);
     }
-    protected DynamicMethod getMethod4(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 4, methodName);
+    protected static DynamicMethod getMethod1(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 1, methodName);
     }
-    protected DynamicMethod getMethod5(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 5, methodName);
+    protected static DynamicMethod getMethod2(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 2, methodName);
     }
-    protected DynamicMethod getMethod6(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 6, methodName);
+    protected static DynamicMethod getMethod3(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 3, methodName);
     }
-    protected DynamicMethod getMethod7(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 7, methodName);
+    protected static DynamicMethod getMethod4(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 4, methodName);
     }
-    protected DynamicMethod getMethod8(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 8, methodName);
+    protected static DynamicMethod getMethod5(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 5, methodName);
     }
-    protected DynamicMethod getMethod9(ThreadContext context, IRubyObject self, String methodName) {
-        return runtimeCache. getMethod(context, self, 9, methodName);
+    protected static DynamicMethod getMethod6(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 6, methodName);
+    }
+    protected static DynamicMethod getMethod7(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 7, methodName);
+    }
+    protected static DynamicMethod getMethod8(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 8, methodName);
+    }
+    protected static DynamicMethod getMethod9(AbstractScript script, ThreadContext context, IRubyObject self, String methodName) {
+        return getMethodDirect(script.runtimeCache.methodCache, context, self, 9, methodName);
     }
 
     public static ByteList[] createByteList(ByteList[] byteLists, int index, String str) {

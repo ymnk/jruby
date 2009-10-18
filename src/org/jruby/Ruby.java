@@ -1080,8 +1080,8 @@ public final class Ruby {
         for (int i=0; i<NIL_PREFILLED_ARRAY_SIZE; i++) nilPrefilledArray[i] = nilObject;
         singleNilArray = new IRubyObject[] {nilObject};
 
-        falseObject = new RubyBoolean(this, false);
-        trueObject = new RubyBoolean(this, true);
+        falseObject = new RubyBoolean.FalseBoolean(this);
+        trueObject = new RubyBoolean.TrueBoolean(this);
 
         if (profile.allowClass("Data")) {
             defineClass("Data", objectClass, ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
