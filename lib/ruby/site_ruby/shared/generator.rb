@@ -219,8 +219,10 @@ class Generator
 
     # Rewinds the generator.
     def rewind()
-      @thread.kill
-      initialize(@enum, &@block) if @index.nonzero?
+      if @index.nonzero?
+        @thread.kill
+        initialize(@enum, &@block) if @index.nonzero?
+      end
       self
     end
 
@@ -244,46 +246,32 @@ class Generator
 
   module Iterators
     module ClassMethods
-      def indexed_enum(method, &block)
-        extenum_method = :"enum_for_#{method}"
+      def indexed_iter(method, &block)
+        ext_iter_method = :"iter_for_#{method}"
 
-        define_method extenum_method do
+        define_method ext_iter_method do
           Generator::Indexed.new(self, &block)
         end
-
-        iterators[method] = extenum_method
-      end
-
-      def iterators
-        @iterators ||= {}
       end
     end
     def self.included(cls)
       cls.extend ClassMethods
     end
-
-    def to_enum(method = :each, *args)
-      if extenum_method = self.class.iterators[method]
-        send extenum_method, *args
-      else
-        super(method, *args)
-      end
-    end
   end
 
   class ::Array
     include Iterators
-    indexed_enum(:each)
-    indexed_enum(:each_with_index) {|a,i| [ a[i], i ]}
-    indexed_enum(:each_index) {|a,i| i}
-    indexed_enum(:reverse_each) {|a,i| a[a.size - i - 1]}
+    indexed_iter(:each)
+    indexed_iter(:each_with_index) {|a,i| [ a[i], i ]}
+    indexed_iter(:each_index) {|a,i| i}
+    indexed_iter(:reverse_each) {|a,i| a[a.size - i - 1]}
   end
 
   class ::Hash
     include Iterators
     # these are inefficient and need a place to store 'keys'
-    indexed_enum(:each) {|h,i| keys = k.keys; [ keys[i], h[keys[i]] ]}
-    indexed_enum(:each_with_index) {|h,i| keys = k.keys; [ [ keys[i], h[keys[i]] ], i]}
+    indexed_iter(:each) {|h,i| keys = k.keys; [ keys[i], h[keys[i]] ]}
+    indexed_iter(:each_with_index) {|h,i| keys = k.keys; [ [ keys[i], h[keys[i]] ], i]}
   end
 
   class Enumerator
@@ -292,11 +280,12 @@ class Generator
     end
 
     def __choose_generator
-      enum_for_method = :"enum_for_#{@__method__}"
-      if @__object__.respond_to? enum_for_method
-        @__object__.send enum_for_method
+      iter_for_method = :"iter_for_#{@__method__}"
+      if @__object__.respond_to? iter_for_method
+        @__object__.send iter_for_method
+      else
+        Generator::Threaded.new(self)
       end
-      return Generator::Threaded.new(self)
     end
     private :__generator, :__choose_generator
 
