@@ -134,6 +134,8 @@ class Generator
         Thread.new do
           begin
             yield self
+          rescue StopIteration
+            self.clear
           ensure
             self.yield(END_MARKER)
           end
@@ -143,11 +145,14 @@ class Generator
 
     class ThreadFinalizer
       def initialize(thread)
-        @thread
+        @thread = thread
       end
 
       def to_proc
-        proc {@thread.kill}
+        proc do
+          @thread.raise StopIteration.new("generator terminating")
+          @thread.join rescue nil
+        end
       end
     end
 
@@ -159,8 +164,6 @@ class Generator
     # In the latter, the given block is called with the generator
     # itself, and expected to call the +yield+ method for each element.
     def initialize(enum = nil, &block)
-      @thread.kill if @thread
-
       @queue = ProducerQueue.new
       @got_next_element = false
       @next_element = nil
@@ -216,6 +219,7 @@ class Generator
 
     # Rewinds the generator.
     def rewind()
+      @thread.kill
       initialize(@enum, &@block) if @index.nonzero?
       self
     end

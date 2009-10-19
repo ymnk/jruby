@@ -402,7 +402,7 @@ public class ThreadLibrary implements Library {
                 numWaiting++;
                 while ( java_length() >= capacity ) {
                     try {
-                        wait();
+                        context.getThread().wait_timeout(this, null);
                     } catch (InterruptedException e) {
                     }
                 }
