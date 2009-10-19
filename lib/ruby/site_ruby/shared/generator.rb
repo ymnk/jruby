@@ -59,80 +59,6 @@ require 'thread'
 class Generator
   include Enumerable
 
-  # marks the end of enumeration
-  END_MARKER = Object.new
-  def END_MARKER.inspect ; "END_MARKER" ; end
-
-  # a queue which emulates the producer-side interface of a generator
-  class ProducerQueue < SizedQueue
-    def initialize
-      super(1)
-    end
-
-    alias yield push
-
-    def _run_enum(enum)
-      _run { enum.each { |x| self.yield(x) } }
-    end
-
-    def _run
-      # caller manages thread, to avoid circularity
-      Thread.new do
-        begin
-          yield self
-        ensure
-          self.yield(END_MARKER)
-        end
-      end
-    end
-  end
-
-  # Creates a new generator either from an Enumerable object or from a
-  # block.
-  #
-  # In the former, block is ignored even if given.
-  #
-  # In the latter, the given block is called with the generator
-  # itself, and expected to call the +yield+ method for each element.
-  def initialize(enum = nil, &block)
-    @thread.kill if @thread
-
-    @queue = ProducerQueue.new
-    @got_next_element = false
-    @next_element = nil
-    @index = 0
-    
-    @enum = enum
-    @block = block
-    if enum
-      @thread = @queue._run_enum(enum)
-    else
-      @thread = @queue._run(&block)
-    end
-
-    self
-  end
-
-  # Yields an element to the generator.
-  def yield(value)
-    @queue.yield(value)
-    self
-  end
-
-  # gets the next element; may block
-  def _next_element
-    unless @got_next_element
-      @next_element = @queue.pop
-      @got_next_element = true
-    end
-    @next_element
-  end
-
-  # Returns true if the generator has reached the end.
-  def end?()
-    END_MARKER.equal? _next_element
-  end
-
   # Returns true if the generator has not reached the end yet.
   def next?()
     !end?
@@ -144,36 +70,166 @@ class Generator
   end
   alias pos index
 
-  # Returns the element at the current position and moves forward.
-  def next()
-    result = current
-    @index += 1
-    @got_next_element = false
-    @next_element = nil
-    result
+  # Construct a new generator; defaults to the threaded impl
+  def self.new(*args, &block)
+    generator = (self == Generator) ? Threaded : self
+
+    gen = generator.allocate
+    gen.send :initialize, *args, &block
+    gen
   end
 
-  # Returns the element at the current position.
-  def current()
-    raise EOFError, "no more elements available" if end?
-    _next_element
-  end
-
-  # Rewinds the generator.
-  def rewind()
-    initialize(@enum, &@block) if @index.nonzero?
-    self
-  end
-
-  # Rewinds the generator and enumerates the elements.
-  def each
-    rewind
-
-    until end?
-      yield self.next
+  class Indexed < Generator
+    SIMPLE_INDEXER = proc {|ary, i| ary[i]}
+    def initialize(ary, &indexer)
+      @ary = ary
+      @index = 0
+      @indexer = indexer || SIMPLE_INDEXER
     end
 
-    self
+    def end?
+      @index >= @ary.size
+    end
+
+    def next
+      obj, @index = current, @index + 1
+      obj
+    end
+
+    def current
+      raise EOFError, "no more elements available" if end?
+      @indexer.call(@ary, @index)
+    end
+
+    def rewind
+      @index = 0
+    end
+
+    def each
+      for i in 0...@ary.size
+        yield @indexer.call(i)
+      end
+    end
+  end
+
+  class Threaded < Generator
+    # marks the end of enumeration
+    END_MARKER = Object.new
+    def END_MARKER.inspect ; "END_MARKER" ; end
+
+    # a queue which emulates the producer-side interface of a generator
+    class ProducerQueue < SizedQueue
+      def initialize
+        super(1)
+      end
+
+      alias yield push
+
+      def _run_enum(enum)
+        _run { enum.each { |x| self.yield(x) } }
+      end
+
+      def _run
+        # caller manages thread, to avoid circularity
+        Thread.new do
+          begin
+            yield self
+          ensure
+            self.yield(END_MARKER)
+          end
+        end
+      end
+    end
+
+    class ThreadFinalizer
+      def initialize(thread)
+        @thread
+      end
+
+      def to_proc
+        proc {@thread.kill}
+      end
+    end
+
+    # Creates a new generator either from an Enumerable object or from a
+    # block.
+    #
+    # In the former, block is ignored even if given.
+    #
+    # In the latter, the given block is called with the generator
+    # itself, and expected to call the +yield+ method for each element.
+    def initialize(enum = nil, &block)
+      @thread.kill if @thread
+
+      @queue = ProducerQueue.new
+      @got_next_element = false
+      @next_element = nil
+      @index = 0
+
+      @enum = enum
+      @block = block
+      if enum
+        @thread = @queue._run_enum(enum.each)
+      else
+        @thread = @queue._run(&block)
+      end
+
+      ObjectSpace.define_finalizer self, &ThreadFinalizer.new(@thread)
+
+      self
+    end
+
+    # Yields an element to the generator.
+    def yield(value)
+      @queue.yield(value)
+      self
+    end
+
+    # gets the next element; may block
+    def _next_element
+      unless @got_next_element
+        @next_element = @queue.pop
+        @got_next_element = true
+      end
+      @next_element
+    end
+
+    # Returns true if the generator has reached the end.
+    def end?()
+      END_MARKER.equal? _next_element
+    end
+
+    # Returns the element at the current position and moves forward.
+    def next()
+      result = current
+      @index += 1
+      @got_next_element = false
+      @next_element = nil
+      result
+    end
+
+    # Returns the element at the current position.
+    def current()
+      raise EOFError, "no more elements available" if end?
+      _next_element
+    end
+
+    # Rewinds the generator.
+    def rewind()
+      initialize(@enum, &@block) if @index.nonzero?
+      self
+    end
+
+    # Rewinds the generator and enumerates the elements.
+    def each
+      rewind
+
+      until end?
+        yield self.next
+      end
+
+      self
+    end
   end
 
   if RUBY_VERSION =~ /^1\.9/
@@ -182,11 +238,63 @@ class Generator
     Enumerator = Enumerable::Enumerator
   end
 
+  module Iterators
+    module ClassMethods
+      def indexed_enum(method, &block)
+        extenum_method = :"enum_for_#{method}"
+
+        define_method extenum_method do
+          Generator::Indexed.new(self, &block)
+        end
+
+        iterators[method] = extenum_method
+      end
+
+      def iterators
+        @iterators ||= {}
+      end
+    end
+    def self.included(cls)
+      cls.extend ClassMethods
+    end
+
+    def to_enum(method = :each, *args)
+      if extenum_method = self.class.iterators[method]
+        send extenum_method, *args
+      else
+        super(method, *args)
+      end
+    end
+  end
+
+  class ::Array
+    include Iterators
+    indexed_enum(:each)
+    indexed_enum(:each_with_index) {|a,i| [ a[i], i ]}
+    indexed_enum(:each_index) {|a,i| i}
+    indexed_enum(:reverse_each) {|a,i| a[a.size - i - 1]}
+  end
+
+  class ::Hash
+    include Iterators
+    # these are inefficient and need a place to store 'keys'
+    indexed_enum(:each) {|h,i| keys = k.keys; [ keys[i], h[keys[i]] ]}
+    indexed_enum(:each_with_index) {|h,i| keys = k.keys; [ [ keys[i], h[keys[i]] ], i]}
+  end
+
   class Enumerator
     def __generator
-      @generator ||= Generator.new(self)
+      @generator ||= __choose_generator
     end
-    private :__generator
+
+    def __choose_generator
+      enum_for_method = :"enum_for_#{@__method__}"
+      if @__object__.respond_to? enum_for_method
+        @__object__.send enum_for_method
+      end
+      return Generator::Threaded.new(self)
+    end
+    private :__generator, :__choose_generator
 
     # call-seq:
     #   e.next   => object
