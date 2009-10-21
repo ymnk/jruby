@@ -143,15 +143,14 @@ class Generator
       end
     end
 
-    class ThreadFinalizer
-      def initialize(thread)
-        @thread = thread
+    class QueueFinalizer
+      def initialize(queue)
+        @queue = queue
       end
 
       def to_proc
         proc do
-          @thread.raise StopIteration.new("generator terminating")
-          @thread.join rescue nil
+          @queue.shutdown!
         end
       end
     end
@@ -177,7 +176,7 @@ class Generator
         @thread = @queue._run(&block)
       end
 
-      ObjectSpace.define_finalizer self, &ThreadFinalizer.new(@thread)
+      ObjectSpace.define_finalizer self, &QueueFinalizer.new(@queue)
 
       self
     end
@@ -220,7 +219,8 @@ class Generator
     # Rewinds the generator.
     def rewind()
       if @index.nonzero?
-        @thread.kill
+        @queue.shutdown!
+        @thread.join
         initialize(@enum, &@block) if @index.nonzero?
       end
       self
@@ -281,7 +281,8 @@ class Generator
 
     def __choose_generator
       iter_for_method = :"iter_for_#{@__method__}"
-      if @__object__.respond_to? iter_for_method
+      if ENV_JAVA['jruby.enumerator.lightweight'] != 'false' &&
+          @__object__.respond_to?(iter_for_method)
         @__object__.send iter_for_method
       else
         Generator::Threaded.new(self)

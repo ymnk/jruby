@@ -276,6 +276,7 @@ public class ThreadLibrary implements Library {
         @JRubyMethod(name = "shutdown!")
         public synchronized IRubyObject shutdown(ThreadContext context) {
             entries = null;
+            notifyAll();
             return context.getRuntime().getNil();
         }
 
