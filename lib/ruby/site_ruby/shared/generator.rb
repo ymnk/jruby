@@ -144,13 +144,15 @@ class Generator
     end
 
     class QueueFinalizer
-      def initialize(queue)
-        @queue = queue
+      attr_accessor :queue
+
+      def initialize
+        @queue = nil
       end
 
       def to_proc
         proc do
-          @queue.shutdown!
+          @queue.shutdown! if @queue
         end
       end
     end
@@ -163,20 +165,22 @@ class Generator
     # In the latter, the given block is called with the generator
     # itself, and expected to call the +yield+ method for each element.
     def initialize(enum = nil, &block)
+      @queue_finalizer = QueueFinalizer.new
+      ObjectSpace.define_finalizer self, &@queue_finalizer
+      _setup(enum, block)
+    end
+
+    def _setup(enum, block)
       @queue = ProducerQueue.new
+      @queue_finalizer.queue = @queue
+
       @got_next_element = false
       @next_element = nil
       @index = 0
 
       @enum = enum
       @block = block
-      if enum
-        @thread = @queue._run_enum(enum.each)
-      else
-        @thread = @queue._run(&block)
-      end
-
-      ObjectSpace.define_finalizer self, &QueueFinalizer.new(@queue)
+      @thread = nil
 
       self
     end
@@ -190,6 +194,13 @@ class Generator
     # gets the next element; may block
     def _next_element
       unless @got_next_element
+        unless @thread
+          if @enum
+            @thread = @queue._run_enum(@enum.each)
+          else
+            @thread = @queue._run(&@block)
+          end
+        end
         @next_element = @queue.pop
         @got_next_element = true
       end
@@ -220,8 +231,11 @@ class Generator
     def rewind()
       if @index.nonzero?
         @queue.shutdown!
-        @thread.join
-        initialize(@enum, &@block) if @index.nonzero?
+        begin
+          @thread.join if @thread
+        rescue Exception
+        end
+        _setup(@enum, @block)
       end
       self
     end
