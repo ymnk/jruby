@@ -19,14 +19,14 @@ public enum Operation
     GET_METHOD(OpType.dont_care),
     RETURN(OpType.ret_op), CLOSURE_RETURN(OpType.ret_op),
     RECV_ARG(OpType.recv_arg_op), RECV_CLOSURE(OpType.recv_arg_op), RECV_OPT_ARG(OpType.recv_arg_op), RECV_CLOSURE_ARG(OpType.recv_arg_op),
-    CALL(OpType.call_op), JRUBY_IMPL(OpType.call_op), RUBY_INTERNALS(OpType.call_op), 
+    CALL(OpType.call_op), JRUBY_IMPL(OpType.call_op), RUBY_INTERNALS(OpType.call_op),
     DECLARE_TYPE(OpType.declare_type_op),
 
 // closure instructions
     YIELD(OpType.dont_care),
 
 // eval instructions
-    EVAL_OP(OpType.eval_op), CLASS_EVAL(OpType.eval_op), 
+    EVAL_OP(OpType.eval_op), CLASS_EVAL(OpType.eval_op),
     
 // def instructions
     DEF_INST_METH(OpType.dont_care), DEF_CLASS_METH(OpType.dont_care),
@@ -36,18 +36,18 @@ public enum Operation
 
 // Loads
     GET_CONST(OpType.load_op), GET_GLOBAL_VAR(OpType.load_op), GET_FIELD(OpType.load_op), GET_CVAR(OpType.load_op), GET_ARRAY(OpType.load_op),
-	 FRAME_LOAD(OpType.load_op), 
+    FRAME_LOAD(OpType.load_op),
 
 // Stores
     PUT_CONST(OpType.store_op), PUT_GLOBAL_VAR(OpType.store_op), PUT_FIELD(OpType.store_op), PUT_ARRAY(OpType.store_op), PUT_CVAR(OpType.store_op),
-	 FRAME_STORE(OpType.store_op),
+    FRAME_STORE(OpType.store_op),
 
 // jump and branch operations
     BREAK(OpType.branch_op), JUMP(OpType.branch_op), BEQ(OpType.branch_op), BNE(OpType.branch_op), BLE(OpType.branch_op), BLT(OpType.branch_op), BGE(OpType.branch_op), BGT(OpType.branch_op),
 
 // others
-	 ATTR_ASSIGN(OpType.dont_care),
-    BUILD_CLOSURE(OpType.dont_care), GET_FRAME(OpType.dont_care), LABEL(OpType.dont_care), THREAD_POLL(OpType.dont_care),
+    ATTR_ASSIGN(OpType.dont_care),
+    BUILD_CLOSURE(OpType.dont_care), ALLOC_FRAME(OpType.dont_care), LABEL(OpType.dont_care), THREAD_POLL(OpType.dont_care),
 
 // comparisons & checks
     IS_TRUE(OpType.dont_care), // checks if the operand is non-null and non-false

@@ -16,7 +16,7 @@
   <property file="default.build.properties"/>
 
   <!-- Gem file names -->
-  <property name="rspec.gem" value="rspec-1.2.6.gem"/>
+  <property name="rspec.gem" value="rspec-1.2.9.gem"/>
   <property name="rake.gem" value="rake-0.8.7.gem"/>
 
   <property name="shared.lib.dir" value="lib/ruby/site_ruby/shared"/>
@@ -52,7 +52,6 @@
 
   <!-- Initializes the build -->
   <target name="init">
-    <xmlproperty file="build-config.xml" keepRoot="false" collapseAttributes="true"/>
     <tstamp><format property="build.date" pattern="yyyy-MM-dd"/></tstamp>
     <property environment="env"/>
     <property name="version.ruby" value="${version.ruby.major}.${version.ruby.minor}"/>
@@ -234,15 +233,17 @@
 
   <target name="_update_scm_revision_">
       <condition property="ruby.available">
-          <available file="/usr/bin/ruby"/>
+          <available file="${ruby.executable}"/>
       </condition>
       <antcall target="_update_scm_revision_with_ruby_"/>
       <antcall target="_update_scm_revision_with_jruby_"/>
   </target>
 
   <target name="_update_scm_revision_with_ruby_" if="ruby.available">
-      <exec failonerror="false" failifexecutionfails="false" errorproperty="ruby.command.failed" executable="/usr/bin/ruby">
-          <arg line="tool/snapshot.rb ${jruby.classes.dir}/org/jruby/jruby.properties"/>
+      <echo message="Using '${ruby.executable}' to calculate revision"/>
+      <exec failonerror="false" failifexecutionfails="false" errorproperty="ruby.command.failed" dir="${base.dir}" executable="${ruby.executable}">
+          <arg value="${base.dir}/tool/snapshot.rb"/>
+          <arg value="${jruby.classes.dir}/org/jruby/jruby.properties"/>
       </exec>
       <condition property="ruby.failed">
           <istrue value="${ruby.command.failed}"/>
@@ -250,12 +251,15 @@
   </target>
 
   <target name="_update_scm_revision_with_jruby_" unless="ruby.available">
+      <echo message="Using JRuby to calculate revision..."/>
+      <echo message="Adjust ruby.executable value in build.properties to speed things up!"/>
+      <property name="jruby.home" value="${basedir}"/>
       <java classname="org.jruby.Main" resultproperty="snapshot.result" errorproperty="snapshot.error" failonerror="false">
         <classpath refid="build.classpath"/>
         <classpath path="${jruby.classes.dir}"/>
         <sysproperty key="jruby.home" value="${jruby.home}"/>
         <jvmarg value="${run.jvm.model}"/>
-        <arg value="tool/snapshot.rb"/>
+        <arg value="${base.dir}/tool/snapshot.rb"/>
         <arg value="${jruby.classes.dir}/org/jruby/jruby.properties"/>
       </java>
   </target>
@@ -961,7 +965,7 @@
         <sysproperty key="emma.verbosity.level" value="silent" />
 
         <arg line="@{jruby.args}"/>
-        <arg line="${base.dir}/bin/rake"/>
+        <arg value="${base.dir}/bin/rake"/>
         <arg line="@{rake.targets}"/>
       </java>
     </sequential>
@@ -1274,7 +1278,7 @@
 
   <macrodef name="fixEOLs">
     <sequential>
-      <fixcrlf srcdir="dist/bin" excludes="*.bat" eol="lf"/>
+      <fixcrlf srcdir="dist/bin" excludes="*.bat,*.exe,*.dll" eol="lf"/>
       <fixcrlf srcdir="dist/bin" includes="*.bat" eol="crlf"/>
     </sequential>
   </macrodef>
@@ -1347,7 +1351,6 @@
     <include name="build_lib/**"/>
     <include name="Rakefile"/>
     <include name="build.xml"/>
-    <include name="build-config.xml"/>
     <include name="ivy/**"/>
     <include name="nbproject/*"/>
     <include name=".project"/>
@@ -1549,6 +1552,7 @@
   </target>
 
   <target name="clean-all" depends="clean, clear-specs, dist-clean" description="Cleans everything, including dist files and specs">
+      <delete dir="${base.dir}/build.eclipse"/>
   </target>
 
   <property name="nailgun.home" value="${basedir}/tool/nailgun"/>
