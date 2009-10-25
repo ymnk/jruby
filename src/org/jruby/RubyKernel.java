@@ -91,7 +91,7 @@ public class RubyKernel {
         @Override
         public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args, Block block) {
             try {
-                preFrameOnly(context, self, name, block);
+                preFrameOnly(this, context, self, name, block);
                 return methodMissing(context, self, clazz, name, args, block);
             } finally {
                 postFrameOnly(context);

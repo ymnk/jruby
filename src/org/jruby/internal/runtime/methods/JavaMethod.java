@@ -99,18 +99,52 @@ public abstract class JavaMethod extends DynamicMethod implements JumpTarget, Cl
         }
     }
 
+    protected final static void preFrameAndScope(JavaMethod javaMethod, ThreadContext context, IRubyObject self, String name, Block block) {
+        context.preMethodFrameAndScope(javaMethod.implementationClass, name, self, block, javaMethod.staticScope);
+    }
+    
+    protected final static void preFrameAndDummyScope(JavaMethod javaMethod, ThreadContext context, IRubyObject self, String name, Block block) {
+        context.preMethodFrameAndDummyScope(javaMethod.implementationClass, name, self, block, javaMethod.staticScope);
+    }
+    
+    protected final static void preFrameOnly(JavaMethod javaMethod, ThreadContext context, IRubyObject self, String name, Block block) {
+        context.preMethodFrameOnly(javaMethod.implementationClass, name, self, block);
+    }
+    
+    protected final static void preScopeOnly(JavaMethod javaMethod, ThreadContext context) {
+        context.preMethodScopeOnly(javaMethod.implementationClass, javaMethod.staticScope);
+    }
+
+    protected final static void preNoFrameDummyScope(JavaMethod javaMethod, ThreadContext context) {
+        context.preMethodNoFrameAndDummyScope(javaMethod.implementationClass, javaMethod.staticScope);
+    }
+    
+    protected final static void preBacktraceOnly(JavaMethod javaMethod, ThreadContext context, String name) {
+        context.preMethodBacktraceOnly(name);
+    }
+
+    protected final static void preBacktraceDummyScope(JavaMethod javaMethod, ThreadContext context, String name) {
+        context.preMethodBacktraceDummyScope(javaMethod.implementationClass, name, javaMethod.staticScope);
+    }
+    
+    protected final static void preBacktraceAndScope(JavaMethod javaMethod, ThreadContext context, String name) {
+        context.preMethodBacktraceAndScope(name, javaMethod.implementationClass, javaMethod.staticScope);
+    }
+
+    protected final static void preNoop(JavaMethod javaMethod) {}
+
     protected final void preFrameAndScope(ThreadContext context, IRubyObject self, String name, Block block) {
         context.preMethodFrameAndScope(implementationClass, name, self, block, staticScope);
     }
-    
+
     protected final void preFrameAndDummyScope(ThreadContext context, IRubyObject self, String name, Block block) {
         context.preMethodFrameAndDummyScope(implementationClass, name, self, block, staticScope);
     }
-    
+
     protected final void preFrameOnly(ThreadContext context, IRubyObject self, String name, Block block) {
         context.preMethodFrameOnly(implementationClass, name, self, block);
     }
-    
+
     protected final void preScopeOnly(ThreadContext context) {
         context.preMethodScopeOnly(implementationClass, staticScope);
     }
@@ -118,7 +152,7 @@ public abstract class JavaMethod extends DynamicMethod implements JumpTarget, Cl
     protected final void preNoFrameDummyScope(ThreadContext context) {
         context.preMethodNoFrameAndDummyScope(implementationClass, staticScope);
     }
-    
+
     protected final void preBacktraceOnly(ThreadContext context, String name) {
         context.preMethodBacktraceOnly(name);
     }
@@ -126,7 +160,7 @@ public abstract class JavaMethod extends DynamicMethod implements JumpTarget, Cl
     protected final void preBacktraceDummyScope(ThreadContext context, String name) {
         context.preMethodBacktraceDummyScope(implementationClass, name, staticScope);
     }
-    
+
     protected final void preBacktraceAndScope(ThreadContext context, String name) {
         context.preMethodBacktraceAndScope(name, implementationClass, staticScope);
     }
@@ -204,7 +238,7 @@ public abstract class JavaMethod extends DynamicMethod implements JumpTarget, Cl
 
     protected static IRubyObject raiseArgumentError(JavaMethod method, ThreadContext context, String name, int given, int min, int max) {
         try {
-            method.preBacktraceOnly(context, name);
+            preBacktraceOnly(method, context, name);
             Arity.raiseArgumentError(context.getRuntime(), given, min, max);
         } finally {
             postBacktraceOnly(context);

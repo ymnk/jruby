@@ -680,7 +680,7 @@ public class RubyClass extends RubyModule {
             super(implClass, visibility);
         }
         public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args, Block block) {
-            preBacktraceOnly(context, name);
+            preBacktraceOnly(this, context, name);
             try {
                 RubyClass cls = (RubyClass)self;
                 IRubyObject obj = cls.allocate();
@@ -691,7 +691,7 @@ public class RubyClass extends RubyModule {
             }
         }
         public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, Block block) {
-            preBacktraceOnly(context, name);
+            preBacktraceOnly(this, context, name);
             try {
                 RubyClass cls = (RubyClass)self;
                 IRubyObject obj = cls.allocate();
@@ -702,7 +702,7 @@ public class RubyClass extends RubyModule {
             }
         }
         public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, Block block) {
-            preBacktraceOnly(context, name);
+            preBacktraceOnly(this, context, name);
             try {
                 RubyClass cls = (RubyClass)self;
                 IRubyObject obj = cls.allocate();
@@ -713,7 +713,7 @@ public class RubyClass extends RubyModule {
             }
         }
         public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, Block block) {
-            preBacktraceOnly(context, name);
+            preBacktraceOnly(this, context, name);
             try {
                 RubyClass cls = (RubyClass)self;
                 IRubyObject obj = cls.allocate();
@@ -724,7 +724,7 @@ public class RubyClass extends RubyModule {
             }
         }
         public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, Block block) {
-            preBacktraceOnly(context, name);
+            preBacktraceOnly(this, context, name);
             try {
                 RubyClass cls = (RubyClass)self;
                 IRubyObject obj = cls.allocate();

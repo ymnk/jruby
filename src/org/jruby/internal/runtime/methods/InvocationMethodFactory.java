@@ -1008,7 +1008,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         if (callConfig.isNoop()) return;
 
         prepareForPre(mv, specificArity, block, callConfig);
-        mv.invokevirtual(superClass, getPreMethod(callConfig), getPreSignature(callConfig));
+        mv.invokestatic(superClass, getPreMethod(callConfig), getPreSignature(callConfig));
     }
 
     private void invokeCallConfigPost(SkinnyMethodAdapter mv, String superClass, CallConfiguration callConfig) {
@@ -1056,15 +1056,15 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
 
     private String getPreSignature(CallConfiguration callConfig) {
         switch (callConfig) {
-        case FrameFullScopeFull: return sig(void.class, params(ThreadContext.class, IRubyObject.class, String.class, Block.class));
-        case FrameFullScopeDummy: return sig(void.class, params(ThreadContext.class, IRubyObject.class, String.class, Block.class));
-        case FrameFullScopeNone: return sig(void.class, params(ThreadContext.class, IRubyObject.class, String.class, Block.class));
-        case FrameBacktraceScopeFull: return sig(void.class, params(ThreadContext.class, String.class));
-        case FrameBacktraceScopeDummy: return sig(void.class, params(ThreadContext.class, String.class));
-        case FrameBacktraceScopeNone:  return sig(void.class, params(ThreadContext.class, String.class));
-        case FrameNoneScopeFull: return sig(void.class, params(ThreadContext.class));
-        case FrameNoneScopeDummy: return sig(void.class, params(ThreadContext.class));
-        case FrameNoneScopeNone: return sig(void.class);
+        case FrameFullScopeFull: return sig(void.class, params(JavaMethod.class, ThreadContext.class, IRubyObject.class, String.class, Block.class));
+        case FrameFullScopeDummy: return sig(void.class, params(JavaMethod.class, ThreadContext.class, IRubyObject.class, String.class, Block.class));
+        case FrameFullScopeNone: return sig(void.class, params(JavaMethod.class, ThreadContext.class, IRubyObject.class, String.class, Block.class));
+        case FrameBacktraceScopeFull: return sig(void.class, params(JavaMethod.class, ThreadContext.class, String.class));
+        case FrameBacktraceScopeDummy: return sig(void.class, params(JavaMethod.class, ThreadContext.class, String.class));
+        case FrameBacktraceScopeNone:  return sig(void.class, params(JavaMethod.class, ThreadContext.class, String.class));
+        case FrameNoneScopeFull: return sig(void.class, params(JavaMethod.class, ThreadContext.class));
+        case FrameNoneScopeDummy: return sig(void.class, params(JavaMethod.class, ThreadContext.class));
+        case FrameNoneScopeNone: return sig(void.class, JavaMethod.class);
         default: throw new RuntimeException("Unknown call configuration");
         }
     }
