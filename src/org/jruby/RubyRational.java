@@ -202,12 +202,12 @@ public class RubyRational extends RubyNumeric {
         return null;
     }
 
-    @JRubyMethod(name = "new!", meta = true, visibility = Visibility.PRIVATE)
+    @JRubyMethod(name = "new!", meta = true, visibility = Visibility.PRIVATE, compat = CompatVersion.RUBY1_8)
     public static IRubyObject newInstanceBang(ThreadContext context, IRubyObject recv, IRubyObject num) {
         return newInstanceBang(context, recv, num, RubyFixnum.one(context.getRuntime()));
     }
 
-    @JRubyMethod(name = "new!", meta = true, visibility = Visibility.PRIVATE)
+    @JRubyMethod(name = "new!", meta = true, visibility = Visibility.PRIVATE, compat = CompatVersion.RUBY1_8)
     public static IRubyObject newInstanceBang(ThreadContext context, IRubyObject recv, IRubyObject num, IRubyObject den) {
         if (!(num instanceof RubyInteger)) num = f_to_i(context, num);
         if (!(den instanceof RubyInteger)) den = f_to_i(context, den);
@@ -223,7 +223,15 @@ public class RubyRational extends RubyNumeric {
 
         return new RubyRational(runtime, recv, num, den);
     }
-    
+
+    /** nurat_canonicalization
+     *
+     */
+    private static boolean canonicalization = false;
+    public static void setCanonicalization(boolean canonical) {
+        canonicalization = canonical;
+    }
+
     /** nurat_int_check
      * 
      */
@@ -246,7 +254,6 @@ public class RubyRational extends RubyNumeric {
     /** nurat_s_canonicalize_internal
      * 
      */
-    private static boolean canonicalization = false;
     private static IRubyObject canonicalizeInternal(ThreadContext context, IRubyObject clazz, IRubyObject num, IRubyObject den) {
         Ruby runtime = context.getRuntime();
         IRubyObject res = f_cmp(context, den, RubyFixnum.zero(runtime));

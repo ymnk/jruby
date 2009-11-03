@@ -2432,9 +2432,22 @@ public class RubyArray extends RubyObject implements List {
      */
     @JRubyMethod(name = "<=>", required = 1)
     public IRubyObject op_cmp(ThreadContext context, IRubyObject obj) {
-        Ruby runtime = context.getRuntime(); 
-        RubyArray ary2 = obj.convertToArray();
+        Ruby runtime = context.getRuntime();
+        IRubyObject ary2 = runtime.getNil();
+        boolean isAnArray = (obj instanceof RubyArray) || obj.getMetaClass().getSuperClass() == runtime.getArray();
 
+        if (!isAnArray && !obj.respondsTo("to_ary")) {
+            return ary2;
+        } else if (!isAnArray) {
+            ary2 = obj.callMethod(context, "to_ary");
+        } else {
+            ary2 = obj.convertToArray();
+        }
+        
+        return cmpCommon(context, runtime, (RubyArray) ary2);
+    }
+
+    private IRubyObject cmpCommon(ThreadContext context, Ruby runtime, RubyArray ary2) {
         if (this == ary2 || runtime.isInspecting(this)) return RubyFixnum.zero(runtime);
 
         try {
@@ -2475,9 +2488,8 @@ public class RubyArray extends RubyObject implements List {
         }
     }
 
-    private IRubyObject slice_internal(long pos, long len, IRubyObject arg0, IRubyObject arg1) {
-        Ruby runtime = getRuntime();
-
+    private IRubyObject slice_internal(long pos, long len, 
+            IRubyObject arg0, IRubyObject arg1, Ruby runtime) {
         if(len < 0) return runtime.getNil();
         int orig_len = realLength;
         if(pos < 0) {
@@ -2488,6 +2500,7 @@ public class RubyArray extends RubyObject implements List {
         } else if(orig_len < pos) {
             return runtime.getNil();
         }
+
         if(orig_len < pos + len) {
             len = orig_len - pos;
         }
@@ -2495,7 +2508,7 @@ public class RubyArray extends RubyObject implements List {
             return runtime.newEmptyArray();
         }
 
-        arg1 = makeShared((int)pos, (int)len, getMetaClass());
+        arg1 = makeShared(begin + (int)pos, (int)len, getMetaClass());
         splice(pos, len, null);
 
         return arg1;
@@ -2507,11 +2520,17 @@ public class RubyArray extends RubyObject implements List {
     @JRubyMethod(name = "slice!")
     public IRubyObject slice_bang(IRubyObject arg0) {
         modifyCheck();
+        Ruby runtime = getRuntime();
         if (arg0 instanceof RubyRange) {
-            long[] beglen = ((RubyRange) arg0).begLen(realLength, 1);
+            RubyRange range = (RubyRange) arg0;
+            if (!range.checkBegin(realLength)) {
+                return runtime.getNil();
+            }
+
+            long[] beglen = range.begLen(realLength, 1);
             long pos = beglen[0];
             long len = beglen[1];
-            return slice_internal(pos, len, arg0, null);
+            return slice_internal(pos, len, arg0, null, runtime);
         }
         return delete_at((int) RubyNumeric.num2long(arg0));
     }
@@ -2524,7 +2543,7 @@ public class RubyArray extends RubyObject implements List {
         modifyCheck();
         long pos = RubyNumeric.num2long(arg0);
         long len = RubyNumeric.num2long(arg1);
-        return slice_internal(pos, len, arg0, arg1);
+        return slice_internal(pos, len, arg0, arg1, getRuntime());
     }    
 
     /** rb_ary_assoc
@@ -2625,7 +2644,7 @@ public class RubyArray extends RubyObject implements List {
     public IRubyObject flatten_bang(ThreadContext context, IRubyObject arg) {
         Ruby runtime = context.getRuntime();
         int level = RubyNumeric.num2int(arg);
-        if (level == 0) return this;
+        if (level == 0) return runtime.getNil();
 
         RubyArray result = new RubyArray(runtime, getMetaClass(), realLength);
         if (flatten(context, level, result)) {
@@ -3101,7 +3120,7 @@ public class RubyArray extends RubyObject implements List {
     /** rb_ary_product
      * 
      */
-    @JRubyMethod(name = "product", rest = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = "product", rest = true)
     public IRubyObject product(ThreadContext context, IRubyObject[] args) {
         Ruby runtime = context.getRuntime();
 
@@ -3170,7 +3189,7 @@ public class RubyArray extends RubyObject implements List {
             block.yield(context, newEmptyArray(runtime));
         } else if (n == 1) {
             for (int i = 0; i < realLength; i++) {
-                block.yield(context, values[begin + i]);
+                block.yield(context, newArray(runtime, values[begin + i]));
             }
         } else if (n >= 0 && realLength >= n) {
             int stack[] = new int[n + 1];

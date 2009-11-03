@@ -18,6 +18,8 @@
   <!-- Gem file names -->
   <property name="rspec.gem" value="rspec-1.2.9.gem"/>
   <property name="rake.gem" value="rake-0.8.7.gem"/>
+  <property name="ruby-debug.gem" value="ruby-debug-0.10.3.gem"/>
+  <property name="ruby-debug-base.gem" value="ruby-debug-base-0.10.3.1-java.gem"/>
 
   <property name="shared.lib.dir" value="lib/ruby/site_ruby/shared"/>
 
@@ -429,8 +431,11 @@
         <arg value="maybe_install_gems"/>
         <arg value="${build.lib.dir}/${rspec.gem}"/>
         <arg value="${build.lib.dir}/${rake.gem}"/>
+        <arg value="${build.lib.dir}/${ruby-debug-base.gem}"/>
+        <arg value="${build.lib.dir}/${ruby-debug.gem}"/>
         <arg value="--no-ri"/>
         <arg value="--no-rdoc"/>
+        <arg value="--ignore-dependencies"/>
         <arg value="--env-shebang"/>
       </java>
 
@@ -519,8 +524,11 @@
         <arg value="maybe_install_gems"/>
         <arg value="${build.lib.dir}/${rspec.gem}"/>
         <arg value="${build.lib.dir}/${rake.gem}"/>
+        <arg value="${build.lib.dir}/${ruby-debug-base.gem}"/>
+        <arg value="${build.lib.dir}/${ruby-debug.gem}"/>
         <arg value="--no-ri"/>
         <arg value="--no-rdoc"/>
+        <arg value="--ignore-dependencies"/>
         <arg value="--env-shebang"/>
       </java>
 
@@ -595,7 +603,7 @@
   </target>
 
   <target name="compile-test" depends="jar" description="Compile the unit tests">
-    <javac destdir="${test.classes.dir}" deprecation="true" debug="true"
+    <javac destdir="${test.classes.dir}" deprecation="true" encoding="UTF-8" debug="true"
            source="${javac.version}">
       <classpath>
         <path refid="build.classpath"/>
@@ -627,8 +635,11 @@
       <arg value="maybe_install_gems"/>
       <arg value="${build.lib.dir}/${rspec.gem}"/>
       <arg value="${build.lib.dir}/${rake.gem}"/>
+      <arg value="${build.lib.dir}/${ruby-debug-base.gem}"/>
+      <arg value="${build.lib.dir}/${ruby-debug.gem}"/>
       <arg value="${install.ri}"/>
       <arg value="${install.rdoc}"/>
+      <arg value="--ignore-dependencies"/>
       <arg value="--env-shebang"/>
     </java>
   </target>
@@ -762,6 +773,7 @@
   <target name="run-junit-interpreted-threadpool"><run-junit-1.8 thread.pooling="true"/></target>
   <target name="run-junit-compiled-threadpool"><run-junit-1.8 compile.mode="JIT" jit.threshold="0" thread.pooling="true"/></target>
   <target name="run-junit-precompiled-threadpool"><run-junit-1.8 compile.mode="FORCE" jit.threshold="0" thread.pooling="true"/></target>
+  <target name="run-junit-embed" depends="copy-test-files" description="Runs unit embedding API tests."><run-junit-embed-all/></target>
 
   <path id="test.class.path">
     <fileset dir="${build.lib.dir}" includes="*.jar">
@@ -906,7 +918,23 @@
     </sequential>
   </macrodef>
 
-  <target name="test-security-manager">
+  <macrodef name="run-junit-embed-all">
+    <sequential>
+      <taskdef name="junit" classname="org.apache.tools.ant.taskdefs.optional.junit.JUnitTask" classpath="${build.lib.dir}/junit-4.7.jar"/>
+      <junit jvm="${jruby.test.jvm}" fork="yes" forkMode="once" haltonfailure="true" dir="${basedir}" maxmemory="${jruby.test.memory}" showoutput="true" timeout="1800000">
+        <classpath refid="test.class.path"/>
+        <formatter type="xml"/>
+        <formatter type="brief" usefile="false" />
+        <batchtest fork="yes" todir="${test.results.dir}">
+          <fileset dir="${test.dir}">
+            <include name="org/jruby/embed/**/*Test*.java"/>
+          </fileset>
+        </batchtest>
+      </junit>
+    </sequential>
+  </macrodef>
+
+  <target name="test-security-manager" depends="jar-jruby">
     <java classname="org.jruby.Main" fork="true" failonerror="false">
       <classpath refid="test.class.path"/>
 

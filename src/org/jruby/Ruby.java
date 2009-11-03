@@ -537,7 +537,7 @@ public final class Ruby {
         boolean compile = getInstanceConfig().getCompileMode().shouldPrecompileCLI();
         boolean forceCompile = getInstanceConfig().getCompileMode().shouldPrecompileAll();
         if (compile) {
-            script = tryCompile(scriptNode);
+            script = tryCompile(scriptNode, jrubyClassLoader, config.isShowBytecode());
             if (forceCompile && script == null) {
                 return getNil();
             }
@@ -560,6 +560,10 @@ public final class Ruby {
     }
     
     private Script tryCompile(Node node, JRubyClassLoader classLoader) {
+        return tryCompile(node, classLoader, false);
+    }
+
+    private Script tryCompile(Node node, JRubyClassLoader classLoader, boolean dump) {
         Script script = null;
         try {
             String filename = node.getPosition().getFile();
@@ -570,7 +574,7 @@ public final class Ruby {
 
             StandardASMCompiler asmCompiler = new StandardASMCompiler(classname, filename);
             ASTCompiler compiler = config.newCompiler();
-            if (config.isShowBytecode()) {
+            if (dump) {
                 compiler.compileRoot(node, asmCompiler, inspector, false, false);
                 asmCompiler.dumpClass(System.out);
             } else {
@@ -1373,6 +1377,10 @@ public final class Ruby {
         addLazyBuiltin("ffi-internal.jar", "ffi-internal", "org.jruby.ext.ffi.Factory$Service");
         addLazyBuiltin("tempfile.rb", "tempfile", "org.jruby.libraries.TempfileLibrary");
         addLazyBuiltin("fcntl.rb", "fcntl", "org.jruby.libraries.FcntlLibrary");
+        if (is1_9()) {
+            addLazyBuiltin("mathn/complex.jar", "mathn/complex", "org.jruby.ext.mathn.Complex");
+            addLazyBuiltin("mathn/rational.jar", "mathn/rational", "org.jruby.ext.mathn.Rational");
+        }
         
         if(RubyInstanceConfig.NATIVE_NET_PROTOCOL) {
             addLazyBuiltin("net/protocol.rb", "net/protocol", "org.jruby.libraries.NetProtocolBufferedIOLibrary");
@@ -1395,7 +1403,7 @@ public final class Ruby {
                              "yaml/rubytypes", "yaml/store", "yaml/stream", 
                              "yaml/stringio", "yaml/tag", "yaml/types", 
                              "yaml/yamlnode", "yaml/ypath", 
-                             "jsignal" };
+                             "jsignal", "generator", "prelude"};
         for (String library : builtins) {
             addBuiltinIfAllowed(library + ".rb", new BuiltinScript(library));
         }
@@ -1441,6 +1449,22 @@ public final class Ruby {
 
     public String getCurrentDirectory() {
         return currentDirectory;
+    }
+
+    public void setCurrentLine(int line) {
+        currentLine = line;
+    }
+
+    public int getCurrentLine() {
+        return currentLine;
+    }
+
+    public void setArgsFile(IRubyObject argsFile) {
+        this.argsFile = argsFile;
+    }
+
+    public IRubyObject getArgsFile() {
+        return argsFile;
     }
     
     public RubyModule getEtc() {
@@ -3457,6 +3481,11 @@ public final class Ruby {
 
     // former java.lang.System concepts now internalized for MVM
     private String currentDirectory;
+
+    // The "current line" global variable
+    private int currentLine = 0;
+
+    private IRubyObject argsFile;
 
     private long startTime = System.currentTimeMillis();
 

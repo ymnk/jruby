@@ -16,7 +16,8 @@ class TestSignal < Test::Unit::TestCase
     defined?(Process.kill) or return
 
     # FIXME, JRuby fails this test on OpenSolaris 2009.06 and Windows
-    return if Config::CONFIG['host_os'] =~/SunOS|Windows|mswin/
+    # JRUBY-4183
+    return if Config::CONFIG['host_os'] =~/SunOS|mswin/
 
     begin
       $x = 0

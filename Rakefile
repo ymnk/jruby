@@ -39,7 +39,7 @@ Object.const_set(:BASE_DIR, Dir.pwd)
 File.open("default.build.properties") do |props|
   props.each_line do |line|
     # skip comments
-    next if line =~ /^\W*#/
+    next if line =~ /(^\W*#|^$)/
     
     # build const name
     name, value = line.split("=")
@@ -207,7 +207,7 @@ namespace :maven do
 end
 
 task :installer do
-  ant "dist"
+  ant "dist" unless ENV['TESTING_INSTALLER']
   sh "#{INSTALL4J_EXECUTABLE} -m win32 -D jruby.version=#{VERSION_JRUBY} " \
      "install/jruby.install4j" do |ok, result|
     $stderr.puts "** Something went wrong: #{result}" unless ok

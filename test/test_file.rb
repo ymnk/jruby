@@ -846,8 +846,12 @@ class TestFile < Test::Unit::TestCase
       Tempfile.class_eval { alias_method :make_tmpname, :save_make_tmpname }
     end
 
-    t = Tempfile.new "tcttac.jpg", File.dirname(__FILE__)
-    assert t.path =~ /\.jpg$/
+    begin
+      t = Tempfile.new "tcttac.jpg", File.dirname(__FILE__)
+      assert t.path =~ /\.jpg$/
+    ensure
+      t.close
+    end
   end
 
   unless WINDOWS
@@ -880,7 +884,37 @@ class TestFile < Test::Unit::TestCase
       }
       assert_equal(100, File.size(filename))
       assert_equal(100, File.stat(filename).size)
+      assert_equal(100, File.stat(filename).size?)
+      assert_match(/\ssize=100,/, File.stat(filename).inspect)
       assert_equal(100, File::Stat.new(filename).size)
+      assert_equal(100, File::Stat.new(filename).size?)
+      assert_match(/\ssize=100,/, File::Stat.new(filename).inspect)
+    ensure
+      File.unlink(filename)
+    end
+  end
+
+  # JRUBY-4149
+  def test_open_file_sizes
+    filename = '100_bytes.bin'
+    begin
+      File.open(filename, 'wb+') { |f|
+        f.write('0' * 100)
+        f.flush; f.flush
+
+        assert_equal(100, f.stat.size)
+        assert_equal(100, f.stat.size?)
+        assert_match(/\ssize=100,/, f.stat.inspect)
+
+        assert_equal(100, File.size(filename))
+        assert_equal(100, File.stat(filename).size)
+        assert_equal(100, File.stat(filename).size?)
+        assert_match(/\ssize=100,/, File.stat(filename).inspect)
+
+        assert_equal(100, File::Stat.new(filename).size)
+        assert_equal(100, File::Stat.new(filename).size?)
+        assert_match(/\ssize=100,/, File::Stat.new(filename).inspect)
+      }
     ensure
       File.unlink(filename)
     end

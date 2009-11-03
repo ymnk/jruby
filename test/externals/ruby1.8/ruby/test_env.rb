@@ -1,10 +1,8 @@
 require 'test/unit'
-require 'test/test_helper'
+require 'rbconfig'
 
 class TestEnv < Test::Unit::TestCase
-  include TestHelper
-
-  IGNORE_CASE = (/djgpp|bccwin|mswin|mingw/ =~ RUBY_PLATFORM) || WINDOWS
+  IGNORE_CASE = /djgpp|bccwin|mswin|mingw/ =~ Config::CONFIG['host_os']
 
   def setup
     @backup = ENV.delete('test')

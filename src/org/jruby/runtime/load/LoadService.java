@@ -152,7 +152,6 @@ public class LoadService {
     protected RubyArray loadPath;
     protected RubyArray loadedFeatures;
     protected List loadedFeaturesInternal;
-//    protected final Set firstLineLoadedFeatures = Collections.synchronizedSet(new HashSet());
     protected final Map<String, Library> builtinLibraries = new HashMap<String, Library>();
 
     protected final Map<String, JarFile> jarFiles = new HashMap<String, JarFile>();
@@ -216,11 +215,11 @@ public class LoadService {
         }
     }
 
-    private void addLoadedFeature(RubyString loadNameRubyString) {
+    protected void addLoadedFeature(RubyString loadNameRubyString) {
         loadedFeaturesInternal.add(loadNameRubyString);
     }
 
-    private void addPath(String path) {
+    protected void addPath(String path) {
         // Empty paths do not need to be added
         if (path == null || path.length() == 0) return;
         
@@ -290,7 +289,7 @@ public class LoadService {
         }
     }
 
-    private Map requireLocks = new Hashtable();
+    protected Map requireLocks = new Hashtable();
 
     public boolean smartLoad(String file) {
         checkEmptyLoad(file);
@@ -389,21 +388,20 @@ public class LoadService {
         loadedFeaturesInternal.remove(name);
     }
 
-    private boolean featureAlreadyLoaded(RubyString loadNameRubyString) {
+    protected boolean featureAlreadyLoaded(RubyString loadNameRubyString) {
         return loadedFeaturesInternal.contains(loadNameRubyString);
     }
 
-    private boolean isJarfileLibrary(SearchState state, final String file) {
+    protected boolean isJarfileLibrary(SearchState state, final String file) {
         return state.library instanceof JarredScript && file.endsWith(".jar");
     }
 
-    private void removeLoadedFeature(RubyString loadNameRubyString) {
+    protected void removeLoadedFeature(RubyString loadNameRubyString) {
 
         loadedFeaturesInternal.remove(loadNameRubyString);
     }
 
-    private void reraiseRaiseExceptions(Throwable e) throws RaiseException {
-
+    protected void reraiseRaiseExceptions(Throwable e) throws RaiseException {
         if (e instanceof RaiseException) {
             throw (RaiseException) e;
         }
@@ -556,7 +554,7 @@ public class LoadService {
     
     public class SearchState {
         public Library library;
-        private String loadName;
+        public String loadName;
         public SuffixType suffixType;
         public String searchFile;
         
@@ -615,7 +613,7 @@ public class LoadService {
         }
     }
     
-    private boolean tryLoadingLibraryOrScript(Ruby runtime, SearchState state) {
+    protected boolean tryLoadingLibraryOrScript(Ruby runtime, SearchState state) {
         // attempt to load the found library
         RubyString loadNameRubyString = RubyString.newString(runtime, state.loadName);
         try {
@@ -649,7 +647,7 @@ public class LoadService {
         }
     }
     
-    private final List<LoadSearcher> searchers = new ArrayList<LoadSearcher>();
+    protected final List<LoadSearcher> searchers = new ArrayList<LoadSearcher>();
     {
         searchers.add(new BailoutSearcher());
         searchers.add(new NormalSearcher());
@@ -658,7 +656,7 @@ public class LoadService {
         searchers.add(new ScriptClassSearcher());
     }
 
-    private String buildClassName(String className) {
+    protected String buildClassName(String className) {
         // Remove any relative prefix, e.g. "./foo/bar" becomes "foo/bar".
         className = className.replaceFirst("^\\.\\/", "");
         if (className.lastIndexOf(".") != -1) {
@@ -668,25 +666,25 @@ public class LoadService {
         return className;
     }
 
-    private void checkEmptyLoad(String file) throws RaiseException {
+    protected void checkEmptyLoad(String file) throws RaiseException {
         if (file.equals("")) {
             throw runtime.newLoadError("No such file to load -- " + file);
         }
     }
 
-    private void debugLogTry(String what, String msg) {
+    protected void debugLogTry(String what, String msg) {
         if (RubyInstanceConfig.DEBUG_LOAD_SERVICE) {
             runtime.getErr().println( "LoadService: trying " + what + ": " + msg );
         }
     }
 
-    private void debugLogFound(String what, String msg) {
+    protected void debugLogFound(String what, String msg) {
         if (RubyInstanceConfig.DEBUG_LOAD_SERVICE) {
             runtime.getErr().println( "LoadService: found " + what + ": " + msg );
         }
     }
 
-    private void debugLogFound( LoadServiceResource resource ) {
+    protected void debugLogFound( LoadServiceResource resource ) {
         String resourceUrl;
         try {
             resourceUrl = resource.getURL().toString();
@@ -698,7 +696,7 @@ public class LoadService {
         }
     }
     
-    private Library findBuiltinLibrary(SearchState state, String baseName, SuffixType suffixType) {
+    protected Library findBuiltinLibrary(SearchState state, String baseName, SuffixType suffixType) {
         for (String suffix : suffixType.getSuffixes()) {
             String namePlusSuffix = baseName + suffix;
             debugLogTry( "builtinLib",  namePlusSuffix );
@@ -712,7 +710,7 @@ public class LoadService {
         return null;
     }
 
-    private Library findLibraryWithoutCWD(SearchState state, String baseName, SuffixType suffixType) {
+    protected Library findLibraryWithoutCWD(SearchState state, String baseName, SuffixType suffixType) {
         Library library = null;
         
         switch (suffixType) {
@@ -742,7 +740,7 @@ public class LoadService {
         return library;
     }
 
-    private Library findLibraryWithClassloaders(SearchState state, String baseName, SuffixType suffixType) {
+    protected Library findLibraryWithClassloaders(SearchState state, String baseName, SuffixType suffixType) {
         for (String suffix : suffixType.getSuffixes()) {
             String file = baseName + suffix;
             LoadServiceResource resource = findFileInClasspath(file);
@@ -754,7 +752,7 @@ public class LoadService {
         return null;
     }
 
-    private Library createLibrary(SearchState state, LoadServiceResource resource) {
+    protected Library createLibrary(SearchState state, LoadServiceResource resource) {
         if (resource == null) {
             return null;
         }
@@ -770,7 +768,7 @@ public class LoadService {
         }      
     }
 
-    private LoadServiceResource tryResourceFromCWD(SearchState state, String baseName,SuffixType suffixType) throws RaiseException {
+    protected LoadServiceResource tryResourceFromCWD(SearchState state, String baseName,SuffixType suffixType) throws RaiseException {
         LoadServiceResource foundResource = null;
         
         for (String suffix : suffixType.getSuffixes()) {
@@ -798,7 +796,7 @@ public class LoadService {
         return foundResource;
     }
     
-    private LoadServiceResource tryResourceFromJarURL(SearchState state, String baseName, SuffixType suffixType) {
+    protected LoadServiceResource tryResourceFromJarURL(SearchState state, String baseName, SuffixType suffixType) {
         // if a jar or file URL, return load service resource directly without further searching
         LoadServiceResource foundResource = null;
         if (baseName.startsWith("jar:")) {
@@ -847,7 +845,7 @@ public class LoadService {
         return foundResource;
     }
     
-    private LoadServiceResource tryResourceFromLoadPathOrURL(SearchState state, String baseName, SuffixType suffixType) {
+    protected LoadServiceResource tryResourceFromLoadPathOrURL(SearchState state, String baseName, SuffixType suffixType) {
         LoadServiceResource foundResource = null;
 
         // if it's a ./ baseName, use CWD logic
@@ -916,7 +914,7 @@ public class LoadService {
         return foundResource;
     }
     
-    private LoadServiceResource tryResourceFromJarURLWithLoadPath(String namePlusSuffix, String loadPathEntry) {
+    protected LoadServiceResource tryResourceFromJarURLWithLoadPath(String namePlusSuffix, String loadPathEntry) {
         LoadServiceResource foundResource = null;
         
         JarFile current = jarFiles.get(loadPathEntry);
@@ -966,11 +964,11 @@ public class LoadService {
         return foundResource;
     }
 
-    private boolean loadPathLooksLikeJarURL(String loadPathEntry) {
+    protected boolean loadPathLooksLikeJarURL(String loadPathEntry) {
         return loadPathEntry.startsWith("jar:") || loadPathEntry.endsWith(".jar") || (loadPathEntry.startsWith("file:") && loadPathEntry.indexOf("!/") != -1);
     }
 
-    private LoadServiceResource tryResourceFromLoadPath( String namePlusSuffix,String loadPathEntry) throws RaiseException {
+    protected LoadServiceResource tryResourceFromLoadPath( String namePlusSuffix,String loadPathEntry) throws RaiseException {
         LoadServiceResource foundResource = null;
 
         try {
@@ -1003,7 +1001,7 @@ public class LoadService {
         return foundResource;
     }
 
-    private LoadServiceResource tryResourceAsIs(String namePlusSuffix) throws RaiseException {
+    protected LoadServiceResource tryResourceAsIs(String namePlusSuffix) throws RaiseException {
         LoadServiceResource foundResource = null;
 
         try {
@@ -1045,7 +1043,7 @@ public class LoadService {
      * @param name the file to find, this is a path name
      * @return the correct file
      */
-    private LoadServiceResource findFileInClasspath(String name) {
+    protected LoadServiceResource findFileInClasspath(String name) {
         // Look in classpath next (we do not use File as a test since UNC names will match)
         // Note: Jar resources must NEVER begin with an '/'. (previous code said "always begin with a /")
         ClassLoader classLoader = runtime.getJRubyClassLoader();
@@ -1094,7 +1092,7 @@ public class LoadService {
     }
     
     /* Directories and unavailable resources are not able to open a stream. */
-    private boolean isRequireable(URL loc) {
+    protected boolean isRequireable(URL loc) {
         if (loc != null) {
                 if (loc.getProtocol().equals("file") && new java.io.File(loc.getFile()).isDirectory()) {
                         return false;
@@ -1108,7 +1106,7 @@ public class LoadService {
         return false;
     }
     
-    private String canonicalizePath(String path) {
+    protected String canonicalizePath(String path) {
         try {
             String cwd = new File(runtime.getCurrentDirectory()).getCanonicalPath();
             return new File(path).getCanonicalPath()

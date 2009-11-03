@@ -48,6 +48,7 @@ import org.jruby.RubyIO;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyNil;
 import org.jruby.embed.internal.BiVariableMap;
+import org.jruby.embed.internal.EmbedRubyInterfaceAdapterImpl;
 import org.jruby.embed.internal.EmbedRubyObjectAdapterImpl;
 import org.jruby.embed.internal.EmbedRubyRuntimeAdapterImpl;
 import org.jruby.embed.internal.SingleThreadLocalContextProvider;
@@ -159,12 +160,13 @@ public class ScriptingContainer {
     private LocalContextProvider provider = null;
     private EmbedRubyRuntimeAdapter runtimeAdapter = new EmbedRubyRuntimeAdapterImpl(this);
     private EmbedRubyObjectAdapter objectAdapter = new EmbedRubyObjectAdapterImpl(this);
+    private EmbedRubyInterfaceAdapter interfaceAdapter = new EmbedRubyInterfaceAdapterImpl(this);
 
     /**
      * Constructs a ScriptingContainer with a default values.
      */
     public ScriptingContainer() {
-        this(LocalContextScope.THREADSAFE, LocalVariableBehavior.TRANSIENT, defaultProps);
+        this(LocalContextScope.SINGLETON, LocalVariableBehavior.TRANSIENT, defaultProps);
     }
 
     public ScriptingContainer(LocalContextScope scope) {
@@ -172,7 +174,7 @@ public class ScriptingContainer {
     }
 
     public ScriptingContainer(LocalVariableBehavior behavior) {
-        this(LocalContextScope.THREADSAFE, behavior, defaultProps);
+        this(LocalContextScope.SINGLETON, behavior, defaultProps);
     }
 
     public ScriptingContainer(LocalContextScope scope, LocalVariableBehavior behavior) {
@@ -211,13 +213,13 @@ public class ScriptingContainer {
 
     private LocalContextProvider getProviderInstance(LocalContextScope scope, LocalVariableBehavior behavior) {
         switch(scope) {
-            case SINGLETON :
-                return new SingletonLocalContextProvider(behavior);
+            case THREADSAFE :
+                return new ThreadSafeLocalContextProvider(behavior);
             case SINGLETHREAD :
                 return new SingleThreadLocalContextProvider(behavior);
-            case THREADSAFE :
+            case SINGLETON :
             default :
-                return new ThreadSafeLocalContextProvider(behavior);
+                return new SingletonLocalContextProvider(behavior);
         }
     }
 
@@ -330,6 +332,19 @@ public class ScriptingContainer {
     }
 
     /**
+     * Removes the specified value with the specified key in a
+     * attribute map. If the map previously contained a mapping for the key,
+     * the old value is returned. This is a short cut method of
+     * ScriptingContainer#getAttributeMap().remove(key).
+     *
+     * @param key is a key that the specified value is to be removed from
+     * @return the previous value associated with key, or null if there was no mapping for key.
+     */
+    public Object removeAttribute(Object key) {
+        return provider.getAttributeMap().remove(key);
+    }
+
+    /**
      * Returns a value to which the specified key is mapped in a
      * variable map, or null if this map contains no mapping for the key. The key
      * must be a valid Ruby variable name. This is a short cut method of
@@ -431,8 +446,15 @@ public class ScriptingContainer {
      * @return an evaluated result converted to a Java object
      */
     public Object runScriptlet(String script) {
-        EvalUnit node = parse(script);
-        IRubyObject ret = node.run();
+        EmbedEvalUnit unit = parse(script);
+        return runUnit(unit);
+    }
+
+    private Object runUnit(EmbedEvalUnit unit) {
+        if (unit == null) {
+            return null;
+        }
+        IRubyObject ret = unit.run();
         return JavaEmbedUtils.rubyToJava(ret);
     }
 
@@ -447,9 +469,8 @@ public class ScriptingContainer {
      * @return an evaluated result converted to a Java object
      */
     public Object runScriptlet(Reader reader, String filename) {
-        EvalUnit node = parse(reader, filename);
-        IRubyObject ret = node.run();
-        return JavaEmbedUtils.rubyToJava(ret);
+        EmbedEvalUnit unit = parse(reader, filename);
+        return runUnit(unit);
     }
 
     /**
@@ -463,9 +484,8 @@ public class ScriptingContainer {
      * @return an evaluated result converted to a Java object
      */
     public Object runScriptlet(InputStream istream, String filename) {
-        EvalUnit node = parse(istream, filename);
-        IRubyObject ret = node.run();
-        return JavaEmbedUtils.rubyToJava(ret);
+        EmbedEvalUnit unit = parse(istream, filename);
+        return runUnit(unit);
     }
 
     /**
@@ -478,9 +498,8 @@ public class ScriptingContainer {
      * @return an evaluated result converted to a Java object
      */
     public Object runScriptlet(PathType type, String filename) {
-        EvalUnit node = parse(type, filename);
-        IRubyObject ret = node.run();
-        return JavaEmbedUtils.rubyToJava(ret);
+        EmbedEvalUnit unit = parse(type, filename);
+        return runUnit(unit);
     }
 
     /**
@@ -701,26 +720,7 @@ public class ScriptingContainer {
      * @return an instance of a requested interface type
      */
     public <T> T getInstance(Object receiver, Class<T> clazz) {
-        if (!clazz.isInterface()) {
-            return null;
-        }
-        Ruby runtime = getRuntime();
-        Object o;
-        if (receiver == null || receiver instanceof RubyNil) {
-            o = JavaEmbedUtils.rubyToJava(runtime, runtime.getTopSelf(), clazz);
-        } else if (receiver instanceof IRubyObject) {
-            o = JavaEmbedUtils.rubyToJava(runtime, (IRubyObject) receiver, clazz);
-        } else {
-            IRubyObject rubyReceiver = JavaUtil.convertJavaToRuby(runtime, receiver);
-            o = JavaEmbedUtils.rubyToJava(runtime, rubyReceiver, clazz);
-        }
-        String name = clazz.getName();
-        try {
-            Class<T> c = (Class<T>) Class.forName(name, true, o.getClass().getClassLoader());
-            return c.cast(o);
-        } catch (ClassNotFoundException ex) {
-            throw new RuntimeException(ex);
-        }
+        return interfaceAdapter.getInstance(receiver, clazz);
     }
 
     /**
@@ -729,6 +729,9 @@ public class ScriptingContainer {
      * @param reader is a reader to be set
      */
     public void setReader(Reader reader) {
+        if (reader == null) {
+            return;
+        }
         Map map = getAttributeMap();
         if (map.containsKey(AttributeName.READER)) {
             Reader old = (Reader) map.get(AttributeName.READER);
@@ -774,6 +777,9 @@ public class ScriptingContainer {
      * @param writer is a wrtier to be set
      */
     public void setWriter(Writer writer) {
+        if (writer == null) {
+            return;
+        }
         Map map = getAttributeMap();
         if (map.containsKey(AttributeName.WRITER)) {
             Writer old = (Writer) map.get(AttributeName.WRITER);
@@ -787,6 +793,9 @@ public class ScriptingContainer {
     }
 
     private void setOutputStream(PrintStream pstream) {
+        if (pstream == null) {
+            return;
+        }
         Ruby runtime = getRuntime();
         RubyIO io = new RubyIO(runtime, pstream);
         io.getOpenFile().getMainStream().setSync(true);
@@ -832,6 +841,9 @@ public class ScriptingContainer {
      * @param errorWriter is a wrtier to be set
      */
     public void setErrorWriter(Writer errorWriter) {
+        if (errorWriter == null) {
+            return;
+        }
         Map map = getAttributeMap();
         if (map.containsKey(AttributeName.ERROR_WRITER)) {
             Writer old = (Writer) map.get(AttributeName.ERROR_WRITER);
@@ -845,6 +857,9 @@ public class ScriptingContainer {
     }
 
     private void setErrorStream(PrintStream error) {
+        if (error == null) {
+            return;
+        }
         Ruby runtime = getRuntime();
         RubyIO io = new RubyIO(runtime, error);
         io.getOpenFile().getMainStream().setSync(true);
