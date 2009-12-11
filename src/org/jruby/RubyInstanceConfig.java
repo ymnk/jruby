@@ -242,6 +242,9 @@ public class RubyInstanceConfig {
     public static final boolean JIT_CACHE_ENABLED
             = SafePropertyAccessor.getBoolean("jruby.jit.cache", true);
 
+    public static final String JIT_CODE_CACHE
+            = SafePropertyAccessor.getProperty("jruby.jit.codeCache", null);
+
     public static interface LoadServiceCreator {
         LoadService create(Ruby runtime);
 
