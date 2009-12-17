@@ -84,6 +84,7 @@ import static org.objectweb.asm.Opcodes.*;
 public class RubyClass extends RubyModule {
     public static void createClassClass(Ruby runtime, RubyClass classClass) {
         classClass.index = ClassIndex.CLASS;
+        classClass.setReifiedClass(RubyClass.class);
         classClass.kindOf = new RubyModule.KindOf() {
             @Override
             public boolean isKindOf(IRubyObject obj, RubyModule type) {
@@ -312,6 +313,7 @@ public class RubyClass extends RubyModule {
         superClass = superClazz;
         marshal = superClazz.marshal; // use parent's marshal
         superClazz.addSubclass(this);
+        allocator = superClazz.allocator;
         
         infectBy(superClass);        
     }
@@ -1175,6 +1177,10 @@ public class RubyClass extends RubyModule {
 
         setClassAllocator(result);
         reifiedClass = result;
+    }
+
+    public void setReifiedClass(Class newReifiedClass) {
+        this.reifiedClass = newReifiedClass;
     }
 
     public Class getReifiedClass() {

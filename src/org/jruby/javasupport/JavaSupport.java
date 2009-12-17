@@ -43,7 +43,6 @@ import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.exceptions.RaiseException;
-import org.jruby.java.proxies.JavaProxy;
 import org.jruby.javasupport.util.ObjectProxyCache;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.callback.Callback;
@@ -113,16 +112,6 @@ public class JavaSupport {
     
     public JavaSupport(Ruby ruby) {
         this.runtime = ruby;
-    }
-
-    final synchronized void setConcreteProxyCallback(Callback concreteProxyCallback) {
-        if (this.concreteProxyCallback == null) {
-            this.concreteProxyCallback = concreteProxyCallback;
-        }
-    }
-    
-    final Callback getConcreteProxyCallback() {
-        return concreteProxyCallback;
     }
     
     final Map getMatchCache() {

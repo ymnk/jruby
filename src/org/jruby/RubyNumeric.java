@@ -48,6 +48,7 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.javasupport.JavaUtil;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.runtime.Block;
+import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
@@ -69,6 +70,9 @@ public class RubyNumeric extends RubyObject {
         RubyClass numeric = runtime.defineClass("Numeric", runtime.getObject(), NUMERIC_ALLOCATOR);
         runtime.setNumeric(numeric);
 
+        numeric.index = ClassIndex.NUMERIC;
+        numeric.setReifiedClass(RubyNumeric.class);
+
         numeric.kindOf = new RubyModule.KindOf() {
             @Override
             public boolean isKindOf(IRubyObject obj, RubyModule type) {
@@ -88,7 +92,7 @@ public class RubyNumeric extends RubyObject {
         }
     };
 
-    public static double DBL_EPSILON=2.2204460492503131e-16;
+    public static final double DBL_EPSILON=2.2204460492503131e-16;
 
     private static IRubyObject convertToNum(double val, Ruby runtime) {
 

@@ -38,8 +38,6 @@ import org.jruby.java.addons.KernelJavaAddons;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -58,15 +56,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jruby.MetaClass;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
+import org.jruby.RubyBasicObject;
 import org.jruby.RubyClass;
 import org.jruby.RubyClassPathVariable;
 import org.jruby.RubyException;
 import org.jruby.RubyMethod;
 import org.jruby.RubyModule;
-import org.jruby.RubyProc;
+import org.jruby.RubyObject;
 import org.jruby.RubyString;
 import org.jruby.RubyUnboundMethod;
-import org.jruby.common.IRubyWarnings.ID;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.javasupport.proxy.JavaProxyClass;
 import org.jruby.javasupport.proxy.JavaProxyConstructor;
@@ -92,13 +90,14 @@ import org.jruby.java.invokers.MethodInvoker;
 import org.jruby.java.invokers.StaticMethodInvoker;
 import org.jruby.java.proxies.ArrayJavaProxy;
 import org.jruby.java.proxies.ConcreteJavaProxy;
+import org.jruby.java.proxies.InterfaceJavaProxy;
 import org.jruby.java.proxies.JavaProxy;
-import org.jruby.runtime.callback.Callback;
 import org.jruby.util.CodegenUtils;
 import org.jruby.util.SafePropertyAccessor;
 
 @JRubyModule(name = "Java")
 public class Java implements Library {
+    public static final boolean NEW_STYLE_EXTENSION = SafePropertyAccessor.getBoolean("jruby.ji.newStyleExtension", false);
 
     public void load(Ruby runtime, boolean wrap) throws IOException {
         createJavaModule(runtime);
@@ -125,7 +124,7 @@ public class Java implements Library {
         // the proxy (wrapper) type hierarchy
         JavaProxy.createJavaProxy(context);
         ConcreteJavaProxy.createConcreteJavaProxy(context);
-        //InterfaceJavaProxy.createInterfaceJavaProxy(context);
+        InterfaceJavaProxy.createInterfaceJavaProxy(context);
         ArrayJavaProxy.createArrayJavaProxy(context);
 
         // also create the JavaProxy* classes
@@ -137,18 +136,6 @@ public class Java implements Library {
         RubyModule javaUtils = runtime.defineModule("JavaUtilities");
         
         javaUtils.defineAnnotatedMethods(JavaUtilities.class);
-
-        runtime.getJavaSupport().setConcreteProxyCallback(new Callback() {
-            public IRubyObject execute(IRubyObject recv, IRubyObject[] args, Block block) {
-                Arity.checkArgumentCount(recv.getRuntime(), args, 1, 1);
-                
-                return Java.concrete_proxy_inherited(recv, args[0]);
-            }
-
-            public Arity getArity() {
-                return Arity.ONE_ARGUMENT;
-            }
-        });
 
         JavaArrayUtilities.createJavaArrayUtilitiesModule(runtime);
         
@@ -173,6 +160,25 @@ public class Java implements Library {
 
         return javaModule;
     }
+
+    public static class OldStyleExtensionInherited {
+        @JRubyMethod
+        public static IRubyObject inherited(IRubyObject recv, IRubyObject arg0) {
+            return Java.concrete_proxy_inherited(recv, arg0);
+        }
+    };
+
+    public static class NewStyleExtensionInherited {
+        @JRubyMethod
+        public static IRubyObject inherited(IRubyObject recv, IRubyObject arg0) {
+            if (!(arg0 instanceof RubyClass)) {
+                throw recv.getRuntime().newTypeError(arg0, recv.getRuntime().getClassClass());
+            }
+            
+            JavaInterfaceTemplate.addRealImplClassNew((RubyClass)arg0);
+            return recv.getRuntime().getNil();
+        }
+    };
     
     /**
      * This populates the master map from short-cut names to JavaClass instances for
@@ -406,8 +412,11 @@ public class Java implements Library {
                     proxyClass = createProxyClass(runtime,
                             runtime.getJavaSupport().getConcreteProxyClass(),
                             javaClass, true);
-                    proxyClass.getMetaClass().defineFastMethod("inherited",
-                            runtime.getJavaSupport().getConcreteProxyCallback());
+                    if (NEW_STYLE_EXTENSION) {
+                        proxyClass.getMetaClass().defineAnnotatedMethods(NewStyleExtensionInherited.class);
+                    } else {
+                        proxyClass.getMetaClass().defineAnnotatedMethods(OldStyleExtensionInherited.class);
+                    }
                     addToJavaPackageModule(proxyClass, javaClass);
 
                 } else {
@@ -966,6 +975,12 @@ public class Java implements Library {
             interfaces[i] = ((JavaClass) javaClasses[i]).javaClass();
         }
 
+        return newInterfaceImpl(wrapper, interfaces);
+    }
+
+    public static IRubyObject newInterfaceImpl(final IRubyObject wrapper, Class[] interfaces) {
+        final Ruby runtime = wrapper.getRuntime();
+        
         // hashcode is a combination of the interfaces and the Ruby class we're using
         // to implement them
         if (!SafePropertyAccessor.getBoolean("jruby.interfaces.useProxy")) {
@@ -988,7 +1003,7 @@ public class Java implements Library {
 
             try {
                 Constructor proxyConstructor = proxyImplClass.getConstructor(IRubyObject.class);
-                return JavaObject.wrap(recv.getRuntime(), proxyConstructor.newInstance(wrapper));
+                return JavaObject.wrap(runtime, proxyConstructor.newInstance(wrapper));
             } catch (NoSuchMethodException nsme) {
                 throw runtime.newTypeError("Exception instantiating generated interface impl:\n" + nsme);
             } catch (InvocationTargetException ite) {
@@ -999,7 +1014,7 @@ public class Java implements Library {
                 throw runtime.newTypeError("Exception instantiating generated interface impl:\n" + iae);
             }
         } else {
-            return JavaObject.wrap(recv.getRuntime(), Proxy.newProxyInstance(recv.getRuntime().getJRubyClassLoader(), interfaces, new InvocationHandler() {
+            return JavaObject.wrap(runtime, Proxy.newProxyInstance(runtime.getJRubyClassLoader(), interfaces, new InvocationHandler() {
                 private Map parameterTypeCache = new ConcurrentHashMap();
 
                 public Object invoke(Object proxy, Method method, Object[] nargs) throws Throwable {
@@ -1028,6 +1043,63 @@ public class Java implements Library {
                     } catch (RuntimeException e) { e.printStackTrace(); throw e; }
                 }
             }));
+        }
+    }
+
+    public static IRubyObject generateRealClass(final RubyClass clazz) {
+        final Ruby runtime = clazz.getRuntime();
+        final Class[] interfaces = getInterfacesFromRubyClass(clazz);
+
+        // hashcode is a combination of the interfaces and the Ruby class we're using
+        // to implement them
+        int interfacesHashCode = interfacesHashCode(interfaces);
+        // normal new class implementing interfaces
+        interfacesHashCode = 31 * interfacesHashCode + clazz.hashCode();
+        
+        String implClassName;
+        if (clazz.getBaseName() == null) {
+            // no-name class, generate a bogus name for it
+            implClassName = "anon_class" + System.identityHashCode(clazz) + "_" + Math.abs(interfacesHashCode);
+        } else {
+            implClassName = clazz.getName().replaceAll("::", "\\$\\$") + "_" + Math.abs(interfacesHashCode);
+        }
+        Class proxyImplClass;
+        try {
+            proxyImplClass = Class.forName(implClassName, true, runtime.getJRubyClassLoader());
+        } catch (ClassNotFoundException cnfe) {
+            // try to use super's reified class; otherwise, RubyObject (for now)
+            Class superClass = clazz.getSuperClass().getRealClass().getReifiedClass();
+            if (superClass == null) {
+                superClass = RubyObject.class;
+            }
+            proxyImplClass = MiniJava.createRealImplClass(superClass, interfaces, clazz, runtime, implClassName);
+            clazz.setReifiedClass(proxyImplClass);
+            
+            // add a default initialize if one does not already exist and this is a Java-hierarchy class
+            if (NEW_STYLE_EXTENSION &&
+                    !(RubyBasicObject.class.isAssignableFrom(proxyImplClass) || clazz.getMethods().containsKey("initialize"))
+                    ) {
+                clazz.addMethod("initialize", new JavaMethodZero(clazz, Visibility.PUBLIC) {
+                    @Override
+                    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name) {
+                        return context.getRuntime().getNil();
+                    }
+                });
+            }
+        }
+
+        try {
+            Constructor proxyConstructor = proxyImplClass.getConstructor(Ruby.class, RubyClass.class);
+            return (IRubyObject)proxyConstructor.newInstance(runtime, clazz);
+        } catch (NoSuchMethodException nsme) {
+            throw runtime.newTypeError("Exception instantiating generated interface impl:\n" + nsme);
+        } catch (InvocationTargetException ite) {
+            ite.printStackTrace();
+            throw runtime.newTypeError("Exception instantiating generated interface impl:\n" + ite);
+        } catch (InstantiationException ie) {
+            throw runtime.newTypeError("Exception instantiating generated interface impl:\n" + ie);
+        } catch (IllegalAccessException iae) {
+            throw runtime.newTypeError("Exception instantiating generated interface impl:\n" + iae);
         }
     }
     

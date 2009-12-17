@@ -11,6 +11,8 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
+ * Copyright (C) 2009 Charles O Nutter <headius@headius.com>
+ *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
  * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
@@ -23,43 +25,14 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby;
+package org.jruby.runtime.builtin;
 
-import org.jruby.anno.JRubyClass;
-import org.jruby.runtime.ClassIndex;
-import org.jruby.runtime.ObjectAllocator;
-import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.RubyClass;
 
-@JRubyClass(name="Converter")
-public class RubyConverter extends RubyObject {
-
-    public static RubyClass createConverterClass(Ruby runtime) {
-        RubyClass converterc = runtime.defineClassUnder("Converter", runtime.getClass("Data"), CONVERTER_ALLOCATOR, runtime.getEncoding());
-        runtime.setConverter(converterc);
-        converterc.index = ClassIndex.CONVERTER;
-        converterc.setReifiedClass(RubyConverter.class);
-        converterc.kindOf = new RubyModule.KindOf() {
-            @Override
-            public boolean isKindOf(IRubyObject obj, RubyModule type) {
-                return obj instanceof RubyConverter;
-            }
-        };
-
-        converterc.defineAnnotatedMethods(RubyConverter.class);
-        return converterc;
-    }
-
-    private static ObjectAllocator CONVERTER_ALLOCATOR = new ObjectAllocator() {
-        public IRubyObject allocate(Ruby runtime, RubyClass klass) {
-            return new RubyConverter(runtime, klass);
-        }
-    };
-
-    public RubyConverter(Ruby runtime, RubyClass klass) {
-        super(runtime, klass);
-    }
-
-    public RubyConverter(Ruby runtime) {
-        super(runtime, runtime.getConverter());
-    }
+/**
+ *
+ * @author headius
+ */
+public interface RubyJavaObject {
+    public RubyClass getMetaClass();
 }

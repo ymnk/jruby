@@ -147,10 +147,17 @@
             <include name="**/*.properties"/>
         </fileset>
         <filterset>
-            <filter token="os.arch" value="${os.arch}"/>
+            <filter token="version.ruby.major" value="${version.ruby.major}"/>
+            <filter token="version.ruby" value="${version.ruby}"/>
+            <filter token="version.ruby.patchlevel" value="${version.ruby.patchlevel}"/>
+            <filter token="version.ruby1_9.major" value="${version.ruby1_9.major}"/>
+            <filter token="version.ruby1_9" value="${version.ruby1_9}"/>
+            <filter token="version.ruby1_9.patchlevel" value="${version.ruby1_9.patchlevel}"/>
+            <filter token="build.date" value="${build.date}"/>
+            <filter token="version.jruby" value="${version.jruby}"/>
             <filter token="java.specification.version" value="${java.specification.version}"/>
             <filter token="javac.version" value="${javac.version}"/>
-            <filter token="build.date" value="${build.date}"/>
+            <filter token="os.arch" value="${os.arch}"/>
         </filterset>
     </copy>
   </target>
@@ -297,6 +304,7 @@
         <zipfileset src="${build.lib.dir}/jffi-i386-OpenBSD.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-x86_64-OpenBSD.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-i386-Windows.jar"/>
+        <zipfileset src="${build.lib.dir}/jffi-x86_64-Windows.jar"/>
         <zipfileset src="${build.lib.dir}/jffi-s390x-Linux.jar"/>
         <zipfileset src="${build.lib.dir}/joda-time-1.6.jar"/>
         <zipfileset src="${build.lib.dir}/dynalang-0.3.jar"/>
@@ -443,6 +451,7 @@
       <jarjar destfile="${dest.lib.dir}/${filename}">
         <fileset dir="${jruby.classes.dir}"/>
         <fileset dir="${build.dir}/jar-complete">
+          <exclude name="META-INF/jruby.home/lib/ruby/site_ruby/shared/builtin/**"/>
           <exclude name="META-INF/jruby.home/lib/ruby/1.9/**"/>
         </fileset>
         <zipfileset src="${build.lib.dir}/asm-3.2.jar"/>
@@ -990,12 +999,12 @@
         <sysproperty key="jruby.thread.pool.enabled" value="@{thread.pooling}"/>
         <sysproperty key="jruby.reflection" value="@{reflection}"/>
         <sysproperty key="jruby.launch.inproc" value="@{inproc}"/>
-	<sysproperty key="emma.coverage.out.file" value="${test.results.dir}/coverage.emma" />
-	<sysproperty key="emma.coverage.out.merge" value="true" />
+        <sysproperty key="emma.coverage.out.file" value="${test.results.dir}/coverage.emma" />
+        <sysproperty key="emma.coverage.out.merge" value="true" />
         <sysproperty key="emma.verbosity.level" value="silent" />
 
         <arg line="@{jruby.args}"/>
-        <arg value="${base.dir}/bin/rake"/>
+        <arg line="-S rake"/>
         <arg line="@{rake.targets}"/>
       </java>
     </sequential>
