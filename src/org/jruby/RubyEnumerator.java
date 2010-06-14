@@ -30,13 +30,21 @@ package org.jruby;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyModule;
 import org.jruby.javasupport.util.RuntimeHelpers;
+import org.jruby.parser.StaticScope;
+import org.jruby.runtime.Arity;
+import org.jruby.runtime.Binding;
 import org.jruby.runtime.Block;
+import org.jruby.runtime.Block.Type;
 import org.jruby.runtime.BlockCallback;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
+
+import java.dyn.AsymCoroutine;
+import org.jruby.parser.LocalStaticScope;
+import org.jruby.runtime.BlockBody;
 
 /**
  * Implementation of Ruby's Enumerator module.
@@ -403,14 +411,63 @@ public class RubyEnumerator extends RubyObject {
     }
 
     @JRubyMethod(name = "next", frame = true)
-    public static IRubyObject next(ThreadContext context, IRubyObject self) {
-        context.getRuntime().getLoadService().lockAndRequire("generator_internal");
-        return self.callMethod(context, "next");
+    public static IRubyObject next(final ThreadContext context, final IRubyObject self) {
+        AsymCoroutine coro = getCoro(self);
+        if (coro == null) {
+            coro = setupCoro(context, self);
+        }
+        return (IRubyObject)coro.call();
     }
 
     @JRubyMethod(name = "rewind", frame = true)
     public static IRubyObject rewind(ThreadContext context, IRubyObject self) {
-        context.getRuntime().getLoadService().lockAndRequire("generator_internal");
-        return self.callMethod(context, "rewind");
+        setupCoro(context, self);
+        return context.getRuntime().getNil();
+    }
+
+    private static AsymCoroutine getCoro(IRubyObject self) {
+        return (AsymCoroutine)self.getInternalVariables().getInternalVariable("coro");
+    }
+
+    private static AsymCoroutine setupCoro(final ThreadContext context, final IRubyObject self) {
+        AsymCoroutine coro = new AsymCoroutine<IRubyObject, IRubyObject>() {
+            public IRubyObject run(IRubyObject value) {
+                IRubyObject result = self.callMethod(context, "each", IRubyObject.NULL_ARRAY, new Block(new BlockBody(FL_USHIFT) {
+                    @Override
+                    public IRubyObject yield(ThreadContext context, IRubyObject value, Binding binding, Type type) {
+                        return ret(value);
+                    }
+
+                    @Override
+                    public IRubyObject yield(ThreadContext context, IRubyObject value, IRubyObject self, RubyModule klass, boolean aValue, Binding binding, Type type) {
+                        return ret(value);
+                    }
+
+                    StaticScope scope = new LocalStaticScope(null);
+
+                    @Override
+                    public StaticScope getStaticScope() {
+                        return scope;
+                    }
+
+                    @Override
+                    public void setStaticScope(StaticScope newScope) {
+                    }
+
+                    @Override
+                    public Block cloneBlock(Binding binding) {
+                        return new Block(this);
+                    }
+
+                    @Override
+                    public Arity arity() {
+                        return Arity.ONE_ARGUMENT;
+                    }
+                }));
+                return result;
+            }
+        };
+        self.getInternalVariables().setInternalVariable("coro", coro);
+        return coro;
     }
 }
