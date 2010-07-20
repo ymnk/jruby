@@ -175,7 +175,11 @@ public class RubyBigDecimal extends RubyNumeric {
         RubyBigDecimal rubyBigDecimal = (RubyBigDecimal) (((RubyClass)recv).allocate());
         String precisionAndValue = from.convertToString().asJavaString();
         String value = precisionAndValue.substring(precisionAndValue.indexOf(":")+1);
-        rubyBigDecimal.value = new BigDecimal(value);
+        try {
+            rubyBigDecimal.value = new BigDecimal(value);
+        } catch (NumberFormatException ex) {
+            throw recv.getRuntime().newTypeError("invalid character in the marshaled string");
+        }
         return rubyBigDecimal;
     }
 
