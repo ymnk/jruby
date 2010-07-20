@@ -52,6 +52,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  */
 @JRubyClass(name="BigDecimal", parent="Numeric")
 public class RubyBigDecimal extends RubyNumeric {
+
     private static final ObjectAllocator BIGDECIMAL_ALLOCATOR = new ObjectAllocator() {
         public IRubyObject allocate(Ruby runtime, RubyClass klass) {
             return new RubyBigDecimal(runtime, klass);
@@ -103,6 +104,10 @@ public class RubyBigDecimal extends RubyNumeric {
     public final static int SIGN_NEGATIVE_ZERO=-1;
     @JRubyConstant
     public final static int EXCEPTION_NaN=2;
+
+    public final static String INFINITY = "Infinity";
+    public final static String MINUS_INFINITY = "-Infinity";
+    public final static String NAN = "NaN";
     
     // Static constants
     private static final BigDecimal TWO = new BigDecimal(2);
@@ -351,7 +356,7 @@ public class RubyBigDecimal extends RubyNumeric {
         } else {
             String strValue = args[0].convertToString().toString();
             strValue = strValue.trim();
-            if ("NaN".equals(strValue)) {
+            if (NAN.equals(strValue)) {
                 return newNaN(runtime);
             }
 
@@ -1135,10 +1140,10 @@ public class RubyBigDecimal extends RubyNumeric {
         final RubyString digits;
         final RubyFixnum exp;
         if (isNaN()) {
-            digits = runtime.newString("NaN");
+            digits = runtime.newString(NAN);
             exp = RubyFixnum.zero(runtime);
         } else if (isInfinity()) {
-            digits = runtime.newString("Infinity");
+            digits = runtime.newString(INFINITY);
             exp = RubyFixnum.zero(runtime);
         } else if (isZero()){
             digits = runtime.newString("0");
@@ -1425,19 +1430,26 @@ public class RubyBigDecimal extends RubyNumeric {
     public IRubyObject to_s(IRubyObject[] args) {
         String arg = firstArgument(args);
         if (isNaN()) {
-            return getRuntime().newString("NaN");
+            return getRuntime().newString(NAN);
         }
         if (infinitySign != 0) {
             if (infinitySign == -1) {
-                return getRuntime().newString("-Infinity");
+                return getRuntime().newString(MINUS_INFINITY);
             } else {
-                return getRuntime().newString("Infinity");
+                String inf = INFINITY;
+                if (arg != null && " +".indexOf(arg.charAt(0)) != -1) {
+                    inf = arg.charAt(0) + inf;
+                }
+                return getRuntime().newString(inf);
             }
         }
         if (isZero()) {
             String zero = "0.0";
             if (zeroSign < 0) {
                 zero = "-" + zero;
+            }
+            if (arg != null && " +".indexOf(arg.charAt(0)) != -1) {
+                zero = arg.charAt(0) + zero;
             }
             return getRuntime().newString(zero);
         }
@@ -1593,12 +1605,12 @@ public class RubyBigDecimal extends RubyNumeric {
 
     private void checkFloatDomain() {
         if (isNaN)
-            throw this.getRuntime().newFloatDomainError("NaN");
+            throw this.getRuntime().newFloatDomainError(NAN);
         if (infinitySign != 0) {
             if (infinitySign == -1) {
-                throw getRuntime().newFloatDomainError("-Infinity");
+                throw getRuntime().newFloatDomainError(MINUS_INFINITY);
             } else {
-                throw getRuntime().newFloatDomainError("Infinity");
+                throw getRuntime().newFloatDomainError(INFINITY);
             }
         }
     }
