@@ -1085,7 +1085,11 @@ public class RubyBigDecimal extends RubyNumeric {
           // ...and shift the result back to the left (multiply by 10**(abs(scale)))
           return new RubyBigDecimal(getRuntime(), rounded.movePointLeft(scale));
         } else {
-          return new RubyBigDecimal(getRuntime(), value.setScale(scale, mode));
+            try {
+                return new RubyBigDecimal(getRuntime(), value.setScale(scale, mode));
+            } catch (IllegalArgumentException ex) {
+                throw getRuntime().newTypeError("invalid rounding mode");
+            }
         }
     }
 
