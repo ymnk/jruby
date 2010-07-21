@@ -772,7 +772,7 @@ public class RubyBigDecimal extends RubyNumeric {
     @JRubyMethod(name = "div")
     public IRubyObject op_div(ThreadContext context, IRubyObject other, IRubyObject digits) {
         // TODO: take BigDecimal.mode into account.
-
+        Ruby runtime = getRuntime();
         int scale = RubyNumeric.fix2int(digits);
 
         RubyBigDecimal val = getVpValue(other, false);
@@ -781,24 +781,28 @@ public class RubyBigDecimal extends RubyNumeric {
         }
 
         if (isNaN() || (isZero() && val.isZero()) || val.isNaN()) {
-            return newNaN(getRuntime());
+            return newNaN(runtime);
         }
 
         if (val.isZero()) {
             int sign1 = isInfinity() ? infinitySign : value.signum();
-            return newInfinity(getRuntime(), sign1 * val.zeroSign);
+            return newInfinity(runtime, sign1 * val.zeroSign);
         }
 
         if (isInfinity() && !val.isInfinity()) {
-            return newInfinity(getRuntime(), infinitySign * val.value.signum());
+            return newInfinity(runtime, infinitySign * val.value.signum());
         }
 
         if (!isInfinity() && val.isInfinity()) {
-            return newZero(getRuntime(), value.signum() * val.infinitySign);
+            return newZero(runtime, value.signum() * val.infinitySign);
         }
 
         if (isInfinity() && val.isInfinity()) {
-            return newNaN(getRuntime());
+            return newNaN(runtime);
+        }
+
+        if (isZero()) {
+            return newZero(runtime, zeroSign);
         }
 
         if (scale == 0) {
@@ -807,7 +811,7 @@ public class RubyBigDecimal extends RubyNumeric {
         } else {
             // TODO: better algorithm to set precision needed
             int prec = Math.max(200, scale);
-            return new RubyBigDecimal(getRuntime(),
+            return new RubyBigDecimal(runtime,
                     value.divide(val.value, new MathContext(prec, RoundingMode.HALF_UP))).setResult(scale);
         }
     }
