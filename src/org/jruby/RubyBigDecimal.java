@@ -975,7 +975,10 @@ public class RubyBigDecimal extends RubyNumeric {
         if (val == null) {
             return callCoerced(context, "divmod", other, true);
         }
-        if (val.isInfinity() || val.isNaN() || val.isZero()) {
+        if (val.isZero()) {
+            throw runtime.newZeroDivisionError();
+        }
+        if (val.isInfinity() || val.isNaN()) {
             return RubyArray.newArray(runtime, newNaN(runtime), newNaN(runtime));
         }
 
