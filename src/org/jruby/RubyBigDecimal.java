@@ -360,6 +360,10 @@ public class RubyBigDecimal extends RubyNumeric {
             decimal = new BigDecimal(0);
         } else {
             String strValue = args[0].convertToString().toString();
+            if (args.length == 2 && num2int(args[1]) < 0) {
+                throw runtime.newArgumentError("argument must be positive");
+            }
+
             strValue = strValue.trim();
             if (NaN.equals(strValue)) {
                 return newNaN(runtime);
