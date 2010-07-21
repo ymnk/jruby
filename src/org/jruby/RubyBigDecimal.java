@@ -641,21 +641,25 @@ public class RubyBigDecimal extends RubyNumeric {
     }
 
     private RubyBigDecimal handleAddSpecialValues(RubyBigDecimal val) {
+        Ruby runtime = getRuntime();
         if (isNaN() || val.isNaN) {
-            return newNaN(getRuntime());
+            return newNaN(runtime);
         }
         // TODO: don't calculate the same value 3 times
         if (infinitySign * val.infinitySign > 0) {
             return isInfinity() ? this : val;
         }
         if (infinitySign * val.infinitySign < 0) {
-            return newNaN(getRuntime());
+            return newNaN(runtime);
         }
         if (infinitySign * val.infinitySign == 0) {
             int sign = infinitySign + val.infinitySign;
             if (sign != 0) {
-                return newInfinity(getRuntime(), sign);
+                return newInfinity(runtime, sign);
             }
+        }
+        if (zeroSign == -1 && val.zeroSign == -1) {
+            return newZero(runtime, -1);
         }
         return null;
     }
