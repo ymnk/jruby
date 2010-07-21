@@ -545,29 +545,49 @@ public class RubyBigDecimal extends RubyNumeric {
     
     @JRubyMethod(name = {"**", "power"}, required = 1)
     public IRubyObject op_pow(IRubyObject arg) {
+        Ruby runtime = getRuntime();
         if (!(arg instanceof RubyFixnum)) {
-            throw getRuntime().newTypeError("wrong argument type " + arg.getMetaClass() + " (expected Fixnum)");
+            throw runtime.newTypeError("wrong argument type " + arg.getMetaClass() + " (expected Fixnum)");
         }
 
-        if (isNaN() || isInfinity()) {
-            return newNaN(getRuntime());
+        if (isNaN()) {
+            return newNaN(runtime);
         }
 
         int times = RubyNumeric.fix2int(arg.convertToInteger());
 
+        if (isInfinity()) {
+            RubyBigDecimal rbd = null;
+            if (times == 0) {
+                rbd = new RubyBigDecimal(runtime, new BigDecimal(1));
+            } else if (times < 0) {
+                rbd = newZero(runtime, value.signum());
+                if (times == -1 && infinitySign == -1) {
+                    rbd.zeroSign = -1;
+                }
+            } else {
+                rbd = newInfinity(runtime, value.signum());
+                if (times <= 1 && infinitySign == -1) {
+                   rbd.infinitySign = -1;
+                }
+            }
+
+            return rbd;
+        }
+
         if (times < 0) {
             if (isZero()) {
-                return newInfinity(getRuntime(), value.signum());
+                return newInfinity(runtime, zeroSign);
             }
 
             // Note: MRI has a very non-trivial way of calculating the precision,
             // so we use very simple approximation here:
             int precision = (-times + 4) * (getAllDigits().length() + 4);
 
-            return new RubyBigDecimal(getRuntime(),
+            return new RubyBigDecimal(runtime,
                     value.pow(times, new MathContext(precision, RoundingMode.HALF_UP)));
         } else {
-            return new RubyBigDecimal(getRuntime(), value.pow(times));
+            return new RubyBigDecimal(runtime, value.pow(times));
         }
     }
 
