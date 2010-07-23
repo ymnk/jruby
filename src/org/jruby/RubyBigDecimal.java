@@ -1401,8 +1401,8 @@ public class RubyBigDecimal extends RubyNumeric {
         StringBuilder build = new StringBuilder();
         build.append(signum == -1 ? "-" : (signum == 1 ? (posSign(arg) ? (posSpace(arg) ? " " : "+") : "") : ""));
         build.append("0.");
+        String s = removeTrailingZeroes(unscaledValue());
         if (0 == groups(arg)) {
-            String s = removeTrailingZeroes(unscaledValue());
             if ("".equals(s)) {
                 build.append("0");
             } else {
@@ -1411,12 +1411,12 @@ public class RubyBigDecimal extends RubyNumeric {
         } else {
             int index = 0;
             String sep = "";
-            while (index < unscaledValue().length()) {
+            while (index < s.length()) {
                 int next = index + groups(arg);
-                if (next > unscaledValue().length()) {
-                    next = unscaledValue().length();
+                if (next > s.length()) {
+                    next = s.length();
                 }
-                build.append(sep).append(unscaledValue().substring(index, next));
+                build.append(sep).append(s.substring(index, next));
                 sep = " ";
                 index += groups(arg);
             }
