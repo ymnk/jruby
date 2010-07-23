@@ -383,7 +383,10 @@ public class RubyBigDecimal extends RubyNumeric {
             // by Java's BigDecimal. Not terribly efficient for now.
             // 1. MRI allows d and D as exponent separators
             strValue = strValue.replaceFirst("[dD]", "E");
-            // 2. MRI allows underscores anywhere
+            // 2. MRI allows underscores anywhere but in the beginning
+            if (strValue.startsWith("_")) {
+                return newZero(runtime, 1);
+            }
             strValue = strValue.replaceAll("_", "");
             // 3. MRI ignores the trailing junk
             strValue = NUMBER_PATTERN.matcher(strValue).replaceFirst("$1");
