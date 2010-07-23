@@ -696,8 +696,11 @@ public class RubyBigDecimal extends RubyNumeric {
         if (res != null) {
             return res;
         }
+        Ruby runtime = getRuntime();
 
-        return new RubyBigDecimal(getRuntime(),value.subtract(val.value)).setResult();
+        int prec = getPositiveInt(context, n);
+        RoundingMode roundMode = getRoundingMode(runtime);
+        return new RubyBigDecimal(runtime, value.subtract(val.value, new MathContext(prec, roundMode)));
     }
 
     private RubyBigDecimal handleMinusSpecialValues(RubyBigDecimal val) {
