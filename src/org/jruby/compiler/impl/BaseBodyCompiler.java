@@ -1042,12 +1042,13 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         loadThreadContext();
         loadSelf();
 
-        StandardASMCompiler.buildStaticScopeNames(method, scope);
+        String scopeNames = RuntimeHelpers.encodeScope(scope);
+        method.ldc(scopeNames);
 
         script.getCacheCompiler().cacheSpecialClosure(this, closureMethodName);
 
         invokeUtilityMethod("runBeginBlock", sig(IRubyObject.class,
-                params(ThreadContext.class, IRubyObject.class, String[].class, CompiledBlockCallback.class)));
+                params(ThreadContext.class, IRubyObject.class, String.class, CompiledBlockCallback.class)));
     }
 
     public void createNewForLoop(int arity, CompilerCallback body, CompilerCallback args, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector) {
@@ -2547,24 +2548,22 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
         method.ldc(newMethodName);
 
-        StandardASMCompiler.buildStaticScopeNames(method, scope);
+        String scopeNames = RuntimeHelpers.encodeScope(scope);
+        method.ldc(scopeNames);
 
         method.pushInt(methodArity);
 
         // arities
-        method.pushInt(scope.getRequiredArgs());
-        method.pushInt(scope.getOptionalArgs());
-        method.pushInt(scope.getRestArg());
         method.ldc(filename);
         method.ldc(line);
         method.getstatic(p(CallConfiguration.class), inspector.getCallConfig().name(), ci(CallConfiguration.class));
 
         if (receiver != null) {
             invokeUtilityMethod("defs", sig(IRubyObject.class,
-                    params(ThreadContext.class, IRubyObject.class, IRubyObject.class, Object.class, String.class, String.class, String[].class, int.class, int.class, int.class, int.class, String.class, int.class, CallConfiguration.class)));
+                    params(ThreadContext.class, IRubyObject.class, IRubyObject.class, Object.class, String.class, String.class, String.class, int.class, String.class, int.class, CallConfiguration.class)));
         } else {
             invokeUtilityMethod("def", sig(IRubyObject.class,
-                    params(ThreadContext.class, IRubyObject.class, Object.class, String.class, String.class, String[].class, int.class, int.class, int.class, int.class, String.class, int.class, CallConfiguration.class)));
+                    params(ThreadContext.class, IRubyObject.class, Object.class, String.class, String.class, String.class, int.class, String.class, int.class, CallConfiguration.class)));
         }
 
         script.addInvokerDescriptor(newMethodName, methodArity, scope, inspector.getCallConfig(), filename, line);
