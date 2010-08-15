@@ -43,7 +43,12 @@ end
 def compile_and_run(src)
   cls = compile_to_class(src)
 
-  cls.new_instance.load(JRuby.runtime.current_context, JRuby.runtime.top_self, IRubyObject[0].new, Block::NULL_BLOCK)
+  cls.new_instance.load(
+    JRuby.runtime.current_context,
+    JRuby.runtime.top_self, 
+    JRuby.runtime.top_self.class,
+    "__file__",
+    IRubyObject[0].new, Block::NULL_BLOCK)
 end
 
 asgnFixnumCode = "a = 5; a"

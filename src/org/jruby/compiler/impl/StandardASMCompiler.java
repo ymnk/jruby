@@ -39,11 +39,12 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.jruby.Ruby;
+import org.jruby.RubyClass;
 import org.jruby.RubyInstanceConfig;
+import org.jruby.RubyModule;
 import org.jruby.ast.executable.AbstractScript;
 import org.jruby.compiler.ASTInspector;
 import org.jruby.compiler.CacheCompiler;
@@ -55,7 +56,6 @@ import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
-import org.jruby.runtime.BlockBody;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import static org.jruby.util.CodegenUtils.*;
@@ -83,15 +83,15 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
     public static String getStaticMethodSignature(String classname, int args) {
         switch (args) {
         case 0:
-            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, Block.class);
+            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, Block.class);
         case 1:
-            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, IRubyObject.class, Block.class);
+            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, Block.class);
         case 2:
-            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, IRubyObject.class, IRubyObject.class, Block.class);
+            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class, Block.class);
         case 3:
-            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, IRubyObject.class, IRubyObject.class, IRubyObject.class, Block.class);
+            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class, IRubyObject.class, Block.class);
         case 4:
-            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, IRubyObject[].class, Block.class);
+            return sig(IRubyObject.class, "L" + classname + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject[].class, Block.class);
         default:
             throw new RuntimeException("unsupported arity: " + args);
         }
@@ -100,40 +100,42 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
     public static String getMethodSignature(int args) {
         switch (args) {
         case 0:
-            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, Block.class);
+            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, Block.class);
         case 1:
-            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, IRubyObject.class, Block.class);
+            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, Block.class);
         case 2:
-            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, IRubyObject.class, IRubyObject.class, Block.class);
+            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class, Block.class);
         case 3:
-            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, IRubyObject.class, IRubyObject.class, IRubyObject.class, Block.class);
+            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, IRubyObject.class, IRubyObject.class, Block.class);
         case 4:
-            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, IRubyObject[].class, Block.class);
+            return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject[].class, Block.class);
         default:
             throw new RuntimeException("unsupported arity: " + args);
         }
     }
 
     public static String getStaticClosureSignature(String classdesc) {
-        return sig(IRubyObject.class, "L" + classdesc + ";", ThreadContext.class, IRubyObject.class, IRubyObject.class, Block.class);
+        return sig(IRubyObject.class, "L" + classdesc + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, Block.class);
     }
 
     public static String getStaticClosure19Signature(String classdesc) {
-        return sig(IRubyObject.class, "L" + classdesc + ";", ThreadContext.class, IRubyObject.class, IRubyObject[].class, Block.class);
+        return sig(IRubyObject.class, "L" + classdesc + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject[].class, Block.class);
     }
 
     public static String getClosureSignature() {
-        return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, IRubyObject.class, Block.class);
+        return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, Block.class);
     }
 
     public static String getClosure19Signature() {
-        return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, IRubyObject[].class, Block.class);
+        return sig(IRubyObject.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, IRubyObject[].class, Block.class);
     }
 
     public static final int THIS = 0;
     public static final int THREADCONTEXT_INDEX = 1;
     public static final int SELF_INDEX = 2;
-    public static final int ARGS_INDEX = 3;
+    public static final int CLASS_INDEX = 3;
+    public static final int NAME_INDEX = 4;
+    public static final int ARGS_INDEX = 5;
     
     public static final int CLOSURE_OFFSET = 0;
     public static final int DYNAMIC_SCOPE_OFFSET = 1;
@@ -451,6 +453,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.aload(THIS);
             method.aload(THREADCONTEXT_INDEX);
             method.aload(SELF_INDEX);
+            method.aload(CLASS_INDEX);
+            method.aload(NAME_INDEX);
             method.aload(ARGS_INDEX);
             // load always uses IRubyObject[], so simple closure offset calculation here
             method.aload(ARGS_INDEX + 1 + CLOSURE_OFFSET);
@@ -507,6 +511,9 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.invokevirtual(RUBY, "getCurrentContext", sig(ThreadContext.class));
             method.swap();
             method.invokevirtual(RUBY, "getTopSelf", sig(IRubyObject.class));
+            method.dup();
+            method.invokeinterface(p(IRubyObject.class), "getMetaClass", sig(RubyClass.class));
+            method.ldc("__file__");
             method.getstatic(p(IRubyObject.class), "NULL_ARRAY", ci(IRubyObject[].class));
             method.getstatic(p(Block.class), "NULL_BLOCK", ci(Block.class));
 
@@ -613,6 +620,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         method.aload(THIS);
         method.aload(THREADCONTEXT_INDEX);
         method.aload(SELF_INDEX);
+        method.aload(CLASS_INDEX);
+        method.aload(NAME_INDEX);
         method.aload(ARGS_INDEX);
         method.aload(ARGS_INDEX + 1); // block
         method.invokestatic(getClassname(), "__file__", getStaticMethodSignature(getClassname(), 4));
@@ -629,6 +638,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.aload(THIS);
             method.aload(THREADCONTEXT_INDEX);
             method.aload(SELF_INDEX);
+            method.aload(CLASS_INDEX);
+            method.aload(NAME_INDEX);
             for (int i = 0; i < scope.getRequiredArgs(); i++) {
                 method.aload(ARGS_INDEX + i);
             }

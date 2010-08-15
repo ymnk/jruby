@@ -95,20 +95,23 @@ public class MethodBodyCompiler extends RootScopedBodyCompiler {
             method.start();
 
             // check arity in the variable-arity version
-            method.aload(1);
-            method.aload(3);
+            method.aload(StandardASMCompiler.THREADCONTEXT_INDEX);
+            method.aload(StandardASMCompiler.ARGS_INDEX);
             method.pushInt(scope.getRequiredArgs());
             invokeUtilityMethod("checkArgumentCount", sig(void.class, ThreadContext.class, IRubyObject[].class, int.class));
 
             loadThis();
             loadThreadContext();
             loadSelf();
+            loadCallClass();
+            loadCallName();
             for (int i = 0; i < scope.getRequiredArgs(); i++) {
                 method.aload(StandardASMCompiler.ARGS_INDEX);
                 method.ldc(i);
                 method.arrayload();
             }
             method.aload(StandardASMCompiler.ARGS_INDEX + 1);
+
             // load block from [] version of method
             method.invokestatic(script.getClassname(), methodName, getSignature());
             method.areturn();

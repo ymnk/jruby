@@ -154,7 +154,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     public void beginChainedMethod() {
         method.start();
 
-        method.aload(StandardASMCompiler.THREADCONTEXT_INDEX);
+        loadThreadContext();
         method.invokevirtual(p(ThreadContext.class), "getCurrentScope", sig(DynamicScope.class));
         method.astore(getDynamicScopeIndex());
 
@@ -196,6 +196,14 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
     public void loadSelf() {
         method.aload(StandardASMCompiler.SELF_INDEX);
+    }
+
+    public void loadCallClass() {
+        method.aload(StandardASMCompiler.CLASS_INDEX);
+    }
+
+    public void loadCallName() {
+        method.aload(StandardASMCompiler.NAME_INDEX);
     }
 
     protected int getClosureIndex() {
@@ -1438,7 +1446,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
                 script.getClassVisitor().visitMethod(
                 ACC_PUBLIC | ACC_SYNTHETIC | ACC_STATIC,
                 mname,
-                sig(ret, "L" + script.getClassname() + ";", ThreadContext.class, IRubyObject.class, Block.class),
+                sig(ret, "L" + script.getClassname() + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, Block.class),
                 null,
                 null));
         SkinnyMethodAdapter old_method = null;
@@ -1503,6 +1511,8 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         method.aload(StandardASMCompiler.THIS);
         loadThreadContext();
         loadSelf();
+        loadCallClass();
+        loadCallName();
         if (this instanceof ChildScopedBodyCompiler) {
             pushNull();
         } else {
@@ -1511,7 +1521,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         method.invokestatic(
                 script.getClassname(),
                 mname,
-                sig(ret, "L" + script.getClassname() + ";", ThreadContext.class, IRubyObject.class, Block.class));
+                sig(ret, "L" + script.getClassname() + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, Block.class));
     }
 
     public void performEnsure(BranchCallback regularCode, BranchCallback protectedCode) {
@@ -1571,7 +1581,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
                 script.getClassVisitor().visitMethod(
                     ACC_PUBLIC | ACC_SYNTHETIC | ACC_STATIC,
                     mname,
-                    sig(ret, "L" + script.getClassname() + ";", ThreadContext.class, IRubyObject.class, Block.class),
+                    sig(ret, "L" + script.getClassname() + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, Block.class),
                     null,
                     null));
         SkinnyMethodAdapter old_method = null;
@@ -1674,6 +1684,8 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         method.aload(StandardASMCompiler.THIS);
         loadThreadContext();
         loadSelf();
+        loadCallClass();
+        loadCallName();
         if (this instanceof ChildScopedBodyCompiler) {
             pushNull();
         } else {
@@ -1682,7 +1694,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         method.invokestatic(
                 script.getClassname(),
                 mname,
-                sig(ret, "L" + script.getClassname() + ";", ThreadContext.class, IRubyObject.class, Block.class));
+                sig(ret, "L" + script.getClassname() + ";", ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, Block.class));
     }
 
     public void performRescue(BranchCallback regularCode, BranchCallback rubyCatchCode, BranchCallback rubyElseCode, boolean needsRetry) {
@@ -2314,6 +2326,8 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
             // otherwise, there's a receiver, so we pass that in directly for the sclass logic
             receiverCallback.call(this);
         }
+        loadCallClass();
+        loadCallName();
         method.getstatic(p(Block.class), "NULL_BLOCK", ci(Block.class));
 
         method.invokestatic(script.getClassname(), classMethodName, StandardASMCompiler.getStaticMethodSignature(script.getClassname(), 0));
@@ -2391,6 +2405,8 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         method.aload(StandardASMCompiler.THIS);
         loadThreadContext();
         loadSelf();
+        loadCallClass();
+        loadCallName();
         method.getstatic(p(IRubyObject.class), "NULL_ARRAY", ci(IRubyObject[].class));
         method.getstatic(p(Block.class), "NULL_BLOCK", ci(Block.class));
 

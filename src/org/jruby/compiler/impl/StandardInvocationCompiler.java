@@ -511,6 +511,8 @@ public class StandardInvocationCompiler implements InvocationCompiler {
         method.aload(0);
         methodCompiler.loadThreadContext();
         methodCompiler.loadSelf();
+        methodCompiler.loadCallClass();
+        methodCompiler.loadCallName();
         if (argsCallback != null) {
             argsCallback.call(methodCompiler);
         }

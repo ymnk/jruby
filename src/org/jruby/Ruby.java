@@ -680,7 +680,7 @@ public final class Ruby {
         ThreadContext context = getCurrentContext();
         
         try {
-            return script.load(context, getTopSelf(), IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
+            return script.load(context, getTopSelf(), getTopSelf().getMetaClass(), "__file__", IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return (IRubyObject) rj.getValue();
         }
@@ -694,7 +694,7 @@ public final class Ruby {
         ThreadContext context = getCurrentContext();
 
         try {
-            return script.__file__(context, getTopSelf(), Block.NULL_BLOCK);
+            return script.__file__(context, getTopSelf(), getTopSelf().getMetaClass(), "__file__", Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return (IRubyObject) rj.getValue();
         }
@@ -2635,7 +2635,7 @@ public final class Ruby {
 
             context.preNodeEval(objectClass, self);
             
-            script.load(context, self, IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
+            script.load(context, self, objectClass, "__file__", IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return;
         } finally {

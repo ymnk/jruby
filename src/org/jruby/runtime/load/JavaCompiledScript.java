@@ -49,7 +49,7 @@ public class JavaCompiledScript implements Library {
                 return;
             }
             script.setFilename(resource.getName());
-            script.load(runtime.getCurrentContext(), runtime.getTopSelf(), IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
+            script.load(runtime.getCurrentContext(), runtime.getTopSelf(), runtime.getTopSelf().getMetaClass(), "__file__", IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
         } catch (IOException e) {
             throw runtime.newIOErrorFromException(e);
         }

@@ -28,6 +28,7 @@
 package org.jruby.internal.runtime.methods;
 
 import org.jruby.Ruby;
+import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.ast.executable.Script;
 import org.jruby.exceptions.JumpException;
@@ -82,7 +83,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, block, args.length);
 
-            return jitCompiledScript.__file__(context, self, args, block);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, args, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -99,7 +100,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, Block.NULL_BLOCK, args.length);
 
-            return jitCompiledScript.__file__(context, self, args, Block.NULL_BLOCK);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, args, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -116,7 +117,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, Block.NULL_BLOCK, 0);
 
-            return jitCompiledScript.__file__(context, self, Block.NULL_BLOCK);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -133,7 +134,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, block, 0);
 
-            return jitCompiledScript.__file__(context, self, block);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -150,7 +151,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, Block.NULL_BLOCK, 1);
 
-            return jitCompiledScript.__file__(context, self, arg0, Block.NULL_BLOCK);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -167,7 +168,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, block, 1);
 
-            return jitCompiledScript.__file__(context, self, arg0, block);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -184,7 +185,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, Block.NULL_BLOCK, 2);
 
-            return jitCompiledScript.__file__(context, self, arg0, arg1, Block.NULL_BLOCK);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -201,7 +202,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, block, 2);
 
-            return jitCompiledScript.__file__(context, self, arg0, arg1, block);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -218,7 +219,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, Block.NULL_BLOCK, 3);
 
-            return jitCompiledScript.__file__(context, self, arg0, arg1, arg2, Block.NULL_BLOCK);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, arg2, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -235,7 +236,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
         try {
             pre(context, self, name, block, 3);
 
-            return jitCompiledScript.__file__(context, self, arg0, arg1, arg2, block);
+            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, arg2, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {

@@ -61,7 +61,7 @@ public class ChildScopedBodyCompiler extends BaseBodyCompiler {
         method.aload(StandardASMCompiler.THIS);
 
         // load all arguments straight through
-        for (int i = 1; i <= 4; i++) {
+        for (int i = 1; i <= getClosureIndex(); i++) {
             method.aload(i);
         }
         // we append an index to ensure two identical method names will not conflict

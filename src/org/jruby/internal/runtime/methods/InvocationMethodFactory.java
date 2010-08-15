@@ -33,6 +33,7 @@ import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 import org.jruby.Ruby;
+import org.jruby.RubyClass;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyKernel;
 import org.jruby.parser.StaticScope;
@@ -414,7 +415,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
             // FIXME we want to eliminate these type casts when possible
             mv.getfield(invokerPath, "$scriptObject", ci(Object.class));
             mv.checkcast(className);
-            mv.aloadMany(THREADCONTEXT_INDEX, RECEIVER_INDEX);
+            mv.aloadMany(THREADCONTEXT_INDEX, RECEIVER_INDEX, CLASS_INDEX, NAME_INDEX);
             if (specificArity) {
                 for (int i = 0; i < scope.getRequiredArgs(); i++) {
                     mv.aload(ARGS_INDEX + i);
@@ -775,10 +776,16 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         mv.line(-1);
         mv.aload(0);
         mv.getfield(mnamePath, "$scriptObject", "L" + classname + ";");
-        mv.aloadMany(1, 2, 3, 4);
+        mv.aload(1); // TC
+        mv.aload(2); // self
+        mv.dup(); // for metaclass
+        mv.invokeinterface(p(IRubyObject.class), "getMetaClass", sig(RubyClass.class));
+        mv.ldc("__block__"); // name
+        mv.aload(3); // arg
+        mv.aload(4); // block
         mv.invokestatic(classname, method, sig(
                 IRubyObject.class, "L" + classname + ";", ThreadContext.class,
-                        IRubyObject.class, IRubyObject.class, Block.class));
+                        IRubyObject.class, RubyModule.class, String.class, IRubyObject.class, Block.class));
         mv.areturn();
 
         mv.visitMaxs(2, 3);
@@ -823,10 +830,16 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         mv.line(-1);
         mv.aload(0);
         mv.getfield(mnamePath, "$scriptObject", "L" + classname + ";");
-        mv.aloadMany(1, 2, 3, 4);
+        mv.aload(1); // TC
+        mv.aload(2); // self
+        mv.dup(); // for metaclass
+        mv.invokeinterface(p(IRubyObject.class), "getMetaClass", sig(RubyClass.class));
+        mv.ldc("__block__"); // name
+        mv.aload(3); // arg
+        mv.aload(4); // block
         mv.invokestatic(classname, method, sig(
                 IRubyObject.class, "L" + classname + ";", ThreadContext.class,
-                        IRubyObject.class, IRubyObject[].class, Block.class));
+                        IRubyObject.class, RubyModule.class, String.class, IRubyObject[].class, Block.class));
         mv.areturn();
 
         mv.visitMaxs(2, 3);

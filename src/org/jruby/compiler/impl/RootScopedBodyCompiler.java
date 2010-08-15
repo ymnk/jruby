@@ -53,11 +53,8 @@ public abstract class RootScopedBodyCompiler extends BaseBodyCompiler {
     }
 
     public ChainedRootBodyCompiler outline(String methodName) {
-        // chain to the next segment of this giant method
-        method.aload(StandardASMCompiler.THIS);
-
         // load all arguments straight through
-        for (int i = 1; i <= getClosureIndex(); i++) {
+        for (int i = 0; i <= getClosureIndex(); i++) {
             method.aload(i);
         }
         // we append an index to ensure two identical method names will not conflict
@@ -87,9 +84,9 @@ public abstract class RootScopedBodyCompiler extends BaseBodyCompiler {
             method.start();
 
             // check arity in the variable-arity version
-            method.aload(1);
+            loadThreadContext();
             method.invokevirtual(p(ThreadContext.class), "getRuntime", sig(Ruby.class));
-            method.aload(3);
+            method.aload(StandardASMCompiler.ARGS_INDEX);
             method.pushInt(scope.getRequiredArgs());
             method.pushInt(scope.getRequiredArgs());
             method.invokestatic(p(Arity.class), "checkArgumentCount", sig(int.class, Ruby.class, IRubyObject[].class, int.class, int.class));
@@ -98,14 +95,16 @@ public abstract class RootScopedBodyCompiler extends BaseBodyCompiler {
             loadThis();
             loadThreadContext();
             loadSelf();
-            // FIXME: missing arity check
+            loadCallClass();
+            loadCallName();
             for (int i = 0; i < scope.getRequiredArgs(); i++) {
                 method.aload(StandardASMCompiler.ARGS_INDEX);
                 method.ldc(i);
                 method.arrayload();
             }
-            method.aload(StandardASMCompiler.ARGS_INDEX + 1);
             // load block from [] version of method
+            method.aload(StandardASMCompiler.ARGS_INDEX + 1);
+            
             method.invokestatic(script.getClassname(), methodName, getSignature());
             method.areturn();
             method.end();
