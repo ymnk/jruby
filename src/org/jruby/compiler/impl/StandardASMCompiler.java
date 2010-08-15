@@ -39,6 +39,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -443,8 +444,9 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
 
             method.label(tryBegin);
             method.aload(THREADCONTEXT_INDEX);
-            buildStaticScopeNames(method, topLevelScope);
-            method.invokestatic(p(RuntimeHelpers.class), "preLoad", sig(void.class, ThreadContext.class, String[].class));
+            String scopeNames = RuntimeHelpers.encodeScope(topLevelScope);
+            method.ldc(scopeNames);
+            method.invokestatic(p(RuntimeHelpers.class), "preLoad", sig(void.class, ThreadContext.class, String.class));
 
             method.aload(THIS);
             method.aload(THREADCONTEXT_INDEX);
@@ -519,33 +521,8 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         endClassInit();
     }
 
-    public static void buildStaticScopeNames(SkinnyMethodAdapter method, StaticScope scope) {
-        // construct static scope list of names
-        String signature = null;
-        switch (scope.getNumberOfVariables()) {
-        case 0:
-            method.pushInt(0);
-            method.anewarray(p(String.class));
-            break;
-        case 1: case 2: case 3: case 4: case 5:
-        case 6: case 7: case 8: case 9: case 10:
-            signature = sig(String[].class, params(String.class, scope.getNumberOfVariables()));
-            for (int i = 0; i < scope.getNumberOfVariables(); i++) {
-                method.ldc(scope.getVariables()[i]);
-            }
-            method.invokestatic(p(RuntimeHelpers.class), "constructStringArray", signature);
-            break;
-        default:
-            method.pushInt(scope.getNumberOfVariables());
-            method.anewarray(p(String.class));
-            for (int i = 0; i < scope.getNumberOfVariables(); i++) {
-                method.dup();
-                method.pushInt(i);
-                method.ldc(scope.getVariables()[i]);
-                method.arraystore();
-            }
-            break;
-        }
+    public static String buildStaticScopeNames(StaticScope scope) {
+        return RuntimeHelpers.encodeScope(scope);
     }
 
     private void beginInit() {

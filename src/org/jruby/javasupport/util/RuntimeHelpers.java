@@ -1,5 +1,7 @@
 package org.jruby.javasupport.util;
 
+import java.util.ArrayList;
+import java.util.StringTokenizer;
 import org.jruby.MetaClass;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
@@ -225,9 +227,8 @@ public class RuntimeHelpers {
                 body);
     }
     
-    public static IRubyObject runBeginBlock(ThreadContext context, IRubyObject self, String[] staticScopeNames, CompiledBlockCallback callback) {
-        StaticScope staticScope = 
-            new BlockStaticScope(context.getCurrentScope().getStaticScope(), staticScopeNames);
+    public static IRubyObject runBeginBlock(ThreadContext context, IRubyObject self, String scopeString, CompiledBlockCallback callback) {
+        StaticScope staticScope = decodeBlockScope(context, scopeString);
         staticScope.determineModule();
         
         context.preScopedBody(DynamicScope.newDynamicScope(staticScope, context.getCurrentScope()));
@@ -250,8 +251,8 @@ public class RuntimeHelpers {
                 context.getCurrentScope(), callback, hasMultipleArgsHead, argsNodeType);
     }
     
-    public static IRubyObject def(ThreadContext context, IRubyObject self, Object scriptObject, String name, String javaName, String[] scopeNames,
-            int arity, int required, int optional, int rest, String filename, int line, CallConfiguration callConfig) {
+    public static IRubyObject def(ThreadContext context, IRubyObject self, Object scriptObject, String name, String javaName, String scopeString,
+            int arity, String filename, int line, CallConfiguration callConfig) {
         Class compiledClass = scriptObject.getClass();
         Ruby runtime = context.getRuntime();
         
@@ -259,8 +260,8 @@ public class RuntimeHelpers {
         Visibility visibility = context.getCurrentVisibility();
         
         performNormalMethodChecks(containingClass, runtime, name);
-        
-        StaticScope scope = creatScopeForClass(context, scopeNames, required, optional, rest);
+
+        StaticScope scope = createScopeForClass(context, scopeString);
         
         MethodFactory factory = MethodFactory.createFactory(compiledClass.getClassLoader());
         DynamicMethod method = constructNormalMethod(
@@ -273,14 +274,14 @@ public class RuntimeHelpers {
         return runtime.getNil();
     }
     
-    public static IRubyObject defs(ThreadContext context, IRubyObject self, IRubyObject receiver, Object scriptObject, String name, String javaName, String[] scopeNames,
-            int arity, int required, int optional, int rest, String filename, int line, CallConfiguration callConfig) {
+    public static IRubyObject defs(ThreadContext context, IRubyObject self, IRubyObject receiver, Object scriptObject, String name, String javaName, String scopeString,
+            int arity, String filename, int line, CallConfiguration callConfig) {
         Class compiledClass = scriptObject.getClass();
         Ruby runtime = context.getRuntime();
 
         RubyClass rubyClass = performSingletonMethodChecks(runtime, receiver, name);
         
-        StaticScope scope = creatScopeForClass(context, scopeNames, required, optional, rest);
+        StaticScope scope = createScopeForClass(context, scopeString);
         
         MethodFactory factory = MethodFactory.createFactory(compiledClass.getClassLoader());
         DynamicMethod method = constructSingletonMethod( factory, javaName, rubyClass, new SimpleSourcePosition(filename, line), arity, scope,scriptObject, callConfig);
@@ -1321,6 +1322,15 @@ public class RuntimeHelpers {
         // Each root node has a top-level scope that we need to push
         context.preScopedBody(scope);
     }
+
+    public static void preLoad(ThreadContext context, String scopeString) {
+        StaticScope staticScope = decodeLocalScope(context, scopeString);
+        staticScope.setModule(context.getRuntime().getObject());
+        DynamicScope scope = DynamicScope.newDynamicScope(staticScope);
+
+        // Each root node has a top-level scope that we need to push
+        context.preScopedBody(scope);
+    }
     
     public static void postLoad(ThreadContext context) {
         context.postScopedBody();
@@ -1566,11 +1576,45 @@ public class RuntimeHelpers {
         }
     }
 
-    private static StaticScope creatScopeForClass(ThreadContext context, String[] scopeNames, int required, int optional, int rest) {
+    public static String encodeScope(StaticScope scope) {
+        StringBuilder namesBuilder = new StringBuilder();
 
-        StaticScope scope = new LocalStaticScope(context.getCurrentScope().getStaticScope(), scopeNames);
+        boolean first = true;
+        for (String name : scope.getVariables()) {
+            if (!first) namesBuilder.append(';');
+            first = false;
+            namesBuilder.append(name);
+        }
+        namesBuilder
+                .append(',')
+                .append(scope.getRequiredArgs())
+                .append(',')
+                .append(scope.getOptionalArgs())
+                .append(',')
+                .append(scope.getRestArg());
+
+        return namesBuilder.toString();
+    }
+
+    public static LocalStaticScope decodeLocalScope(ThreadContext context, String scopeString) {
+        String[] scopeElements = scopeString.split(",");
+        String[] scopeNames = scopeElements[0].length() == 0 ? new String[0] : getScopeNames(scopeElements[0]);
+        LocalStaticScope scope = new LocalStaticScope(context.getCurrentScope().getStaticScope(), scopeNames);
+        scope.setArities(Integer.parseInt(scopeElements[1]), Integer.parseInt(scopeElements[2]), Integer.parseInt(scopeElements[3]));
+        return scope;
+    }
+
+    public static BlockStaticScope decodeBlockScope(ThreadContext context, String scopeString) {
+        String[] scopeElements = scopeString.split(",");
+        String[] scopeNames = scopeElements[0].length() == 0 ? new String[0] : getScopeNames(scopeElements[0]);
+        BlockStaticScope scope = new BlockStaticScope(context.getCurrentScope().getStaticScope(), scopeNames);
+        scope.setArities(Integer.parseInt(scopeElements[1]), Integer.parseInt(scopeElements[2]), Integer.parseInt(scopeElements[3]));
+        return scope;
+    }
+
+    private static StaticScope createScopeForClass(ThreadContext context, String scopeString) {
+        StaticScope scope = decodeLocalScope(context, scopeString);
         scope.determineModule();
-        scope.setArities(required, optional, rest);
 
         return scope;
     }
@@ -1861,5 +1905,14 @@ public class RuntimeHelpers {
 
     public static boolean isGenerationEqual(IRubyObject object, int generation) {
         return object.getMetaClass().getCacheToken() == generation;
+    }
+
+    public static String[] getScopeNames(String scopeNames) {
+        StringTokenizer toker = new StringTokenizer(scopeNames, ";");
+        ArrayList list = new ArrayList(10);
+        while (toker.hasMoreTokens()) {
+            list.add(toker.nextToken().intern());
+        }
+        return (String[])list.toArray(new String[list.size()]);
     }
 }
