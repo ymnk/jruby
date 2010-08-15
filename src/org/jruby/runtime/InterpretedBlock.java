@@ -41,6 +41,7 @@ import org.jruby.ast.NilImplicitNode;
 import org.jruby.ast.Node;
 import org.jruby.ast.NodeType;
 import org.jruby.ast.ZeroArgNode;
+import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.JumpException;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.assigner.Assigner;
@@ -370,7 +371,7 @@ public class InterpretedBlock extends BlockBody {
         // This while loop is for restarting the block call in case a 'redo' fires.
         while (true) {
             try {
-                return bodyNode.interpret(context.getRuntime(), context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.__INTERPRET_BLOCK__(context, bodyNode, self);
             } catch (JumpException.RedoJump rj) {
                 context.pollThreadEvents();
                 // do nothing, allow loop to redo

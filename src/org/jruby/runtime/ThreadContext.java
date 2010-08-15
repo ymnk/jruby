@@ -980,16 +980,11 @@ public final class ThreadContext {
     public static final Map<String, FrameType> INTERPRETED_FRAMES = new HashMap<String, FrameType>();
     
     static {
-        INTERPRETED_FRAMES.put(InterpretedMethod.class.getName() + ".call", FrameType.METHOD);
-        
-        INTERPRETED_FRAMES.put(InterpretedBlock.class.getName() + ".evalBlockBody", FrameType.BLOCK);
-        
-        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".evalWithBinding", FrameType.EVAL);
-        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".evalSimple", FrameType.EVAL);
-        
-        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".evalClassDefinitionBody", FrameType.CLASS);
-        
-        INTERPRETED_FRAMES.put(Ruby.class.getName() + ".runInterpreter", FrameType.ROOT);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".__INTERPRET_METHOD__", FrameType.METHOD);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".__INTERPRET_BLOCK__", FrameType.BLOCK);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".__INTERPRET_EVAL__", FrameType.EVAL);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".__INTERPRET_CLASS__", FrameType.CLASS);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".__INTERPRET_TOPLEVEL__", FrameType.ROOT);
     }
     
     public static IRubyObject createRubyHybridBacktrace(Ruby runtime, RubyStackTraceElement[] backtraceFrames, StackTraceElement[] stackTrace, boolean debug) {

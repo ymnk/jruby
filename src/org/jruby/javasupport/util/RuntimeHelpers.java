@@ -1750,7 +1750,7 @@ public class RuntimeHelpers {
     }
 
     public static Block getBlock(Ruby runtime, ThreadContext context, IRubyObject self, Node node, Block aBlock) {
-        return RuntimeHelpers.getBlockFromBlockPassBody(runtime, node.interpret(runtime, context, self, aBlock), aBlock);
+        return RuntimeHelpers.getBlockFromBlockPassBody(runtime, ASTInterpreter.__INTERPRET_MISC__(runtime, context, node, self, aBlock), aBlock);
     }
 
     /**
@@ -1800,7 +1800,7 @@ public class RuntimeHelpers {
             name = ((LiteralNode) nameNode).getName();
         } else {
             assert nameNode instanceof DSymbolNode: "Alias or Undef not literal or dsym";
-            name = ((RubySymbol) nameNode.interpret(runtime, context, self, aBlock)).asJavaString();
+            name = ((RubySymbol)ASTInterpreter.__INTERPRET_MISC__(runtime, context, nameNode, self, aBlock)).asJavaString();
         }
 
         return name;

@@ -192,6 +192,7 @@ public class RubyException extends RubyObject {
     }
     
     public void initBacktrace() {
+        Thread.dumpStack();
         switch (TRACE_TYPE) {
         case RAW:
             backtrace = ThreadContext.createRawBacktrace(getRuntime(), javaStackTrace, false);
