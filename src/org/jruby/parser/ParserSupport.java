@@ -1479,9 +1479,6 @@ public class ParserSupport {
 
     // 1.9
     public Node new_bv(Token identifier) {
-        if (!is_local_id(identifier)) {
-            getterIdentifierError(identifier.getPosition(), (String) identifier.getValue());
-        }
         shadowing_lvar(identifier);
         arg_var(identifier);
 
