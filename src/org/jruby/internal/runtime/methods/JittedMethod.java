@@ -78,182 +78,52 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args, Block block) {
-        Ruby runtime = context.getRuntime();
-        
-        try {
-            pre(context, self, name, block, args.length);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, args, block);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime, context, name);
-        }
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, args, block);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args) {
-        Ruby runtime = context.getRuntime();
-
-        try {
-            pre(context, self, name, Block.NULL_BLOCK, args.length);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, args, Block.NULL_BLOCK);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime,context, name);
-        }
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, args, Block.NULL_BLOCK);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name) {
-        Ruby runtime = context.getRuntime();
-
-        try {
-            pre(context, self, name, Block.NULL_BLOCK, 0);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, Block.NULL_BLOCK);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime, context, name);
-        }
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, Block.NULL_BLOCK);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, Block block) {
-        Ruby runtime = context.getRuntime();
-
-        try {
-            pre(context, self, name, block, 0);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, block);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime, context, name);
-        }
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, block);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0) {
-        Ruby runtime = context.getRuntime();
-
-        try {
-            pre(context, self, name, Block.NULL_BLOCK, 1);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, Block.NULL_BLOCK);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime, context, name);
-        }
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, Block.NULL_BLOCK);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, Block block) {
-        Ruby runtime = context.getRuntime();
-
-        try {
-            pre(context, self, name, block, 1);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, block);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime, context, name);
-        }
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, block);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1) {
-        Ruby runtime = context.getRuntime();
-
-        try {
-            pre(context, self, name, Block.NULL_BLOCK, 2);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, Block.NULL_BLOCK);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime, context, name);
-        }
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, Block.NULL_BLOCK);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, Block block) {
-        Ruby runtime = context.getRuntime();
-
-        try {
-            pre(context, self, name, block, 2);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, block);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime, context, name);
-        }
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, block);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
-        Ruby runtime = context.getRuntime();
-
-        try {
-            pre(context, self, name, Block.NULL_BLOCK, 3);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, arg2, Block.NULL_BLOCK);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime, context, name);
-        }
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, arg2, Block.NULL_BLOCK);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, Block block) {
-        Ruby runtime = context.getRuntime();
-
-        try {
-            pre(context, self, name, block, 3);
-
-            return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, arg2, block);
-        } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
-        } catch (JumpException.RedoJump rj) {
-            return handleRedo(runtime);
-        } finally {
-            post(runtime, context, name);
-        }
-    }
-
-    protected void pre(ThreadContext context, IRubyObject self, String name, Block block, int argsLength) {
-        callConfig.pre(context, self, getImplementationClass(), name, block, staticScope);
-
-        getArity().checkArity(context.getRuntime(), argsLength);
-    }
-
-    protected void post(Ruby runtime, ThreadContext context, String name) {
-        callConfig.post(context);
+        return jitCompiledScript.__file__(context, self, getImplementationClass(), name, arg0, arg1, arg2, block);
     }
 
     public ISourcePosition getPosition() {

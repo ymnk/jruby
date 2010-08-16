@@ -403,10 +403,10 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         boolean framed = callConfig.framing() == Framing.Full;
 
         if (framed || heapScoped)   mv.trycatch(tryBegin, tryEnd, catchReturnJump, p(JumpException.ReturnJump.class));
-        if (framed)                 mv.trycatch(tryBegin, tryEnd, catchRedoJump, p(JumpException.RedoJump.class));
+//        if (framed)                 mv.trycatch(tryBegin, tryEnd, catchRedoJump, p(JumpException.RedoJump.class));
         if (framed || heapScoped)   mv.trycatch(tryBegin, tryEnd, doFinally, null);
         if (framed || heapScoped)   mv.trycatch(catchReturnJump, doReturnFinally, doFinally, null);
-        if (framed)                 mv.trycatch(catchRedoJump, doRedoFinally, doFinally, null);
+//        if (framed)                 mv.trycatch(catchRedoJump, doRedoFinally, doFinally, null);
         if (framed || heapScoped)   mv.label(tryBegin);
 
         // main body
@@ -468,28 +468,28 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
 
         if (framed) {
             // redo jump handling
-            mv.label(catchRedoJump);
-            {
-                // clear the redo
-                mv.pop();
-
-                // get runtime, create jump error, and throw it
-                mv.aload(1);
-                mv.invokevirtual(p(ThreadContext.class), "getRuntime", sig(Ruby.class));
-                mv.invokevirtual(p(Ruby.class), "newRedoLocalJumpError", sig(RaiseException.class));
-                mv.label(doRedoFinally);
-
-                // finally
-                if (RubyInstanceConfig.FULL_TRACE_ENABLED) {
-                    invokeTraceCompiledPost(mv, COMPILED_SUPER_CLASS, traceBoolIndex);
-                }
-                if (!callConfig.isNoop()) {
-                    invokeCallConfigPost(mv, COMPILED_SUPER_CLASS, callConfig);
-                }
-
-                // throw redo error if we're still good
-                mv.athrow();
-            }
+//            mv.label(catchRedoJump);
+//            {
+//                // clear the redo
+//                mv.pop();
+//
+//                // get runtime, create jump error, and throw it
+//                mv.aload(1);
+//                mv.invokevirtual(p(ThreadContext.class), "getRuntime", sig(Ruby.class));
+//                mv.invokevirtual(p(Ruby.class), "newRedoLocalJumpError", sig(RaiseException.class));
+//                mv.label(doRedoFinally);
+//
+//                // finally
+//                if (RubyInstanceConfig.FULL_TRACE_ENABLED) {
+//                    invokeTraceCompiledPost(mv, COMPILED_SUPER_CLASS, traceBoolIndex);
+//                }
+//                if (!callConfig.isNoop()) {
+//                    invokeCallConfigPost(mv, COMPILED_SUPER_CLASS, callConfig);
+//                }
+//
+//                // throw redo error if we're still good
+//                mv.athrow();
+//            }
         }
 
         // finally handling for abnormal exit

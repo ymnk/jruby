@@ -47,6 +47,7 @@ import org.jruby.RubyModule;
 import org.jruby.RubyString;
 import org.jruby.RubyThread;
 import org.jruby.evaluator.ASTInterpreter;
+import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.JumpException.ReturnJump;
 import org.jruby.internal.runtime.methods.DefaultMethod;
 import org.jruby.internal.runtime.methods.InterpretedMethod;
@@ -1484,5 +1485,12 @@ public final class ThreadContext {
         Frame frame = getPreviousFrame();
         Frame current = getCurrentFrame();
         return new Binding(self, frame, frame.getVisibility(), getPreviousRubyClass(), getCurrentScope(), current.getFile(), current.getLine());
+    }
+
+    public IRubyObject handleReturn(JumpException.ReturnJump rj) {
+        if (rj.getTarget() == getFrameJumpTarget()) {
+            return (IRubyObject) rj.getValue();
+        }
+        throw rj;
     }
 }

@@ -2531,9 +2531,9 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         invokeUtilityMethod("retryJump", sig(IRubyObject.class));
     }
 
-    public void defineNewMethod(String name, int methodArity, StaticScope scope,
-            CompilerCallback body, CompilerCallback args,
-            CompilerCallback receiver, ASTInspector inspector, boolean root, String filename, int line) {
+    public void defineNewMethod(String name, int methodArity, final StaticScope scope,
+            final CompilerCallback body, CompilerCallback args,
+            CompilerCallback receiver, final ASTInspector inspector, boolean root, String filename, int line) {
         // TODO: build arg list based on number of args, optionals, etc
         String newMethodName;
         if (root && SafePropertyAccessor.getBoolean("jruby.compile.toplevel", false)) {
@@ -2543,9 +2543,8 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
             newMethodName = "method__" + script.getAndIncrementMethodIndex() + "$RUBY$" + mangledName;
         }
 
-        BodyCompiler methodCompiler = script.startMethod(name, newMethodName, args, scope, inspector);
+        final BaseBodyCompiler methodCompiler = (BaseBodyCompiler)script.startMethod(name, newMethodName, args, scope, inspector);
 
-        // callbacks to fill in method body
         body.call(methodCompiler);
 
         methodCompiler.endBody();

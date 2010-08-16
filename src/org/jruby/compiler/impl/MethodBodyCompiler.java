@@ -1,14 +1,18 @@
 package org.jruby.compiler.impl;
 
 import org.jruby.Ruby;
+import org.jruby.RubyModule;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.compiler.ASTInspector;
 import org.jruby.compiler.CompilerCallback;
 import org.jruby.exceptions.JumpException;
+import org.jruby.internal.runtime.methods.CallConfiguration;
 import org.jruby.parser.StaticScope;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.Label;
 import static org.jruby.util.CodegenUtils.*;
 import static org.objectweb.asm.Opcodes.*;
 
@@ -50,9 +54,27 @@ public class MethodBodyCompiler extends RootScopedBodyCompiler {
         }
     }
 
+    private Label top = new Label();
+    private Label returnLbl = new Label();
+    private Label finallyLbl = new Label();
+
     @Override
     public void beginMethod(CompilerCallback args, StaticScope scope) {
         method.start();
+
+        method.trycatch(top, scopeEnd, returnLbl, p(JumpException.ReturnJump.class));
+        method.trycatch(top, scopeEnd, finallyLbl, p(Throwable.class));
+        
+        method.getstatic(p(CallConfiguration.class), inspector.getCallConfig().name(), ci(CallConfiguration.class));
+        loadThreadContext();
+        loadSelf();
+        loadCallClass();
+        loadCallName();
+        loadBlock();
+        getScriptCompiler().getCacheCompiler().cacheStaticScope(this, scope);
+        method.invokevirtual(p(CallConfiguration.class), "pre", sig(void.class, ThreadContext.class, IRubyObject.class, RubyModule.class, String.class, Block.class, StaticScope.class));
+
+        method.label(top);
 
         variableCompiler.beginMethod(args, scope);
 
@@ -62,11 +84,33 @@ public class MethodBodyCompiler extends RootScopedBodyCompiler {
 
     @Override
     public void endBody() {
+        // finally logic
+        method.getstatic(p(CallConfiguration.class), inspector.getCallConfig().name(), ci(CallConfiguration.class));
+        loadThreadContext();
+        method.invokevirtual(p(CallConfiguration.class), "post", sig(void.class, ThreadContext.class));
+        
         // return last value from execution
         method.areturn();
 
         // end of variable scope
         method.label(scopeEnd);
+
+        // return handling
+        method.label(returnLbl);
+        method.getstatic(p(CallConfiguration.class), inspector.getCallConfig().name(), ci(CallConfiguration.class));
+        loadThreadContext();
+        method.invokevirtual(p(CallConfiguration.class), "post", sig(void.class, ThreadContext.class));
+        loadThreadContext();
+        method.swap();
+        method.invokevirtual(p(ThreadContext.class), "handleReturn", sig(IRubyObject.class, JumpException.ReturnJump.class));
+        method.areturn();
+
+        // finally handling
+        method.label(finallyLbl);
+        method.getstatic(p(CallConfiguration.class), inspector.getCallConfig().name(), ci(CallConfiguration.class));
+        loadThreadContext();
+        method.invokevirtual(p(CallConfiguration.class), "post", sig(void.class, ThreadContext.class));
+        method.athrow();
 
         // method is done, declare all variables
         variableCompiler.declareLocals(scope, scopeStart, scopeEnd);
@@ -127,6 +171,10 @@ public class MethodBodyCompiler extends RootScopedBodyCompiler {
             invokeUtilityMethod("returnJump", sig(JumpException.ReturnJump.class, IRubyObject.class, ThreadContext.class));
             method.athrow();
         } else {
+            // finally logic
+            method.getstatic(p(CallConfiguration.class), inspector.getCallConfig().name(), ci(CallConfiguration.class));
+            loadThreadContext();
+            method.invokevirtual(p(CallConfiguration.class), "post", sig(void.class, ThreadContext.class));
             method.areturn();
         }
     }

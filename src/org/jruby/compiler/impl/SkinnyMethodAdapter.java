@@ -424,6 +424,40 @@ public class SkinnyMethodAdapter implements MethodVisitor, Opcodes {
                                    String arg3) {
         getMethodVisitor().visitTryCatchBlock(arg0, arg1, arg2, arg3);
     }
+
+    public void trycatch(Runnable body, Class[] catchExceptions, Runnable[] catchBodies, Runnable finallyBody) {
+        Label before = new Label();
+        Label after = new Label();
+        Label finallyStart = new Label();
+        Label done = new Label();
+
+        Label[] catchLabels = new Label[catchExceptions.length];
+        for (int i = 0; i < catchExceptions.length; i++) {
+            Class exception = catchExceptions[i];
+            Label label = new Label();
+            catchLabels[i] = label;
+            trycatch(before, after, label, p(exception));
+        }
+        trycatch(before, after, finallyStart, p(Throwable.class));
+        
+        label(before);
+        body.run();
+        label(after);
+        go_to(done);
+
+        // exception handling
+        for (int i = 0; i < catchExceptions.length; i++) {
+            label(catchLabels[i]);
+            catchBodies[i].run();
+            go_to(done);
+        }
+
+        // finally
+        label(finallyStart);
+        finallyBody.run();
+        
+        label(done);
+    }
     
     public void trycatch(String type, Runnable body, Runnable catchBody) {
         Label before = new Label();
@@ -439,6 +473,25 @@ public class SkinnyMethodAdapter implements MethodVisitor, Opcodes {
         if (catchBody != null) {
             label(catchStart);
             catchBody.run();
+        }
+        label(done);
+    }
+
+    public void tryfinally(String type, Runnable body, Runnable finallyBody) {
+        Label before = new Label();
+        Label after = new Label();
+        Label catchStart = new Label();
+        Label done = new Label();
+
+        trycatch(before, after, catchStart, type);
+        label(before);
+        body.run();
+        label(after);
+        go_to(done);
+        if (finallyBody != null) {
+            label(catchStart);
+            finallyBody.run();
+            athrow();
         }
         label(done);
     }

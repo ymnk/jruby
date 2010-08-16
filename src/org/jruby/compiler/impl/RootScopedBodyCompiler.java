@@ -8,6 +8,7 @@ import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.objectweb.asm.Label;
 import static org.jruby.util.CodegenUtils.*;
 import static org.objectweb.asm.Opcodes.*;
 
@@ -45,7 +46,7 @@ public abstract class RootScopedBodyCompiler extends BaseBodyCompiler {
 
     public void beginMethod(CompilerCallback args, StaticScope scope) {
         method.start();
-
+        
         variableCompiler.beginMethod(args, scope);
 
         // visit a label to start scoping for local vars in this method

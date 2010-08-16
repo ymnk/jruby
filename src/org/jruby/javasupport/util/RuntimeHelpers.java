@@ -31,6 +31,7 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.exceptions.Unrescuable;
 import org.jruby.internal.runtime.methods.CallConfiguration;
 import org.jruby.internal.runtime.methods.DynamicMethod;
+import org.jruby.internal.runtime.methods.Scoping;
 import org.jruby.internal.runtime.methods.UndefinedMethod;
 import org.jruby.internal.runtime.methods.WrapperMethod;
 import org.jruby.javasupport.JavaClass;
@@ -262,12 +263,12 @@ public class RuntimeHelpers {
         performNormalMethodChecks(containingClass, runtime, name);
 
         StaticScope scope = createScopeForClass(context, scopeString);
-        
+
         MethodFactory factory = MethodFactory.createFactory(compiledClass.getClassLoader());
         DynamicMethod method = constructNormalMethod(
                 factory, javaName,
                 name, containingClass, new SimpleSourcePosition(filename, line), arity, scope, visibility, scriptObject,
-                callConfig);
+                CallConfiguration.FrameNoneScopeNone);
         
         addInstanceMethod(containingClass, name, method, visibility,context, runtime);
         
@@ -284,7 +285,15 @@ public class RuntimeHelpers {
         StaticScope scope = createScopeForClass(context, scopeString);
         
         MethodFactory factory = MethodFactory.createFactory(compiledClass.getClassLoader());
-        DynamicMethod method = constructSingletonMethod( factory, javaName, rubyClass, new SimpleSourcePosition(filename, line), arity, scope,scriptObject, callConfig);
+        DynamicMethod method = constructSingletonMethod(
+                factory,
+                javaName,
+                rubyClass,
+                new SimpleSourcePosition(filename, line),
+                arity,
+                scope,
+                scriptObject,
+                CallConfiguration.FrameNoneScopeNone);
         
         rubyClass.addMethod(name, method);
         
