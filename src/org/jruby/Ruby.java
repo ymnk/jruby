@@ -3208,7 +3208,9 @@ public final class Ruby {
     }
 
     public RaiseException newNoMethodError(String message, String name, IRubyObject args) {
-        return new RaiseException(new RubyNoMethodError(this, getNoMethodError(), message, name, args), true);
+        RaiseException exception = new RaiseException(new RubyNoMethodError(this, getNoMethodError(), message, name, args), true);
+        exception.preRaise(getCurrentContext());
+        return exception;
     }
 
     public RaiseException newNameError(String message, String name) {
@@ -3223,12 +3225,18 @@ public final class Ruby {
         if (printWhenVerbose && origException != null && this.isVerbose()) {
             origException.printStackTrace(getErrorStream());
         }
-        return new RaiseException(new RubyNameError(
+        
+        RaiseException exception = new RaiseException(new RubyNameError(
                 this, getNameError(), message, name), false);
+        exception.preRaise(getCurrentContext());
+
+        return exception;
     }
 
     public RaiseException newLocalJumpError(RubyLocalJumpError.Reason reason, IRubyObject exitValue, String message) {
-        return new RaiseException(new RubyLocalJumpError(this, getLocalJumpError(), message, reason, exitValue), true);
+        RaiseException exception = new RaiseException(new RubyLocalJumpError(this, getLocalJumpError(), message, reason, exitValue), true);
+        exception.preRaise(getCurrentContext());
+        return exception;
     }
 
     public RaiseException newLocalJumpErrorNoBlock() {
@@ -3236,7 +3244,7 @@ public final class Ruby {
     }
 
     public RaiseException newRedoLocalJumpError() {
-        return new RaiseException(new RubyLocalJumpError(this, getLocalJumpError(), "unexpected redo", RubyLocalJumpError.Reason.REDO, getNil()), true);
+        return newLocalJumpError(RubyLocalJumpError.Reason.REDO, getNil(), "unexpected redo");
     }
 
     public RaiseException newLoadError(String message) {
@@ -3244,8 +3252,12 @@ public final class Ruby {
     }
 
     public RaiseException newFrozenError(String objectType) {
+        return newFrozenError(objectType, false);
+    }
+
+    public RaiseException newFrozenError(String objectType, boolean runtimeError) {
         // TODO: Should frozen error have its own distinct class?  If not should more share?
-        return newRaiseException(is1_9() ? getRuntimeError() : getTypeError(), "can't modify frozen " + objectType);
+        return newRaiseException(is1_9() || runtimeError ? getRuntimeError() : getTypeError(), "can't modify frozen " + objectType);
     }
 
     public RaiseException newSystemStackError(String message) {
@@ -3260,7 +3272,9 @@ public final class Ruby {
     }
 
     public RaiseException newSystemExit(int status) {
-        return new RaiseException(RubySystemExit.newInstance(this, status));
+        RaiseException exception = new RaiseException(RubySystemExit.newInstance(this, status));
+        exception.preRaise(getCurrentContext());
+        return exception;
     }
 
     public RaiseException newIOError(String message) {
