@@ -655,73 +655,9 @@ public final class ThreadContext {
         return result;
     }
     
-    @Deprecated
-    private static void addBackTraceElement(RubyArray backtrace, Backtrace frame, Backtrace previousFrame) {
-        addBackTraceElement(backtrace.getRuntime(), backtrace, frame, previousFrame);
-    }
-    
     private static void addBackTraceElement(Ruby runtime, RubyArray backtrace, RubyStackTraceElement element) {
         RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ": `" + element.getMethodName() + "'");
         backtrace.append(str);
-    }
-    
-    private static void addBackTraceElement(Ruby runtime, RubyArray backtrace, Backtrace frame, Backtrace previousFrame) {
-        RubyString traceLine;
-        String fileName = frame.filename;
-        if (fileName == null) fileName = "";
-        if (previousFrame.method.equals(UNKNOWN_NAME)) {
-            traceLine = RubyString.newString(runtime, fileName + ':' + (frame.line));
-        } else {
-            traceLine = RubyString.newString(runtime, fileName + ':' + (frame.line) + ":in `" + previousFrame.method + '\'');
-        }
-        
-        backtrace.append(traceLine);
-    }
-    
-    private static void addBackTraceElement(RubyArray backtrace, Backtrace frame, FrameType frameType) {
-        StringBuilder buf = new StringBuilder(60);
-        buf.append(frame.filename).append(':').append(frame.line + 1);
-        
-//        if (previousFrame.method != null) {
-            switch (frameType) {
-            case METHOD:
-                buf.append(":in `");
-                buf.append(frame.method);
-                buf.append('\'');
-                break;
-            case BLOCK:
-                buf.append(":in `");
-                buf.append("block in " + frame.method);
-                buf.append('\'');
-                break;
-            case EVAL:
-                buf.append(":in `");
-                buf.append("eval in " + frame.method);
-                buf.append('\'');
-                break;
-            case CLASS:
-                buf.append(":in `");
-                buf.append("class in " + frame.method);
-                buf.append('\'');
-                break;
-            case ROOT:
-                buf.append(":in `<toplevel>'");
-                break;
-            }
-//        }
-        
-        backtrace.append(backtrace.getRuntime().newString(buf.toString()));
-    }
-    
-    /**
-     * Create an Array with backtrace information.
-     * @param runtime
-     * @param level
-     * @param nativeException
-     * @return an Array with the backtrace
-     */
-    public static IRubyObject createBacktraceFromFrames(Ruby runtime, Backtrace[] backtraceFrames) {
-        return createBacktraceFromFrames(runtime, backtraceFrames, true);
     }
     
     /**
@@ -741,32 +677,6 @@ public final class ThreadContext {
 
         for (int i = 0; i < trace.length - level; i++) {
             addBackTraceElement(runtime, backtrace, trace[i]);
-        }
-        
-        return backtrace;
-    }
-    
-    /**
-     * Create an Array with backtrace information.
-     * @param runtime
-     * @param level
-     * @param nativeException
-     * @return an Array with the backtrace
-     */
-    public static IRubyObject createBacktraceFromFrames(Ruby runtime, Backtrace[] backtraceFrames, boolean cropAtEval) {
-        RubyArray backtrace = runtime.newArray();
-        
-        if (backtraceFrames == null || backtraceFrames.length <= 0) return backtrace;
-        
-        int traceSize = backtraceFrames.length;
-
-        for (int i = 0; i < traceSize - 1; i++) {
-            Backtrace frame = backtraceFrames[i];
-            // We are in eval with binding break out early
-            // FIXME: This is broken with the new backtrace stuff
-            if (cropAtEval && frame.method.equals("(eval)")) break;
-
-            addBackTraceElement(runtime, backtrace, frame, backtraceFrames[i + 1]);
         }
         
         return backtrace;
@@ -869,36 +779,6 @@ public final class ThreadContext {
             newTrace[i] = backtrace.get(i).clone();
         }
         return newTrace;
-    }
-
-//    private RubyStackTraceElement[] buildTrace(RubyStackTraceElement[] newTrace) {
-//        for (int i = 0; i < newTrace.length; i++) {
-//            Frame current = frameStack[i];
-//            String klazzName = getClassNameFromFrame(current);
-//            String methodName = getMethodNameFromFrame(current);
-//            newTrace[newTrace.length - 1 - i] =
-//                    new RubyStackTraceElement(klazzName, methodName, current.getFile(), current.getLine() + 1, current.isBindingFrame());
-//        }
-//
-//        return newTrace;
-//    }
-
-    private String getClassNameFromFrame(Frame current) {
-        String klazzName;
-        if (current.getKlazz() == null) {
-            klazzName = UNKNOWN_NAME;
-        } else {
-            klazzName = current.getKlazz().getName();
-        }
-        return klazzName;
-    }
-    
-    private String getMethodNameFromFrame(Frame current) {
-        String methodName = current.getName();
-        if (current.getName() == null) {
-            methodName = UNKNOWN_NAME;
-        }
-        return methodName;
     }
     
     private static String createRubyBacktraceString(StackTraceElement element) {
