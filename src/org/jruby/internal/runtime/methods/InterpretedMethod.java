@@ -42,6 +42,7 @@ import org.jruby.RubyModule;
 import org.jruby.ast.ArgsNode;
 import org.jruby.ast.Node;
 import org.jruby.compiler.ASTInspector;
+import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.JumpException;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.StaticScope;
@@ -110,7 +111,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, args.length);
             argsNode.prepare(context, runtime, self, args, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -136,7 +137,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 0);
             argsNode.prepare(context, runtime, self, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -157,7 +158,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 0);
             argsNode.prepare(context, runtime, self, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -177,7 +178,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 1);
             argsNode.prepare(context, runtime, self, arg0, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -198,7 +199,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 1);
             argsNode.prepare(context, runtime, self, arg0, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -218,7 +219,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 2);
             argsNode.prepare(context, runtime, self, arg0, arg1, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -239,7 +240,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 2);
             argsNode.prepare(context, runtime, self, arg0, arg1, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -259,7 +260,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 3);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -280,7 +281,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 3);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -300,7 +301,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 4);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -321,7 +322,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 4);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -341,7 +342,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 5);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -362,7 +363,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 5);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -382,7 +383,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 6);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -403,7 +404,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 6);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -423,7 +424,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 7);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -444,7 +445,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 7);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -464,7 +465,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 8);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -485,7 +486,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 8);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -505,7 +506,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 9);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -526,7 +527,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 9);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -546,7 +547,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 10);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, Block.NULL_BLOCK);
 
-            return body.interpret(runtime, context, self, Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {
@@ -567,7 +568,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
             argsNode.checkArgCount(runtime, 10);
             argsNode.prepare(context, runtime, self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, block);
 
-            return body.interpret(runtime, context, self, block);
+            return ASTInterpreter.INTERPRET_METHOD(runtime, context, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
             return handleReturn(context, rj);
         } catch (JumpException.RedoJump rj) {

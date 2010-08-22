@@ -35,6 +35,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import org.jruby.runtime.scope.ManyVarsDynamicScope;
@@ -48,8 +49,6 @@ import org.jruby.RubyString;
 import org.jruby.RubyThread;
 import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.JumpException.ReturnJump;
-import org.jruby.internal.runtime.methods.DefaultMethod;
-import org.jruby.internal.runtime.methods.InterpretedMethod;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.libraries.FiberLibrary.Fiber;
 import org.jruby.parser.BlockStaticScope;
@@ -89,6 +88,27 @@ public final class ThreadContext {
     
     private Frame[] frameStack = new Frame[INITIAL_FRAMES_SIZE];
     private int frameIndex = -1;
+
+    public static class Stack<T> extends ArrayList<T> {
+        public T pop() {return remove(size() - 1);}
+        public void push(T t) {add(t);}
+    }
+    public static class Backtrace {
+        public String method;
+        public String filename;
+        public int line;
+        public Backtrace(String method, String filename, int line) {
+            this.method = method;
+            this.filename = filename;
+            this.line = line;
+        }
+        public Backtrace(String method, ISourcePosition position) {
+            this.method = method;
+            this.filename = position.getFile();
+            this.line = position.getLine();
+        }
+    }
+    public final Stack<Backtrace> backtrace = new Stack<Backtrace>();
     
     // List of active dynamic scopes.  Each of these may have captured other dynamic scopes
     // to implement closures.
@@ -477,26 +497,26 @@ public final class ThreadContext {
     }
     
     public void setFile(String file) {
-        this.file = file;
+        backtrace.get(backtrace.size() - 1).filename = file;
     }
     
     public void setLine(int line) {
-        this.line = line;
+        backtrace.get(backtrace.size() - 1).line = line;
     }
     
     public void setFileAndLine(String file, int line) {
-        this.file = file;
-        this.line = line;
+        backtrace.get(backtrace.size() - 1).filename = file;
+        backtrace.get(backtrace.size() - 1).line = line;
     }
     
     public void setFileAndLine(Frame frame) {
-        this.file = frame.getFile();
-        this.line = frame.getLine();
+        backtrace.get(backtrace.size() - 1).filename = frame.getFile();
+        backtrace.get(backtrace.size() - 1).line = frame.getLine();
     }
 
     public void setFileAndLine(ISourcePosition position) {
-        this.file = position.getFile();
-        this.line = position.getStartLine();
+        backtrace.get(backtrace.size() - 1).filename = position.getFile();
+        backtrace.get(backtrace.size() - 1).line = position.getStartLine();
     }
     
     public Visibility getCurrentVisibility() {
@@ -980,16 +1000,11 @@ public final class ThreadContext {
     public static final Map<String, FrameType> INTERPRETED_FRAMES = new HashMap<String, FrameType>();
     
     static {
-        INTERPRETED_FRAMES.put(InterpretedMethod.class.getName() + ".call", FrameType.METHOD);
-        
-        INTERPRETED_FRAMES.put(InterpretedBlock.class.getName() + ".evalBlockBody", FrameType.BLOCK);
-        
-        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".evalWithBinding", FrameType.EVAL);
-        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".evalSimple", FrameType.EVAL);
-        
-        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".evalClassDefinitionBody", FrameType.CLASS);
-        
-        INTERPRETED_FRAMES.put(Ruby.class.getName() + ".runInterpreter", FrameType.ROOT);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".INTERPRET_METHOD", FrameType.METHOD);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".INTERPRET_EVAL", FrameType.EVAL);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".INTERPRET_CLASS", FrameType.CLASS);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".INTERPRET_BLOCK", FrameType.BLOCK);
+        INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".INTERPRET_ROOT", FrameType.ROOT);
     }
     
     public static IRubyObject createRubyHybridBacktrace(Ruby runtime, RubyStackTraceElement[] backtraceFrames, StackTraceElement[] stackTrace, boolean debug) {

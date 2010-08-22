@@ -130,6 +130,7 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jruby.ast.RootNode;
+import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.Unrescuable;
 import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.javasupport.util.RuntimeHelpers;
@@ -307,7 +308,7 @@ public final class Ruby {
 
         try {
             context.preEvalScriptlet(scope);
-            return node.interpret(this, context, context.getFrameSelf(), Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_ROOT(this, context, node, context.getFrameSelf(), Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             throw newLocalJumpError(RubyLocalJumpError.Reason.RETURN, (IRubyObject)rj.getValue(), "unexpected return");
         } catch (JumpException.BreakJump bj) {
@@ -705,7 +706,7 @@ public final class Ruby {
         assert scriptNode != null : "scriptNode is not null";
         
         try {
-            return scriptNode.interpret(this, context, getTopSelf(), Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_ROOT(this, context, scriptNode, getTopSelf(), Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return (IRubyObject) rj.getValue();
         }
@@ -722,7 +723,7 @@ public final class Ruby {
         assert scriptNode instanceof RootNode;
 
         try {
-            return ((RootNode)scriptNode).interpret(this, context, getTopSelf(), Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_ROOT(this, context, scriptNode, getTopSelf(), Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return (IRubyObject) rj.getValue();
         }
@@ -2542,7 +2543,8 @@ public final class Ruby {
             context.setFile(scriptName);
             context.preNodeEval(objectClass, self, scriptName);
 
-            parseFile(in, scriptName, null).interpret(this, context, self, Block.NULL_BLOCK);
+            Node node = parseFile(in, scriptName, null);
+            ASTInterpreter.INTERPRET_ROOT(this, context, node, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return;
         } finally {
