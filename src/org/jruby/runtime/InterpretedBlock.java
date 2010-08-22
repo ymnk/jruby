@@ -239,7 +239,7 @@ public class InterpretedBlock extends BlockBody {
             if (!noargblock) assigner.assign(context.getRuntime(), context, self, arg0, Block.NULL_BLOCK);
 
             // This while loop is for restarting the block call in case a 'redo' fires.
-            return evalBlockBody(context, self);
+            return evalBlockBody(context, binding, self);
         } catch (JumpException.NextJump nj) {
             return handleNextJump(context, nj, type);
         } finally {
@@ -257,7 +257,7 @@ public class InterpretedBlock extends BlockBody {
             if (!noargblock) assigner.assign(context.getRuntime(), context, self, arg0, arg1, Block.NULL_BLOCK);
 
             // This while loop is for restarting the block call in case a 'redo' fires.
-            return evalBlockBody(context, self);
+            return evalBlockBody(context, binding, self);
         } catch (JumpException.NextJump nj) {
             return handleNextJump(context, nj, type);
         } finally {
@@ -275,7 +275,7 @@ public class InterpretedBlock extends BlockBody {
             if (!noargblock) assigner.assign(context.getRuntime(), context, self, arg0, arg1, arg2, Block.NULL_BLOCK);
 
             // This while loop is for restarting the block call in case a 'redo' fires.
-            return evalBlockBody(context, self);
+            return evalBlockBody(context, binding, self);
         } catch (JumpException.NextJump nj) {
             return handleNextJump(context, nj, type);
         } finally {
@@ -292,7 +292,7 @@ public class InterpretedBlock extends BlockBody {
         try {
             if (!noargblock) assigner.assign(context.getRuntime(), context, self, Block.NULL_BLOCK);
 
-            return evalBlockBody(context, self);
+            return evalBlockBody(context, binding, self);
         } catch (JumpException.NextJump nj) {
             return handleNextJump(context, nj, type);
         } finally {
@@ -325,7 +325,7 @@ public class InterpretedBlock extends BlockBody {
             }
 
             // This while loop is for restarting the block call in case a 'redo' fires.
-            return evalBlockBody(context, self);
+            return evalBlockBody(context, binding, self);
         } catch (JumpException.NextJump nj) {
             return handleNextJump(context, nj, type);
         } finally {
@@ -344,7 +344,7 @@ public class InterpretedBlock extends BlockBody {
             if (!noargblock) assigner.assignArray(context.getRuntime(), context, self,
                     assigner.convertToArray(context.getRuntime(), value), block);
 
-            return evalBlockBody(context, self);
+            return evalBlockBody(context, binding, self);
         } catch (JumpException.NextJump nj) {
             return handleNextJump(context, nj, type);
         } finally {
@@ -367,11 +367,11 @@ public class InterpretedBlock extends BlockBody {
         return yield(context, value, self, klass, alreadyArray, binding, type, Block.NULL_BLOCK);
     }
     
-    private IRubyObject evalBlockBody(ThreadContext context, IRubyObject self) {
+    private IRubyObject evalBlockBody(ThreadContext context, Binding binding, IRubyObject self) {
         // This while loop is for restarting the block call in case a 'redo' fires.
         while (true) {
             try {
-                return ASTInterpreter.INTERPRET_BLOCK(context.getRuntime(), context, bodyNode, self, Block.NULL_BLOCK);
+                return ASTInterpreter.INTERPRET_BLOCK(context.getRuntime(), context, bodyNode, binding.getMethod(), self, Block.NULL_BLOCK);
             } catch (JumpException.RedoJump rj) {
                 context.pollThreadEvents();
                 // do nothing, allow loop to redo

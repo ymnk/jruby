@@ -63,7 +63,7 @@ import org.jruby.util.SafePropertyAccessor;
  */
 @JRubyClass(name="Exception")
 public class RubyException extends RubyObject {
-    private ThreadContext.RubyStackTraceElement[] backtraceFrames;
+    private ThreadContext.Backtrace[] backtraceFrames;
     private StackTraceElement[] javaStackTrace;
     private IRubyObject backtrace;
     public IRubyObject message;
@@ -79,7 +79,6 @@ public class RubyException extends RubyObject {
         super(runtime, rubyClass);
         
         this.message = message == null ? runtime.getNil() : runtime.newString(message);
-        this.javaStackTrace = Thread.currentThread().getStackTrace();
     }
     
     private static ObjectAllocator EXCEPTION_ALLOCATOR = new ObjectAllocator() {
@@ -139,26 +138,27 @@ public class RubyException extends RubyObject {
         return new RubyException(runtime, excptnClass, msg);
     }
     
-    public void setBacktraceFrames(ThreadContext.RubyStackTraceElement[] backtraceFrames) {
+    public void setBacktraceFrames(ThreadContext.Backtrace[] backtraceFrames) {
         this.backtraceFrames = backtraceFrames;
     }
     
-    public ThreadContext.RubyStackTraceElement[] getBacktraceFrames() {
+    public ThreadContext.Backtrace[] getBacktraceFrames() {
         return backtraceFrames;
     }
 
     public void prepareBacktrace(ThreadContext context, boolean nativeException) {
-        ThreadContext.RubyStackTraceElement[] stackTrace = getBacktraceFrames();
+        ThreadContext.Backtrace[] stackTrace = getBacktraceFrames();
 
         // if it's null, build a backtrace
         if (stackTrace == null) {
             stackTrace = context.createBacktrace2(0, nativeException);
 
             // if it's still null, just use an empty trace
-            if (stackTrace == null) stackTrace = new ThreadContext.RubyStackTraceElement[0];
+            if (stackTrace == null) stackTrace = new ThreadContext.Backtrace[0];
 
             setBacktraceFrames(stackTrace);
         }
+        this.javaStackTrace = Thread.currentThread().getStackTrace();
     }
     
     public static final int RAW = 0;
@@ -201,13 +201,14 @@ public class RubyException extends RubyObject {
             break;
         case RUBY_FRAMED:
         case RUBINIUS:
-            backtrace = backtraceFrames == null ? getRuntime().getNil() : ThreadContext.createBacktraceFromFrames(getRuntime(), backtraceFrames);
+            backtrace = ThreadContext.createHybridBacktrace(getRuntime(), backtraceFrames, javaStackTrace);
+//            backtrace = backtraceFrames == null ? getRuntime().getNil() : ThreadContext.createBacktraceFromFrames(getRuntime(), backtraceFrames);
             break;
         case RUBY_COMPILED:
             backtrace = ThreadContext.createRubyCompiledBacktrace(getRuntime(), javaStackTrace);
             break;
         case RUBY_HYBRID:
-            backtrace = ThreadContext.createRubyHybridBacktrace(getRuntime(), backtraceFrames, javaStackTrace, getRuntime().getDebug().isTrue());
+//            backtrace = ThreadContext.createRubyHybridBacktrace(getRuntime(), backtraceFrames, javaStackTrace, getRuntime().getDebug().isTrue());
             break;
         }
     }
@@ -332,12 +333,6 @@ public class RubyException extends RubyObject {
                 IRubyObject stackTraceLine = elements[i];
                     if (stackTraceLine instanceof RubyString) {
                     printStackTraceLine(errorStream, stackTraceLine);
-                }
-
-                if (!debug && TRACE_TYPE != RAW && i == RubyException.TRACE_HEAD && elements.length > RubyException.TRACE_MAX) {
-                    int hiddenLevels = elements.length - RubyException.TRACE_HEAD - RubyException.TRACE_TAIL;
-                            errorStream.print("\t ... " + hiddenLevels + " levels...\n");
-                    i = elements.length - RubyException.TRACE_TAIL;
                 }
             }
         }

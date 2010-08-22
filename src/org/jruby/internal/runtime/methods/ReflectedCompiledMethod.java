@@ -72,9 +72,7 @@ public class ReflectedCompiledMethod extends CompiledMethod {
                 return (IRubyObject)method.invoke(null, $scriptObject, context, self, args, block);
             } finally {
                 if (isTrace) {
-                    Frame frame = context.getPreviousFrame();
-
-                    runtime.callEventHooks(context, RubyEvent.RETURN, frame.getFile(), frame.getLine(), name, getImplementationClass());
+                    runtime.callEventHooks(context, RubyEvent.RETURN, context.getFile(), context.getLine(), name, getImplementationClass());
                 }
             }
             

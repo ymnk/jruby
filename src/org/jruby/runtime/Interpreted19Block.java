@@ -136,7 +136,7 @@ public class Interpreted19Block  extends BlockBody {
         try {
             setupBlockArg(context, value, self, Block.NULL_BLOCK, type);
 
-            return evalBlockBody(context, self);
+            return evalBlockBody(context, binding, self);
         } catch (JumpException.NextJump nj) {
             return handleNextJump(context, nj, type);
         } finally {
@@ -172,7 +172,7 @@ public class Interpreted19Block  extends BlockBody {
             setupBlockArgs(context, value, self, block, type, aValue);
 
             // This while loop is for restarting the block call in case a 'redo' fires.
-            return evalBlockBody(context, self);
+            return evalBlockBody(context, binding, self);
         } catch (JumpException.NextJump nj) {
             return handleNextJump(context, nj, type);
         } finally {
@@ -180,11 +180,11 @@ public class Interpreted19Block  extends BlockBody {
         }
     }
 
-    private IRubyObject evalBlockBody(ThreadContext context, IRubyObject self) {
+    private IRubyObject evalBlockBody(ThreadContext context, Binding binding, IRubyObject self) {
         // This while loop is for restarting the block call in case a 'redo' fires.
         while (true) {
             try {
-                return ASTInterpreter.INTERPRET_BLOCK(context.getRuntime(), context, body, self, Block.NULL_BLOCK);
+                return ASTInterpreter.INTERPRET_BLOCK(context.getRuntime(), context, body, binding.getMethod(), self, Block.NULL_BLOCK);
             } catch (JumpException.RedoJump rj) {
                 context.pollThreadEvents();
                 // do nothing, allow loop to redo

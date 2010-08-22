@@ -170,7 +170,7 @@ public class ASTInspector {
     }
 
     public CallConfiguration getCallConfig() {
-        if (hasFrameAwareMethods() || hasClosure() || !(noFrame() || RubyInstanceConfig.FRAMELESS_COMPILE_ENABLED)) {
+        if (hasFrameAwareMethods() || hasClosure() || !(noFrame() || !RubyInstanceConfig.FRAMELESS_COMPILE_ENABLED)) {
             // We're doing normal framed compilation or the method needs a frame
             if (hasClosure() || hasScopeAwareMethods()) {
                 // The method also needs a scope, do both

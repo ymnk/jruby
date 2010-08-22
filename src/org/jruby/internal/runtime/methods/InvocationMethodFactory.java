@@ -1046,7 +1046,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         case FrameFullScopeDummy: return "preFrameAndDummyScope";
         case FrameFullScopeNone: return "preFrameOnly";
         case FrameBacktraceScopeFull: return "preBacktraceAndScope";
-        case FrameBacktraceScopeDummy: return "preBacktraceDummyscope";
+        case FrameBacktraceScopeDummy: return "preBacktraceDummyScope";
         case FrameBacktraceScopeNone:  return "preBacktraceOnly";
         case FrameNoneScopeFull: return "preScopeOnly";
         case FrameNoneScopeDummy: return "preNoFrameDummyScope";
@@ -1076,7 +1076,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         case FrameFullScopeDummy: return "postFrameAndScope";
         case FrameFullScopeNone: return "postFrameOnly";
         case FrameBacktraceScopeFull: return "postBacktraceAndScope";
-        case FrameBacktraceScopeDummy: return "postBacktraceDummyscope";
+        case FrameBacktraceScopeDummy: return "postBacktraceDummyScope";
         case FrameBacktraceScopeNone:  return "postBacktraceOnly";
         case FrameNoneScopeFull: return "postScopeOnly";
         case FrameNoneScopeDummy: return "postNoFrameDummyScope";

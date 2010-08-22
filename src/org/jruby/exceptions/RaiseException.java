@@ -180,10 +180,10 @@ public class RaiseException extends JumpException {
         this.exception = newException;
     }
 
-    private StackTraceElement[] javaTraceFromRubyTrace(ThreadContext.RubyStackTraceElement[] trace) {
+    private StackTraceElement[] javaTraceFromRubyTrace(ThreadContext.Backtrace[] trace) {
         StackTraceElement[] newTrace = new StackTraceElement[trace.length];
         for (int i = 0; i < newTrace.length; i++) {
-            newTrace[i] = trace[i].getElement();
+            newTrace[i] = new StackTraceElement("", trace[i].method, trace[i].filename, trace[i].line);
         }
         return newTrace;
     }

@@ -64,25 +64,25 @@ public class ASTInterpreter {
             context.backtrace.pop();
         }
     }
-    public static IRubyObject INTERPRET_EVAL(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block block) {
+    public static IRubyObject INTERPRET_EVAL(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.backtrace.push(new ThreadContext.Backtrace("(eval)", node.getPosition()));
+            context.backtrace.push(new ThreadContext.Backtrace(name, node.getPosition()));
             return node.interpret(runtime, context, self, block);
         } finally {
             context.backtrace.pop();
         }
     }
-    public static IRubyObject INTERPRET_CLASS(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block block) {
+    public static IRubyObject INTERPRET_CLASS(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.backtrace.push(new ThreadContext.Backtrace("(class)", node.getPosition()));
+            context.backtrace.push(new ThreadContext.Backtrace(name, node.getPosition()));
             return node.interpret(runtime, context, self, block);
         } finally {
             context.backtrace.pop();
         }
     }
-    public static IRubyObject INTERPRET_BLOCK(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block block) {
+    public static IRubyObject INTERPRET_BLOCK(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.backtrace.push(new ThreadContext.Backtrace("(block)", node.getPosition()));
+            context.backtrace.push(new ThreadContext.Backtrace(name, node.getPosition()));
             return node.interpret(runtime, context, self, block);
         } finally {
             context.backtrace.pop();
@@ -121,7 +121,7 @@ public class ASTInterpreter {
             RubyString source = src.convertToString();
             Node node = runtime.parseEval(source.getByteList(), binding.getFile(), evalScope, binding.getLine());
 
-            return INTERPRET_EVAL(runtime, context, node, newSelf, binding.getFrame().getBlock());
+            return INTERPRET_EVAL(runtime, context, node, binding.getMethod(), newSelf, binding.getFrame().getBlock());
         } catch (JumpException.BreakJump bj) {
             throw runtime.newLocalJumpError(RubyLocalJumpError.Reason.BREAK, (IRubyObject)bj.getValue(), "unexpected break");
         } catch (JumpException.RedoJump rj) {
@@ -158,7 +158,7 @@ public class ASTInterpreter {
         try {
             Node node = runtime.parseEval(source.getByteList(), file, evalScope, lineNumber);
 
-            return INTERPRET_EVAL(runtime, context, node, self, Block.NULL_BLOCK);
+            return INTERPRET_EVAL(runtime, context, node, "(eval)", self, Block.NULL_BLOCK);
         } catch (JumpException.BreakJump bj) {
             throw runtime.newLocalJumpError(RubyLocalJumpError.Reason.BREAK, (IRubyObject)bj.getValue(), "unexpected break");
         } catch (StackOverflowError soe) {
@@ -205,7 +205,7 @@ public class ASTInterpreter {
             }
 
             if (bodyNode == null) return runtime.getNil();
-            return INTERPRET_CLASS(runtime, context, bodyNode, type, block);
+            return INTERPRET_CLASS(runtime, context, bodyNode, type.getBaseName() == null ? "(anonymous)" : type.getBaseName(), type, block);
         } finally {
             if (runtime.hasEventHooks()) {
                 callTraceFunction(runtime, context, RubyEvent.END);

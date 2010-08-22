@@ -999,11 +999,9 @@ public class RubyKernel {
     }
 
     private static void printExceptionSummary(ThreadContext context, Ruby runtime, RubyException rEx) {
-        Frame currentFrame = context.getCurrentFrame();
-
         String msg = String.format("Exception `%s' at %s:%s - %s\n",
                 rEx.getMetaClass(),
-                currentFrame.getFile(), currentFrame.getLine() + 1,
+                context.getFile(), context.getLine() + 1,
                 rEx.convertToString().toString());
 
         runtime.getErrorStream().print(msg);
