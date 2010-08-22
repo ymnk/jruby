@@ -927,6 +927,10 @@ public final class ThreadContext {
     }
 
     public static IRubyObject renderBacktraceMRI(Ruby runtime, RubyStackTraceElement[] trace) {
+        if (trace == null) {
+            return runtime.getNil();
+        }
+        
         RubyArray traceArray = RubyArray.newArray(runtime);
 
         for (int i = 0; i < trace.length; i++) {

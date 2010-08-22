@@ -226,7 +226,7 @@ public class RubyInstanceConfig {
             || SafePropertyAccessor.getBoolean("jruby.compile.frameless");
     public static boolean POSITIONLESS_COMPILE_ENABLED
             = FASTEST_COMPILE_ENABLED
-            || SafePropertyAccessor.getBoolean("jruby.compile.positionless");
+            || SafePropertyAccessor.getBoolean("jruby.compile.positionless", true);
     public static boolean THREADLESS_COMPILE_ENABLED
             = FASTEST_COMPILE_ENABLED
             || SafePropertyAccessor.getBoolean("jruby.compile.threadless");

@@ -207,7 +207,6 @@ public class RubyException extends RubyObject {
     @JRubyMethod
     public IRubyObject backtrace() {
         IRubyObject bt = getBacktrace();
-        if (bt == null) bt = getRuntime().getNil();
         return bt;
     }
 
