@@ -989,7 +989,8 @@ public final class ThreadContext {
     public static IRubyObject createHybridBacktrace(Ruby runtime, Backtrace[] backtraceFrames, StackTraceElement[] stackTrace) {
         RubyArray traceArray = RubyArray.newArray(runtime);
 
-        int rubyFrameIndex = backtraceFrames.length - 1;
+        int rubyFrameIndex = backtraceFrames == null ? -1 : backtraceFrames.length - 1;
+        if (stackTrace == null) return runtime.getNil();
         for (int i = 0; i < stackTrace.length; i++) {
             StackTraceElement element = stackTrace[i];
 
@@ -1011,7 +1012,7 @@ public final class ThreadContext {
             // try to mine out a Ruby frame using our list of interpreter entry-point markers
             String classMethod = element.getClassName() + "." + element.getMethodName();
             FrameType frameType = INTERPRETED_FRAMES.get(classMethod);
-            if (frameType != null) {
+            if (frameType != null && rubyFrameIndex >= 0) {
                 // Frame matches one of our markers for "interpreted" calls
                 addBackTraceElement(traceArray, backtraceFrames[rubyFrameIndex], frameType);
                 rubyFrameIndex--;
