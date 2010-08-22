@@ -63,8 +63,7 @@ import org.jruby.util.SafePropertyAccessor;
  */
 @JRubyClass(name="Exception")
 public class RubyException extends RubyObject {
-    private ThreadContext.Backtrace[] backtraceFrames;
-    private StackTraceElement[] javaStackTrace;
+    private ThreadContext.RubyStackTraceElement[] backtraceElements;
     private IRubyObject backtrace;
     public IRubyObject message;
     public static final int TRACE_HEAD = 8;
@@ -138,27 +137,31 @@ public class RubyException extends RubyObject {
         return new RubyException(runtime, excptnClass, msg);
     }
     
-    public void setBacktraceFrames(ThreadContext.Backtrace[] backtraceFrames) {
-        this.backtraceFrames = backtraceFrames;
+    public void setBacktraceElements(ThreadContext.RubyStackTraceElement[] backtraceElements) {
+        this.backtraceElements = backtraceElements;
     }
     
-    public ThreadContext.Backtrace[] getBacktraceFrames() {
-        return backtraceFrames;
+    public ThreadContext.RubyStackTraceElement[] getBacktraceElements() {
+        return backtraceElements;
     }
 
     public void prepareBacktrace(ThreadContext context, boolean nativeException) {
-        ThreadContext.Backtrace[] stackTrace = getBacktraceFrames();
-
         // if it's null, build a backtrace
-        if (stackTrace == null) {
-            stackTrace = context.createBacktrace2(0, nativeException);
-
-            // if it's still null, just use an empty trace
-            if (stackTrace == null) stackTrace = new ThreadContext.Backtrace[0];
-
-            setBacktraceFrames(stackTrace);
+        if (backtraceElements == null) {
+            switch (TRACE_TYPE) {
+            case RAW:
+                backtraceElements = ThreadContext.gatherRawBacktrace(getRuntime(), Thread.currentThread().getStackTrace(), false);
+                break;
+            case RAW_FILTERED:
+                backtraceElements = ThreadContext.gatherRawBacktrace(getRuntime(), Thread.currentThread().getStackTrace(), true);
+                break;
+            default:
+                backtraceElements = context.gatherHybridBacktrace(
+                        context.getRuntime(),
+                        context.createBacktrace2(0, nativeException),
+                        Thread.currentThread().getStackTrace());
+            }
         }
-        this.javaStackTrace = Thread.currentThread().getStackTrace();
     }
     
     public static final int RAW = 0;
@@ -192,25 +195,7 @@ public class RubyException extends RubyObject {
     }
     
     public void initBacktrace() {
-        switch (TRACE_TYPE) {
-        case RAW:
-            backtrace = ThreadContext.createRawBacktrace(getRuntime(), javaStackTrace, false);
-            break;
-        case RAW_FILTERED:
-            backtrace = ThreadContext.createRawBacktrace(getRuntime(), javaStackTrace, true);
-            break;
-        case RUBY_FRAMED:
-        case RUBINIUS:
-            backtrace = ThreadContext.createHybridBacktrace(getRuntime(), backtraceFrames, javaStackTrace);
-//            backtrace = backtraceFrames == null ? getRuntime().getNil() : ThreadContext.createBacktraceFromFrames(getRuntime(), backtraceFrames);
-            break;
-        case RUBY_COMPILED:
-            backtrace = ThreadContext.createRubyCompiledBacktrace(getRuntime(), javaStackTrace);
-            break;
-        case RUBY_HYBRID:
-//            backtrace = ThreadContext.createRubyHybridBacktrace(getRuntime(), backtraceFrames, javaStackTrace, getRuntime().getDebug().isTrue());
-            break;
-        }
+        backtrace = ThreadContext.renderBacktraceMRI(getRuntime(), backtraceElements);
     }
 
     @JRubyMethod(optional = 2, frame = true, visibility = Visibility.PRIVATE)
@@ -221,7 +206,9 @@ public class RubyException extends RubyObject {
 
     @JRubyMethod
     public IRubyObject backtrace() {
-        return getBacktrace(); 
+        IRubyObject bt = getBacktrace();
+        if (bt == null) bt = getRuntime().getNil();
+        return bt;
     }
 
     @JRubyMethod(required = 1)
@@ -317,8 +304,7 @@ public class RubyException extends RubyObject {
     @Override
     public void copySpecialInstanceVariables(IRubyObject clone) {
         RubyException exception = (RubyException)clone;
-        exception.backtraceFrames = backtraceFrames;
-        exception.javaStackTrace = javaStackTrace;
+        exception.backtraceElements = backtraceElements;
         exception.backtrace = backtrace;
         exception.message = message;
     }

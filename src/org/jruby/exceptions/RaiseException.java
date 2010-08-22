@@ -166,7 +166,7 @@ public class RaiseException extends JumpException {
             if (exception instanceof NativeException) {
                 setStackTrace(cachedTrace = ((NativeException)exception).getCause().getStackTrace());
             } else {
-                setStackTrace(cachedTrace = javaTraceFromRubyTrace(exception.getBacktraceFrames()));
+                setStackTrace(cachedTrace = javaTraceFromRubyTrace(exception.getBacktraceElements()));
             }
         }
         return cachedTrace;
@@ -180,10 +180,10 @@ public class RaiseException extends JumpException {
         this.exception = newException;
     }
 
-    private StackTraceElement[] javaTraceFromRubyTrace(ThreadContext.Backtrace[] trace) {
+    private StackTraceElement[] javaTraceFromRubyTrace(ThreadContext.RubyStackTraceElement[] trace) {
         StackTraceElement[] newTrace = new StackTraceElement[trace.length];
         for (int i = 0; i < newTrace.length; i++) {
-            newTrace[i] = new StackTraceElement("", trace[i].method, trace[i].filename, trace[i].line);
+            newTrace[i] = trace[i].getElement();
         }
         return newTrace;
     }

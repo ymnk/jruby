@@ -817,6 +817,15 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         return context.createCallerBacktrace(context.getRuntime(), 0);
     }
 
+    public StackTraceElement[] javaBacktrace() {
+        if (threadImpl instanceof NativeThread) {
+            return ((NativeThread)threadImpl).getThread().getStackTrace();
+        }
+
+        // Future-based threads can't get a Java trace
+        return new StackTraceElement[0];
+    }
+
     private boolean isCurrent() {
         return threadImpl.isCurrent();
     }

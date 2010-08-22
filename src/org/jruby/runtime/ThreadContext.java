@@ -38,6 +38,7 @@ package org.jruby.runtime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.jruby.runtime.scope.ManyVarsDynamicScope;
 
@@ -45,6 +46,7 @@ import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyClass;
 import org.jruby.RubyContinuation.Continuation;
+import org.jruby.RubyException;
 import org.jruby.RubyModule;
 import org.jruby.RubyString;
 import org.jruby.RubyThread;
@@ -658,29 +660,9 @@ public final class ThreadContext {
         addBackTraceElement(backtrace.getRuntime(), backtrace, frame, previousFrame);
     }
     
-    private static void addBackTraceElement(Ruby runtime, RubyArray backtrace, Frame frame, Frame previousFrame) {
-        // TODO: implement Kernel#caller
-        return;
-//        if (frame != previousFrame && // happens with native exceptions, should not filter those out
-//                frame.getLine() == previousFrame.getLine() &&
-//                frame.getName() != null &&
-//                frame.getName().equals(previousFrame.getName()) &&
-//                frame.getFile().equals(previousFrame.getFile())) {
-//            return;
-//        }
-//
-//        RubyString traceLine;
-//        if (previousFrame.getName() != null) {
-//            traceLine = RubyString.newString(runtime, frame.getFile() + ':' + (frame.getLine() + 1) + ":in `" + previousFrame.getName() + '\'');
-//        } else if (runtime.is1_9()) {
-//            // TODO: This probably isn't the best hack, but it works until we can have different
-//            // root frame setup for 1.9 easily.
-//            traceLine = RubyString.newString(runtime, frame.getFile() + ':' + (frame.getLine() + 1) + ":in `<main>'");
-//        } else {
-//            traceLine = RubyString.newString(runtime, frame.getFile() + ':' + (frame.getLine() + 1));
-//        }
-//
-//        backtrace.append(traceLine);
+    private static void addBackTraceElement(Ruby runtime, RubyArray backtrace, RubyStackTraceElement element) {
+        RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ": `" + element.getMethodName() + "'");
+        backtrace.append(str);
     }
     
     private static void addBackTraceElement(Ruby runtime, RubyArray backtrace, Backtrace frame, Backtrace previousFrame) {
@@ -750,11 +732,15 @@ public final class ThreadContext {
      * @return an Array with the backtrace
      */
     public IRubyObject createCallerBacktrace(Ruby runtime, int level) {
-        int traceSize = frameIndex - level + 1;
-        RubyArray backtrace = runtime.newArray(traceSize);
+        RubyStackTraceElement[] trace = gatherHybridBacktrace(
+                runtime,
+                (Backtrace[])backtrace.toArray(new Backtrace[backtrace.size()]),
+                Thread.currentThread().getStackTrace());
+        
+        RubyArray backtrace = runtime.newArray(trace.length - level);
 
-        for (int i = traceSize - 1; i > 0; i--) {
-            addBackTraceElement(runtime, backtrace, frameStack[i], frameStack[i - 1]);
+        for (int i = 0; i < trace.length - level; i++) {
+            addBackTraceElement(runtime, backtrace, trace[i]);
         }
         
         return backtrace;
@@ -821,12 +807,24 @@ public final class ThreadContext {
     }
 
     public static class RubyStackTraceElement {
-        private StackTraceElement element;
-        private boolean binding;
+        private final StackTraceElement element;
+        private final boolean binding;
+        private final FrameType frameType;
+
+        public RubyStackTraceElement(StackTraceElement element) {
+            this.element = element;
+            this.binding = false;
+            this.frameType = FrameType.METHOD;
+        }
 
         public RubyStackTraceElement(String cls, String method, String file, int line, boolean binding) {
-            element = new StackTraceElement(cls, method, file, line);
+            this(cls, method, file, line, binding, FrameType.METHOD);
+        }
+
+        public RubyStackTraceElement(String cls, String method, String file, int line, boolean binding, FrameType frameType) {
+            this.element = new StackTraceElement(cls, method, file, line);
             this.binding = binding;
+            this.frameType = frameType;
         }
 
         public StackTraceElement getElement() {
@@ -851,6 +849,10 @@ public final class ThreadContext {
 
         public String getMethodName() {
             return element.getMethodName();
+        }
+
+        public FrameType getFrameType() {
+            return frameType;
         }
     }
     
@@ -927,23 +929,23 @@ public final class ThreadContext {
         
         return buffer.toString();
     }
-    
-    public static IRubyObject createRawBacktrace(Ruby runtime, StackTraceElement[] stackTrace, boolean filter) {
-        RubyArray traceArray = RubyArray.newArray(runtime);
+
+    public static RubyStackTraceElement[] gatherRawBacktrace(Ruby runtime, StackTraceElement[] stackTrace, boolean filter) {
+        List trace = new ArrayList(stackTrace.length);
+        
         for (int i = 0; i < stackTrace.length; i++) {
             StackTraceElement element = stackTrace[i];
-            
             if (filter) {
                 if (element.getClassName().startsWith("org.jruby") ||
                         element.getLineNumber() < 0) {
                     continue;
                 }
             }
-            RubyString str = RubyString.newString(runtime, createRubyBacktraceString(element));
-            traceArray.append(str);
+            trace.add(new RubyStackTraceElement(element));
         }
-        
-        return traceArray;
+
+        RubyStackTraceElement[] rubyStackTrace = new RubyStackTraceElement[trace.size()];
+        return (RubyStackTraceElement[])trace.toArray(rubyStackTrace);
     }
     
     public static IRubyObject createRubyCompiledBacktrace(Ruby runtime, StackTraceElement[] stackTrace) {
@@ -986,11 +988,11 @@ public final class ThreadContext {
         INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".INTERPRET_ROOT", FrameType.ROOT);
     }
 
-    public static IRubyObject createHybridBacktrace(Ruby runtime, Backtrace[] backtraceFrames, StackTraceElement[] stackTrace) {
-        RubyArray traceArray = RubyArray.newArray(runtime);
+    public static RubyStackTraceElement[] gatherHybridBacktrace(Ruby runtime, Backtrace[] backtraceFrames, StackTraceElement[] stackTrace) {
+        List trace = new ArrayList(stackTrace.length);
 
         int rubyFrameIndex = backtraceFrames == null ? -1 : backtraceFrames.length - 1;
-        if (stackTrace == null) return runtime.getNil();
+        if (stackTrace == null) return null;
         for (int i = 0; i < stackTrace.length; i++) {
             StackTraceElement element = stackTrace[i];
 
@@ -1001,7 +1003,7 @@ public final class ThreadContext {
                 String methodName = element.getMethodName();
 
                 String className = element.getClassName();
-                
+
                 // FIXME: Formalize jitted method structure so this isn't quite as hacky
                 int rubyJitIndex = className.indexOf("ruby.jit.");
                 if (rubyJitIndex == 0) {
@@ -1013,15 +1015,13 @@ public final class ThreadContext {
                 if (RUBYindex >= 0) {
                     methodName = methodName.substring(RUBYindex + "$RUBY$".length());
                 }
-                
-                RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ": `" + methodName + "'");
-                traceArray.append(str);
+
+                trace.add(new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false));
                 continue;
             }
 
             if (runtime.coreMethods.contains(element.getClassName() + "." + element.getMethodName())) {
-                RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ": `" + element.getMethodName() + "'");
-                traceArray.append(str);
+                trace.add(new RubyStackTraceElement(element.getClassName(), element.getMethodName(), element.getFileName(), element.getLineNumber(), false));
                 continue;
             }
 
@@ -1030,7 +1030,8 @@ public final class ThreadContext {
             FrameType frameType = INTERPRETED_FRAMES.get(classMethod);
             if (frameType != null && rubyFrameIndex >= 0) {
                 // Frame matches one of our markers for "interpreted" calls
-                addBackTraceElement(traceArray, backtraceFrames[rubyFrameIndex], frameType);
+                Backtrace rubyElement = backtraceFrames[rubyFrameIndex];
+                trace.add(new RubyStackTraceElement(element.getClassName(), rubyElement.method, rubyElement.filename, rubyElement.line, false));
                 rubyFrameIndex--;
                 continue;
             } else {
@@ -1041,84 +1042,22 @@ public final class ThreadContext {
             }
         }
 
+        RubyStackTraceElement[] rubyStackTrace = new RubyStackTraceElement[trace.size()];
+        return (RubyStackTraceElement[])trace.toArray(rubyStackTrace);
+    }
+
+    public static IRubyObject renderBacktraceMRI(Ruby runtime, RubyStackTraceElement[] trace) {
+        RubyArray traceArray = RubyArray.newArray(runtime);
+
+        for (int i = 0; i < trace.length; i++) {
+            RubyStackTraceElement element = trace[i];
+
+            RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ": `" + element.getMethodName() + "'");
+            traceArray.append(str);
+        }
+
         return traceArray;
     }
-    
-//    public static IRubyObject createRubyHybridBacktrace(Ruby runtime, RubyStackTraceElement[] backtraceFrames, StackTraceElement[] stackTrace, boolean debug) {
-//        RubyArray traceArray = RubyArray.newArray(runtime);
-//        ThreadContext context = runtime.getCurrentContext();
-//
-//        int rubyFrameIndex = backtraceFrames.length - 1;
-//        for (int i = 0; i < stackTrace.length; i++) {
-//            StackTraceElement element = stackTrace[i];
-//
-//            // look for mangling markers for compiled Ruby in method name
-//            int index = element.getMethodName().indexOf("$RUBY$");
-//            if (index >= 0) {
-//                String unmangledMethod = element.getMethodName().substring(index + 6);
-//                RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ":in `" + unmangledMethod + "'");
-//                traceArray.append(str);
-//
-//                // if it's not a rescue or ensure, there's a frame associated, so decrement
-//                if (!(element.getMethodName().contains("__rescue__") || element.getMethodName().contains("__ensure__"))) {
-//                    rubyFrameIndex--;
-//                }
-//                continue;
-//            }
-//
-//            // look for __file__ method name for compiled roots
-//            if (element.getMethodName().equals("__file__")) {
-//                RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ": `<toplevel>'");
-//                traceArray.append(str);
-//                rubyFrameIndex--;
-//                continue;
-//            }
-//
-//            // look for mangling markers for bound, unframed methods in class name
-//            index = element.getClassName().indexOf("$RUBYINVOKER$");
-//            if (index >= 0) {
-//                // unframed invokers have no Ruby frames, so pull from class name
-//                // but use current frame as file and line
-//                String unmangledMethod = element.getClassName().substring(index + 13);
-//                Frame current = context.frameStack[rubyFrameIndex];
-//                RubyString str = RubyString.newString(runtime, current.getFile() + ":" + (current.getLine() + 1) + ":in `" + unmangledMethod + "'");
-//                traceArray.append(str);
-//                continue;
-//            }
-//
-//            // look for mangling markers for bound, framed methods in class name
-//            index = element.getClassName().indexOf("$RUBYFRAMEDINVOKER$");
-//            if (index >= 0) {
-//                // framed invokers will have Ruby frames associated with them
-//                addBackTraceElement(traceArray, backtraceFrames[rubyFrameIndex], backtraceFrames[rubyFrameIndex - 1], FrameType.METHOD);
-//                rubyFrameIndex--;
-//                continue;
-//            }
-//
-//            // try to mine out a Ruby frame using our list of interpreter entry-point markers
-//            String classMethod = element.getClassName() + "." + element.getMethodName();
-//            FrameType frameType = INTERPRETED_FRAMES.get(classMethod);
-//            if (frameType != null) {
-//                // Frame matches one of our markers for "interpreted" calls
-//                if (rubyFrameIndex == 0) {
-//                    addBackTraceElement(traceArray, backtraceFrames[rubyFrameIndex], backtraceFrames[rubyFrameIndex], frameType);
-//                } else {
-//                    addBackTraceElement(traceArray, backtraceFrames[rubyFrameIndex], backtraceFrames[rubyFrameIndex - 1], frameType);
-//                    rubyFrameIndex--;
-//                }
-//                continue;
-//            } else {
-//                // Frame is extraneous runtime information, skip it unless debug
-//                if (debug) {
-//                    RubyString str = RubyString.newString(runtime, createRubyBacktraceString(element));
-//                    traceArray.append(str);
-//                }
-//                continue;
-//            }
-//        }
-//
-//        return traceArray;
-//    }
     
     public void preAdoptThread() {
         pushFrame();
