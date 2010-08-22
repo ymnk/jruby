@@ -911,7 +911,7 @@ public final class ThreadContext {
             if (frameType != null && rubyFrameIndex >= 0) {
                 // Frame matches one of our markers for "interpreted" calls
                 Backtrace rubyElement = backtraceFrames[rubyFrameIndex];
-                trace.add(new RubyStackTraceElement(element.getClassName(), rubyElement.method, rubyElement.filename, rubyElement.line, false));
+                trace.add(new RubyStackTraceElement(element.getClassName(), rubyElement.method, rubyElement.filename, rubyElement.line + 1, false));
                 rubyFrameIndex--;
                 continue;
             } else {
