@@ -73,6 +73,8 @@ public abstract class DynamicMethod {
     protected boolean builtin = false;
     /** Data on what native call will eventually be made */
     protected NativeCall nativeCall;
+    /** The simple, base name this method was defined under. May be null.*/
+    protected String name;
 
     /**
      * Base constructor for dynamic method handles.
@@ -86,6 +88,20 @@ public abstract class DynamicMethod {
     protected DynamicMethod(RubyModule implementationClass, Visibility visibility, CallConfiguration callConfig) {
         assert implementationClass != null;
         init(implementationClass, visibility, callConfig);
+    }
+
+    /**
+     * Base constructor for dynamic method handles with names.
+     *
+     * @param implementationClass The class to which this method will be
+     * immediately bound
+     * @param visibility The visibility assigned to this method
+     * @param callConfig The CallConfiguration to use for this method's
+     * pre/post invocation logic.
+     */
+    protected DynamicMethod(RubyModule implementationClass, Visibility visibility, CallConfiguration callConfig, String name) {
+        this(implementationClass, visibility, callConfig);
+        this.name = name;
     }
 
     /**
@@ -479,6 +495,24 @@ public abstract class DynamicMethod {
      */
     public boolean isNative() {
         return false;
+    }
+
+    /**
+     * Get the base name this method was defined as.
+     *
+     * @return the base name for the method
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Set the base name for this method.
+     *
+     * @param name the name to set
+     */
+    public void setName(String name) {
+        this.name = name;
     }
 
     protected IRubyObject handleRedo(Ruby runtime) throws RaiseException {

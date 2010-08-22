@@ -998,7 +998,23 @@ public final class ThreadContext {
                     (element.getFileName().endsWith(".rb") ||
                     element.getFileName().equals("-e"))) {
                 if (element.getLineNumber() == -1) continue;
-                RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ": `" + element.getMethodName() + "'");
+                String methodName = element.getMethodName();
+
+                String className = element.getClassName();
+                
+                // FIXME: Formalize jitted method structure so this isn't quite as hacky
+                int rubyJitIndex = className.indexOf("ruby.jit.");
+                if (rubyJitIndex == 0) {
+                    methodName = className.substring("ruby.jit.".length(), className.lastIndexOf("_"));
+                }
+
+                // AOT formatted method names, need to be cleaned up
+                int RUBYindex = methodName.indexOf("$RUBY$");
+                if (RUBYindex >= 0) {
+                    methodName = methodName.substring(RUBYindex + "$RUBY$".length());
+                }
+                
+                RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ": `" + methodName + "'");
                 traceArray.append(str);
                 continue;
             }

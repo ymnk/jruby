@@ -56,9 +56,9 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
     private final DefaultMethod realMethod;
     
     public JittedMethod(RubyModule implementationClass, StaticScope staticScope, Script jitCompiledScript,
-            CallConfiguration jitCallConfig, Visibility visibility, Arity arity, ISourcePosition position,
+            String name, CallConfiguration jitCallConfig, Visibility visibility, Arity arity, ISourcePosition position,
             DefaultMethod realMethod) {
-        super(implementationClass, visibility, jitCallConfig);
+        super(implementationClass, visibility, jitCallConfig, name);
         this.position = position;
         this.jitCompiledScript = jitCompiledScript;
         this.staticScope = staticScope;
@@ -273,7 +273,7 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
     }
 
     public DynamicMethod dup() {
-        return new JittedMethod(getImplementationClass(), staticScope, jitCompiledScript, callConfig, getVisibility(), arity, position, realMethod);
+        return new JittedMethod(getImplementationClass(), staticScope, jitCompiledScript, name, callConfig, getVisibility(), arity, position, realMethod);
     }
 
 

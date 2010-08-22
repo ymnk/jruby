@@ -64,8 +64,8 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     private boolean needsScope;
 
     public InterpretedMethod(RubyModule implementationClass, StaticScope staticScope, Node body,
-            ArgsNode argsNode, Visibility visibility, ISourcePosition position) {
-        super(implementationClass, visibility, CallConfiguration.FrameFullScopeFull);
+            String name, ArgsNode argsNode, Visibility visibility, ISourcePosition position) {
+        super(implementationClass, visibility, CallConfiguration.FrameFullScopeFull, name);
         this.body = body;
         this.staticScope = staticScope;
         this.argsNode = argsNode;
@@ -611,6 +611,6 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     }
     
     public DynamicMethod dup() {
-        return new InterpretedMethod(getImplementationClass(), staticScope, body, argsNode, getVisibility(), position);
+        return new InterpretedMethod(getImplementationClass(), staticScope, body, name, argsNode, getVisibility(), position);
     }
 }

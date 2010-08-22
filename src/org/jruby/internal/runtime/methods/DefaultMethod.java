@@ -72,11 +72,11 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     private final InterpretedMethod interpretedMethod;
 
     public DefaultMethod(RubyModule implementationClass, StaticScope staticScope, Node body,
-            ArgsNode argsNode, Visibility visibility, ISourcePosition position) {
-        super(implementationClass, visibility, CallConfiguration.FrameFullScopeFull);
+            String name, ArgsNode argsNode, Visibility visibility, ISourcePosition position) {
+        super(implementationClass, visibility, CallConfiguration.FrameFullScopeFull, name);
         this.interpretedMethod = DynamicMethodFactory.newInterpretedMethod(
                 implementationClass.getRuntime(), implementationClass, staticScope,
-                body, argsNode, visibility, position);
+                body, name, argsNode, visibility, position);
         this.box.actualMethod = interpretedMethod;
         this.argsNode = argsNode;
         this.body = body;
@@ -121,13 +121,13 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     public void switchToJitted(Script jitCompiledScript, CallConfiguration jitCallConfig) {
         this.box.actualMethod = DynamicMethodFactory.newJittedMethod(
                 getImplementationClass().getRuntime(), getImplementationClass(),
-                staticScope, jitCompiledScript, jitCallConfig, getVisibility(), argsNode.getArity(), position,
+                staticScope, jitCompiledScript, name, jitCallConfig, getVisibility(), argsNode.getArity(), position,
                 this);
         this.box.callCount = -1;
         getImplementationClass().invalidateCacheDescendants();
     }
 
-    private DynamicMethod tryJitReturnMethod(ThreadContext context, String name) {
+    private DynamicMethod tryJitReturnMethod(ThreadContext context) {
         context.getRuntime().getJITCompiler().tryJIT(this, context, name);
         return box.actualMethod;
     }
@@ -135,7 +135,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, args, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, args, block);
         }
         
         return box.actualMethod.call(context, self, clazz, name, args, block);
@@ -144,7 +144,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, args);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, args);
         }
 
         return box.actualMethod.call(context, self, clazz, name, args);
@@ -153,7 +153,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name);
+            return tryJitReturnMethod(context).call(context, self, clazz, name);
         }
 
         return box.actualMethod.call(context, self, clazz, name );
@@ -161,7 +161,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, block);
@@ -169,7 +169,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0);
@@ -177,7 +177,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, block);
@@ -185,7 +185,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0, arg1);
@@ -193,7 +193,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, arg1, block);
@@ -201,7 +201,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0, arg1, arg2);
@@ -209,7 +209,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, arg1, arg2, block);
@@ -217,7 +217,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0, arg1, arg2, arg3);
@@ -225,7 +225,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, arg1, arg2, arg3, block);
@@ -233,7 +233,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0, arg1, arg2, arg3, arg4);
@@ -241,7 +241,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, block);
@@ -249,7 +249,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0, arg1, arg2, arg3, arg4, arg5);
@@ -257,7 +257,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, block);
@@ -265,7 +265,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0, arg1, arg2, arg3, arg4, arg5, arg6);
@@ -273,7 +273,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, block);
@@ -281,7 +281,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
@@ -289,7 +289,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, block);
@@ -297,7 +297,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, IRubyObject arg8) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
@@ -305,7 +305,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, IRubyObject arg8, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, block);
@@ -313,7 +313,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, IRubyObject arg8, IRubyObject arg9) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
         }
 
         return box.actualMethod.call(context, self, clazz, name , arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
@@ -321,7 +321,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, IRubyObject arg8, IRubyObject arg9, Block block) {
         if (box.callCount >= 0) {
-            return tryJitReturnMethod(context, name).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, block);
+            return tryJitReturnMethod(context).call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, block);
         }
 
         return box.actualMethod.call(context, self, clazz, name, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, block);
@@ -346,7 +346,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     }
 
     public DynamicMethod dup() {
-        DefaultMethod newMethod = new DefaultMethod(getImplementationClass(), staticScope, body, argsNode, getVisibility(), position);
+        DefaultMethod newMethod = new DefaultMethod(getImplementationClass(), staticScope, body, name, argsNode, getVisibility(), position);
         newMethod.setIsBuiltin(this.builtin);
         newMethod.box = this.box;
         return newMethod;

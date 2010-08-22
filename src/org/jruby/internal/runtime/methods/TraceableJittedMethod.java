@@ -56,9 +56,9 @@ public class TraceableJittedMethod extends DynamicMethod {
     private final DefaultMethod realMethod;
     
     public TraceableJittedMethod(RubyModule implementationClass, StaticScope staticScope, Script jitCompiledScript,
-            CallConfiguration jitCallConfig, Visibility visibility, Arity arity, ISourcePosition position,
+            String name, CallConfiguration jitCallConfig, Visibility visibility, Arity arity, ISourcePosition position,
             DefaultMethod realMethod) {
-        super(implementationClass, visibility, jitCallConfig);
+        super(implementationClass, visibility, jitCallConfig, name);
         this.position = position;
         this.jitCompiledScript = jitCompiledScript;
         this.staticScope = staticScope;
@@ -279,7 +279,7 @@ public class TraceableJittedMethod extends DynamicMethod {
     }
 
     public DynamicMethod dup() {
-        return new TraceableJittedMethod(getImplementationClass(), staticScope, jitCompiledScript, callConfig, getVisibility(), arity, position, realMethod);
+        return new TraceableJittedMethod(getImplementationClass(), staticScope, jitCompiledScript, name, callConfig, getVisibility(), arity, position, realMethod);
     }
 
 
