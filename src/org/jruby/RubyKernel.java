@@ -974,10 +974,13 @@ public class RubyKernel {
                 }
                 break;
         }
+        
+        raise.preRaise(context);
+
         if (runtime.getDebug().isTrue()) {
             printExceptionSummary(context, runtime, raise.getException());
         }
-        raise.preRaise(context);
+
         throw raise;
     }
 
@@ -999,9 +1002,11 @@ public class RubyKernel {
     }
 
     private static void printExceptionSummary(ThreadContext context, Ruby runtime, RubyException rEx) {
+        ThreadContext.RubyStackTraceElement[] elements = rEx.getBacktraceElements();
+        ThreadContext.RubyStackTraceElement firstElement = elements[0];
         String msg = String.format("Exception `%s' at %s:%s - %s\n",
                 rEx.getMetaClass(),
-                context.getFile(), context.getLine() + 1,
+                firstElement.getFileName(), firstElement.getLineNumber(),
                 rEx.convertToString().toString());
 
         runtime.getErrorStream().print(msg);

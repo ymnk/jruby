@@ -49,15 +49,16 @@ public class TestRubyException extends TestCase {
 		exception = new RubyException(interpreter, interpreter.getClass("StandardError"), "test");
 	}
 
-	public void testPrintBacktraceWithHiddenLevels() throws Exception {
-		setBackTrace(19);
-		
-		String[] lines = printError();
-        
-		assertEquals(expectedTraceLine(1), lines[0]);
-		assertEquals("\t ... 7 levels...", lines[RubyException.TRACE_HEAD]);
-		assertEquals(expectedTraceLine(16), lines[RubyException.TRACE_HEAD + 1]);
-	}
+	// With the new backtrace logic, we are no longer hiding any backtrace levels
+	// public void testPrintBacktraceWithHiddenLevels() throws Exception {
+	// 	setBackTrace(19);
+	// 	
+	// 	String[] lines = printError();
+	//         
+	// 	assertEquals(expectedTraceLine(1), lines[0]);
+	// 	assertEquals("\t ... 7 levels...", lines[RubyException.TRACE_HEAD]);
+	// 	assertEquals(expectedTraceLine(16), lines[RubyException.TRACE_HEAD + 1]);
+	// }
 	
 	public void testPrintBacktrace() throws Exception {
 		setBackTrace(18);
