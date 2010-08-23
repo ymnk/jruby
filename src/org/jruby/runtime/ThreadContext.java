@@ -936,7 +936,7 @@ public final class ThreadContext {
         for (int i = 0; i < trace.length; i++) {
             RubyStackTraceElement element = trace[i];
 
-            RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ": `" + element.getMethodName() + "'");
+            RubyString str = RubyString.newString(runtime, element.getFileName() + ":" + element.getLineNumber() + ":in `" + element.getMethodName() + "'");
             traceArray.append(str);
         }
 

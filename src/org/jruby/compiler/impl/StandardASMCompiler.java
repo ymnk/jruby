@@ -413,19 +413,25 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         
         cacheCompiler = new InheritedCacheCompiler(this);
 
-        String sourceNoPath;
-        if (sourcename.indexOf("/") >= 0) {
-            String[] pathElements = sourcename.split("/");
-            sourceNoPath = pathElements[pathElements.length - 1];
-        } else if (sourcename.indexOf("\\") >= 0) {
-            String[] pathElements = sourcename.split("\\\\");
-            sourceNoPath = pathElements[pathElements.length - 1];
-        } else {
-            sourceNoPath = sourcename;
-        }
+        // This code was originally used to provide debugging info using JSR-45
+        // "SMAP" format. However, it breaks using normal Java traces to
+        // generate Ruby traces, since the original path is lost. Reverting
+        // to full path for now.
+//        String sourceNoPath;
+//        if (sourcename.indexOf("/") >= 0) {
+//            String[] pathElements = sourcename.split("/");
+//            sourceNoPath = pathElements[pathElements.length - 1];
+//        } else if (sourcename.indexOf("\\") >= 0) {
+//            String[] pathElements = sourcename.split("\\\\");
+//            sourceNoPath = pathElements[pathElements.length - 1];
+//        } else {
+//            sourceNoPath = sourcename;
+//        }
 
         final File sourceFile = new File(getSourcename());
-        classWriter.visitSource(sourceNoPath, sourceFile.getAbsolutePath());
+        // Revert to using original sourcename here, so that jitted traces match
+        // interpreted traces.
+        classWriter.visitSource(sourcename, sourceFile.getAbsolutePath());
     }
 
     public void endScript(boolean generateLoad, boolean generateMain) {
