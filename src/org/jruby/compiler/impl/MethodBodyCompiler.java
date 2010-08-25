@@ -17,11 +17,9 @@ import static org.objectweb.asm.Opcodes.*;
  */
 public class MethodBodyCompiler extends RootScopedBodyCompiler {
     protected boolean specificArity;
-    protected String rubyName;
 
     public MethodBodyCompiler(StandardASMCompiler scriptCompiler, String rubyName, String javaName, ASTInspector inspector, StaticScope scope) {
-        super(scriptCompiler, javaName, inspector, scope);
-        this.rubyName = rubyName;
+        super(scriptCompiler, javaName, rubyName, inspector, scope);
     }
 
     public boolean isSpecificArity() {

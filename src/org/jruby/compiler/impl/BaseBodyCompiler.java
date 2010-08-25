@@ -29,7 +29,6 @@ import org.jruby.RubyHash;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyMatchData;
 import org.jruby.RubyModule;
-import org.jruby.RubyNil;
 import org.jruby.RubyProc;
 import org.jruby.RubyRange;
 import org.jruby.RubyRegexp;
@@ -93,13 +92,15 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     protected StaticScope scope;
     protected ASTInspector inspector;
     protected String methodName;
+    protected String rubyName;
     protected StandardASMCompiler script;
 
-    public BaseBodyCompiler(StandardASMCompiler scriptCompiler, String methodName, ASTInspector inspector, StaticScope scope) {
+    public BaseBodyCompiler(StandardASMCompiler scriptCompiler, String methodName, String rubyName, ASTInspector inspector, StaticScope scope) {
         this.script = scriptCompiler;
         this.scope = scope;
         this.inspector = inspector;
         this.methodName = methodName;
+        this.rubyName = rubyName;
         this.argParamCount = getActualArgsCount(scope);
 
         method = new SkinnyMethodAdapter(script.getClassVisitor().visitMethod(ACC_PUBLIC | ACC_STATIC, methodName, getSignature(), null, null));
@@ -123,6 +124,10 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
     public String getNativeMethodName() {
         return methodName;
+    }
+
+    public String getRubyName() {
+        return rubyName;
     }
 
     protected boolean shouldUseBoxedArgs(StaticScope scope) {
@@ -976,7 +981,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
             ASTInspector inspector) {
         String closureMethodName = "block_" + script.getAndIncrementInnerIndex() + "$RUBY$" + "__block__";
 
-        ChildScopedBodyCompiler closureCompiler = new ChildScopedBodyCompiler(script, closureMethodName, inspector, scope);
+        ChildScopedBodyCompiler closureCompiler = new ChildScopedBodyCompiler(script, closureMethodName, rubyName, inspector, scope);
 
         closureCompiler.beginMethod(args, scope);
 
@@ -1007,7 +1012,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
             ASTInspector inspector) {
         String closureMethodName = "block_" + script.getAndIncrementInnerIndex() + "$RUBY$" + "__block__";
 
-        ChildScopedBodyCompiler19 closureCompiler = new ChildScopedBodyCompiler19(script, closureMethodName, inspector, scope);
+        ChildScopedBodyCompiler19 closureCompiler = new ChildScopedBodyCompiler19(script, closureMethodName, rubyName, inspector, scope);
 
         closureCompiler.beginMethod(args, scope);
 
@@ -1030,7 +1035,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     public void runBeginBlock(StaticScope scope, CompilerCallback body) {
         String closureMethodName = "block_" + script.getAndIncrementInnerIndex() + "$RUBY$__begin__";
 
-        ChildScopedBodyCompiler closureCompiler = new ChildScopedBodyCompiler(script, closureMethodName, null, scope);
+        ChildScopedBodyCompiler closureCompiler = new ChildScopedBodyCompiler(script, closureMethodName, rubyName, null, scope);
 
         closureCompiler.beginMethod(null, scope);
 
@@ -1054,7 +1059,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     public void createNewForLoop(int arity, CompilerCallback body, CompilerCallback args, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector) {
         String closureMethodName = "block_" + script.getAndIncrementInnerIndex() + "$RUBY$__for__";
 
-        ChildScopedBodyCompiler closureCompiler = new ChildScopedBodyCompiler(script, closureMethodName, inspector, scope);
+        ChildScopedBodyCompiler closureCompiler = new ChildScopedBodyCompiler(script, closureMethodName, rubyName, inspector, scope);
 
         closureCompiler.beginMethod(args, null);
 
@@ -1079,7 +1084,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     public void createNewEndBlock(CompilerCallback body) {
         String closureMethodName = "block_" + script.getAndIncrementInnerIndex() + "$RUBY$__end__";
 
-        ChildScopedBodyCompiler closureCompiler = new ChildScopedBodyCompiler(script, closureMethodName, null, scope);
+        ChildScopedBodyCompiler closureCompiler = new ChildScopedBodyCompiler(script, closureMethodName, rubyName, null, scope);
 
         closureCompiler.beginMethod(null, null);
 
@@ -1551,7 +1556,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     }
 
     protected String getNewRescueName() {
-        return "rescue_" + (script.getAndIncrementRescueNumber()) + "$RUBY$__rescue__";
+        return "rescue_" + (script.getAndIncrementRescueNumber()) + "$RUBY$SYNTHETIC" + getRubyName();
     }
 
     public void storeExceptionInErrorInfo() {
@@ -2201,14 +2206,17 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
             final CompilerCallback receiverCallback,
             final ASTInspector inspector) {
         String classMethodName = null;
+        String rubyName;
         if (receiverCallback == null) {
             String mangledName = JavaNameMangler.mangleStringForCleanJavaIdentifier(name);
             classMethodName = "class_" + script.getAndIncrementMethodIndex() + "$RUBY$" + mangledName;
+            rubyName = mangledName;
         } else {
             classMethodName = "sclass_" + script.getAndIncrementMethodIndex() + "$RUBY$__singleton__";
+            rubyName = "__singleton__";
         }
 
-        final RootScopedBodyCompiler classBody = new ClassBodyCompiler(script, classMethodName, inspector, staticScope);
+        final RootScopedBodyCompiler classBody = new ClassBodyCompiler(script, classMethodName, rubyName, inspector, staticScope);
 
         CompilerCallback bodyPrep = new CompilerCallback() {
             public void call(BodyCompiler context) {
@@ -2325,7 +2333,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         String mangledName = JavaNameMangler.mangleStringForCleanJavaIdentifier(name);
         String moduleMethodName = "module__" + script.getAndIncrementMethodIndex() + "$RUBY$" + mangledName;
 
-        final RootScopedBodyCompiler classBody = new ClassBodyCompiler(script, moduleMethodName, inspector, staticScope);
+        final RootScopedBodyCompiler classBody = new ClassBodyCompiler(script, moduleMethodName, mangledName, inspector, staticScope);
 
         CompilerCallback bodyPrep = new CompilerCallback() {
 

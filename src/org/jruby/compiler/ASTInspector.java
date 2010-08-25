@@ -651,6 +651,7 @@ public class ASTInspector {
             break;
         case SCLASSNODE:
             setFlag(CLASS);
+            setFlag(FRAME_AWARE);
             SClassNode sclassNode = (SClassNode)node;
             inspect(sclassNode.getReceiverNode());
             break;

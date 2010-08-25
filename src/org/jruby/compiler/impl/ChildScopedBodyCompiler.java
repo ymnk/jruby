@@ -1,6 +1,5 @@
 package org.jruby.compiler.impl;
 
-import org.jruby.Ruby;
 import org.jruby.compiler.ASTInspector;
 import org.jruby.compiler.CompilerCallback;
 import org.jruby.compiler.NotCompilableException;
@@ -14,8 +13,8 @@ import static org.jruby.util.CodegenUtils.*;
 
 public class ChildScopedBodyCompiler extends BaseBodyCompiler {
 
-    public ChildScopedBodyCompiler(StandardASMCompiler scriptCompiler, String closureMethodName, ASTInspector inspector, StaticScope scope) {
-        super(scriptCompiler, closureMethodName, inspector, scope);
+    public ChildScopedBodyCompiler(StandardASMCompiler scriptCompiler, String closureMethodName, String rubyName, ASTInspector inspector, StaticScope scope) {
+        super(scriptCompiler, closureMethodName, rubyName, inspector, scope);
     }
 
     @Override
@@ -65,10 +64,11 @@ public class ChildScopedBodyCompiler extends BaseBodyCompiler {
             method.aload(i);
         }
         // we append an index to ensure two identical method names will not conflict
-        methodName = methodName + "_" + script.getAndIncrementMethodIndex();
+        // TODO: make this match general method name structure with SYNTHETIC in place
+        methodName = "chained_" + script.getAndIncrementMethodIndex() + "_" + methodName;
         method.invokestatic(script.getClassname(), methodName, getSignature());
 
-        ChainedChildBodyCompiler methodCompiler = new ChainedChildBodyCompiler(script, methodName, inspector, scope, this);
+        ChainedChildBodyCompiler methodCompiler = new ChainedChildBodyCompiler(script, methodName, rubyName, inspector, scope, this);
 
         methodCompiler.beginChainedMethod();
 

@@ -894,12 +894,37 @@ public final class ThreadContext {
                 int rubyJitIndex = className.indexOf("ruby.jit.");
                 if (rubyJitIndex == 0) {
                     methodName = className.substring("ruby.jit.".length(), className.lastIndexOf("_"));
+                    trace.add(new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false));
+
+                    // if it's a synthetic call, use it but gobble up parent calls
+                    // TODO: need to formalize this better
+                    if (element.getMethodName().contains("$RUBY$SYNTHETIC")) {
+                        // gobble up at least one parent, and keep going if there's more synthetic frames
+                        while (element.getMethodName().indexOf("$RUBY$SYNTHETIC") != -1) {
+                            i++;
+                            element = stackTrace[i];
+                        }
+                        continue;
+                    }
                 }
 
                 // AOT formatted method names, need to be cleaned up
                 int RUBYindex = methodName.indexOf("$RUBY$");
                 if (RUBYindex >= 0) {
                     methodName = methodName.substring(RUBYindex + "$RUBY$".length());
+                    // if it's a synthetic call, use it but gobble up parent calls
+                    // TODO: need to formalize this better
+                    if (methodName.startsWith("SYNTHETIC")) {
+                        methodName = methodName.substring("SYNTHETIC".length());
+                        trace.add(new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false));
+
+                        // gobble up at least one parent, and keep going if there's more synthetic frames
+                        while (element.getMethodName().indexOf("$RUBY$SYNTHETIC") != -1) {
+                            i++;
+                            element = stackTrace[i];
+                        }
+                        continue;
+                    }
                 }
 
                 trace.add(new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false));

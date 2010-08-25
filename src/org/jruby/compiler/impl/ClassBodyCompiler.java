@@ -9,8 +9,8 @@ import org.jruby.runtime.builtin.IRubyObject;
 import static org.jruby.util.CodegenUtils.*;
 
 public class ClassBodyCompiler extends RootScopedBodyCompiler {
-    public ClassBodyCompiler(StandardASMCompiler scriptCompiler, String friendlyName, ASTInspector inspector, StaticScope scope) {
-        super(scriptCompiler, friendlyName, inspector, scope);
+    public ClassBodyCompiler(StandardASMCompiler scriptCompiler, String friendlyName, String rubyName, ASTInspector inspector, StaticScope scope) {
+        super(scriptCompiler, friendlyName, rubyName, inspector, scope);
     }
 
     @Override
