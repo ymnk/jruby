@@ -36,7 +36,6 @@
 package org.jruby.runtime;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +45,6 @@ import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyClass;
 import org.jruby.RubyContinuation.Continuation;
-import org.jruby.RubyException;
 import org.jruby.RubyModule;
 import org.jruby.RubyString;
 import org.jruby.RubyThread;
@@ -505,29 +503,29 @@ public final class ThreadContext {
     }
     
     public String getFile() {
-        return file;
+        return backtrace.peek().filename;
     }
     
     public int getLine() {
-        return line;
+        return backtrace.peek().line;
     }
     
     public void setFile(String file) {
-        backtrace.get(backtrace.size() - 1).filename = file;
+        backtrace.peek().filename = file;
     }
     
     public void setLine(int line) {
-        backtrace.get(backtrace.size() - 1).line = line;
+        backtrace.peek().line = line;
     }
     
     public void setFileAndLine(String file, int line) {
-        backtrace.get(backtrace.size() - 1).filename = file;
-        backtrace.get(backtrace.size() - 1).line = line;
+        backtrace.peek().filename = file;
+        backtrace.peek().line = line;
     }
 
     public void setFileAndLine(ISourcePosition position) {
-        backtrace.get(backtrace.size() - 1).filename = position.getFile();
-        backtrace.get(backtrace.size() - 1).line = position.getStartLine();
+        backtrace.peek().filename = position.getFile();
+        backtrace.peek().line = position.getStartLine();
     }
     
     public Visibility getCurrentVisibility() {
@@ -561,7 +559,7 @@ public final class ThreadContext {
     }
     
     public void trace(RubyEvent event, String name, RubyModule implClass) {
-        trace(event, name, implClass, file, line);
+        trace(event, name, implClass, backtrace.peek().filename, backtrace.peek().line);
     }
 
     public void trace(RubyEvent event, String name, RubyModule implClass, String file, int line) {
@@ -764,6 +762,10 @@ public final class ThreadContext {
         public FrameType getFrameType() {
             return frameType;
         }
+
+        public String toString() {
+            return element.toString();
+        }
     }
     
     /**
@@ -868,6 +870,10 @@ public final class ThreadContext {
         INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".INTERPRET_ROOT", FrameType.ROOT);
     }
 
+    public static RubyStackTraceElement[] gatherHybridBacktrace(Ruby runtime, List<Backtrace> backtrace, StackTraceElement[] stackTrace) {
+        return gatherHybridBacktrace(runtime, backtrace.toArray(new Backtrace[backtrace.size()]), stackTrace);
+    }
+
     public static RubyStackTraceElement[] gatherHybridBacktrace(Ruby runtime, Backtrace[] backtraceFrames, StackTraceElement[] stackTrace) {
         List trace = new ArrayList(stackTrace.length);
 
@@ -911,7 +917,7 @@ public final class ThreadContext {
             if (frameType != null && rubyFrameIndex >= 0) {
                 // Frame matches one of our markers for "interpreted" calls
                 Backtrace rubyElement = backtraceFrames[rubyFrameIndex];
-                trace.add(new RubyStackTraceElement(element.getClassName(), rubyElement.method, rubyElement.filename, rubyElement.line + 1, false));
+                trace.add(new RubyStackTraceElement("RUBY", rubyElement.method, rubyElement.filename, rubyElement.line + 1, false));
                 rubyFrameIndex--;
                 continue;
             } else {

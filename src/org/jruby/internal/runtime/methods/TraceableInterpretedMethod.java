@@ -34,7 +34,6 @@ import org.jruby.ast.Node;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Block;
-import org.jruby.runtime.RubyEvent;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -47,7 +46,6 @@ public class TraceableInterpretedMethod extends InterpretedMethod {
     private Node body;
     private ArgsNode argsNode;
     private ISourcePosition position;
-    private String name;
 
     public TraceableInterpretedMethod(RubyModule implementationClass, StaticScope staticScope, Node body,
             String name, ArgsNode argsNode, Visibility visibility, ISourcePosition position) {
@@ -65,23 +63,26 @@ public class TraceableInterpretedMethod extends InterpretedMethod {
     protected void pre(ThreadContext context, String name, IRubyObject self, Block block, Ruby runtime) {
         context.preMethodFrameAndScope(getImplementationClass(), name, self, block, staticScope);
 
-        if (runtime.hasEventHooks()) traceCall(context, runtime, name);
+        // disabled now because it happens in ASTInterpreter.INTERPRET_METHOD
+//        if (runtime.hasEventHooks()) traceCall(context, runtime, name);
     }
 
     @Override
     protected void post(Ruby runtime, ThreadContext context, String name) {
-        if (runtime.hasEventHooks()) traceReturn(context, runtime, name);
+        // disabled now because it happens in ASTInterpreter.INTERPRET_METHOD
+//        if (runtime.hasEventHooks()) traceReturn(context, runtime, name);
 
         context.postMethodFrameAndScope();
     }
 
-    private void traceReturn(ThreadContext context, Ruby runtime, String name) {
-        runtime.callEventHooks(context, RubyEvent.RETURN, context.getFile(), context.getLine(), name, getImplementationClass());
-    }
-    
-    private void traceCall(ThreadContext context, Ruby runtime, String name) {
-        runtime.callEventHooks(context, RubyEvent.CALL, position.getFile(), position.getStartLine(), name, getImplementationClass());
-    }
+        // disabled now because it happens in ASTInterpreter.INTERPRET_METHOD
+//    private void traceReturn(ThreadContext context, Ruby runtime, String name) {
+//        context.trace(RubyEvent.RETURN, name, getImplementationClass());
+//    }
+//
+//    private void traceCall(ThreadContext context, Ruby runtime, String name) {
+//        context.trace(RubyEvent.CALL, name, getImplementationClass());
+//    }
 
     @Override
     public DynamicMethod dup() {

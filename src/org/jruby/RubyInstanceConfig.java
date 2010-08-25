@@ -1164,6 +1164,7 @@ public class RubyInstanceConfig {
                         break FOR;
                     } else if (argument.equals("--debug")) {
                         FULL_TRACE_ENABLED = true;
+                        compileMode = CompileMode.OFF;
                         break FOR;
                     } else if (argument.equals("--jdb")) {
                         debug = true;
