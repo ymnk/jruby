@@ -1,6 +1,5 @@
 package org.jruby.runtime.callsite;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.jruby.RubyClass;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyFloat;

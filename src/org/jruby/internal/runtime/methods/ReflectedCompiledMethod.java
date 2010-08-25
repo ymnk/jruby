@@ -63,6 +63,7 @@ public class ReflectedCompiledMethod extends CompiledMethod {
         callConfig.pre(context, self, getImplementationClass(), name, block, staticScope);
         
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
         try {
             boolean isTrace = runtime.hasEventHooks();
             try {
@@ -83,7 +84,7 @@ public class ReflectedCompiledMethod extends CompiledMethod {
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof JumpException.ReturnJump) {
-                return handleReturn(context, (JumpException.ReturnJump)cause);
+                return handleReturn(context, (JumpException.ReturnJump)cause, callNumber);
             } else if (cause instanceof JumpException.RedoJump) {
                 return handleRedo(runtime);
             } else if (cause instanceof RuntimeException) {

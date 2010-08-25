@@ -355,6 +355,26 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         mv.visitCode();
         mv.line(-1);
 
+        // save off callNumber
+        mv.aload(1);
+        mv.getfield(p(ThreadContext.class), "callNumber", ci(int.class));
+        int callNumberIndex = -1;
+        if (specificArity) {
+            switch (scope.getRequiredArgs()) {
+            case -1:
+                callNumberIndex = ARGS_INDEX + 1/*args*/ + 1/*block*/ + 1;
+                break;
+            case 0:
+                callNumberIndex = ARGS_INDEX + 1/*block*/ + 1;
+                break;
+            default:
+                callNumberIndex = ARGS_INDEX + scope.getRequiredArgs() + 1/*block*/ + 1;
+            }
+        } else {
+            callNumberIndex = ARGS_INDEX + 1/*block*/ + 1;
+        }
+        mv.istore(callNumberIndex);
+
         // invoke pre method stuff
         if (!callConfig.isNoop() || RubyInstanceConfig.FULL_TRACE_ENABLED) {
             if (specificArity) {
@@ -364,22 +384,23 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
             }
         }
 
+        // pre-call trace
         int traceBoolIndex = -1;
         if (RubyInstanceConfig.FULL_TRACE_ENABLED) {
             // load and store trace enabled flag
             if (specificArity) {
                 switch (scope.getRequiredArgs()) {
                 case -1:
-                    traceBoolIndex = ARGS_INDEX + 1/*block*/ + 1;
+                    traceBoolIndex = ARGS_INDEX + 1/*args*/ + 1/*block*/ + 2;
                     break;
                 case 0:
-                    traceBoolIndex = ARGS_INDEX + 1/*block*/;
+                    traceBoolIndex = ARGS_INDEX + 1/*block*/ + 2;
                     break;
                 default:
-                    traceBoolIndex = ARGS_INDEX + scope.getRequiredArgs() + 1/*block*/ + 1;
+                    traceBoolIndex = ARGS_INDEX + scope.getRequiredArgs() + 1/*block*/ + 2;
                 }
             } else {
-                traceBoolIndex = ARGS_INDEX + 1/*block*/ + 1;
+                traceBoolIndex = ARGS_INDEX + 1/*block*/ + 2;
             }
 
             mv.aload(1);
@@ -449,7 +470,8 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
                 mv.swap();
                 mv.aload(1);
                 mv.swap();
-                mv.invokevirtual(COMPILED_SUPER_CLASS, "handleReturn", sig(IRubyObject.class, ThreadContext.class, JumpException.ReturnJump.class));
+                mv.iload(callNumberIndex);
+                mv.invokevirtual(COMPILED_SUPER_CLASS, "handleReturn", sig(IRubyObject.class, ThreadContext.class, JumpException.ReturnJump.class, int.class));
                 mv.label(doReturnFinally);
 
                 // finally

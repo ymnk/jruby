@@ -519,15 +519,15 @@ public abstract class DynamicMethod {
         throw runtime.newLocalJumpError(RubyLocalJumpError.Reason.REDO, runtime.getNil(), "unexpected redo");
     }
 
-    protected IRubyObject handleReturn(ThreadContext context, JumpException.ReturnJump rj) {
-        if (rj.getTarget() == context.getFrameJumpTarget()) {
+    protected IRubyObject handleReturn(ThreadContext context, JumpException.ReturnJump rj, int callNumber) {
+        if (rj.getTarget() == callNumber) {
             return (IRubyObject) rj.getValue();
         }
         throw rj;
     }
 
-    protected IRubyObject handleBreak(ThreadContext context, Ruby runtime, JumpException.BreakJump bj) {
-        if (bj.getTarget() == context.getFrameJumpTarget()) {
+    protected IRubyObject handleBreak(ThreadContext context, Ruby runtime, JumpException.BreakJump bj, int callNumber) {
+        if (bj.getTarget() == callNumber) {
             throw runtime.newLocalJumpError(RubyLocalJumpError.Reason.BREAK, runtime.getNil(), "unexpected break");
         }
         throw bj;

@@ -104,6 +104,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
         assert args != null;
         
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -112,11 +113,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -130,6 +131,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -138,11 +140,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -151,6 +153,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -159,11 +162,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -171,6 +174,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -179,11 +183,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -192,6 +196,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -200,11 +205,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -212,6 +217,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -220,11 +226,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -233,6 +239,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -241,11 +248,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -253,6 +260,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -261,11 +269,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -274,6 +282,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -282,11 +291,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -294,6 +303,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -302,11 +312,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -315,6 +325,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -323,11 +334,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -335,6 +346,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -343,11 +355,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -356,6 +368,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -364,11 +377,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -376,6 +389,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -384,11 +398,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -397,6 +411,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -405,11 +420,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -417,6 +432,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -425,11 +441,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -438,6 +454,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -446,11 +463,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -458,6 +475,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -466,11 +484,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -479,6 +497,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -487,11 +506,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -499,6 +518,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, IRubyObject arg8) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -507,11 +527,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -520,6 +540,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, IRubyObject arg8, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -528,11 +549,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -540,6 +561,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, IRubyObject arg8, IRubyObject arg9) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, Block.NULL_BLOCK, runtime);
@@ -548,11 +570,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -561,6 +583,7 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, IRubyObject arg4, IRubyObject arg5, IRubyObject arg6, IRubyObject arg7, IRubyObject arg8, IRubyObject arg9, Block block) {
         Ruby runtime = context.getRuntime();
+        int callNumber = context.callNumber;
 
         try {
             pre(context, name, self, block, runtime);
@@ -569,11 +592,11 @@ public class InterpretedMethod extends DynamicMethod implements MethodArgs, Posi
 
             return ASTInterpreter.INTERPRET_METHOD(runtime, context, position, body, name, self, block);
         } catch (JumpException.ReturnJump rj) {
-            return handleReturn(context, rj);
+            return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
         } catch (JumpException.BreakJump bj) {
-            return handleBreak(context, runtime, bj);
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
