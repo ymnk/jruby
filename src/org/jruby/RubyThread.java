@@ -270,8 +270,9 @@ public class RubyThread extends RubyObject implements ExecutionContext {
             } else {
                 Thread thread = new Thread(runnable);
                 thread.setDaemon(true);
+                thread.setName("Ruby" + thread.getName() + ": " + context.getFile() + ":" + (context.getLine() + 1));
                 threadImpl = new NativeThread(this, thread);
-            
+
                 addToCorrectThreadGroup(context);
 
                 threadImpl.start();
