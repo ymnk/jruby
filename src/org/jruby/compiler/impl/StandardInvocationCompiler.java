@@ -435,7 +435,7 @@ public class StandardInvocationCompiler implements InvocationCompiler {
             method.ldc(moduleGeneration);
             methodCompiler.invokeUtilityMethod("isGenerationEqual", sig(boolean.class, IRubyObject.class, int.class));
 
-            method.ifne(slow);
+            method.ifeq(slow);
         }
 
         method.aload(tmp);
@@ -472,7 +472,7 @@ public class StandardInvocationCompiler implements InvocationCompiler {
             method.ldc(moduleGeneration);
             methodCompiler.invokeUtilityMethod("isGenerationEqual", sig(boolean.class, IRubyObject.class, int.class));
 
-            method.ifne(slow);
+            method.ifeq(slow);
         }
 
         method.aload(tmp);
@@ -505,7 +505,7 @@ public class StandardInvocationCompiler implements InvocationCompiler {
             method.ldc(moduleGeneration);
             methodCompiler.invokeUtilityMethod("isGenerationEqual", sig(boolean.class, IRubyObject.class, int.class));
 
-            method.ifne(slow);
+            method.ifeq(slow);
         }
 
         method.aload(0);
@@ -546,7 +546,7 @@ public class StandardInvocationCompiler implements InvocationCompiler {
             method.ldc(moduleGeneration);
             methodCompiler.invokeUtilityMethod("isGenerationEqual", sig(boolean.class, IRubyObject.class, int.class));
 
-            method.ifne(slow);
+            method.ifeq(slow);
         }
 
         if (nativeCall.isStatic()) {

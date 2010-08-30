@@ -36,6 +36,7 @@
 
 package org.jruby.internal.runtime.methods;
 
+import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyModule;
 import org.jruby.ast.ArgsNode;
 import org.jruby.ast.Node;
@@ -111,9 +112,11 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     }
 
     public DynamicMethod getMethodForCaching() {
-        DynamicMethod method = box.actualMethod;
-        if (method instanceof JittedMethod) {
-            return method;
+        if (!RubyInstanceConfig.DYNOPT_COMPILE_ENABLED) {
+            DynamicMethod method = box.actualMethod;
+            if (method instanceof JittedMethod) {
+                return method;
+            }
         }
         return this;
     }
@@ -124,7 +127,9 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
                 staticScope, jitCompiledScript, name, jitCallConfig, getVisibility(), argsNode.getArity(), position,
                 this);
         this.box.callCount = -1;
-        getImplementationClass().invalidateCacheDescendants();
+        if (!RubyInstanceConfig.DYNOPT_COMPILE_ENABLED) {
+            getImplementationClass().invalidateCacheDescendants();
+        }
     }
 
     private DynamicMethod tryJitReturnMethod(ThreadContext context) {
