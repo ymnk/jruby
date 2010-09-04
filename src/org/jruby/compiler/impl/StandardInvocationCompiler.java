@@ -498,33 +498,38 @@ public class StandardInvocationCompiler implements InvocationCompiler {
     }
 
     public void invokeRecursive(String name, int moduleGeneration, ArgumentsCallback argsCallback, CompilerCallback closure, CallType callType, boolean iterator) {
-        Label slow = new Label();
-        Label after = new Label();
-        if (!RubyInstanceConfig.NOGUARDS_COMPILE_ENABLED) {
-            methodCompiler.loadSelf();
-            method.ldc(moduleGeneration);
-            methodCompiler.invokeUtilityMethod("isGenerationEqual", sig(boolean.class, IRubyObject.class, int.class));
-
-            method.ifeq(slow);
-        }
-
-        method.aload(0);
-        methodCompiler.loadThreadContext();
-        methodCompiler.loadSelf();
-        if (argsCallback != null) {
-            argsCallback.call(methodCompiler);
-        }
-        method.aconst_null();
-
-        method.invokestatic(methodCompiler.getScriptCompiler().getClassname(), methodCompiler.getNativeMethodName(), methodCompiler.getSignature());
-
-        if (!RubyInstanceConfig.NOGUARDS_COMPILE_ENABLED) {
-            method.go_to(after);
-            method.label(slow);
-
+        if (methodCompiler.getVariableCompiler().isHeap()) {
+            // direct recursive invocation doesn't work with heap-based scopes yet
             invokeDynamic(name, null, argsCallback, callType, closure, iterator);
+        } else {
+            Label slow = new Label();
+            Label after = new Label();
+            if (!RubyInstanceConfig.NOGUARDS_COMPILE_ENABLED) {
+                methodCompiler.loadSelf();
+                method.ldc(moduleGeneration);
+                methodCompiler.invokeUtilityMethod("isGenerationEqual", sig(boolean.class, IRubyObject.class, int.class));
 
-            method.label(after);
+                method.ifeq(slow);
+            }
+
+            method.aload(0);
+            methodCompiler.loadThreadContext();
+            methodCompiler.loadSelf();
+            if (argsCallback != null) {
+                argsCallback.call(methodCompiler);
+            }
+            method.aconst_null();
+
+            method.invokestatic(methodCompiler.getScriptCompiler().getClassname(), methodCompiler.getNativeMethodName(), methodCompiler.getSignature());
+
+            if (!RubyInstanceConfig.NOGUARDS_COMPILE_ENABLED) {
+                method.go_to(after);
+                method.label(slow);
+
+                invokeDynamic(name, null, argsCallback, callType, closure, iterator);
+
+                method.label(after);
+            }
         }
     }
 
