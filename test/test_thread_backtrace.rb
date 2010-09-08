@@ -15,13 +15,13 @@ class TestThreadBacktrace < Test::Unit::TestCase
     if $0 == __FILE__
       expected = [
                   "test/test_thread_backtrace.rb:7:in `test_simple_backtrace'",
-                  "RubyProc.java:277:in `call'",
-                  "RubyProc.java:242:in `call'"]
+                  "org/jruby/RubyProc.java:277:in `call'",
+                  "org/jruby/RubyProc.java:242:in `call'"]
     else
       expected = [
                   "./test/test_thread_backtrace.rb:7:in `test_simple_backtrace'",
-                  "RubyProc.java:277:in `call'",
-                  "RubyProc.java:242:in `call'"]
+                  "org/jruby/RubyProc.java:277:in `call'",
+                  "org/jruby/RubyProc.java:242:in `call'"]
     end
 
     assert_equal expected, backtrace[0..2]

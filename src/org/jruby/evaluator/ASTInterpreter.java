@@ -57,13 +57,13 @@ import org.jruby.runtime.Frame;
 import org.jruby.runtime.InterpretedBlock;
 
 public class ASTInterpreter {
-    public static IRubyObject INTERPRET_METHOD(Ruby runtime, ThreadContext context, ISourcePosition position, Node node, String name, IRubyObject self, Block block) {
+    public static IRubyObject INTERPRET_METHOD(Ruby runtime, ThreadContext context, ISourcePosition position, RubyModule implClass, Node node, String name, IRubyObject self, Block block) {
         try {
             context.backtrace.push(new ThreadContext.Backtrace(name, position));
-            if (runtime.hasEventHooks()) context.trace(RubyEvent.CALL, name, self.getMetaClass());
+            if (runtime.hasEventHooks()) context.trace(RubyEvent.CALL, name, implClass);
             return node.interpret(runtime, context, self, block);
         } finally {
-            if (runtime.hasEventHooks()) context.trace(RubyEvent.RETURN, name, self.getMetaClass());
+            if (runtime.hasEventHooks()) context.trace(RubyEvent.RETURN, name, implClass);
             context.backtrace.pop();
         }
     }
