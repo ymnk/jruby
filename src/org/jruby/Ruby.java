@@ -558,16 +558,23 @@ public final class Ruby {
                 return getNil();
             }
         }
-        
-        if (script != null) {
-            if (config.isShowBytecode()) {
-                return nilObject;
-            } else {
-                return runScript(script);
+
+        if (config.isShowBytecode()) {
+            if (script == null) {
+                // try to force compile the script again, in case we are in a -X-C or dynopt mode
+                script = tryCompile(scriptNode, null, new JRubyClassLoader(getJRubyClassLoader()), config.isShowBytecode());
             }
+            // if still null, print error and return
+            if (script == null) {
+                System.err.print("error: bytecode printing only works with JVM bytecode");
+            }
+            return nilObject;
         } else {
-            if (config.isShowBytecode()) System.err.print("error: bytecode printing only works with JVM bytecode");
-            return runInterpreter(scriptNode);
+            if (script != null) {
+                return runScript(script);
+            } else {
+                return runInterpreter(scriptNode);
+            }
         }
     }
 
@@ -630,7 +637,6 @@ public final class Ruby {
                 String pathName = cachedClassName.replace('.', '/');
                 JITCompiler.saveToCodeCache(this, asmCompiler.getClassByteArray(), "ruby/jit", new File(RubyInstanceConfig.JIT_CODE_CACHE, pathName + ".class"));
             }
-
             script = (Script)asmCompiler.loadClass(classLoader).newInstance();
 
             if (config.isJitLogging()) {
