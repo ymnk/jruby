@@ -726,10 +726,15 @@ public final class Ruby {
         ThreadContext context = getCurrentContext();
 
         assert scriptNode != null : "scriptNode is not null";
-        assert scriptNode instanceof RootNode;
+        assert scriptNode instanceof RootNode : "scriptNode is not a RootNode";
 
         try {
-            return ASTInterpreter.INTERPRET_ROOT(this, context, scriptNode, getTopSelf(), Block.NULL_BLOCK);
+            return ASTInterpreter.INTERPRET_ROOT(
+                    this,
+                    context,
+                    ((RootNode)scriptNode).getBodyNode(),
+                    getTopSelf(),
+                    Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return (IRubyObject) rj.getValue();
         }
