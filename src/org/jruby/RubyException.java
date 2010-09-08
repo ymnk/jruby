@@ -147,19 +147,22 @@ public class RubyException extends RubyObject {
 
     public void prepareBacktrace(ThreadContext context, boolean nativeException) {
         // if it's null, build a backtrace
+        boolean fullTrace = false;
         if (backtraceElements == null) {
             switch (TRACE_TYPE) {
             case RAW:
-                backtraceElements = ThreadContext.gatherRawBacktrace(getRuntime(), Thread.currentThread().getStackTrace(), false);
-                break;
+                fullTrace = true;
             case RAW_FILTERED:
-                backtraceElements = ThreadContext.gatherRawBacktrace(getRuntime(), Thread.currentThread().getStackTrace(), true);
+                backtraceElements = ThreadContext.gatherRawBacktrace(getRuntime(), Thread.currentThread().getStackTrace(), !fullTrace);
                 break;
+            case FULL:
+                fullTrace = true;
             default:
                 backtraceElements = context.gatherHybridBacktrace(
                         context.getRuntime(),
                         context.createBacktrace2(0, nativeException),
-                        Thread.currentThread().getStackTrace());
+                        Thread.currentThread().getStackTrace(),
+                        fullTrace);
             }
         }
     }
@@ -170,6 +173,7 @@ public class RubyException extends RubyObject {
     public static final int RUBY_COMPILED = 3;
     public static final int RUBY_HYBRID = 4;
     public static final int RUBINIUS = 5;
+    public static final int FULL = 6;
 
     public static final int RAW_FRAME_CROP_COUNT = 10;
     
@@ -184,6 +188,7 @@ public class RubyException extends RubyObject {
         else if (style.equalsIgnoreCase("ruby_compiled")) TRACE_TYPE = RUBY_COMPILED;
         else if (style.equalsIgnoreCase("ruby_hybrid")) TRACE_TYPE = RUBY_HYBRID;
         else if (style.equalsIgnoreCase("rubinius")) TRACE_TYPE = RUBINIUS;
+        else if (style.equalsIgnoreCase("full")) TRACE_TYPE = FULL;
         else TRACE_TYPE = RUBY_FRAMED;
     }
     

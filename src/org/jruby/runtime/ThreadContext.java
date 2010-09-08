@@ -669,7 +669,8 @@ public final class ThreadContext {
         RubyStackTraceElement[] trace = gatherHybridBacktrace(
                 runtime,
                 (Backtrace[])backtrace.toArray(new Backtrace[backtrace.size()]),
-                Thread.currentThread().getStackTrace());
+                Thread.currentThread().getStackTrace(),
+                false);
         
         RubyArray backtrace = runtime.newArray(trace.length - level);
 
@@ -870,11 +871,7 @@ public final class ThreadContext {
         INTERPRETED_FRAMES.put(ASTInterpreter.class.getName() + ".INTERPRET_ROOT", FrameType.ROOT);
     }
 
-    public static RubyStackTraceElement[] gatherHybridBacktrace(Ruby runtime, List<Backtrace> backtrace, StackTraceElement[] stackTrace) {
-        return gatherHybridBacktrace(runtime, backtrace.toArray(new Backtrace[backtrace.size()]), stackTrace);
-    }
-
-    public static RubyStackTraceElement[] gatherHybridBacktrace(Ruby runtime, Backtrace[] backtraceFrames, StackTraceElement[] stackTrace) {
+    public static RubyStackTraceElement[] gatherHybridBacktrace(Ruby runtime, Backtrace[] backtraceFrames, StackTraceElement[] stackTrace, boolean fullTrace) {
         List trace = new ArrayList(stackTrace.length);
 
         int rubyFrameIndex = backtraceFrames == null ? -1 : backtraceFrames.length - 1;
@@ -931,9 +928,18 @@ public final class ThreadContext {
                 continue;
             }
 
-            if (runtime.coreMethods.contains(element.getClassName() + "." + element.getMethodName())) {
-                trace.add(new RubyStackTraceElement(element.getClassName(), element.getMethodName(), element.getFileName(), element.getLineNumber(), false));
-                continue;
+            if (fullTrace || runtime.coreMethods.contains(element.getClassName() + "." + element.getMethodName())) {
+                String filename = element.getFileName();
+                int lastDot = element.getClassName().lastIndexOf('.');
+                if (lastDot != -1) {
+                    filename = element.getClassName().substring(0, lastDot + 1).replaceAll("\\.", "/") + filename;
+                }
+                trace.add(new RubyStackTraceElement(element.getClassName(), element.getMethodName(), filename, element.getLineNumber(), false));
+
+                if (!fullTrace) {
+                    // we want to fall through below to add Ruby trace info as well
+                    continue;
+                }
             }
 
             // try to mine out a Ruby frame using our list of interpreter entry-point markers
