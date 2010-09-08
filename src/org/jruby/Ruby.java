@@ -136,6 +136,7 @@ import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.management.BeanManager;
 import org.jruby.management.BeanManagerFactory;
 import org.jruby.threading.DaemonThreadFactory;
+import org.jruby.util.io.SelectorPool;
 
 /**
  * The Ruby object represents the top-level of a JRuby "instance" in a given VM.
@@ -2480,7 +2481,7 @@ public final class Ruby {
                 + 2 // initial spaces
                 + 1; // spaces before "at"
 
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder buffer = new StringBuilder();
 
         buffer
                 .append("An exception has occurred:\n")
@@ -3771,6 +3772,15 @@ public final class Ruby {
         return hierarchyLock;
     }
 
+    /**
+     * Get the runtime-global selector pool
+     *
+     * @return a SelectorPool from which to get Selector instances
+     */
+    public SelectorPool getSelectorPool() {
+        return selectorPool;
+    }
+
     private volatile int constantGeneration = 1;
     private final ThreadService threadService;
     
@@ -3959,4 +3969,7 @@ public final class Ruby {
 
     // A list of Java class+method names to include in backtraces
     public final Set<String> coreMethods = new HashSet();
+
+    // A soft pool of selectors for blocking IO operations
+    private final SelectorPool selectorPool = new SelectorPool();
 }
