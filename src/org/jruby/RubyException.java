@@ -158,7 +158,7 @@ public class RubyException extends RubyObject {
             case FULL:
                 fullTrace = true;
             default:
-                backtraceElements = context.gatherHybridBacktrace(
+                backtraceElements = ThreadContext.gatherHybridBacktrace(
                         context.getRuntime(),
                         context.createBacktrace2(0, nativeException),
                         Thread.currentThread().getStackTrace(),

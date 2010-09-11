@@ -14,16 +14,19 @@ class TestThreadBacktrace < Test::Unit::TestCase
     # to match the RubyProc calls at the top of a new Thread's stack.
     if $0 == __FILE__
       expected = [
-                  "test/test_thread_backtrace.rb:7:in `test_simple_backtrace'",
-                  "org/jruby/RubyProc.java:277:in `call'",
-                  "org/jruby/RubyProc.java:242:in `call'"]
+                  /test\/test_thread_backtrace\.rb:7:in `test_simple_backtrace'/,
+                  /org\/jruby\/RubyProc\.java:[0-9]+:in `call'/,
+                  /org\/jruby\/RubyProc\.java:[0-9]+:in `call'/]
     else
       expected = [
-                  "./test/test_thread_backtrace.rb:7:in `test_simple_backtrace'",
-                  "org/jruby/RubyProc.java:277:in `call'",
-                  "org/jruby/RubyProc.java:242:in `call'"]
+                  /\.\/test\/test_thread_backtrace\.rb:7:in `test_simple_backtrace'/,
+                  /org\/jruby\/RubyProc\.java:[0-9]+:in `call'/,
+                  /org\/jruby\/RubyProc\.java:[0-9]+:in `call'/]
     end
 
-    assert_equal expected, backtrace[0..2]
+    expected.each_with_index do |pattern, index|
+      assert pattern =~ backtrace[index],
+          "mismatched traces: #{backtrace[index].inspect} did not match #{pattern.inspect}"
+    end
   end
 end

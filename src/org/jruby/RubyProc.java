@@ -66,8 +66,7 @@ import org.jruby.runtime.marshal.DataType;
 public class RubyProc extends RubyObject implements DataType {
     private Block block = Block.NULL_BLOCK;
     private Block.Type type;
-    private String file;
-    private int line;
+    private ThreadContext.RubyStackTraceElement traceElement;
     private ISourcePosition sourcePosition;
 
     public RubyProc(Ruby runtime, RubyClass rubyClass, Block.Type type) {
@@ -173,8 +172,10 @@ public class RubyProc extends RubyObject implements DataType {
         block.type = type;
         block.setProcObject(this);
 
-        file = context.getFile();
-        line = context.getLine();
+        // FIXME: This is probably inefficient. Need a faster way to get the
+        // (possibly compiled) file+line for the block. Perhaps passed in as
+        // block state?
+        traceElement= ThreadContext.findFirstRubyBacktrace(context);
         return this;
     }
     
@@ -183,8 +184,7 @@ public class RubyProc extends RubyObject implements DataType {
     public IRubyObject rbClone() {
     	RubyProc newProc = new RubyProc(getRuntime(), getRuntime().getProc(), type);
     	newProc.block = getBlock();
-    	newProc.file = file;
-    	newProc.line = line;
+    	newProc.traceElement = traceElement;
     	// TODO: CLONE_SETUP here
     	return newProc;
     }
@@ -194,8 +194,7 @@ public class RubyProc extends RubyObject implements DataType {
     public IRubyObject dup() {
         RubyProc newProc = new RubyProc(getRuntime(), getRuntime().getProc(), type);
         newProc.block = getBlock();
-        newProc.file = file;
-        newProc.line = line;
+    	newProc.traceElement = traceElement;
         return newProc;
     }
     
@@ -215,13 +214,13 @@ public class RubyProc extends RubyObject implements DataType {
     public IRubyObject to_s() {
         return RubyString.newString(
                 getRuntime(),"#<Proc:0x" + Integer.toString(block.hashCode(), 16) + "@" +
-                file + ":" + (line + 1) + ">");
+                traceElement.getFileName() + ":" + traceElement.getLineNumber() + ">");
     }
 
     @JRubyMethod(name = "to_s", compat = CompatVersion.RUBY1_9)
     public IRubyObject to_s19() {
         StringBuilder sb = new StringBuilder("#<Proc:0x" + Integer.toString(block.hashCode(), 16) + "@" +
-                file + ":" + (line + 1));
+                traceElement.getFileName() + ":" + traceElement.getLineNumber());
         if (isLambda())
             sb.append(" (lambda)");
         sb.append(">");
