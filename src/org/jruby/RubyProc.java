@@ -172,10 +172,8 @@ public class RubyProc extends RubyObject implements DataType {
         block.type = type;
         block.setProcObject(this);
 
-        // FIXME: This is probably inefficient. Need a faster way to get the
-        // (possibly compiled) file+line for the block. Perhaps passed in as
-        // block state?
-        traceElement= ThreadContext.findFirstRubyBacktrace(context);
+        // FIXME: see comments in findFirstRubyBacktrace
+        traceElement = ThreadContext.findFirstRubyBacktrace(context);
         return this;
     }
     

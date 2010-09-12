@@ -59,44 +59,48 @@ import org.jruby.runtime.InterpretedBlock;
 public class ASTInterpreter {
     public static IRubyObject INTERPRET_METHOD(Ruby runtime, ThreadContext context, ISourcePosition position, RubyModule implClass, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.backtrace.push(new ThreadContext.Backtrace(name, position));
+            context.pushBacktrace(name, position);
             if (runtime.hasEventHooks()) context.trace(RubyEvent.CALL, name, implClass);
             return node.interpret(runtime, context, self, block);
         } finally {
-            if (runtime.hasEventHooks()) context.trace(RubyEvent.RETURN, name, implClass);
-            context.backtrace.pop();
+            if (runtime.hasEventHooks()) {
+                try {context.trace(RubyEvent.RETURN, name, implClass);}
+                finally {context.popBacktrace();}
+            } else {
+                context.popBacktrace();
+            }
         }
     }
     public static IRubyObject INTERPRET_EVAL(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.backtrace.push(new ThreadContext.Backtrace(name, node.getPosition()));
+            context.pushBacktrace(name, node.getPosition());
             return node.interpret(runtime, context, self, block);
         } finally {
-            context.backtrace.pop();
+            context.popBacktrace();
         }
     }
     public static IRubyObject INTERPRET_CLASS(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.backtrace.push(new ThreadContext.Backtrace(name, node.getPosition()));
+            context.pushBacktrace(name, node.getPosition());
             return node.interpret(runtime, context, self, block);
         } finally {
-            context.backtrace.pop();
+            context.popBacktrace();
         }
     }
     public static IRubyObject INTERPRET_BLOCK(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.backtrace.push(new ThreadContext.Backtrace(name, node.getPosition()));
+            context.pushBacktrace(name, node.getPosition());
             return node.interpret(runtime, context, self, block);
         } finally {
-            context.backtrace.pop();
+            context.popBacktrace();
         }
     }
     public static IRubyObject INTERPRET_ROOT(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block block) {
         try {
-            context.backtrace.push(new ThreadContext.Backtrace("(root)", node.getPosition()));
+            context.pushBacktrace("(root)", node.getPosition());
             return node.interpret(runtime, context, self, block);
         } finally {
-            context.backtrace.pop();
+            context.popBacktrace();
         }
     }
     

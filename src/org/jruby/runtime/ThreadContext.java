@@ -92,6 +92,9 @@ public final class ThreadContext {
     private Frame[] frameStack = new Frame[INITIAL_FRAMES_SIZE];
     private int frameIndex = -1;
 
+    private Backtrace[] backtrace = new Backtrace[1000];
+    private int backtraceIndex = -1;
+
     public static class Stack<T> extends ArrayList<T> {
         public T pop() {return remove(size() - 1);}
         public void push(T t) {add(t);}
@@ -102,6 +105,8 @@ public final class ThreadContext {
         public String method;
         public String filename;
         public int line;
+        public Backtrace() {
+        }
         public Backtrace(String method, String filename, int line) {
             this.method = method;
             this.filename = filename;
@@ -124,8 +129,23 @@ public final class ThreadContext {
         public Backtrace clone() {
             return new Backtrace(method, filename, line);
         }
+        public void update(String method, ISourcePosition position) {
+            this.method = method;
+            if (position == ISourcePosition.INVALID_POSITION) {
+                // use dummy values; there's no need for a real position here anyway
+                this.filename = "dummy";
+                this.line = -1;
+            } else {
+                this.filename = position.getFile();
+                this.line = position.getLine();
+            }
+        }
+        public void update(String method, String file, int line) {
+            this.method = method;
+            this.filename = file;
+            this.line = line;
+        }
     }
-    public final Stack<Backtrace> backtrace = new Stack<Backtrace>();
     
     // List of active dynamic scopes.  Each of these may have captured other dynamic scopes
     // to implement closures.
@@ -168,8 +188,13 @@ public final class ThreadContext {
         for (int i = 0; i < length; i++) {
             stack[i] = new Frame();
         }
-        backtrace.add(new Backtrace("", "", 0));
-        backtrace.add(new Backtrace("", "", 0));
+        Backtrace[] stack2 = backtrace;
+        int length2 = stack2.length;
+        for (int i = 0; i < length2; i++) {
+            stack2[i] = new Backtrace();
+        }
+        pushBacktrace("", "", 0);
+        pushBacktrace("", "", 0);
     }
 
     @Override
@@ -469,6 +494,45 @@ public final class ThreadContext {
         return frames;
     }
 
+    /////////////////// BACKTRACE ////////////////////
+
+    private void expandBacktraceIfNecessary() {
+        int newSize = backtrace.length * 2;
+        backtrace = fillNewBacktrace(new Backtrace[newSize], newSize);
+    }
+
+    private Backtrace[] fillNewBacktrace(Backtrace[] newBacktrace, int newSize) {
+        System.arraycopy(backtrace, 0, newBacktrace, 0, backtrace.length);
+
+        for (int i = backtrace.length; i < newSize; i++) {
+            newBacktrace[i] = new Backtrace();
+        }
+
+        return newBacktrace;
+    }
+
+    public void pushBacktrace(String method, ISourcePosition position) {
+        int index = ++this.backtraceIndex;
+        Backtrace[] stack = backtrace;
+        stack[index].update(method, position);
+        if (index + 1 == stack.length) {
+            expandBacktraceIfNecessary();
+        }
+    }
+
+    public void pushBacktrace(String method, String file, int line) {
+        int index = ++this.backtraceIndex;
+        Backtrace[] stack = backtrace;
+        stack[index].update(method, file, line);
+        if (index + 1 == stack.length) {
+            expandBacktraceIfNecessary();
+        }
+    }
+
+    public void popBacktrace() {
+        backtraceIndex--;
+    }
+
     /**
      * Search the frame stack for the given JumpTarget. Return true if it is
      * found and false otherwise. Skip the given number of frames before
@@ -506,29 +570,29 @@ public final class ThreadContext {
     }
     
     public String getFile() {
-        return backtrace.peek().filename;
+        return backtrace[backtraceIndex].filename;
     }
     
     public int getLine() {
-        return backtrace.peek().line;
+        return backtrace[backtraceIndex].line;
     }
     
     public void setFile(String file) {
-        backtrace.peek().filename = file;
+        backtrace[backtraceIndex].filename = file;
     }
     
     public void setLine(int line) {
-        backtrace.peek().line = line;
+        backtrace[backtraceIndex].line = line;
     }
     
     public void setFileAndLine(String file, int line) {
-        backtrace.peek().filename = file;
-        backtrace.peek().line = line;
+        backtrace[backtraceIndex].filename = file;
+        backtrace[backtraceIndex].line = line;
     }
 
     public void setFileAndLine(ISourcePosition position) {
-        backtrace.peek().filename = position.getFile();
-        backtrace.peek().line = position.getStartLine();
+        backtrace[backtraceIndex].filename = position.getFile();
+        backtrace[backtraceIndex].line = position.getStartLine();
     }
     
     public Visibility getCurrentVisibility() {
@@ -562,7 +626,7 @@ public final class ThreadContext {
     }
     
     public void trace(RubyEvent event, String name, RubyModule implClass) {
-        trace(event, name, implClass, backtrace.peek().filename, backtrace.peek().line);
+        trace(event, name, implClass, backtrace[backtraceIndex].filename, backtrace[backtraceIndex].line);
     }
 
     public void trace(RubyEvent event, String name, RubyModule implClass, String file, int line) {
@@ -669,9 +733,11 @@ public final class ThreadContext {
      * @return an Array with the backtrace
      */
     public IRubyObject createCallerBacktrace(Ruby runtime, int level) {
+        Backtrace[] copy = new Backtrace[backtraceIndex + 1];
+        System.arraycopy(backtrace, 0, copy, 0, backtraceIndex + 1);
         RubyStackTraceElement[] trace = gatherHybridBacktrace(
                 runtime,
-                (Backtrace[])backtrace.toArray(new Backtrace[backtrace.size()]),
+                copy,
                 Thread.currentThread().getStackTrace(),
                 false);
         
@@ -780,9 +846,9 @@ public final class ThreadContext {
      * @return an Array with the backtrace
      */
     public Backtrace[] createBacktrace2(int level, boolean nativeException) {
-        Backtrace[] newTrace = new Backtrace[backtrace.size()];
-        for (int i = 0; i < backtrace.size(); i++) {
-            newTrace[i] = backtrace.get(i).clone();
+        Backtrace[] newTrace = new Backtrace[backtraceIndex + 1];
+        for (int i = 0; i <= backtraceIndex; i++) {
+            newTrace[i] = backtrace[i].clone();
         }
         return newTrace;
     }
@@ -982,59 +1048,65 @@ public final class ThreadContext {
      * @return
      */
     public static RubyStackTraceElement findFirstRubyBacktrace(ThreadContext context) {
-        // a running index into the Ruby backtrace stack, incremented for each
-        // interpreter frame we encounter in the Java backtrace.
-        int rubyFrameIndex = context.backtrace.size() - 1;
-
-        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-
-        // FIXME duplication here with gatherHybridBacktrace
-        for (int i = 0; i < stackTrace.length; i++) {
-            StackTraceElement element = stackTrace[i];
-
-            if (element.getFileName() != null &&
-                    (element.getFileName().endsWith(".rb") ||
-                    element.getFileName().equals("-e")) ||
-                    // FIXME: Formalize jitted method structure so this isn't quite as hacky
-                    element.getClassName().indexOf("ruby.jit.") == 0) {
-                if (element.getLineNumber() == -1) continue;
-                String methodName = element.getMethodName();
-
-                String className = element.getClassName();
-
-                // FIXME: Formalize jitted method structure so this isn't quite as hacky
-                int rubyJitIndex = className.indexOf("ruby.jit.");
-                if (rubyJitIndex == 0) {
-                    methodName = className.substring("ruby.jit.".length(), className.lastIndexOf("_"));
-                    return new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false);
-                }
-
-                // AOT formatted method names, need to be cleaned up
-                int RUBYindex = methodName.indexOf("$RUBY$");
-                if (RUBYindex >= 0) {
-                    methodName = methodName.substring(RUBYindex + "$RUBY$".length());
-                    // if it's a synthetic call, use it but gobble up parent calls
-                    // TODO: need to formalize this better
-                    if (methodName.startsWith("SYNTHETIC")) {
-                        methodName = methodName.substring("SYNTHETIC".length());
-                        return new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false);
-                    }
-                }
-
-                return new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false);
-            }
-
-            // try to mine out a Ruby frame using our list of interpreter entry-point markers
-            String classMethod = element.getClassName() + "." + element.getMethodName();
-            FrameType frameType = INTERPRETED_FRAMES.get(classMethod);
-            if (frameType != null && rubyFrameIndex >= 0) {
-                // Frame matches one of our markers for "interpreted" calls
-                Backtrace rubyElement = context.backtrace.get(rubyFrameIndex);
-                return new RubyStackTraceElement("RUBY", rubyElement.method, rubyElement.filename, rubyElement.line + 1, false);
-            }
-        }
-
-        return new RubyStackTraceElement(UNKNOWN_NAME, UNKNOWN_NAME, UNKNOWN_NAME, -1, false);
+        // The old logic was unacceptably slow; forcing Java to generate a
+        // backtrace for every proc killed performance. We'll need to do it
+        // the proper way (likely by having the compiled block save its position
+        // info for retrieval here)
+        Backtrace element = context.backtrace[context.backtraceIndex];
+        return new RubyStackTraceElement("RUBY", element.method, element.filename, element.line, false);
+//        // a running index into the Ruby backtrace stack, incremented for each
+//        // interpreter frame we encounter in the Java backtrace.
+//        int rubyFrameIndex = context.backtraceIndex;
+//
+//        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+//
+//        // FIXME duplication here with gatherHybridBacktrace
+//        for (int i = 0; i < stackTrace.length; i++) {
+//            StackTraceElement element = stackTrace[i];
+//
+//            if (element.getFileName() != null &&
+//                    (element.getFileName().endsWith(".rb") ||
+//                    element.getFileName().equals("-e")) ||
+//                    // FIXME: Formalize jitted method structure so this isn't quite as hacky
+//                    element.getClassName().indexOf("ruby.jit.") == 0) {
+//                if (element.getLineNumber() == -1) continue;
+//                String methodName = element.getMethodName();
+//
+//                String className = element.getClassName();
+//
+//                // FIXME: Formalize jitted method structure so this isn't quite as hacky
+//                int rubyJitIndex = className.indexOf("ruby.jit.");
+//                if (rubyJitIndex == 0) {
+//                    methodName = className.substring("ruby.jit.".length(), className.lastIndexOf("_"));
+//                    return new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false);
+//                }
+//
+//                // AOT formatted method names, need to be cleaned up
+//                int RUBYindex = methodName.indexOf("$RUBY$");
+//                if (RUBYindex >= 0) {
+//                    methodName = methodName.substring(RUBYindex + "$RUBY$".length());
+//                    // if it's a synthetic call, use it but gobble up parent calls
+//                    // TODO: need to formalize this better
+//                    if (methodName.startsWith("SYNTHETIC")) {
+//                        methodName = methodName.substring("SYNTHETIC".length());
+//                        return new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false);
+//                    }
+//                }
+//
+//                return new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false);
+//            }
+//
+//            // try to mine out a Ruby frame using our list of interpreter entry-point markers
+//            String classMethod = element.getClassName() + "." + element.getMethodName();
+//            FrameType frameType = INTERPRETED_FRAMES.get(classMethod);
+//            if (frameType != null && rubyFrameIndex >= 0) {
+//                // Frame matches one of our markers for "interpreted" calls
+//                Backtrace rubyElement = context.backtrace[rubyFrameIndex];
+//                return new RubyStackTraceElement("RUBY", rubyElement.method, rubyElement.filename, rubyElement.line + 1, false);
+//            }
+//        }
+//
+//        return new RubyStackTraceElement(UNKNOWN_NAME, UNKNOWN_NAME, UNKNOWN_NAME, -1, false);
     }
 
     public static IRubyObject renderBacktraceMRI(Ruby runtime, RubyStackTraceElement[] trace) {
@@ -1397,7 +1469,7 @@ public final class ThreadContext {
      */
     public Binding currentBinding() {
         Frame frame = getCurrentFrame();
-        return new Binding(frame, getRubyClass(), getCurrentScope(), backtrace.peek().clone());
+        return new Binding(frame, getRubyClass(), getCurrentScope(), backtrace[backtraceIndex].clone());
     }
 
     /**
@@ -1407,7 +1479,7 @@ public final class ThreadContext {
      */
     public Binding currentBinding(IRubyObject self) {
         Frame frame = getCurrentFrame();
-        return new Binding(self, frame, frame.getVisibility(), getRubyClass(), getCurrentScope(), backtrace.peek().clone());
+        return new Binding(self, frame, frame.getVisibility(), getRubyClass(), getCurrentScope(), backtrace[backtraceIndex].clone());
     }
 
     /**
@@ -1419,7 +1491,7 @@ public final class ThreadContext {
      */
     public Binding currentBinding(IRubyObject self, Visibility visibility) {
         Frame frame = getCurrentFrame();
-        return new Binding(self, frame, visibility, getRubyClass(), getCurrentScope(), backtrace.peek().clone());
+        return new Binding(self, frame, visibility, getRubyClass(), getCurrentScope(), backtrace[backtraceIndex].clone());
     }
 
     /**
@@ -1431,7 +1503,7 @@ public final class ThreadContext {
      */
     public Binding currentBinding(IRubyObject self, DynamicScope scope) {
         Frame frame = getCurrentFrame();
-        return new Binding(self, frame, frame.getVisibility(), getRubyClass(), scope, backtrace.peek().clone());
+        return new Binding(self, frame, frame.getVisibility(), getRubyClass(), scope, backtrace[backtraceIndex].clone());
     }
 
     /**
@@ -1446,7 +1518,7 @@ public final class ThreadContext {
      */
     public Binding currentBinding(IRubyObject self, Visibility visibility, DynamicScope scope) {
         Frame frame = getCurrentFrame();
-        return new Binding(self, frame, visibility, getRubyClass(), scope, backtrace.peek().clone());
+        return new Binding(self, frame, visibility, getRubyClass(), scope, backtrace[backtraceIndex].clone());
     }
 
     /**
@@ -1456,7 +1528,7 @@ public final class ThreadContext {
     public Binding previousBinding() {
         Frame frame = getPreviousFrame();
         Frame current = getCurrentFrame();
-        return new Binding(frame, getPreviousRubyClass(), getCurrentScope(), backtrace.peek().clone());
+        return new Binding(frame, getPreviousRubyClass(), getCurrentScope(), backtrace[backtraceIndex].clone());
     }
 
     /**
@@ -1466,6 +1538,6 @@ public final class ThreadContext {
      */
     public Binding previousBinding(IRubyObject self) {
         Frame frame = getPreviousFrame();
-        return new Binding(self, frame, frame.getVisibility(), getPreviousRubyClass(), getCurrentScope(), backtrace.peek().clone());
+        return new Binding(self, frame, frame.getVisibility(), getPreviousRubyClass(), getCurrentScope(), backtrace[backtraceIndex].clone());
     }
 }
