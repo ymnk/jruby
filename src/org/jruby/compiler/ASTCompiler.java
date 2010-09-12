@@ -954,7 +954,7 @@ public class ASTCompiler {
         return false;
     }
 
-    private boolean compileTrivialCall(DynamicMethod method, BodyCompiler context, boolean expr) {
+    private boolean compileTrivialCall(String name, DynamicMethod method, int generation, BodyCompiler context, boolean expr) {
         Node simpleBody = null;
         if (method instanceof InterpretedMethod) {
             InterpretedMethod target = (InterpretedMethod)method;
@@ -987,7 +987,13 @@ public class ASTCompiler {
             case TRUENODE:
             case SYMBOLNODE:
             case XSTRNODE:
-                compile(simpleBody, context, expr);
+                final Node simpleBodyFinal = simpleBody;
+                context.getInvocationCompiler().invokeTrivial(name, generation, new CompilerCallback() {
+                    public void call(BodyCompiler context) {
+                        compile(simpleBodyFinal, context, true);
+                    }
+                });
+                if (!expr) context.consumeCurrentValue();
                 return true;
             }
         }
@@ -2415,7 +2421,9 @@ public class ASTCompiler {
                         if (compileRecursiveCall(fcallNode.getName(), entry.token, CallType.FUNCTIONAL, fcallNode.getIterNode() instanceof IterNode, entry.method, context, argsCallback, closureArg, expr)) return;
 
                         // peephole inlining for trivial targets
-                        if (compileTrivialCall(entry.method, context, expr)) return;
+                        if (closureArg == null &&
+                                argsCallback == null &&
+                                compileTrivialCall(fcallNode.getName(), entry.method, entry.token, context, expr)) return;
                     }
                 }
             }
@@ -3912,7 +3920,7 @@ public class ASTCompiler {
                     if (compileRecursiveCall(vcallNode.getName(), entry.token, CallType.VARIABLE, false, entry.method, context, null, null, expr)) return;
 
                     // peephole inlining for trivial targets
-                    if (compileTrivialCall(entry.method, context, expr)) return;
+                    if (compileTrivialCall(vcallNode.getName(), entry.method, entry.token, context, expr)) return;
                 }
             }
         }
