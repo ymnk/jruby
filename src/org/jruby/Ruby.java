@@ -129,12 +129,15 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jruby.ast.RootNode;
+import org.jruby.ast.executable.RuntimeCache;
 import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.Unrescuable;
 import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.management.BeanManager;
 import org.jruby.management.BeanManagerFactory;
+import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.MethodIndex;
 import org.jruby.threading.DaemonThreadFactory;
 import org.jruby.util.io.SelectorPool;
 
@@ -269,6 +272,9 @@ public final class Ruby {
         this.beanManager.register(new Config(this));
         this.beanManager.register(parserStats);
         this.beanManager.register(new ClassCache(this));
+
+        this.runtimeCache = new RuntimeCache();
+        runtimeCache.initMethodCache(ClassIndex.MAX_CLASSES * MethodIndex.MAX_METHODS);
     }
     
     /**
@@ -3794,6 +3800,14 @@ public final class Ruby {
         return selectorPool;
     }
 
+    /**
+     * Get the core class RuntimeCache instance, for doing dynamic calls from
+     * core class methods.
+     */
+    public RuntimeCache getRuntimeCache() {
+        return runtimeCache;
+    }
+
     private volatile int constantGeneration = 1;
     private final ThreadService threadService;
     
@@ -3985,4 +3999,6 @@ public final class Ruby {
 
     // A soft pool of selectors for blocking IO operations
     private final SelectorPool selectorPool = new SelectorPool();
+
+    private final RuntimeCache runtimeCache;
 }

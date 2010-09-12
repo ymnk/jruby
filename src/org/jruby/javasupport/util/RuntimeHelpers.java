@@ -1935,4 +1935,10 @@ public class RuntimeHelpers {
         RubyArray arrayish2 = ensureMultipleAssignableRubyArray(arrayish, arrayish.getRuntime(), true);
         return arrayEntryOrNilZero(arrayish2);
     }
+
+    public static RubyClass _metaclass(IRubyObject object) {
+        return object instanceof RubyBasicObject ?
+            ((RubyBasicObject)object).getMetaClass() :
+            object.getMetaClass();
+    }
 }

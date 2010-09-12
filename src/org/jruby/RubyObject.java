@@ -49,15 +49,18 @@ import java.util.Set;
 import org.jruby.anno.JRubyClass;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.common.IRubyWarnings.ID;
+import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.MethodIndex;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.IdUtil;
 import org.jruby.runtime.marshal.DataType;
+import static org.jruby.javasupport.util.RuntimeHelpers._metaclass;
 
 /**
  * RubyObject is the only implementation of the
@@ -385,12 +388,23 @@ public class RubyObject extends RubyBasicObject {
         return runtime.getNil();
     }
 
+    protected static DynamicMethod _op_equal(ThreadContext context, RubyClass metaclass) {
+        if (metaclass.index >= ClassIndex.MAX_CLASSES) return metaclass.searchMethod("==");
+        return context.runtimeCache.getMethod(context, metaclass, metaclass.index * (MethodIndex.OP_EQUAL + 1), "==");
+    }
+
+    protected static DynamicMethod _eql(ThreadContext context, RubyClass metaclass) {
+        if (metaclass.index >= ClassIndex.MAX_CLASSES) return metaclass.searchMethod("eql?");
+        return context.runtimeCache.getMethod(context, metaclass, metaclass.index * (MethodIndex.EQL + 1), "eql?");
+    }
+
     /**
      * Helper method for checking equality, first using Java identity
      * equality, and then calling the "==" method.
      */
     protected static boolean equalInternal(final ThreadContext context, final IRubyObject that, final IRubyObject other){
-        return that == other || that.callMethod(context, "==", other).isTrue();
+        RubyClass metaclass = _metaclass(that);
+        return that == other || _op_equal(context, metaclass).call(context, that, metaclass, "==", other).isTrue();
     }
 
     /**
@@ -398,7 +412,8 @@ public class RubyObject extends RubyBasicObject {
      * equality, and then calling the "eql?" method.
      */
     protected static boolean eqlInternal(final ThreadContext context, final IRubyObject that, final IRubyObject other){
-        return that.callMethod(context, "eql?", other).isTrue();
+        RubyClass metaclass = _metaclass(that);
+        return that == other || _eql(context, metaclass).call(context, that, metaclass, "eql?", other).isTrue();
     }
 
     /** rb_obj_init_copy

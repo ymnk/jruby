@@ -437,13 +437,16 @@ public class RuntimeCache {
         return blockCallbacks[index] = callback;
     }
 
-    public DynamicMethod getMethod(ThreadContext context, IRubyObject self, int index, String methodName) {
-        RubyClass selfType = pollAndGetClass(context, self);
+    public DynamicMethod getMethod(ThreadContext context, RubyClass selfType, int index, String methodName) {
         CacheEntry myCache = getCacheEntry(index);
         if (CacheEntry.typeOk(myCache, selfType)) {
             return myCache.method;
         }
         return cacheAndGet(context, selfType, index, methodName);
+    }
+
+    public DynamicMethod getMethod(ThreadContext context, IRubyObject self, int index, String methodName) {
+        return getMethod(context, pollAndGetClass(context, self), index, methodName);
     }
 
     private DynamicMethod cacheAndGet(ThreadContext context, RubyClass selfType, int index, String methodName) {

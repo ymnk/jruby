@@ -48,6 +48,7 @@ import org.jruby.RubyContinuation.Continuation;
 import org.jruby.RubyModule;
 import org.jruby.RubyString;
 import org.jruby.RubyThread;
+import org.jruby.ast.executable.RuntimeCache;
 import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.JumpException.ReturnJump;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -71,9 +72,10 @@ public final class ThreadContext {
     private final static int CALL_POLL_COUNT = 0xFFF;
     private final static String UNKNOWN_NAME = "(unknown)";
 
-    // runtime and nil cached here for speed of access from any thread
+    // runtime, nil, and runtimeCache cached here for speed of access from any thread
     public final Ruby runtime;
     public final IRubyObject nil;
+    public final RuntimeCache runtimeCache;
     
     // Is this thread currently with in a function trace?
     private boolean isWithinTrace;
@@ -154,6 +156,7 @@ public final class ThreadContext {
     private ThreadContext(Ruby runtime) {
         this.runtime = runtime;
         this.nil = runtime.getNil();
+        this.runtimeCache = runtime.getRuntimeCache();
         
         // TOPLEVEL self and a few others want a top-level scope.  We create this one right
         // away and then pass it into top-level parse so it ends up being the top level.
