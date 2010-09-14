@@ -765,6 +765,10 @@ public class RubyFixnum extends RubyInteger {
         return RubyBoolean.newBoolean(context.getRuntime(), value == other);
     }
 
+    public boolean fastEqual(RubyFixnum other) {
+        return value == other.value;
+    }
+
     @JRubyMethod(name = "==", compat = CompatVersion.RUBY1_9)
     public IRubyObject op_equal19(ThreadContext context, IRubyObject other) {
         if (other instanceof RubyFixnum) return op_equal(context, ((RubyFixnum) other).value);

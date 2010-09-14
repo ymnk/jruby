@@ -51,6 +51,7 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.common.IRubyWarnings.ID;
 import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.javasupport.util.RuntimeHelpers;
+import static org.jruby.javasupport.util.RuntimeHelpers.metaclass;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.MethodIndex;
@@ -60,7 +61,6 @@ import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.IdUtil;
 import org.jruby.runtime.marshal.DataType;
-import static org.jruby.javasupport.util.RuntimeHelpers._metaclass;
 
 /**
  * RubyObject is the only implementation of the
@@ -252,23 +252,6 @@ public class RubyObject extends RubyBasicObject {
        testFrozen();
    }
 
-    /** init_copy
-     *
-     * Initializes a copy with variable and special instance variable
-     * information, and then call the initialize_copy Ruby method.
-     */
-    private static void initCopy(IRubyObject clone, RubyObject original) {
-        assert !clone.isFrozen() : "frozen object (" + clone.getMetaClass().getName() + ") allocated";
-
-        original.copySpecialInstanceVariables(clone);
-
-        if (original.hasVariables()) clone.syncVariables(original.getVariableList());
-        if (original instanceof RubyModule) ((RubyModule) clone).syncConstants((RubyModule) original);
-
-        /* FIXME: finalizer should be dupped here */
-        clone.callMethod(clone.getRuntime().getCurrentContext(), "initialize_copy", original);
-    }
-
     /**
      * Call the Ruby initialize method with the supplied arguments and block.
      */
@@ -402,18 +385,36 @@ public class RubyObject extends RubyBasicObject {
      * Helper method for checking equality, first using Java identity
      * equality, and then calling the "==" method.
      */
-    protected static boolean equalInternal(final ThreadContext context, final IRubyObject that, final IRubyObject other){
-        RubyClass metaclass = _metaclass(that);
-        return that == other || _op_equal(context, metaclass).call(context, that, metaclass, "==", other).isTrue();
+    protected static boolean equalInternal(final ThreadContext context, final IRubyObject a, final IRubyObject b){
+        if (a == b) {
+            return true;
+        } else if (a instanceof RubySymbol) {
+            return false;
+        } else if (a instanceof RubyFixnum && b instanceof RubyFixnum) {
+            return ((RubyFixnum)a).fastEqual((RubyFixnum)b);
+        } else if (a instanceof RubyFloat && b instanceof RubyFloat) {
+            return ((RubyFloat)a).fastEqual((RubyFloat)b);
+        } else {
+            RubyClass metaclass = metaclass(a);
+            return _op_equal(context, metaclass).call(context, a, metaclass, "==", b).isTrue();
+        }
     }
 
     /**
      * Helper method for checking equality, first using Java identity
      * equality, and then calling the "eql?" method.
      */
-    protected static boolean eqlInternal(final ThreadContext context, final IRubyObject that, final IRubyObject other){
-        RubyClass metaclass = _metaclass(that);
-        return that == other || _eql(context, metaclass).call(context, that, metaclass, "eql?", other).isTrue();
+    protected static boolean eqlInternal(final ThreadContext context, final IRubyObject a, final IRubyObject b){
+        if (a == b) {
+            return true;
+        } else if (a instanceof RubySymbol) {
+            return false;
+        } else if (a instanceof RubyNumeric) {
+            return equalInternal(context, a, b);
+        } else {
+            RubyClass metaclass = metaclass(a);
+            return _eql(context, metaclass).call(context, a, metaclass, "eql?", b).isTrue();
+        }
     }
 
     /** rb_obj_init_copy

@@ -1936,7 +1936,7 @@ public class RuntimeHelpers {
         return arrayEntryOrNilZero(arrayish2);
     }
 
-    public static RubyClass _metaclass(IRubyObject object) {
+    public static RubyClass metaclass(IRubyObject object) {
         return object instanceof RubyBasicObject ?
             ((RubyBasicObject)object).getMetaClass() :
             object.getMetaClass();
