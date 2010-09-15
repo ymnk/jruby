@@ -18,8 +18,7 @@ require 'openssl.so'
 
 require 'openssl/bn'
 require 'openssl/cipher'
-require 'openssl/config'
 require 'openssl/digest'
 require 'openssl/pkcs7' unless OpenSSL.autoload? :PKCS7
-require 'openssl/ssl' unless OpenSSL.autoload? :SSL
-require 'openssl/x509' unless OpenSSL.autoload? :X509
+require 'openssl/ssl-internal' unless OpenSSL.autoload? :SSL
+require 'openssl/x509-internal' unless OpenSSL.autoload? :X509
