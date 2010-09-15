@@ -105,7 +105,10 @@ EXT_FILES = {
   'ext/nkf/lib/kconv.rb' => 'kconv.rb',
   'ext/digest/lib/md5.rb' => 'md5.rb',
   'ext/digest/lib/sha1.rb' => 'sha1.rb',
-  'ext/Win32API/lib/win32' => 'win32'
+  'ext/Win32API/lib/win32' => 'win32',
+  'ext/openssl/lib/openssl.rb' => 'openssl.rb',
+  'ext/openssl/lib/openssl' => 'openssl',
+  'ext/openssl/lib/net' => 'net'
 }
 
 # yaml files go into src/builtin for jruby
