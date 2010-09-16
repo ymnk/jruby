@@ -1,6 +1,5 @@
 require 'test/unit'
 require 'timeout'
-require 'rbconfig'
 
 class TestSignal < Test::Unit::TestCase
   def have_fork?
@@ -14,20 +13,11 @@ class TestSignal < Test::Unit::TestCase
 
   def test_signal
     defined?(Process.kill) or return
-
-    # FIXME, JRuby fails this test on OpenSolaris 2009.06 and Windows
-    # JRUBY-4183
-    return if Config::CONFIG['host_os'] =~/SunOS|mswin/
-
     begin
       $x = 0
       oldtrap = trap "SIGINT", proc{|sig| $x = 2}
       Process.kill "SIGINT", $$
-      t = Time.now
-      while (Time.now - t) < 5
-        sleep 0.1
-        break if $x == 2
-      end
+      sleep 0.1
       assert_equal(2, $x)
 
       trap "SIGINT", proc{raise "Interrupt"}
