@@ -63,8 +63,9 @@ public class SSL {
         RubyClass openSSLError = ossl.getClass("OpenSSLError");
         mSSL.defineClassUnder("SSLError",openSSLError,openSSLError.getAllocator());
 
-        SSLContext.createSSLContext(runtime,mSSL);
-        SSLSocket.createSSLSocket(runtime,mSSL);
+        SSLContext.createSSLContext(runtime, mSSL);
+        SSLSocket.createSSLSocket(runtime, mSSL);
+        SSLSession.createSSLSession(runtime, ossl);
 
         mSSL.setConstant("VERIFY_NONE", runtime.newFixnum(VERIFY_NONE));
         mSSL.setConstant("VERIFY_PEER", runtime.newFixnum(VERIFY_PEER));

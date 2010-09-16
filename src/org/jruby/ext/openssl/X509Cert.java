@@ -144,6 +144,7 @@ public class X509Cert extends RubyObject {
         if(args.length == 0) {
             return this;
         }
+        // TODO: replace 'tc' with 'context'.
         ThreadContext tc = runtime.getCurrentContext();
         IRubyObject arg = OpenSSLImpl.to_der_if_possible(args[0]);
         ByteArrayInputStream bis = new ByteArrayInputStream(arg.convertToString().getBytes());
