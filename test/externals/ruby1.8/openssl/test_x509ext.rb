@@ -34,6 +34,8 @@ class OpenSSL::TestX509Extension < Test::Unit::TestCase
     assert_equal(@basic_constraints.to_der, ext.to_der)
   end
 
+unless defined?(JRUBY_VERSION)
+
   def test_create_by_factory
     ef = OpenSSL::X509::ExtensionFactory.new
 
@@ -69,6 +71,9 @@ class OpenSSL::TestX509Extension < Test::Unit::TestCase
       %r{URI:ldap://ldap.example.com/cn=ca\?certificateRevocationList;binary},
       cdp.value)
   end
+
+end # unless defined?(JRUBY_VERSION)
+
 end
 
 end

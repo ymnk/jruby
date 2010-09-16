@@ -411,6 +411,8 @@ class OpenSSL::TestSSL < Test::Unit::TestCase
     }
   end
 
+unless defined?(JRUBY_VERSION)
+
   def test_client_session
     last_session = nil
     start_server(PORT, OpenSSL::SSL::VERIFY_NONE, true) do |server, port|
@@ -532,6 +534,9 @@ class OpenSSL::TestSSL < Test::Unit::TestCase
       end
     end
   end
+
+end # unless defined?(JRUBY_VERSION)
+
 end
 
 end
