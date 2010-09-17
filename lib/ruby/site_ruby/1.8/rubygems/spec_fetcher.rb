@@ -1,5 +1,6 @@
 require 'zlib'
 require 'fileutils'
+require 'rexml/document'
 
 require 'rubygems/remote_fetcher'
 require 'rubygems/user_interaction'
@@ -57,6 +58,9 @@ class Gem::SpecFetcher
   # Returns the local directory to write +uri+ to.
 
   def cache_dir(uri)
+    if uri.to_s[/^maven:/]
+      uri = URI.parse(uri.to_s.sub("maven:", ""))
+    end
     File.join @dir, "#{uri.host}%#{uri.port}", File.dirname(uri.path)
   end
 
@@ -101,10 +105,18 @@ class Gem::SpecFetcher
     if File.exist? local_spec then
       spec = Gem.read_binary local_spec
     else
-      uri.path << '.rz'
+      if source_uri.to_s[/^maven:/]
+        pom_uri = source_uri.to_s.sub("maven:", "")
+        pom_uri += "#{spec[0].gsub('.', '/')}/#{spec[1]}/#{spec[0].split('.')[-1]}-#{spec[1]}.pom"
+        pom_doc = MavenGem::PomFetcher.fetch(pom_uri)
+        pom = MavenGem::PomSpec.parse_pom(pom_doc)
+        spec = Marshal.dump(MavenGem::PomSpec.generate_spec(pom))
+      else
+        uri.path << '.rz'
 
-      spec = @fetcher.fetch_path uri
-      spec = Gem.inflate spec
+        spec = @fetcher.fetch_path uri
+        spec = Gem.inflate spec
+      end
 
       if @update_cache then
         FileUtils.mkdir_p cache_dir
@@ -123,34 +135,84 @@ class Gem::SpecFetcher
   # Find spec names that match +dependency+.  If +all+ is true, all
   # matching released versions are returned.  If +matching_platform+
   # is false, gems for all platforms are returned.
+  
+  def get_type(all, prerelease)
+    if all
+      :all
+    elsif prerelease
+      :prerelease
+    else
+      :latest
+    end
+  end
+  
+  SPEC_FILES = {
+    :latest => 'latest_specs',
+    :prerelease => 'prerelease_specs',
+    :all => 'specs'
+  }
 
   def find_matching_with_errors(dependency, all = false, matching_platform = true, prerelease = false)
-    found = {}
+    # TODO: make type the only argument
+    type = get_type(all, prerelease)
+    file = SPEC_FILES[type]
 
+    cache = { :latest => @latest_specs,
+      :prerelease => @prerelease_specs,
+      :all => @specs }[type]
+    
+    specs_and_sources = []
     rejected_specs = {}
 
-    list(all, prerelease).each do |source_uri, specs|
-      found[source_uri] = specs.select do |spec_name, version, spec_platform|
-        if dependency.match?(spec_name, version)
-          if matching_platform and !Gem::Platform.match(spec_platform)
-            pm = (rejected_specs[dependency] ||= Gem::PlatformMismatch.new(spec_name, version))
-            pm.add_platform spec_platform
-            false
-          else
-            true
+    Gem.sources.each do |source_uri|
+      if source_uri[/^maven:/]
+        # maven processing
+        
+        # peel off maven:
+        maven_repo = source_uri.sub("maven:", "")
+        # add metadata xml
+        maven_repo += dependency.name.gsub(".", "/") + "/maven-metadata.xml"
+        
+        # fetch and process metadata XML
+        maven_uri = URI.parse(maven_repo)
+        begin
+          xml_data = @fetcher.fetch_path(maven_uri)
+        
+          xml = REXML::Document.new(xml_data)
+
+          # scan all versions for matching ones
+          REXML::XPath.each(xml, "//versions/version") do |version|
+            if dependency.match?(dependency.name, version.text)
+              # no platform check here, since maven jars are a jruby-specific feature
+              specs_and_sources.push [[dependency.name, version.text, "java"], source_uri.to_s]
+            end
+          end
+        end
+      else
+        source_uri = URI.parse source_uri
+
+        unless cache.include? source_uri
+          cache[source_uri] = load_specs source_uri, file
+        end
+
+        cache[source_uri].each do |gem|
+          # filter out prereleases
+          next if type == all && (!gems[1] || gems[1].prerelease?)
+        
+          spec_name, version, spec_platform = gem
+          if dependency.match?(spec_name, version) and
+            if matching_platform and !Gem::Platform.match(spec_platform)
+              pm = (rejected_specs[dependency] ||= Gem::PlatformMismatch.new(spec_name, version))
+              pm.add_platform spec_platform
+            else
+              specs_and_sources.push [gem, source_uri.to_s]
+            end
           end
         end
       end
     end
-
+    
     errors = rejected_specs.values
-
-    specs_and_sources = []
-
-    found.each do |source_uri, specs|
-      uri_str = source_uri.to_s
-      specs_and_sources.push(*specs.map { |spec| [spec, uri_str] })
-    end
 
     [specs_and_sources, errors]
   end
@@ -208,6 +270,7 @@ class Gem::SpecFetcher
       :all => @specs }[type]
 
     Gem.sources.each do |source_uri|
+      next if source_uri[/^maven:/]
       source_uri = URI.parse source_uri
 
       unless cache.include? source_uri

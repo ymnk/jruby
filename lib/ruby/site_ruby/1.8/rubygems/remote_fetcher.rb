@@ -4,6 +4,7 @@ require 'time'
 require 'uri'
 
 require 'rubygems'
+require 'maven_gem'
 
 ##
 # RemoteFetcher handles the details of fetching gems and gem information from
@@ -93,73 +94,81 @@ class Gem::RemoteFetcher
                              URI.escape(source_uri))
     end
 
-    scheme = source_uri.scheme
-
-    # URI.parse gets confused by MS Windows paths with forward slashes.
-    scheme = nil if scheme =~ /^[a-z]$/i
-
-    case scheme
-    when 'http', 'https' then
-      unless File.exist? local_gem_path then
-        begin
-          say "Downloading gem #{gem_file_name}" if
-            Gem.configuration.really_verbose
-
-          remote_gem_path = source_uri + "gems/#{gem_file_name}"
-
-          gem = self.fetch_path remote_gem_path
-        rescue Gem::RemoteFetcher::FetchError
-          raise if spec.original_platform == spec.platform
-
-          alternate_name = "#{spec.original_name}.gem"
-
-          say "Failed, downloading gem #{alternate_name}" if
-            Gem.configuration.really_verbose
-
-          remote_gem_path = source_uri + "gems/#{alternate_name}"
-
-          gem = self.fetch_path remote_gem_path
-        end
-
-        File.open local_gem_path, 'wb' do |fp|
-          fp.write gem
-        end
-      end
-    when 'file' then
-      begin
-        path = source_uri.path
-        path = File.dirname(path) if File.extname(path) == '.gem'
-
-        remote_gem_path = File.join(path, 'gems', gem_file_name)
-
-        FileUtils.cp(remote_gem_path, local_gem_path)
-      rescue Errno::EACCES
-        local_gem_path = source_uri.to_s
-      end
-
-      say "Using local gem #{local_gem_path}" if
-        Gem.configuration.really_verbose
-    when nil then # TODO test for local overriding cache
-      source_path = if Gem.win_platform? && source_uri.scheme &&
-                       !source_uri.path.include?(':') then
-                      "#{source_uri.scheme}:#{source_uri.path}"
-                    else
-                      source_uri.path
-                    end
-
-      source_path = URI.unescape source_path
-
-      begin
-        FileUtils.cp source_path, local_gem_path unless
-          File.expand_path(source_path) == File.expand_path(local_gem_path)
-      rescue Errno::EACCES
-        local_gem_path = source_uri.to_s
-      end
-
-      say "Using local gem #{local_gem_path}" if
-        Gem.configuration.really_verbose
+    if source_uri.to_s[/^maven:/]
+      pom_uri = source_uri.to_s.sub("maven:", "")
+      pom_uri += "#{spec.name.gsub('.', '/')}/#{spec.version}/#{spec.name.split('.')[-1]}-#{spec.version}.pom"
+      pom_doc = MavenGem::PomFetcher.fetch(pom_uri)
+      pom = MavenGem::PomSpec.parse_pom(pom_doc)
+      gem_dir = MavenGem::PomSpec.create_gem(spec, pom, local_gem_path)
+      FileUtils.mv "/tmp/" + pom.gem_file, local_gem_path
     else
-      raise Gem::InstallError, "unsupported URI scheme #{source_uri.scheme}"
+      scheme = source_uri.scheme
+
+      # URI.parse gets confused by MS Windows paths with forward slashes.
+      scheme = nil if scheme =~ /^[a-z]$/i
+      case scheme
+      when 'http', 'https' then
+        unless File.exist? local_gem_path then
+          begin
+            say "Downloading gem #{gem_file_name}" if
+              Gem.configuration.really_verbose
+
+            remote_gem_path = source_uri + "gems/#{gem_file_name}"
+
+            gem = self.fetch_path remote_gem_path
+          rescue Gem::RemoteFetcher::FetchError
+            raise if spec.original_platform == spec.platform
+
+            alternate_name = "#{spec.original_name}.gem"
+
+            say "Failed, downloading gem #{alternate_name}" if
+              Gem.configuration.really_verbose
+
+            remote_gem_path = source_uri + "gems/#{alternate_name}"
+
+            gem = self.fetch_path remote_gem_path
+          end
+
+          File.open local_gem_path, 'wb' do |fp|
+            fp.write gem
+          end
+        end
+      when 'file' then
+        begin
+          path = source_uri.path
+          path = File.dirname(path) if File.extname(path) == '.gem'
+
+          remote_gem_path = File.join(path, 'gems', gem_file_name)
+
+          FileUtils.cp(remote_gem_path, local_gem_path)
+        rescue Errno::EACCES
+          local_gem_path = source_uri.to_s
+        end
+
+        say "Using local gem #{local_gem_path}" if
+          Gem.configuration.really_verbose
+      when nil then # TODO test for local overriding cache
+        source_path = if Gem.win_platform? && source_uri.scheme &&
+                         !source_uri.path.include?(':') then
+                        "#{source_uri.scheme}:#{source_uri.path}"
+                      else
+                        source_uri.path
+                      end
+
+        source_path = URI.unescape source_path
+
+        begin
+          FileUtils.cp source_path, local_gem_path unless
+            File.expand_path(source_path) == File.expand_path(local_gem_path)
+        rescue Errno::EACCES
+          local_gem_path = source_uri.to_s
+        end
+
+        say "Using local gem #{local_gem_path}" if
+          Gem.configuration.really_verbose
+      else
+        raise Gem::InstallError, "unsupported URI scheme #{source_uri.scheme}"
+      end
     end
 
     local_gem_path
