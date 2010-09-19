@@ -66,14 +66,14 @@ public class RubySignal {
         //registerThreadDumpSignalHandler(runtime);
     }
 
-    @JRubyMethod(name = "trap", required = 1, optional = 1, frame = true, module = true)
+    @JRubyMethod(required = 1, optional = 1, module = true)
     public static IRubyObject trap(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
         Ruby runtime = recv.getRuntime();
         runtime.getLoadService().require("jsignal_internal");
         return RuntimeHelpers.invoke(context, runtime.getKernel(), "__jtrap", args, block);
     }
     
-    @JRubyMethod(name = "list", module = true)
+    @JRubyMethod(module = true)
     public static IRubyObject list(ThreadContext context, IRubyObject recv) {
         Ruby runtime = recv.getRuntime();
         RubyHash names = RubyHash.newHash(runtime);

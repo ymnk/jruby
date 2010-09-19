@@ -436,7 +436,7 @@ public class RubySymbol extends RubyObject {
         }
     }
     
-    @JRubyMethod(frame = true)
+    @JRubyMethod
     public IRubyObject to_proc(ThreadContext context) {
         BlockBody body = new BlockBody(BlockBody.SINGLE_RESTARG) {
             private StaticScope scope = new LocalStaticScope(null);

@@ -549,8 +549,21 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
             backtrace = false;
             rest = false;
             block = false;
+            boolean first = true;
+            boolean lastBlock = false;
 
             for (JavaMethodDescriptor desc: descs) {
+                // make sure we don't have some methods with blocks and others without
+                // the handle generation logic can't handle such cases yet
+                if (first) {
+                    first = false;
+                } else {
+                    if (lastBlock != desc.hasBlock) {
+                        throw new RuntimeException("Mismatched block parameters for method " + desc.declaringClassName + "." + desc.name);
+                    }
+                }
+                lastBlock = desc.hasBlock;
+                
                 int specificArity = -1;
                 if (desc.hasVarArgs) {
                     if (desc.optional == 0 && !desc.rest && desc.required == 0) {

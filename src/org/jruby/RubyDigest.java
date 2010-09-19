@@ -370,7 +370,7 @@ public class RubyDigest {
             super(runtime, type);
         }
         
-        @JRubyMethod(name = "digest", required = 1, rest = true, frame = true, meta = true)
+        @JRubyMethod(name = "digest", required = 1, rest = true, meta = true)
         public static IRubyObject s_digest(ThreadContext ctx, IRubyObject recv, IRubyObject[] args, Block unusedBlock) {
             Ruby runtime = recv.getRuntime();
             if (args.length < 1) {
@@ -383,14 +383,14 @@ public class RubyDigest {
             return obj.callMethod(ctx, "digest", str);
         }
 
-        @JRubyMethod(name = "hexdigest", required = 1, optional = 1, frame = true, meta = true)
+        @JRubyMethod(name = "hexdigest", required = 1, optional = 1, meta = true)
         public static IRubyObject s_hexdigest(ThreadContext ctx, IRubyObject recv, IRubyObject[] args, Block unusedBlock) {
             Ruby runtime = recv.getRuntime();
             byte[] digest = recv.callMethod(ctx, "digest", args, Block.NULL_BLOCK).convertToString().getBytes();
             return RubyDigest.toHexString(runtime, digest);
         }
 
-        @JRubyMethod(name = "file", frame = true, meta = true)
+        @JRubyMethod(meta = true)
         public static IRubyObject file(ThreadContext ctx, IRubyObject recv, IRubyObject filename) {
             Ruby runtime = recv.getRuntime();
             IRubyObject obj = ((RubyClass)recv).newInstance(ctx, new IRubyObject[0], Block.NULL_BLOCK);
@@ -441,7 +441,7 @@ public class RubyDigest {
             return null;
         }
         
-        @JRubyMethod(optional = 1, frame = true)
+        @JRubyMethod(optional = 1)
         public IRubyObject initialize(IRubyObject[] args, Block unusedBlock) {
             if(args.length > 0 && !args[0].isNil()) {
                 update(args[0]);

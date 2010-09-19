@@ -49,7 +49,7 @@ import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ObjectMarshal;
 import org.jruby.runtime.ThreadContext;
-import org.jruby.runtime.Visibility;
+import static org.jruby.runtime.Visibility.*;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.builtin.Variable;
 import org.jruby.runtime.component.VariableEntry;
@@ -203,7 +203,7 @@ public class RubyException extends RubyObject {
         backtrace = ThreadContext.renderBacktraceMRI(getRuntime(), backtraceElements);
     }
 
-    @JRubyMethod(optional = 2, frame = true, visibility = Visibility.PRIVATE)
+    @JRubyMethod(optional = 2, visibility = PRIVATE)
     public IRubyObject initialize(IRubyObject[] args, Block block) {
         if (args.length == 1) message = args[0];
         return this;

@@ -62,7 +62,7 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyClass;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.ObjectMarshal;
-import org.jruby.runtime.Visibility;
+import static org.jruby.runtime.Visibility.*;
 import org.jruby.util.io.BlockingIO;
 
 /**
@@ -215,7 +215,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
      * </pre>
      * <i>produces:</i> abxyzc
      */
-    @JRubyMethod(name = {"new", "fork"}, rest = true, frame = true, meta = true)
+    @JRubyMethod(name = {"new", "fork"}, rest = true, meta = true)
     public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
         return startThread(recv, args, true, block);
     }
@@ -225,7 +225,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
      * subclassed, then calling start in that subclass will not invoke the
      * subclass's initialize method.
      */
-    @JRubyMethod(name = "start", rest = true, frame = true, meta = true)
+    @JRubyMethod(rest = true, meta = true)
     public static RubyThread start(IRubyObject recv, IRubyObject[] args, Block block) {
         return startThread(recv, args, false, block);
     }
@@ -250,7 +250,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         return rubyThread;
     }
     
-    @JRubyMethod(name = "initialize", rest = true, frame = true, visibility = Visibility.PRIVATE)
+    @JRubyMethod(rest = true, visibility = PRIVATE)
     public IRubyObject initialize(ThreadContext context, IRubyObject[] args, Block block) {
         Ruby runtime = getRuntime();
         if (!block.isGiven()) throw runtime.newThreadError("must be called with a block");
@@ -519,7 +519,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
 	}
     }
 
-    @JRubyMethod(name = "value", frame = true)
+    @JRubyMethod
     public IRubyObject value() {
         join(new IRubyObject[0]);
         synchronized (this) {
@@ -527,7 +527,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         }
     }
 
-    @JRubyMethod(name = "group")
+    @JRubyMethod
     public IRubyObject group() {
         if (threadGroup == null) {
         	return getRuntime().getNil();
@@ -601,13 +601,13 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         return receiver.getRuntime().getNil();
     }
     
-    @JRubyMethod(name = "kill", required = 1, frame = true, meta = true)
+    @JRubyMethod(required = 1, meta = true)
     public static IRubyObject kill(IRubyObject receiver, IRubyObject rubyThread, Block block) {
         if (!(rubyThread instanceof RubyThread)) throw receiver.getRuntime().newTypeError(rubyThread, receiver.getRuntime().getThread());
         return ((RubyThread)rubyThread).kill();
     }
     
-    @JRubyMethod(name = "exit", frame = true, meta = true)
+    @JRubyMethod(meta = true)
     public static IRubyObject s_exit(IRubyObject receiver, Block block) {
         RubyThread rubyThread = receiver.getRuntime().getThreadService().getCurrentContext().getThread();
 
@@ -661,7 +661,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         return this.priority;
     }
 
-    @JRubyMethod(name = "raise", optional = 3, frame = true)
+    @JRubyMethod(optional = 3)
     public IRubyObject raise(IRubyObject[] args, Block block) {
         Ruby runtime = getRuntime();
         ThreadContext context = runtime.getCurrentContext();

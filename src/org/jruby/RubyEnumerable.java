@@ -94,7 +94,7 @@ public class RubyEnumerable {
         return largs.length == 0 ? runtime.getNil() : largs[0];
     }
 
-    @JRubyMethod(name = "count", frame = true)
+    @JRubyMethod
     public static IRubyObject count(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
         final ThreadContext localContext = context;
@@ -127,7 +127,7 @@ public class RubyEnumerable {
         return RubyFixnum.newFixnum(runtime, result[0]);
     }
     
-    @JRubyMethod(name = "count", frame = true)
+    @JRubyMethod
     public static IRubyObject count(ThreadContext context, IRubyObject self, final IRubyObject arg, final Block block) {
         final Ruby runtime = context.getRuntime();
         final ThreadContext localContext = context;
@@ -146,14 +146,14 @@ public class RubyEnumerable {
         return RubyFixnum.newFixnum(runtime, result[0]);
     }
     
-    @JRubyMethod(name = "cycle", frame = true)
+    @JRubyMethod
     public static IRubyObject cycle(ThreadContext context, IRubyObject self, final Block block) {
         if (!block.isGiven()) return enumeratorize(context.getRuntime(), self, "cycle");
         
         return cycleCommon(context, self, -1, block);
     }
 
-    @JRubyMethod(name = "cycle", frame = true)
+    @JRubyMethod
     public static IRubyObject cycle(ThreadContext context, IRubyObject self, IRubyObject arg, final Block block) {
         if (arg.isNil()) return cycle(context, self, block);
         if (!block.isGiven()) return enumeratorize(context.getRuntime(), self, "cycle", arg);
@@ -220,7 +220,7 @@ public class RubyEnumerable {
         return result;
     }
 
-    @JRubyMethod(name = "take_while", frame = true)
+    @JRubyMethod
     public static IRubyObject take_while(ThreadContext context, IRubyObject self, final Block block) {
         if (!block.isGiven()) return enumeratorize(context.getRuntime(), self, "take_while");
 
@@ -270,7 +270,7 @@ public class RubyEnumerable {
         return result;
     }
 
-    @JRubyMethod(name = "drop_while", frame = true)
+    @JRubyMethod
     public static IRubyObject drop_while(ThreadContext context, IRubyObject self, final Block block) {
         if (!block.isGiven()) return enumeratorize(context.getRuntime(), self, "drop_while");
 
@@ -381,7 +381,7 @@ public class RubyEnumerable {
         return result;
     }
 
-    @JRubyMethod(name = "sort", frame = true)
+    @JRubyMethod
     public static IRubyObject sort(ThreadContext context, IRubyObject self, final Block block) {
         Ruby runtime = context.getRuntime();
         RubyArray result = runtime.newArray();
@@ -453,12 +453,12 @@ public class RubyEnumerable {
         }
     }
 
-    @JRubyMethod(name = "sort_by", frame = true)
+    @JRubyMethod
     public static IRubyObject sort_by(ThreadContext context, IRubyObject self, final Block block) {
         return block.isGiven() ? sort_byCommon(context, self, block) : enumeratorize(context.getRuntime(), self, "sort_by");
     }
 
-    @JRubyMethod(name = "grep", required = 1, frame = true)
+    @JRubyMethod
     public static IRubyObject grep(ThreadContext context, IRubyObject self, final IRubyObject pattern, final Block block) {
         final Ruby runtime = context.getRuntime();
         final RubyArray result = runtime.newArray();
@@ -523,7 +523,7 @@ public class RubyEnumerable {
         return ifnone != null ? ifnone.callMethod(context, "call") : runtime.getNil();
     }
 
-    @JRubyMethod(name = "detect", frame = true)
+    @JRubyMethod
     public static IRubyObject detect(ThreadContext context, IRubyObject self, final Block block) {
         boolean blockGiven = block.isGiven();
 
@@ -532,7 +532,7 @@ public class RubyEnumerable {
         return block.isGiven() ? detectCommon(context, self, block) : enumeratorize(context.getRuntime(), self, "detect");
     }
 
-    @JRubyMethod(name = "detect", frame = true)
+    @JRubyMethod
     public static IRubyObject detect(ThreadContext context, IRubyObject self, IRubyObject ifnone, final Block block) {
         boolean blockGiven = block.isGiven();
 
@@ -542,7 +542,7 @@ public class RubyEnumerable {
     }
 
     // FIXME: Custom Array enumeratorize should be made for all of these methods which skip Array without a supplied block.
-    @JRubyMethod(name = "find", frame = true)
+    @JRubyMethod
     public static IRubyObject find(ThreadContext context, IRubyObject self, final Block block) {
         boolean blockGiven = block.isGiven();
 
@@ -551,7 +551,7 @@ public class RubyEnumerable {
         return blockGiven ? detectCommon(context, self, block) : enumeratorize(context.getRuntime(), self, "find");
     }
 
-    @JRubyMethod(name = "find", frame = true)
+    @JRubyMethod
     public static IRubyObject find(ThreadContext context, IRubyObject self, IRubyObject ifnone, final Block block) {
         boolean blockGiven = block.isGiven();
 
@@ -561,7 +561,7 @@ public class RubyEnumerable {
             enumeratorize(context.getRuntime(), self, "find", ifnone);
     }
 
-    @JRubyMethod(name = "find_index", frame = true)
+    @JRubyMethod
     public static IRubyObject find_index(ThreadContext context, IRubyObject self, final Block block) {
         boolean blockGiven = block.isGiven();
 
@@ -571,7 +571,7 @@ public class RubyEnumerable {
             enumeratorize(context.getRuntime(), self, "find_index");
     }
 
-    @JRubyMethod(name = "find_index", frame = true)
+    @JRubyMethod
     public static IRubyObject find_index(ThreadContext context, IRubyObject self, final IRubyObject cond, final Block block) {
         final Ruby runtime = context.getRuntime();
 
@@ -640,12 +640,12 @@ public class RubyEnumerable {
         return result;
     }
 
-    @JRubyMethod(name = "select", frame = true)
+    @JRubyMethod
     public static IRubyObject select(ThreadContext context, IRubyObject self, final Block block) {
         return block.isGiven() ? selectCommon(context, self, block) : enumeratorize(context.getRuntime(), self, "select");
     }
 
-    @JRubyMethod(name = "find_all", frame = true)
+    @JRubyMethod
     public static IRubyObject find_all(ThreadContext context, IRubyObject self, final Block block) {
         return block.isGiven() ? selectCommon(context, self, block) : enumeratorize(context.getRuntime(), self, "find_all");
     }
@@ -669,12 +669,12 @@ public class RubyEnumerable {
         return result;
     }
 
-    @JRubyMethod(name = "reject", frame = true)
+    @JRubyMethod
     public static IRubyObject reject(ThreadContext context, IRubyObject self, final Block block) {
         return block.isGiven() ? rejectCommon(context, self, block) : enumeratorize(context.getRuntime(), self, "reject");
     }
 
-    @JRubyMethod(name = {"collect", "map"}, frame = true, compat = CompatVersion.RUBY1_8)
+    @JRubyMethod(name = {"collect", "map"}, compat = CompatVersion.RUBY1_8)
     public static IRubyObject collect(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
         final RubyArray result = runtime.newArray();
@@ -696,12 +696,12 @@ public class RubyEnumerable {
         return result;
     }
 
-    @JRubyMethod(name = {"collect"}, frame = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = {"collect"}, compat = CompatVersion.RUBY1_9)
     public static IRubyObject collect19(ThreadContext context, IRubyObject self, final Block block) {
         return collectCommon19(context, self, block, "collect");
     }
 
-    @JRubyMethod(name = {"map"}, frame = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = {"map"}, compat = CompatVersion.RUBY1_9)
     public static IRubyObject map19(ThreadContext context, IRubyObject self, final Block block) {
         return collectCommon19(context, self, block, "map");
     }
@@ -733,12 +733,12 @@ public class RubyEnumerable {
         return result;
     }
 
-    @JRubyMethod(name = {"flat_map"}, frame = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = {"flat_map"}, compat = CompatVersion.RUBY1_9)
     public static IRubyObject flat_map19(ThreadContext context, IRubyObject self, final Block block) {
         return flatMapCommon19(context, self, block, "flat_map");
     }
 
-    @JRubyMethod(name = {"collect_concat"}, frame = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = {"collect_concat"}, compat = CompatVersion.RUBY1_9)
     public static IRubyObject collect_concat19(ThreadContext context, IRubyObject self, final Block block) {
         return flatMapCommon19(context, self, block, "collect_concat");
     }
@@ -788,17 +788,17 @@ public class RubyEnumerable {
         return result[0] == null ? runtime.getNil() : result[0];
     }
 
-    @JRubyMethod(name = {"inject", "reduce"}, frame = true)
+    @JRubyMethod(name = {"inject", "reduce"})
     public static IRubyObject inject(ThreadContext context, IRubyObject self, final Block block) {
         return injectCommon(context, self, null, block);
     }
     
-    @JRubyMethod(name = {"inject", "reduce"}, frame = true)
+    @JRubyMethod(name = {"inject", "reduce"})
     public static IRubyObject inject(ThreadContext context, IRubyObject self, IRubyObject arg, final Block block) {
         return block.isGiven() ? injectCommon(context, self, arg, block) : inject(context, self, null, arg, block);
     }
 
-    @JRubyMethod(name = {"inject", "reduce"}, frame = true)
+    @JRubyMethod(name = {"inject", "reduce"})
     public static IRubyObject inject(ThreadContext context, IRubyObject self, IRubyObject init, IRubyObject method, final Block block) {
         final Ruby runtime = context.getRuntime();
 
@@ -842,7 +842,7 @@ public class RubyEnumerable {
         return runtime.newArray(arr_true, arr_false);
     }
 
-    @JRubyMethod(name = "partition", frame = true)
+    @JRubyMethod(name = "partition")
     public static IRubyObject partition(ThreadContext context, IRubyObject self, final Block block) {
         return block.isGiven() ? partitionCommon(context, self, block) : enumeratorize(context.getRuntime(), self, "partition");
     }
@@ -882,22 +882,22 @@ public class RubyEnumerable {
         return self;
     }
 
-    @JRubyMethod(name = "each_with_index", frame = true, compat = CompatVersion.RUBY1_8)
+    @JRubyMethod(compat = CompatVersion.RUBY1_8)
     public static IRubyObject each_with_index(ThreadContext context, IRubyObject self, Block block) {
         return block.isGiven() ? each_with_indexCommon(context, self, block) : enumeratorize(context.getRuntime(), self, "each_with_index");
     }
 
-    @JRubyMethod(name = "each_with_index", frame = true, rest = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = "each_with_index", rest = true, compat = CompatVersion.RUBY1_9)
     public static IRubyObject each_with_index19(ThreadContext context, IRubyObject self, IRubyObject[] args, Block block) {
         return block.isGiven() ? each_with_indexCommon19(context, self, block, args) : enumeratorize(context.getRuntime(), self, "each_with_index", args);
     }
 
-    @JRubyMethod(name = "enum_with_index", frame = true)
+    @JRubyMethod
     public static IRubyObject enum_with_index(ThreadContext context, IRubyObject self, Block block) {
         return block.isGiven() ? each_with_indexCommon(context, self, block) : enumeratorize(context.getRuntime(), self, "enum_with_index");
     }
 
-    @JRubyMethod(name = "each_entry", frame = true, rest = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(rest = true, compat = CompatVersion.RUBY1_9)
     public static IRubyObject each_entry(ThreadContext context, final IRubyObject self, final IRubyObject[] args, final Block block) {
         return block.isGiven() ? each_entryCommon(context, self, args, block) : enumeratorize(context.getRuntime(), self, "each_entry", args);
     }
@@ -911,13 +911,13 @@ public class RubyEnumerable {
         return self;
     }
 
-    @JRubyMethod(name = "reverse_each", frame = true)
+    @JRubyMethod
     public static IRubyObject reverse_each(ThreadContext context, IRubyObject self, Block block) {
         return block.isGiven() ? reverse_eachInternal(context, self, to_a(context, self), block) :
             enumeratorize(context.getRuntime(), self, "reverse_each");
     }
 
-    @JRubyMethod(name = "reverse_each", frame = true, rest = true)
+    @JRubyMethod(rest = true)
     public static IRubyObject reverse_each(ThreadContext context, IRubyObject self, IRubyObject[] args, Block block) {
         return block.isGiven() ? reverse_eachInternal(context, self, to_a(context, self, args), block) :
             enumeratorize(context.getRuntime(), self, "reverse_each", args);
@@ -928,7 +928,7 @@ public class RubyEnumerable {
         return self;
     }
 
-    @JRubyMethod(name = {"include?", "member?"}, required = 1, frame = true)
+    @JRubyMethod(name = {"include?", "member?"}, required = 1)
     public static IRubyObject include_p(ThreadContext context, IRubyObject self, final IRubyObject arg) {
         final Ruby runtime = context.getRuntime();
         final ThreadContext localContext = context;
@@ -951,7 +951,7 @@ public class RubyEnumerable {
         return runtime.getFalse();
     }
 
-    @JRubyMethod(name = "max", frame = true)
+    @JRubyMethod
     public static IRubyObject max(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
         final IRubyObject result[] = new IRubyObject[] { null };
@@ -986,7 +986,7 @@ public class RubyEnumerable {
         return result[0] == null ? runtime.getNil() : result[0];
     }
 
-    @JRubyMethod(name = "max_by", frame = true)
+    @JRubyMethod
     public static IRubyObject max_by(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
 
@@ -1012,7 +1012,7 @@ public class RubyEnumerable {
         return result[0];
     }
 
-    @JRubyMethod(name = "min", frame = true)
+    @JRubyMethod
     public static IRubyObject min(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
         final IRubyObject result[] = new IRubyObject[] { null };
@@ -1047,7 +1047,7 @@ public class RubyEnumerable {
         return result[0] == null ? runtime.getNil() : result[0];
     }
 
-    @JRubyMethod(name = "min_by", frame = true)
+    @JRubyMethod
     public static IRubyObject min_by(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
 
@@ -1073,7 +1073,7 @@ public class RubyEnumerable {
         return result[0];
     }
 
-    @JRubyMethod(name = "minmax", frame = true)
+    @JRubyMethod
     public static IRubyObject minmax(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
         final IRubyObject result[] = new IRubyObject[] { null, null };
@@ -1128,7 +1128,7 @@ public class RubyEnumerable {
         return runtime.newArrayNoCopy(result);
     }
 
-    @JRubyMethod(name = "minmax_by", frame = true)
+    @JRubyMethod
     public static IRubyObject minmax_by(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
 
@@ -1163,7 +1163,7 @@ public class RubyEnumerable {
         return runtime.newArrayNoCopy(result);
     }
     
-    @JRubyMethod(name = "none?", frame = true)
+    @JRubyMethod(name = "none?")
     public static IRubyObject none_p(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
         final ThreadContext localContext = context;
@@ -1195,7 +1195,7 @@ public class RubyEnumerable {
         return runtime.getTrue();
     }
     
-    @JRubyMethod(name = "one?", frame = true)
+    @JRubyMethod(name = "one?")
     public static IRubyObject one_p(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
         final ThreadContext localContext = context;
@@ -1239,7 +1239,7 @@ public class RubyEnumerable {
         return result[0] ? runtime.getTrue() : runtime.getFalse();
     }
 
-    @JRubyMethod(name = "all?", frame = true)
+    @JRubyMethod(name = "all?")
     public static IRubyObject all_p(ThreadContext context, IRubyObject self, final Block block) {
         if (self instanceof RubyArray) return ((RubyArray) self).all_p(context, block);
 
@@ -1281,7 +1281,7 @@ public class RubyEnumerable {
         return runtime.getTrue();
     }
     
-    @JRubyMethod(name = "any?", frame = true)
+    @JRubyMethod(name = "any?")
     public static IRubyObject any_p(ThreadContext context, IRubyObject self, final Block block) {
         if (self instanceof RubyArray) return ((RubyArray) self).any_p(context, block);
         
@@ -1323,12 +1323,12 @@ public class RubyEnumerable {
         return runtime.getFalse();
     }
 
-    @JRubyMethod(name = "zip", rest = true, frame = true, compat = CompatVersion.RUBY1_8)
+    @JRubyMethod(rest = true, compat = CompatVersion.RUBY1_8)
     public static IRubyObject zip(ThreadContext context, IRubyObject self, final IRubyObject[] args, final Block block) {
         return zipCommon(context, self, args, block, "to_a");
     }
     
-    @JRubyMethod(name = "zip", rest = true, frame = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = "zip", rest = true, compat = CompatVersion.RUBY1_9)
     public static IRubyObject zip19(ThreadContext context, IRubyObject self, final IRubyObject[] args, final Block block) {
         return zipCommon(context, self, args, block, "to_ary");
     }
@@ -1389,7 +1389,7 @@ public class RubyEnumerable {
         }
     }
 
-    @JRubyMethod(name = "group_by", frame = true)
+    @JRubyMethod
     public static IRubyObject group_by(ThreadContext context, IRubyObject self, final Block block) {
         final Ruby runtime = context.getRuntime();
         
@@ -1417,15 +1417,28 @@ public class RubyEnumerable {
         return result;
     }
 
-    @JRubyMethod(name = "chunk", required = 0, optional = 1, frame = true, compat = CompatVersion.RUBY1_9)
+    @Deprecated
     public static IRubyObject chunk(ThreadContext context, IRubyObject self, final IRubyObject[] args, final Block block) {
-        IRubyObject initialState = context.getRuntime().getNil();
+        switch (Arity.checkArgumentCount(context.runtime, args, 0, 1)) {
+        case 0:
+            return chunk(context, self, block);
+        case 1:
+            return chunk(context, self, args[0], block);
+        default:
+            // should never be reached
+            throw context.runtime.newArgumentError(args.length, 0);
+        }
+    }
+    
+    @JRubyMethod(compat = CompatVersion.RUBY1_9)
+    public static IRubyObject chunk(ThreadContext context, IRubyObject self, final Block block) {
+        return chunk(context, self, context.nil, block);
+    }
+    
+    @JRubyMethod(compat = CompatVersion.RUBY1_9)
+    public static IRubyObject chunk(ThreadContext context, IRubyObject self, final IRubyObject initialState, final Block block) {
         if(!block.isGiven()) {
             throw context.getRuntime().newArgumentError("no block given");
-        }
-
-        if(args.length > 0) {
-            initialState = args[0];
         }
 
         IRubyObject enumerator = context.getRuntime().getEnumerator().allocate();

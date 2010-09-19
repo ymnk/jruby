@@ -40,7 +40,6 @@ import org.jcodings.Encoding;
 import org.jruby.util.io.OpenFile;
 import org.jruby.util.io.ChannelDescriptor;
 import java.io.File;
-import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -60,7 +59,7 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
-import org.jruby.runtime.Visibility;
+import static org.jruby.runtime.Visibility.*;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.encoding.EncodingCapable;
 import org.jruby.util.ByteList;
@@ -75,6 +74,7 @@ import org.jruby.util.io.BadDescriptorException;
 import org.jruby.util.io.FileExistsException;
 import org.jruby.util.io.InvalidValueException;
 import org.jruby.util.io.PipeException;
+import static org.jruby.CompatVersion.*;
 
 /**
  * Ruby File class equivalent in java.
@@ -402,7 +402,7 @@ public class RubyFile extends RubyIO implements EncodingCapable {
         }
     }
 
-    @JRubyMethod(required = 1, optional = 2, frame = true, visibility = Visibility.PRIVATE, compat = CompatVersion.RUBY1_8)
+    @JRubyMethod(required = 1, optional = 2, visibility = PRIVATE, compat = RUBY1_8)
     @Override
     public IRubyObject initialize(IRubyObject[] args, Block block) {
         if (openFile == null) {
@@ -420,7 +420,7 @@ public class RubyFile extends RubyIO implements EncodingCapable {
         return openFile(args);
     }
 
-    @JRubyMethod(name = "initialize", required = 1, optional = 2, frame = true, visibility = Visibility.PRIVATE, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = "initialize", required = 1, optional = 2, visibility = PRIVATE, compat = RUBY1_9)
     public IRubyObject initialize19(ThreadContext context, IRubyObject[] args, Block block) {
         if (openFile == null) {
             throw context.getRuntime().newRuntimeError("reinitializing File");
@@ -714,7 +714,7 @@ public class RubyFile extends RubyIO implements EncodingCapable {
         return getLastModified(context.getRuntime(), path);
     }
 
-    @JRubyMethod(meta = true, frame = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(meta = true, compat = RUBY1_9)
     public static IRubyObject path(ThreadContext context, IRubyObject self, IRubyObject str) {
         return get_path(context, str);
     }
@@ -1066,17 +1066,17 @@ public class RubyFile extends RubyIO implements EncodingCapable {
      * @param args
      * @return
      */
-    @JRubyMethod(required = 1, optional = 1, meta = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(required = 1, optional = 1, meta = true, compat = RUBY1_9)
     public static IRubyObject absolute_path(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
         return expandPathInternal(context, recv, args, false);
     }
 
-    @JRubyMethod(name = {"realdirpath"}, required = 1, optional = 1, meta = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = {"realdirpath"}, required = 1, optional = 1, meta = true, compat = RUBY1_9)
     public static IRubyObject realdirpath(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
         return expandPathInternal(context, recv, args, false);
     }
 
-    @JRubyMethod(name = {"realpath"}, required = 1, optional = 1, meta = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = {"realpath"}, required = 1, optional = 1, meta = true, compat = RUBY1_9)
     public static IRubyObject realpath(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
         IRubyObject file = expandPathInternal(context, recv, args, false);
         if (!RubyFileTest.exist_p(recv, file).isTrue()) {
@@ -1600,12 +1600,12 @@ public class RubyFile extends RubyIO implements EncodingCapable {
     }
 
     // Can we produce IOError which bypasses a close?
-    @JRubyMethod(required = 2, meta = true, compat = CompatVersion.RUBY1_8)
+    @JRubyMethod(required = 2, meta = true, compat = RUBY1_8)
     public static IRubyObject truncate(ThreadContext context, IRubyObject recv, IRubyObject arg1, IRubyObject arg2) {        
         return truncateCommon(context, recv, arg1, arg2);
     }
 
-    @JRubyMethod(name = "truncate", required = 2, meta = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = "truncate", required = 2, meta = true, compat = RUBY1_9)
     public static IRubyObject truncate19(ThreadContext context, IRubyObject recv, IRubyObject arg1, IRubyObject arg2) {
         if (!(arg1 instanceof RubyString) && arg1.respondsTo("to_path")) {
             arg1 = arg1.callMethod(context, "to_path");
@@ -1717,7 +1717,7 @@ public class RubyFile extends RubyIO implements EncodingCapable {
         return runtime.newFixnum(args.length);
     }
 
-    @JRubyMethod(name = "size", backtrace = true, compat = CompatVersion.RUBY1_9)
+    @JRubyMethod(name = "size", backtrace = true, compat = RUBY1_9)
     public IRubyObject size(ThreadContext context) {
         Ruby runtime = context.getRuntime();
         if ((openFile.getMode() & OpenFile.WRITABLE) != 0) {

@@ -37,6 +37,7 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 import org.jruby.util.CodegenUtils;
+import static org.jruby.anno.FrameField.*;
 
 public class JavaProxy extends RubyObject {
     private static final boolean DEBUG = false;
@@ -107,7 +108,8 @@ public class JavaProxy extends RubyObject {
         
         return javaProxy;
     }
-    
+
+    // framed for invokeSuper
     @JRubyMethod(frame = true, meta = true)
     public static IRubyObject inherited(ThreadContext context, IRubyObject recv, IRubyObject subclass) {
         IRubyObject subJavaClass = RuntimeHelpers.invoke(context, subclass, "java_class");
@@ -341,7 +343,7 @@ public class JavaProxy extends RubyObject {
         return getRubyMethod(name, argTypesClasses);
     }
 
-    @JRubyMethod(frame = true)
+    @JRubyMethod
     public IRubyObject marshal_dump() {
         if (Serializable.class.isAssignableFrom(object.getClass())) {
             try {
@@ -359,7 +361,7 @@ public class JavaProxy extends RubyObject {
         }
     }
 
-    @JRubyMethod(frame = true)
+    @JRubyMethod
     public IRubyObject marshal_load(ThreadContext context, IRubyObject str) {
         try {
             ByteList byteList = str.convertToString().getByteList();
