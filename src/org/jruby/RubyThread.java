@@ -38,6 +38,7 @@ import java.nio.channels.Channel;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.nio.channels.spi.SelectorProvider;
 import java.util.WeakHashMap;
 import java.util.HashMap;
 import java.util.Map;
@@ -64,6 +65,7 @@ import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.ObjectMarshal;
 import static org.jruby.runtime.Visibility.*;
 import org.jruby.util.io.BlockingIO;
+import org.jruby.util.io.SelectorFactory;
 
 /**
  * Implementation of Ruby's <code>Thread</code> class.  Each Ruby thread is
@@ -101,6 +103,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
 
     private volatile ThreadService.Event mail;
     private volatile Status status = Status.RUN;
+    private volatile BlockingTask currentBlockingTask;
 
     protected RubyThread(Ruby runtime, RubyClass type) {
         super(runtime, type);
@@ -111,18 +114,20 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         errorInfo = runtime.getNil();
     }
 
-    public synchronized void receiveMail(ThreadService.Event event) {
-        // if we're already aborting, we can receive no further mail
-        if (status == Status.ABORTING) return;
-        
-        mail = event;
-        switch (event.type) {
-        case KILL:
-            status = Status.ABORTING;
+    public void receiveMail(ThreadService.Event event) {
+        synchronized (this) {
+            // if we're already aborting, we can receive no further mail
+            if (status == Status.ABORTING) return;
+
+            mail = event;
+            switch (event.type) {
+            case KILL:
+                status = Status.ABORTING;
+            }
+
+            // If this thread is sleeping or stopped, wake it
+            notify();
         }
-        
-        // If this thread is sleeping or stopped, wake it
-        notify();
 
         // interrupt the target thread in case it's blocking or waiting
         // WARNING: We no longer interrupt the target thread, since this usually means
@@ -776,6 +781,48 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         }
     }
 
+    public static interface BlockingTask {
+        public void run() throws InterruptedException;
+        public void wakeup();
+    }
+
+    public static final class SleepTask implements BlockingTask {
+        private final Object object;
+        private final long millis;
+        private final int nanos;
+
+        public SleepTask(Object object, long millis, int nanos) {
+            this.object = object;
+            this.millis = millis;
+            this.nanos = nanos;
+        }
+
+        public void run() throws InterruptedException {
+            synchronized (object) {
+                object.wait(millis, nanos);
+            }
+        }
+
+        public void wakeup() {
+            synchronized (object) {
+                object.notify();
+            }
+        }
+    }
+
+    public void executeBlockingTask(BlockingTask task) throws InterruptedException {
+        enterSleep();
+        try {
+            currentBlockingTask = task;
+            pollThreadEvents();
+            task.run();
+        } finally {
+            exitSleep();
+            currentBlockingTask = null;
+            pollThreadEvents();
+        }
+    }
+
     public void enterSleep() {
         status = Status.SLEEP;
     }
@@ -860,7 +907,6 @@ public class RubyThread extends RubyObject implements ExecutionContext {
     }
     
     private volatile Selector currentSelector;
-    private volatile Object currentWaitObject;
     
     @Deprecated
     public boolean selectForAccept(RubyIO io) {
@@ -868,7 +914,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
     }
 
     private synchronized Selector getSelector(SelectableChannel channel) throws IOException {
-        return channel.provider().openSelector();
+        return SelectorFactory.openWithRetryFrom(getRuntime(), channel.provider());
     }
     
     public boolean select(RubyIO io, int ops) {
@@ -963,11 +1009,10 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         if (iowait != null) {
             iowait.cancel();
         }
-        Object object = currentWaitObject;
-        if (object != null) {
-            synchronized (object) {
-                object.notify();
-            }
+        
+        BlockingTask task = currentBlockingTask;
+        if (task != null) {
+            task.wakeup();
         }
     }
     private volatile BlockingIO.Condition blockingIO = null;
@@ -1020,28 +1065,12 @@ public class RubyThread extends RubyObject implements ExecutionContext {
             if (delay_ns > 0) {
                 long delay_ms = delay_ns / 1000000;
                 int delay_ns_remainder = (int)( delay_ns % 1000000 );
-                try {
-                    currentWaitObject = o;
-                    status = Status.SLEEP;
-                    o.wait(delay_ms, delay_ns_remainder);
-                } finally {
-                    pollThreadEvents();
-                    status = Status.RUN;
-                    currentWaitObject = null;
-                }
+                executeBlockingTask(new SleepTask(o, delay_ms, delay_ns_remainder));
             }
             long end_ns = System.nanoTime();
             return ( end_ns - start_ns ) <= delay_ns;
         } else {
-            try {
-                currentWaitObject = o;
-                status = Status.SLEEP;
-                o.wait();
-            } finally {
-                pollThreadEvents();
-                status = Status.RUN;
-                currentWaitObject = null;
-            }
+            executeBlockingTask(new SleepTask(o, 0, 0));
             return true;
         }
     }

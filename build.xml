@@ -173,8 +173,11 @@
         <format property="build.date" pattern="yyyy-MM-dd"/>
     </tstamp>
 
-    <exec executable="git" outputproperty="jruby.revision" failonerror="false" failifexecutionfails="false">
-      <arg line="log -1 --pretty=format:%h"/>
+    <exec osfamily="unix" executable="git" outputproperty="jruby.revision" failonerror="false" failifexecutionfails="false">
+      <arg line="log -1 --format=format:%h"/>
+    </exec>
+    <exec osfamily="windows" executable="cmd" outputproperty="jruby.revision" failonerror="false" failifexecutionfails="false">
+      <arg line="/c git log -1 --format=format:%h"/>
     </exec>
 
     <copy todir="${basedir}/src_gen" overwrite="true">
@@ -452,6 +455,12 @@
         <fileset dir="${basedir}">
           <patternset refid="dist.bindir.files"/>
           <patternset refid="dist.lib.files"/>
+        </fileset>
+      </copy>
+
+      <copy todir="${build.dir}/jar-complete/cext">
+        <fileset dir="${lib.dir}/native">
+	  <patternset refid="dist.jruby-cext-native.files"/>
         </fileset>
       </copy>
 
@@ -1108,6 +1117,7 @@
   <target name="spec:ci_all" depends="install-gems"><rake task="spec:ci_all"/></target>
   <target name="spec:ci_latest" depends="install-gems"><rake task="spec:ci_latest"/></target>
   <target name="spec:ci_latest_19" depends="install-gems"><rake task="spec:ci_latest_19"/></target>
+  <target name="spec:ci_cext" depends="install-gems,build-jruby-cext-native"><rake task="spec:ci_cext"/></target>
 
   <!-- Old compatibility targets which call to newer Rake-based ones -->
   <target name="spec" depends="spec:ci_18"/>
@@ -1121,6 +1131,7 @@
   <!-- latest, unstable specs -->
   <target name="spec-latest-all" depends="spec:ci_all"/>
   <target name="spec-latest" depends="spec:ci_latest"/>
+  <target name="spec-cext" depends="spec:ci_cext"/>
 
   <target name="update-excludes">
     <java classname="org.jruby.Main" fork="true" maxmemory="${jruby.launch.memory}" failonerror="false" dir="${spec.dir}">
@@ -1289,7 +1300,14 @@
     <include name="tool/nailgun/src/**"/>
   </patternset>
 
-  <target name="dist-bin" depends="jar-dist">
+  <patternset id="dist.jruby-cext-native.files">
+    <include name="**/libjruby-cext.so"/>
+    <include name="**/libjruby-cext.a"/>
+    <include name="**/libjruby-cext.jnilib"/>
+    <include name="**/jruby-cext.dll"/>
+  </patternset>
+
+  <target name="dist-bin" depends="build-jruby-cext-native,jar-dist">
     <mkdir dir="${dist.stage.bin.dir}"/>
     <copy todir="${dist.stage.bin.dir}">
       <fileset dir="${basedir}">
@@ -1513,6 +1531,28 @@
     <mkdir dir="${build.dir}/nailmain"/>
   </target>
 
+  <property name="jruby-cext-native.home" value="${basedir}/cext/src/"/>
+
+  <target name="build-jruby-cext-native" depends="jar"
+    description="Build JRuby cext support">
+    <exec osfamily="unix" executable="make" dir="${jruby-cext-native.home}" failonerror="true"/>
+    <exec osfamily="windows" executable="cmd" dir="${jruby-cext-native.home}" failonerror="true">
+      <arg line='/c sh -c "make CC=gcc"'/>
+    </exec>
+  </target>
+
+  <target name="clean-jruby-cext-native" depends="compile"
+    description="Build JRuby cext support">
+    <exec osfamily="unix" executable="make" dir="${jruby-cext-native.home}" failonerror="true">
+      <arg value="dist-clean"/>
+    </exec>
+    <exec osfamily="windows" executable="cmd" dir="${jruby-cext-native.home}" failonerror="true">
+      <arg line='/c sh -c "make dist-clean"'/>
+    </exec>
+  </target>
+
+  <target name="cext" depends="build-jruby-cext-native"/>
+
   <target name="test-rails-stable" depends="jar"><rake task="test:rails"/></target>
   <target name="test-prawn" depends="jar"><rake task="test:prawn"/></target>
   <target name="bench-language" depends="jar"><rake task="bench:language"/></target>
@@ -1581,5 +1621,11 @@
     <exec executable="git" failonerror="false" failifexecutionfails="false">
       <arg line="checkout -- ${build.lib.dir}/joda-time-${joda.time.version}.jar"/>
     </exec>
+  </target>
+
+  <target name="ci-matrix" depends="clean,jar" description="Run a matrix configuration job from Hudson.">
+    <property name="testtype" value="test"/>
+    <echo>Running ${testtype} build with JDK ${jdk}</echo>
+    <antcall target="${testtype}"/>
   </target>
 </project>

@@ -274,7 +274,7 @@ public class RubyKernel {
         throw exception;
     }
 
-    @JRubyMethod(required = 1, optional = 2, module = true, visibility = PRIVATE)
+    @JRubyMethod(required = 1, optional = 2, module = true, visibility = PRIVATE, compat = RUBY1_8)
     public static IRubyObject open(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
         String arg = args[0].convertToString().toString();
         Ruby runtime = context.getRuntime();
@@ -286,6 +286,17 @@ public class RubyKernel {
         } 
 
         return RubyFile.open(context, runtime.getFile(), args, block);
+    }
+
+    @JRubyMethod(name = "open", required = 1, optional = 2, module = true, visibility = PRIVATE, compat = RUBY1_9)
+    public static IRubyObject open19(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
+        Ruby runtime = context.getRuntime();
+        if (args[0].respondsTo("to_open")) {
+            args[0] = args[0].callMethod(context, "to_open");
+            return RubyFile.open(context, runtime.getFile(), args, block);
+        } else {
+            return open(context, recv, args, block);
+        }
     }
 
     @JRubyMethod(name = "getc", module = true, visibility = PRIVATE)
@@ -1054,15 +1065,24 @@ public class RubyKernel {
         return runtime.getTrue();
     }
 
-    @JRubyMethod(required = 1, optional = 3, module = true, visibility = PRIVATE)
+    @JRubyMethod(required = 1, optional = 3, module = true, visibility = PRIVATE, compat = RUBY1_8)
     public static IRubyObject eval(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
+        return evalCommon(context, recv, args, block, evalBinding18);
+    }
+
+    @JRubyMethod(name = "eval", required = 1, optional = 3, module = true, visibility = PRIVATE, compat = RUBY1_9)
+    public static IRubyObject eval19(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
+        return evalCommon(context, recv, args, block, evalBinding19);
+    }
+
+    private static IRubyObject evalCommon(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block, EvalBinding evalBinding) {
         Ruby runtime = context.getRuntime();
         // string to eval
         RubyString src = args[0].convertToString();
         runtime.checkSafeString(src);
 
         boolean bindingGiven = args.length > 1 && !args[1].isNil();
-        Binding binding = bindingGiven ? convertToBinding(args[1]) : context.currentBinding();
+        Binding binding = bindingGiven ? evalBinding.convertToBinding(args[1]) : context.currentBinding();
         if (args.length > 2) {
             // file given, use it and force it into binding
             binding.setFile(args[2].convertToString().toString());
@@ -1083,22 +1103,39 @@ public class RubyKernel {
             // no binding given, use 0 for both
             binding.setLine(0);
         }
-        
+
         return ASTInterpreter.evalWithBinding(context, src, binding);
     }
 
-    private static Binding convertToBinding(IRubyObject scope) {
-        if (scope instanceof RubyBinding) {
-            return ((RubyBinding)scope).getBinding().clone();
-        } else {
-            if (scope instanceof RubyProc) {
-                return ((RubyProc) scope).getBlock().getBinding().clone();
+    private static abstract class EvalBinding {
+        public abstract Binding convertToBinding(IRubyObject scope);
+    }
+
+    private static EvalBinding evalBinding18 = new EvalBinding() {
+        public Binding convertToBinding(IRubyObject scope) {
+            if (scope instanceof RubyBinding) {
+                return ((RubyBinding)scope).getBinding().clone();
             } else {
-                // bomb out, it's not a binding or a proc
-                throw scope.getRuntime().newTypeError("wrong argument type " + scope.getMetaClass() + " (expected Proc/Binding)");
+                if (scope instanceof RubyProc) {
+                    return ((RubyProc) scope).getBlock().getBinding().clone();
+                } else {
+                    // bomb out, it's not a binding or a proc
+                    throw scope.getRuntime().newTypeError("wrong argument type " + scope.getMetaClass() + " (expected Proc/Binding)");
+                }
             }
         }
-    }
+    };
+
+    private static EvalBinding evalBinding19 = new EvalBinding() {
+        public Binding convertToBinding(IRubyObject scope) {
+            if (scope instanceof RubyBinding) {
+                return ((RubyBinding)scope).getBinding().clone();
+            } else {
+                throw scope.getRuntime().newTypeError("wrong argument type " + scope.getMetaClass() + " (expected Binding)");
+            }
+        }
+    };
+
 
     @JRubyMethod(module = true, visibility = PRIVATE)
     public static IRubyObject callcc(ThreadContext context, IRubyObject recv, Block block) {
@@ -1128,17 +1165,27 @@ public class RubyKernel {
         }
     }
 
-    @JRubyMethod(name = "throw", module = true, visibility = PRIVATE)
+    @JRubyMethod(name = "throw", module = true, visibility = PRIVATE, compat = RUBY1_8)
     public static IRubyObject rbThrow(ThreadContext context, IRubyObject recv, IRubyObject tag, Block block) {
-        return rbThrowInternal(context, tag.asJavaString(), IRubyObject.NULL_ARRAY, block);
+        return rbThrowInternal(context, tag.asJavaString(), IRubyObject.NULL_ARRAY, block, uncaught18);
     }
 
-    @JRubyMethod(name = "throw", module = true, visibility = PRIVATE)
+    @JRubyMethod(name = "throw", module = true, visibility = PRIVATE, compat = RUBY1_8)
     public static IRubyObject rbThrow(ThreadContext context, IRubyObject recv, IRubyObject tag, IRubyObject arg, Block block) {
-        return rbThrowInternal(context, tag.asJavaString(), new IRubyObject[] {arg}, block);
+        return rbThrowInternal(context, tag.asJavaString(), new IRubyObject[] {arg}, block, uncaught18);
     }
 
-    public static IRubyObject rbThrowInternal(ThreadContext context, String tag, IRubyObject[] args, Block block) {
+    @JRubyMethod(name = "throw", frame = true, module = true, visibility = PRIVATE, compat = CompatVersion.RUBY1_9)
+    public static IRubyObject rbThrow19(ThreadContext context, IRubyObject recv, IRubyObject tag, Block block) {
+        return rbThrowInternal(context, tag.asJavaString(), IRubyObject.NULL_ARRAY, block, uncaught19);
+    }
+
+    @JRubyMethod(name = "throw", frame = true, module = true, visibility = PRIVATE, compat = CompatVersion.RUBY1_9)
+    public static IRubyObject rbThrow19(ThreadContext context, IRubyObject recv, IRubyObject tag, IRubyObject arg, Block block) {
+        return rbThrowInternal(context, tag.asJavaString(), new IRubyObject[] {arg}, block, uncaught19);
+    }
+
+    public static IRubyObject rbThrowInternal(ThreadContext context, String tag, IRubyObject[] args, Block block, Uncaught uncaught) {
         Ruby runtime = context.getRuntime();
 
         RubyContinuation.Continuation continuation = context.getActiveCatch(tag.intern());
@@ -1153,11 +1200,27 @@ public class RubyKernel {
         RubyThread currentThread = context.getThread();
 
         if (currentThread == runtime.getThreadService().getMainThread()) {
-            throw runtime.newNameError(message, tag);
+            throw uncaught.uncaughtThrow(runtime, message, tag);
         } else {
             throw runtime.newThreadError(message + " in thread 0x" + Integer.toHexString(RubyInteger.fix2int(currentThread.id())));
         }
     }
+
+    private static abstract class Uncaught {
+        public abstract RaiseException uncaughtThrow(Ruby runtime, String message, String tag);
+    }
+
+    private static final Uncaught uncaught18 = new Uncaught() {
+        public RaiseException uncaughtThrow(Ruby runtime, String message, String tag) {
+            return runtime.newNameError(message, tag);
+        }
+    };
+
+    private static final Uncaught uncaught19 = new Uncaught() {
+        public RaiseException uncaughtThrow(Ruby runtime, String message, String tag) {
+            return runtime.newArgumentError(message);
+        }
+    };
 
     @JRubyMethod(required = 1, optional = 1, module = true, visibility = PRIVATE)
     public static IRubyObject trap(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
@@ -1258,12 +1321,7 @@ public class RubyKernel {
     public static RubyProc proc(ThreadContext context, IRubyObject recv, Block block) {
         return context.getRuntime().newProc(Block.Type.LAMBDA, block);
     }
-    
-    @Deprecated
-    public static RubyProc proc(IRubyObject recv, Block block) {
-        return recv.getRuntime().newProc(Block.Type.LAMBDA, block);
-    }
-    
+
     @JRubyMethod(module = true, visibility = PRIVATE, compat = RUBY1_9)
     public static RubyProc lambda(ThreadContext context, IRubyObject recv, Block block) {
         return context.getRuntime().newProc(Block.Type.LAMBDA, block);
@@ -1542,8 +1600,24 @@ public class RubyKernel {
         throw context.getRuntime().newNotImplementedError("Kernel#syscall is not implemented in JRuby");
     }
 
-    @JRubyMethod(name = "system", required = 1, rest = true, module = true, visibility = PRIVATE)
+    @JRubyMethod(name = "system", required = 1, rest = true, module = true, visibility = PRIVATE, compat = CompatVersion.RUBY1_8)
     public static RubyBoolean system(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
+        Ruby runtime = context.getRuntime();
+        return systemCommon(context, recv, args) == 0 ? runtime.getTrue() : runtime.getFalse();
+    }
+
+    @JRubyMethod(name = "system", required = 1, rest = true, module = true, visibility = PRIVATE, compat = CompatVersion.RUBY1_9)
+    public static IRubyObject system19(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
+        Ruby runtime = context.getRuntime();
+        int resultCode = systemCommon(context, recv, args);
+        switch (resultCode) {
+            case 0: return runtime.getTrue();
+            case 127: return runtime.getNil();
+            default: return runtime.getFalse();
+        }
+    }
+
+    private static int systemCommon(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
         Ruby runtime = context.getRuntime();
         int resultCode;
 
@@ -1551,7 +1625,7 @@ public class RubyKernel {
             if (! Platform.IS_WINDOWS && args[args.length -1].asJavaString().matches(".*[^&]&\\s*")) {
                 // looks like we need to send process to the background
                 ShellLauncher.runWithoutWait(runtime, args);
-                return runtime.newBoolean(true);
+                return 0;
             }
             resultCode = ShellLauncher.runAndWait(runtime, args);
         } catch (Exception e) {
@@ -1559,7 +1633,7 @@ public class RubyKernel {
         }
 
         context.setLastExitStatus(RubyProcess.RubyStatus.newProcessStatus(runtime, resultCode));
-        return runtime.newBoolean(resultCode == 0);
+        return resultCode;
     }
     
     @JRubyMethod(name = {"exec"}, required = 1, rest = true, module = true, visibility = PRIVATE)

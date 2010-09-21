@@ -63,6 +63,7 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.platform.Platform;
 import org.jruby.runtime.Constants;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.load.LoadService.SuffixType;
 import org.jruby.util.JRubyFile;
 
 /**
@@ -131,8 +132,8 @@ public class LoadService {
         Source, Extension, Both, Neither;
         
         public static final String[] sourceSuffixes = { ".class", ".rb" };
-        public static final String[] extensionSuffixes = { ".jar" };
-        private static final String[] allSuffixes = { ".class", ".rb", ".jar" };
+        public static final String[] extensionSuffixes = { ".jar", ".so", ".bundle", ".dll" };
+        private static final String[] allSuffixes = { ".class", ".rb", ".jar", ".so", ".bundle", ".dll" };
         private static final String[] emptySuffixes = { "" };
         
         public String[] getSuffixes() {
@@ -150,7 +151,7 @@ public class LoadService {
         }
     }
     protected static final Pattern sourcePattern = Pattern.compile("\\.(?:rb)$");
-    protected static final Pattern extensionPattern = Pattern.compile("\\.(?:so|o|dll|jar)$");
+    protected static final Pattern extensionPattern = Pattern.compile("\\.(?:so|o|dll|bundle|jar)$");
 
     protected RubyArray loadPath;
     protected RubyArray loadedFeatures;
@@ -299,18 +300,21 @@ public class LoadService {
 
     public boolean smartLoad(String file) {
         checkEmptyLoad(file);
-
-        // We don't support .so, but some stdlib require .so directly
-        // replace it with .jar to look for an extension type we do support
-        if (file.endsWith(".so")) {
-            file = file.replaceAll(".so$", ".jar");
-        }
         if (Platform.IS_WINDOWS) {
             file = file.replace('\\', '/');
         }
-        
+
+        SearchState state;
+
         try {
-            SearchState state = findFileForLoad(file);
+            // Even if we don't support .so, some stdlib require .so directly.
+            // Replace it with .jar to look for a java extension
+            // JRUBY-5033: The ExtensionSearcher will locate C exts, too, this way.
+            if (file.endsWith(".so")) {
+                file = file.replaceAll(".so$", ".jar");
+            }
+            state = findFileForLoad(file);
+
             return tryLoadingLibraryOrScript(runtime, state);
         } catch (AlreadyLoaded al) {
             // Library has already been loaded in some form, bail out
@@ -465,20 +469,40 @@ public class LoadService {
             return searchNameString;
         }
     }
-    
+
     public class BailoutSearcher implements LoadSearcher {
         public boolean shouldTrySearch(SearchState state) {
-            return true;
+            return state.library == null;
         }
-    
-        public void trySearch(SearchState state) throws AlreadyLoaded {
-            for (String suffix : state.suffixType.getSuffixes()) {
-                String searchName = state.searchFile + suffix;
+
+        protected void trySearch(String file, SuffixType suffixType) throws AlreadyLoaded {
+            for (String suffix : suffixType.getSuffixes()) {
+                String searchName = file + suffix;
                 RubyString searchNameString = RubyString.newString(runtime, searchName);
                 if (featureAlreadyLoaded(searchNameString)) {
                     throw new AlreadyLoaded(searchNameString);
                 }
             }
+        }
+
+        public void trySearch(SearchState state) throws AlreadyLoaded {
+            trySearch(state.searchFile, state.suffixType);
+        }
+    }
+
+    public class SourceBailoutSearcher extends BailoutSearcher {
+        public boolean shouldTrySearch(SearchState state) {
+            // JRUBY-5032: Load extension files if they are required
+            // explicitely, and even if an rb file of the same name
+            // has already been loaded (effectively skipping the search for a source file).
+            return !extensionPattern.matcher(state.loadName).find();
+        }
+
+        // According to Rubyspec, source files should be loaded even if an equally named
+        // extension is loaded already. So we use the bailout search twice, once only
+        // for source files and once for whatever suffix type the state determines
+        public void trySearch(SearchState state) throws AlreadyLoaded {
+            super.trySearch(state.searchFile, SuffixType.Source);
         }
     }
 
@@ -692,12 +716,15 @@ public class LoadService {
     private static RaiseException newLoadErrorFromThrowable(Ruby runtime, String file, Throwable t) {
         return runtime.newLoadError(String.format("load error: %s -- %s: %s", file, t.getClass().getName(), t.getMessage()));
     }
-    
+
+    // Using the BailoutSearch twice, once only for source files and once for state suffixes,
+    // in order to adhere to Rubyspec
     protected final List<LoadSearcher> searchers = new ArrayList<LoadSearcher>();
     {
-        searchers.add(new BailoutSearcher());
+        searchers.add(new SourceBailoutSearcher());
         searchers.add(new NormalSearcher());
         searchers.add(new ClassLoaderSearcher());
+        searchers.add(new BailoutSearcher());
         searchers.add(new ExtensionSearcher());
         searchers.add(new ScriptClassSearcher());
     }
@@ -803,15 +830,15 @@ public class LoadService {
             return null;
         }
         String file = state.loadName;
-        if (file.endsWith(".so")) {
-            throw runtime.newLoadError("JRuby does not support .so libraries from filesystem");
+        if (file.endsWith(".so") || file.endsWith(".dll") || file.endsWith(".bundle")) {
+            return new CExtension(resource);
         } else if (file.endsWith(".jar")) {
             return new JarredScript(resource);
         } else if (file.endsWith(".class")) {
             return new JavaCompiledScript(resource);
         } else {
             return new ExternalScript(resource, file);
-        }      
+        }
     }
 
     protected LoadServiceResource tryResourceFromCWD(SearchState state, String baseName,SuffixType suffixType) throws RaiseException {
