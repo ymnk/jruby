@@ -180,11 +180,11 @@ public class Digest extends RubyObject {
                 this.getMetaClass() + " doesn't implement block_length()");
     }
 
-    String getAlgorithm() {
+    public String getAlgorithm() {
         return this.algo.getAlgorithm();
     }
 
-    String getShortAlgorithm() {
+    public String getShortAlgorithm() {
         return getAlgorithm().replace("-", "");
     }
 }

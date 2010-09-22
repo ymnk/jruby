@@ -45,7 +45,6 @@ import org.jruby.RubyNumeric;
 import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.exceptions.RaiseException;
-import org.jruby.ext.openssl.x509store.PEMInputOutput;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -130,7 +129,7 @@ public class PKeyDH extends PKey {
             IRubyObject arg0 = args[0];
             if (argc == 1 && arg0 instanceof RubyString) {
                 try {
-                    DHParameterSpec spec = PEMInputOutput.readDHParameters(new StringReader(arg0.toString()));
+                    DHParameterSpec spec = OpenSSLReal.getFormatHandler().readDHParameters(new StringReader(arg0.toString()));
                     this.dh_p = spec.getP();
                     this.dh_g = spec.getG();
                 } catch (NoClassDefFoundError ncdfe) {
@@ -282,7 +281,7 @@ public class PKeyDH extends PKey {
         }
         StringWriter w = new StringWriter();
         try {
-            PEMInputOutput.writeDHParameters(w, new DHParameterSpec(p, g));
+            OpenSSLReal.getFormatHandler().writeDHParameters(w, new DHParameterSpec(p, g));
             w.flush();
             w.close();
         } catch (NoClassDefFoundError ncdfe) {
@@ -302,7 +301,7 @@ public class PKeyDH extends PKey {
             g = this.dh_g;
         }
         try {
-            byte[] bytes = org.jruby.ext.openssl.impl.PKey.toDerDHKey(p, g);
+            byte[] bytes = OpenSSLReal.getFormatHandler().toDerDHKey(p, g);
             return RubyString.newString(getRuntime(), bytes);
         } catch (NoClassDefFoundError ncdfe) {
             throw newDHError(getRuntime(), OpenSSLReal.bcExceptionMessage(ncdfe));

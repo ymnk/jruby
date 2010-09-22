@@ -59,7 +59,6 @@ import org.jruby.RubyNumeric;
 import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.exceptions.RaiseException;
-import org.jruby.ext.openssl.x509store.PEMInputOutput;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ObjectAllocator;
@@ -118,17 +117,17 @@ public class PKeyRSA extends PKey {
     private transient volatile BigInteger rsa_iqmp;
     
     @Override
-    PublicKey getPublicKey() {
+    public PublicKey getPublicKey() {
         return pubKey;
     }
 
     @Override
-    PrivateKey getPrivateKey() {
+    public PrivateKey getPrivateKey() {
         return privKey;
     }
 
     @Override
-    String getAlgorithm() {
+    public String getAlgorithm() {
         return "RSA";
     }
 
@@ -201,7 +200,7 @@ public class PKeyRSA extends PKey {
                 if (null == val) {
                     // PEM_read_bio_RSAPrivateKey
                     try {
-                        val = PEMInputOutput.readPrivateKey(new StringReader(input), passwd);
+                        val = OpenSSLReal.getFormatHandler().readPrivateKey(new StringReader(input), passwd);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -211,7 +210,7 @@ public class PKeyRSA extends PKey {
                 if (null == val) {
                     // PEM_read_bio_RSAPublicKey
                     try {
-                        val = PEMInputOutput.readRSAPublicKey(new StringReader(input), passwd);
+                        val = OpenSSLReal.getFormatHandler().readRSAPublicKey(new StringReader(input), passwd);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -221,7 +220,7 @@ public class PKeyRSA extends PKey {
                 if (null == val) {
                     // PEM_read_bio_RSA_PUBKEY
                     try {
-                        val = PEMInputOutput.readRSAPubKey(new StringReader(input), passwd);
+                        val = OpenSSLReal.getFormatHandler().readRSAPubKey(new StringReader(input), passwd);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -231,7 +230,7 @@ public class PKeyRSA extends PKey {
                 if (null == val) {
                     // d2i_RSAPrivateKey_bio
                     try {
-                        val = org.jruby.ext.openssl.impl.PKey.readRSAPrivateKey(input);
+                        val = OpenSSLReal.getFormatHandler().readRSAPrivateKey(input);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -241,7 +240,7 @@ public class PKeyRSA extends PKey {
                 if (null == val) {
                     // d2i_RSAPublicKey_bio
                     try {
-                        val = org.jruby.ext.openssl.impl.PKey.readRSAPublicKey(input);
+                        val = OpenSSLReal.getFormatHandler().readRSAPublicKey(input);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -302,7 +301,7 @@ public class PKeyRSA extends PKey {
     @JRubyMethod
     public IRubyObject to_der() {
         try {
-            byte[] bytes = org.jruby.ext.openssl.impl.PKey.toDerRSAKey(pubKey, privKey);
+            byte[] bytes = OpenSSLReal.getFormatHandler().toDerRSAKey(pubKey, privKey);
             return RubyString.newString(getRuntime(), bytes);
         } catch (NoClassDefFoundError ncdfe) {
             throw newRSAError(getRuntime(), OpenSSLReal.bcExceptionMessage(ncdfe));
@@ -390,9 +389,9 @@ public class PKeyRSA extends PKey {
         }
         try {
             if (privKey != null) {
-                PEMInputOutput.writeRSAPrivateKey(w, privKey, algo, passwd);
+                OpenSSLReal.getFormatHandler().writeRSAPrivateKey(w, privKey, algo, passwd);
             } else {
-                PEMInputOutput.writeRSAPublicKey(w, pubKey);
+                OpenSSLReal.getFormatHandler().writeRSAPublicKey(w, pubKey);
             }
             w.close();
             return getRuntime().newString(w.toString());

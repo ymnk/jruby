@@ -55,7 +55,6 @@ import org.jruby.RubyNumeric;
 import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.exceptions.RaiseException;
-import org.jruby.ext.openssl.x509store.PEMInputOutput;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
@@ -104,17 +103,17 @@ public class PKeyDSA extends PKey {
     private static final int SPEC_G = 3;
     
     @Override
-    PublicKey getPublicKey() {
+    public PublicKey getPublicKey() {
         return pubKey;
     }
 
     @Override
-    PrivateKey getPrivateKey() {
+    public PrivateKey getPrivateKey() {
         return privKey;
     }
 
     @Override
-    String getAlgorithm() {
+    public String getAlgorithm() {
         return "DSA";
     }
 
@@ -174,7 +173,7 @@ public class PKeyDSA extends PKey {
                 if (null == val) {
                     // PEM_read_bio_DSAPrivateKey
                     try {
-                        val = PEMInputOutput.readDSAPrivateKey(new StringReader(input), passwd);
+                        val = OpenSSLReal.getFormatHandler().readDSAPrivateKey(new StringReader(input), passwd);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -184,7 +183,7 @@ public class PKeyDSA extends PKey {
                 if (null == val) {
                     // PEM_read_bio_DSAPublicKey
                     try {
-                        val = PEMInputOutput.readDSAPublicKey(new StringReader(input), passwd);
+                        val = OpenSSLReal.getFormatHandler().readDSAPublicKey(new StringReader(input), passwd);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -194,7 +193,7 @@ public class PKeyDSA extends PKey {
                 if (null == val) {
                     // PEM_read_bio_DSA_PUBKEY
                     try {
-                        val = PEMInputOutput.readDSAPubKey(new StringReader(input), passwd);
+                        val = OpenSSLReal.getFormatHandler().readDSAPubKey(new StringReader(input), passwd);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -204,7 +203,7 @@ public class PKeyDSA extends PKey {
                 if (null == val) {
                     // d2i_DSAPrivateKey_bio
                     try {
-                        val = org.jruby.ext.openssl.impl.PKey.readDSAPrivateKey(input);
+                        val = OpenSSLReal.getFormatHandler().readDSAPrivateKey(input);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -214,7 +213,7 @@ public class PKeyDSA extends PKey {
                 if (null == val) {
                     // d2i_DSA_PUBKEY_bio
                     try {
-                        val = org.jruby.ext.openssl.impl.PKey.readDSAPublicKey(input);
+                        val = OpenSSLReal.getFormatHandler().readDSAPublicKey(input);
                     } catch (NoClassDefFoundError e) {
                         val = null;
                     } catch (Exception e) {
@@ -268,7 +267,7 @@ public class PKeyDSA extends PKey {
     @JRubyMethod
     public IRubyObject to_der() {
         try {
-            byte[] bytes = org.jruby.ext.openssl.impl.PKey.toDerDSAKey(pubKey, privKey);
+            byte[] bytes = OpenSSLReal.getFormatHandler().toDerDSAKey(pubKey, privKey);
             return RubyString.newString(getRuntime(), bytes);
         } catch (NoClassDefFoundError ncdfe) {
             throw newDSAError(getRuntime(), OpenSSLReal.bcExceptionMessage(ncdfe));
@@ -319,9 +318,9 @@ public class PKeyDSA extends PKey {
         }
         try {
             if (privKey != null) {
-                PEMInputOutput.writeDSAPrivateKey(w, privKey, algo, passwd);
+                OpenSSLReal.getFormatHandler().writeDSAPrivateKey(w, privKey, algo, passwd);
             } else {
-                PEMInputOutput.writeDSAPublicKey(w, pubKey);
+                OpenSSLReal.getFormatHandler().writeDSAPublicKey(w, pubKey);
             }
             w.close();
             return getRuntime().newString(w.toString());

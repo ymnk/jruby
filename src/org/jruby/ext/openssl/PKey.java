@@ -80,15 +80,15 @@ public abstract class PKey extends RubyObject {
         return this;
     }
 
-    PublicKey getPublicKey() {
+    public PublicKey getPublicKey() {
         return null;
     }
 
-    PrivateKey getPrivateKey() {
+    public PrivateKey getPrivateKey() {
         return null;
     }
 
-    String getAlgorithm() {
+    public String getAlgorithm() {
         return "NONE";
     }
 

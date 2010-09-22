@@ -32,22 +32,28 @@ import java.security.MessageDigest;
 import java.security.NoSuchProviderException;
 import java.security.cert.CertificateFactory;
 import javax.crypto.SecretKeyFactory;
-import org.bouncycastle.asn1.DERObjectIdentifier;
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
+import org.jruby.ext.openssl.impl.ASN1FormatHandler;
 
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
 public class OpenSSLReal {
-    private static java.security.Provider BC_PROVIDER = null;
+    private static java.security.Provider BC_PROVIDER = null;   // const-ish
+    private static ASN1FormatHandler FORMAT_HANDLER = null;     // const-ish
 
     static {
         try {
             BC_PROVIDER = (java.security.Provider) Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider").newInstance();
         } catch (Throwable ignored) {
             // no bouncy castle available
+        }
+        try {
+            FORMAT_HANDLER = (ASN1FormatHandler) Class.forName("org.jruby.ext.openssl.x509store.PEMInputOutput").newInstance();
+        } catch (Throwable ignored) {
+            FORMAT_HANDLER = null;
         }
     }
 
@@ -67,6 +73,18 @@ public class OpenSSLReal {
                 return null;
             }
         });
+    }
+    
+    public static synchronized void setBCProvider(java.security.Provider newProvider) {
+        BC_PROVIDER = newProvider;
+    }
+    
+    public static synchronized ASN1FormatHandler getFormatHandler() {
+        return FORMAT_HANDLER;
+    }
+    
+    public static synchronized void setFormatHandler(ASN1FormatHandler newHandler) {
+        FORMAT_HANDLER = newHandler;
     }
 
     // This method just adds BouncyCastleProvider if it's allowed.  Removing
@@ -100,7 +118,6 @@ public class OpenSSLReal {
         RubyClass standardError = runtime.getClass("StandardError");
         ossl.defineClassUnder("OpenSSLError", standardError, standardError.getAllocator());
 
-        // those are BC provider free (uses BC class but does not use BC provider)
         PKey.createPKey(runtime, ossl);
         BN.createBN(runtime, ossl);
         Digest.createDigest(runtime, ossl);
@@ -109,29 +126,8 @@ public class OpenSSLReal {
         HMAC.createHMAC(runtime, ossl);
         Config.createConfig(runtime, ossl);
 
-        // these classes depends on BC provider now.
-        try {
-            ASN1.createASN1(runtime, ossl);
-            X509.createX509(runtime, ossl);
-            NetscapeSPKI.createNetscapeSPKI(runtime, ossl);
-            PKCS7.createPKCS7(runtime, ossl);
-        } catch (SecurityException ignore) {
-            // some class might be prohibited to use.
-            runtime.getLoadService().require("openssl/dummy");
-        } catch (Error ignore) {
-            // mainly for rescuing NoClassDefFoundError: no bc*.jar
-            runtime.getLoadService().require("openssl/dummy");
-        }
-        try {
-            SSL.createSSL(runtime, ossl);
-        } catch (SecurityException ignore) {
-            // some class might be prohibited to use. ex. SSL* on GAE/J.
-            runtime.getLoadService().require("openssl/dummyssl");
-        } catch (Error ignore) {
-            // mainly for rescuing NoClassDefFoundError: no bc*.jar
-            runtime.getLoadService().require("openssl/dummyssl");
-        }
-
+        runtime.getLoadService().require("opensslext");
+        
         ossl.setConstant("VERSION", runtime.newString("1.0.0"));
         ossl.setConstant("OPENSSL_VERSION", runtime.newString("jruby-ossl 1.0.0"));
         ossl.setConstant("OPENSSL_VERSION_NUMBER", runtime.newFixnum(9469999));
@@ -146,10 +142,6 @@ public class OpenSSLReal {
         });
     }
 
-    public static javax.crypto.Cipher getCipherBC(final DERObjectIdentifier oid) throws GeneralSecurityException {
-        return getCipherBC(oid.getId());
-    }
-
     public static SecretKeyFactory getSecretKeyFactoryBC(final String algorithm) throws GeneralSecurityException {
         return (SecretKeyFactory) getWithBCProvider(new Callable() {
 
@@ -157,10 +149,6 @@ public class OpenSSLReal {
                 return SecretKeyFactory.getInstance(algorithm, "BC");
             }
         });
-    }
-
-    public static MessageDigest getMessageDigestBC(final DERObjectIdentifier oid) throws GeneralSecurityException {
-        return getMessageDigestBC(oid.getId());
     }
 
     public static MessageDigest getMessageDigestBC(final String algorithm) throws GeneralSecurityException {
