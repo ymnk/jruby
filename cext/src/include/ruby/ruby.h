@@ -30,6 +30,8 @@
 #include <fcntl.h>
 #include <ctype.h>
 
+#include <st_sizes.h>
+
 // Some platform specific includes
 #if defined(__WIN32__) || defined(__MINGW32__)
 #   include "jruby_win32.h"
@@ -382,9 +384,6 @@ RUBY_DLLSPEC VALUE rb_exc_raise(VALUE);
 
 RUBY_DLLSPEC void rb_secure(int);
 RUBY_DLLSPEC int rb_safe_level(void);
-RUBY_DLLSPEC void rb_set_safe_level(int);
-RUBY_DLLSPEC void rb_set_safe_level_force(int);
-RUBY_DLLSPEC void rb_secure_update(VALUE);
 
 RUBY_DLLSPEC long rb_num2long(VALUE);
 RUBY_DLLSPEC unsigned long rb_num2ulong(VALUE);
@@ -695,26 +694,17 @@ RUBY_DLLSPEC VALUE rb_str_new_cstr(const char*);
 RUBY_DLLSPEC VALUE rb_tainted_str_new_cstr(const char*);
 RUBY_DLLSPEC VALUE rb_tainted_str_new(const char*, long);
 RUBY_DLLSPEC VALUE rb_str_buf_new(long);
-RUBY_DLLSPEC VALUE rb_str_buf_new_cstr(const char*);
-RUBY_DLLSPEC VALUE rb_str_tmp_new(long);
 RUBY_DLLSPEC VALUE rb_str_buf_append(VALUE, VALUE);
 RUBY_DLLSPEC VALUE rb_str_buf_cat(VALUE, const char*, long);
 RUBY_DLLSPEC VALUE rb_str_buf_cat2(VALUE, const char*);
-RUBY_DLLSPEC VALUE rb_str_buf_cat_ascii(VALUE, const char*);
 RUBY_DLLSPEC VALUE rb_obj_as_string(VALUE);
 RUBY_DLLSPEC VALUE rb_check_string_type(VALUE);
 RUBY_DLLSPEC VALUE rb_str_dup(VALUE);
-RUBY_DLLSPEC VALUE rb_str_locktmp(VALUE);
-RUBY_DLLSPEC VALUE rb_str_unlocktmp(VALUE);
 RUBY_DLLSPEC VALUE rb_str_dup_frozen(VALUE);
 #define rb_str_new_frozen rb_str_dup_frozen
 RUBY_DLLSPEC VALUE rb_str_plus(VALUE, VALUE);
-RUBY_DLLSPEC VALUE rb_str_times(VALUE, VALUE);
 RUBY_DLLSPEC VALUE rb_str_length(VALUE str);
-RUBY_DLLSPEC long rb_str_sublen(VALUE, long);
 RUBY_DLLSPEC VALUE rb_str_substr(VALUE, long, long);
-RUBY_DLLSPEC VALUE rb_str_subseq(VALUE, long, long);
-RUBY_DLLSPEC void rb_str_modify(VALUE);
 RUBY_DLLSPEC VALUE rb_str_freeze(VALUE);
 RUBY_DLLSPEC void rb_str_set_len(VALUE, long);
 RUBY_DLLSPEC VALUE rb_str_resize(VALUE, long);
@@ -722,26 +712,12 @@ RUBY_DLLSPEC VALUE rb_str_cat(VALUE, const char*, long);
 RUBY_DLLSPEC VALUE rb_str_cat2(VALUE, const char*);
 RUBY_DLLSPEC VALUE rb_str_append(VALUE, VALUE);
 RUBY_DLLSPEC VALUE rb_str_concat(VALUE, VALUE);
-RUBY_DLLSPEC int rb_memhash(const void *ptr, long len);
-RUBY_DLLSPEC int rb_str_hash(VALUE);
-RUBY_DLLSPEC int rb_str_hash_cmp(VALUE,VALUE);
-RUBY_DLLSPEC int rb_str_comparable(VALUE, VALUE);
 RUBY_DLLSPEC int rb_str_cmp(VALUE, VALUE);
-RUBY_DLLSPEC VALUE rb_str_equal(VALUE str1, VALUE str2);
-RUBY_DLLSPEC VALUE rb_str_drop_bytes(VALUE, long);
 RUBY_DLLSPEC void rb_str_update(VALUE, long, long, VALUE);
-RUBY_DLLSPEC VALUE rb_str_replace(VALUE, VALUE);
 RUBY_DLLSPEC VALUE rb_str_inspect(VALUE);
-RUBY_DLLSPEC VALUE rb_str_dump(VALUE);
 RUBY_DLLSPEC VALUE rb_str_split(VALUE, const char*);
-RUBY_DLLSPEC void rb_str_associate(VALUE, VALUE);
-RUBY_DLLSPEC VALUE rb_str_associated(VALUE);
-RUBY_DLLSPEC void rb_str_setter(VALUE, ID, VALUE*);
 RUBY_DLLSPEC VALUE rb_str_intern(VALUE);
-RUBY_DLLSPEC VALUE rb_sym_to_s(VALUE);
 RUBY_DLLSPEC VALUE rb_str_length(VALUE);
-RUBY_DLLSPEC long rb_str_offset(VALUE, long);
-RUBY_DLLSPEC size_t rb_str_capacity(VALUE);
 /**
  * Returns a pointer to the String, the length is returned
  * in len parameter, which can be NULL.
@@ -806,10 +782,7 @@ RUBY_DLLSPEC char* jruby_str_cstr_readonly(VALUE v);
 #define rb_str_new3 rb_str_dup
 #define rb_str_new_shared rb_str_new3
 #define rb_str_new4 rb_str_new_frozen
-#define rb_str_new5 rb_str_new_with_class
 #define rb_tainted_str_new2 rb_tainted_str_new_cstr
-#define rb_str_buf_new2 rb_str_buf_new_cstr
-#define rb_usascii_str_new2 rb_usascii_str_new_cstr
 
 /** Returns the string associated with a symbol. */
 RUBY_DLLSPEC const char *rb_id2name(ID sym);
@@ -951,7 +924,8 @@ RUBY_DLLSPEC VALUE rb_inspect(VALUE obj);
 RUBY_DLLSPEC VALUE rb_obj_as_string(VALUE obj);
 RUBY_DLLSPEC void jruby_infect(VALUE object1, VALUE object2);
 RUBY_DLLSPEC VALUE rb_obj_dup(VALUE obj);
-
+RUBY_DLLSPEC VALUE rb_obj_id(VALUE obj);
+RUBY_DLLSPEC VALUE rb_equal(VALUE obj, VALUE other);
 
 RUBY_DLLSPEC VALUE rb_attr_get(VALUE obj, ID id);
 
@@ -1004,6 +978,9 @@ typedef void rb_unblock_function_t(void *);
 RUBY_DLLSPEC VALUE rb_thread_blocking_region(rb_blocking_function_t func, void* data, rb_unblock_function_t, void*);
 /** Block other threads and wait until the system select returns */
 RUBY_DLLSPEC int rb_thread_select(int max, fd_set * read, fd_set * write, fd_set * except, struct timeval *timeout);
+RUBY_DLLSPEC void rb_thread_wait_fd_rw(int fd, int read);
+RUBY_DLLSPEC void rb_thread_wait_fd(int f);
+RUBY_DLLSPEC int rb_thread_fd_writable(int f);
 
 /** The currently executing thread */
 RUBY_DLLSPEC VALUE rb_thread_current(void);

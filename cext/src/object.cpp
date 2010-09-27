@@ -296,6 +296,18 @@ rb_obj_clone(VALUE obj)
     return callMethod(obj, "clone", 0);
 }
 
+extern "C" VALUE
+rb_obj_id(VALUE obj)
+{
+    return callMethod(obj, "object_id", 0);
+}
+
+extern "C" VALUE
+rb_equal(VALUE obj, VALUE other)
+{
+    return callMethod(obj, "==", 1, other);
+}
+
 extern "C" void
 jruby_infect(VALUE object1, VALUE object2)
 {
