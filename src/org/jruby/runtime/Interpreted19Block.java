@@ -40,6 +40,7 @@ import org.jruby.ast.util.ArgsUtil;
 import org.jruby.common.IRubyWarnings.ID;
 import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.JumpException;
+import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.builtin.IRubyObject;
 /**
@@ -48,6 +49,9 @@ import org.jruby.runtime.builtin.IRubyObject;
  */
 public class Interpreted19Block  extends BlockBody {
     private static final boolean ALREADY_ARRAY = true;
+
+    /** The position for the block */
+    private final ISourcePosition position;
 
     /** The argument list, pulled out of iterNode */
     private final ArgsNode args;
@@ -84,6 +88,8 @@ public class Interpreted19Block  extends BlockBody {
             this.body = iter.getBodyNode() == null ? NilImplicitNode.NIL : iter.getBodyNode();
             this.scope = iter.getScope();
         }
+
+        this.position = iter.getPosition();
     }
 
     protected Frame pre(ThreadContext context, RubyModule klass, Binding binding) {
@@ -300,5 +306,13 @@ public class Interpreted19Block  extends BlockBody {
 
     public Arity arity() {
         return arity;
+    }
+
+    public String getFile() {
+        return position.getFile();
+    }
+
+    public int getLine() {
+        return position.getLine();
     }
 }

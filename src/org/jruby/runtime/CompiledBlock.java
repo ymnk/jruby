@@ -230,6 +230,14 @@ public class CompiledBlock extends BlockBody {
         return arity;
     }
 
+    public String getFile() {
+        return callback.getFile();
+    }
+
+    public int getLine() {
+        return callback.getLine();
+    }
+
     private IRubyObject warnMultiReturnNil(Ruby ruby) {
         ruby.getWarnings().warn(ID.MULTIPLE_VALUES_FOR_BLOCK, "multiple values for a block parameter (0 for 1)");
         return ruby.getNil();

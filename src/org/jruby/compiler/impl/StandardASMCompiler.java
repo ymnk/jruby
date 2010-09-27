@@ -39,7 +39,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -55,7 +54,6 @@ import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
-import org.jruby.runtime.BlockBody;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import static org.jruby.util.CodegenUtils.*;
@@ -240,7 +238,11 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         }
 
         for (BlockCallbackDescriptor descriptor : blockCallbackDescriptors) {
-            byte[] callbackBytes = RuntimeHelpers.createBlockCallbackOffline(descriptor.getClassname(), descriptor.getMethod());
+            byte[] callbackBytes = RuntimeHelpers.createBlockCallbackOffline(
+                    descriptor.getClassname(),
+                    descriptor.getMethod(),
+                    descriptor.getFile(),
+                    descriptor.getLine());
 
             CheckClassAdapter.verify(new ClassReader(callbackBytes), false, new PrintWriter(System.err));
 
@@ -248,7 +250,11 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         }
 
         for (BlockCallbackDescriptor descriptor : blockCallback19Descriptors) {
-            byte[] callbackBytes = RuntimeHelpers.createBlockCallback19Offline(descriptor.getClassname(), descriptor.getMethod());
+            byte[] callbackBytes = RuntimeHelpers.createBlockCallback19Offline(
+                    descriptor.getClassname(),
+                    descriptor.getMethod(),
+                    descriptor.getFile(),
+                    descriptor.getLine());
 
             CheckClassAdapter.verify(new ClassReader(callbackBytes), false, new PrintWriter(System.err));
 
@@ -347,11 +353,15 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         private final String method;
         private final String classname;
         private final String callbackName;
+        private final String file;
+        private final int line;
 
-        public BlockCallbackDescriptor(String method, String classname) {
+        public BlockCallbackDescriptor(String method, String classname, String file, int line) {
             this.method = method;
             this.classname = classname;
             this.callbackName = classname + "BlockCallback$" + method + "xx1";
+            this.file = file;
+            this.line = line;
         }
 
         public String getClassname() {
@@ -365,6 +375,14 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         public String getCallbackName() {
             return callbackName;
         }
+
+        public String getFile() {
+            return file;
+        }
+
+        public int getLine() {
+            return line;
+        }
     }
 
     public void addInvokerDescriptor(String newMethodName, int methodArity, StaticScope scope, CallConfiguration callConfig, String filename, int line) {
@@ -376,12 +394,12 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         invokerDescriptors.add(descriptor);
     }
 
-    public void addBlockCallbackDescriptor(String method) {
-        blockCallbackDescriptors.add(new BlockCallbackDescriptor(method, classname));
+    public void addBlockCallbackDescriptor(String method, String file, int line) {
+        blockCallbackDescriptors.add(new BlockCallbackDescriptor(method, classname, file, line));
     }
 
-    public void addBlockCallback19Descriptor(String method) {
-        blockCallback19Descriptors.add(new BlockCallbackDescriptor(method, classname));
+    public void addBlockCallback19Descriptor(String method, String file, int line) {
+        blockCallback19Descriptors.add(new BlockCallbackDescriptor(method, classname, file, line));
     }
 
     public String getClassname() {

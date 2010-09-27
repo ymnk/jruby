@@ -43,6 +43,7 @@ import org.jruby.ast.NodeType;
 import org.jruby.ast.ZeroArgNode;
 import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.JumpException;
+import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.assigner.Assigner;
 import org.jruby.runtime.assigner.Pre0Rest0Post0Assigner;
@@ -82,6 +83,9 @@ public class InterpretedBlock extends BlockBody {
      * explanation).
      */
     private boolean noargblock;
+
+    /** The position for the block */
+    private final ISourcePosition position;
 
     /** The body of the block, pulled out of bodyNode */
     private final Node bodyNode;
@@ -212,6 +216,7 @@ public class InterpretedBlock extends BlockBody {
         this.arity = arity;
         this.bodyNode = iterNode.getBodyNode() == null ? NilImplicitNode.NIL : iterNode.getBodyNode();
         this.scope = iterNode.getScope();
+        this.position = iterNode.getPosition();
         assignerFor(iterNode);
     }
     
@@ -420,5 +425,13 @@ public class InterpretedBlock extends BlockBody {
      */
     public Arity arity() {
         return arity;
+    }
+
+    public String getFile() {
+        return position.getFile();
+    }
+
+    public int getLine() {
+        return position.getLine();
     }
 }

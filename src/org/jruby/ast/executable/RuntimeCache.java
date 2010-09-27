@@ -412,7 +412,7 @@ public class RuntimeCache {
                 secondSplit[i] = secondSplit[i].intern();
             }
         }
-        BlockBody body = RuntimeHelpers.createCompiledBlockBody(context, scriptObject, firstSplit[0], Integer.parseInt(firstSplit[1]), secondSplit, Boolean.valueOf(firstSplit[3]), Integer.parseInt(firstSplit[4]), Boolean.valueOf(firstSplit[5]));
+        BlockBody body = RuntimeHelpers.createCompiledBlockBody(context, scriptObject, firstSplit[0], Integer.parseInt(firstSplit[1]), secondSplit, Boolean.valueOf(firstSplit[3]), Integer.parseInt(firstSplit[4]), firstSplit[5], Integer.parseInt(firstSplit[6]), Boolean.valueOf(firstSplit[7]));
         return blockBodies[index] = body;
     }
 
@@ -428,12 +428,12 @@ public class RuntimeCache {
                 secondSplit[i] = secondSplit[i].intern();
             }
         }
-        BlockBody body = RuntimeHelpers.createCompiledBlockBody19(context, scriptObject, firstSplit[0], Integer.parseInt(firstSplit[1]), secondSplit, Boolean.valueOf(firstSplit[3]), Integer.parseInt(firstSplit[4]), Boolean.valueOf(firstSplit[5]));
+        BlockBody body = RuntimeHelpers.createCompiledBlockBody19(context, scriptObject, firstSplit[0], Integer.parseInt(firstSplit[1]), secondSplit, Boolean.valueOf(firstSplit[3]), Integer.parseInt(firstSplit[4]), firstSplit[5], Integer.parseInt(firstSplit[6]), Boolean.valueOf(firstSplit[7]));
         return blockBodies[index] = body;
     }
 
     private CompiledBlockCallback createCompiledBlockCallback(Object scriptObject, Ruby runtime, int index, String method) {
-        CompiledBlockCallback callback = RuntimeHelpers.createBlockCallback(runtime, scriptObject, method);
+        CompiledBlockCallback callback = RuntimeHelpers.createBlockCallback(runtime, scriptObject, method, "(internal)", -1);
         return blockCallbacks[index] = callback;
     }
 

@@ -55,12 +55,9 @@ import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.BlockBody;
 import org.jruby.runtime.BlockCallback;
-import org.jruby.runtime.CallBlock;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
-import org.jruby.runtime.assigner.Assigner;
-import org.jruby.runtime.assigner.Pre0Rest1Post0Assigner;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.UnmarshalStream;
 import org.jruby.util.ByteList;
@@ -478,6 +475,14 @@ public class RubySymbol extends RubyObject {
             @Override
             public Arity arity() {
                 return Arity.OPTIONAL;
+            }
+
+            public String getFile() {
+                return symbol;
+            }
+
+            public int getLine() {
+                return -1;
             }
         };
         Block block = new Block(body, context.currentBinding());

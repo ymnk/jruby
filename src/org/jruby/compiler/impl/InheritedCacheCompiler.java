@@ -310,7 +310,7 @@ public class InheritedCacheCompiler implements CacheCompiler {
         }
     }
 
-    public void cacheClosure(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector) {
+    public void cacheClosure(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector) {
         // build scope names string
         StringBuffer scopeNames = new StringBuffer();
         for (int i = 0; i < scope.getVariables().length; i++) {
@@ -325,6 +325,8 @@ public class InheritedCacheCompiler implements CacheCompiler {
                 scopeNames + ',' +
                 hasMultipleArgsHead + ',' +
                 BlockBody.asArgumentType(argsNodeId) + ',' +
+                file + "," +
+                line + "," +
                 !(inspector.hasClosure() || inspector.hasScopeAwareMethods());
 
         method.loadThis();
@@ -342,7 +344,7 @@ public class InheritedCacheCompiler implements CacheCompiler {
         inheritedBlockBodyCount++;
     }
 
-    public void cacheClosure19(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector) {
+    public void cacheClosure19(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector) {
         // build scope names string
         StringBuffer scopeNames = new StringBuffer();
         for (int i = 0; i < scope.getVariables().length; i++) {
@@ -357,6 +359,8 @@ public class InheritedCacheCompiler implements CacheCompiler {
                 scopeNames + ',' +
                 hasMultipleArgsHead + ',' +
                 BlockBody.asArgumentType(argsNodeId) + ',' +
+                file + ',' +
+                line + ',' +
                 !(inspector.hasClosure() || inspector.hasScopeAwareMethods());
 
         method.loadThis();

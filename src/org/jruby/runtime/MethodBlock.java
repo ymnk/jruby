@@ -162,4 +162,12 @@ public abstract class MethodBlock extends BlockBody {
     public Arity arity() {
         return arity;
     }
+
+    public String getFile() {
+        return "(method)";
+    }
+
+    public int getLine() {
+        return -1;
+    }
 }

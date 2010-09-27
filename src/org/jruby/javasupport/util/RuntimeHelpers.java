@@ -149,36 +149,36 @@ public class RuntimeHelpers {
         return receiver0.isTrue() || receiver1.isTrue() || receiver2.isTrue();
     }
     
-    public static CompiledBlockCallback createBlockCallback(Ruby runtime, Object scriptObject, String closureMethod) {
+    public static CompiledBlockCallback createBlockCallback(Ruby runtime, Object scriptObject, String closureMethod, String file, int line) {
         Class scriptClass = scriptObject.getClass();
         ClassLoader scriptClassLoader = scriptClass.getClassLoader();
         MethodFactory factory = MethodFactory.createFactory(scriptClassLoader);
         
-        return factory.getBlockCallback(closureMethod, scriptObject);
+        return factory.getBlockCallback(closureMethod, file, line, scriptObject);
     }
 
-    public static CompiledBlockCallback19 createBlockCallback19(Ruby runtime, Object scriptObject, String closureMethod) {
+    public static CompiledBlockCallback19 createBlockCallback19(Ruby runtime, Object scriptObject, String closureMethod, String file, int line) {
         Class scriptClass = scriptObject.getClass();
         ClassLoader scriptClassLoader = scriptClass.getClassLoader();
         MethodFactory factory = MethodFactory.createFactory(scriptClassLoader);
 
-        return factory.getBlockCallback19(closureMethod, scriptObject);
+        return factory.getBlockCallback19(closureMethod, file, line, scriptObject);
     }
 
-    public static byte[] createBlockCallbackOffline(String classPath, String closureMethod) {
+    public static byte[] createBlockCallbackOffline(String classPath, String closureMethod, String file, int line) {
         MethodFactory factory = MethodFactory.createFactory(RuntimeHelpers.class.getClassLoader());
 
-        return factory.getBlockCallbackOffline(closureMethod, classPath);
+        return factory.getBlockCallbackOffline(closureMethod, file, line, classPath);
     }
 
-    public static byte[] createBlockCallback19Offline(String classPath, String closureMethod) {
+    public static byte[] createBlockCallback19Offline(String classPath, String closureMethod, String file, int line) {
         MethodFactory factory = MethodFactory.createFactory(RuntimeHelpers.class.getClassLoader());
 
-        return factory.getBlockCallback19Offline(closureMethod, classPath);
+        return factory.getBlockCallback19Offline(closureMethod, file, line, classPath);
     }
     
     public static BlockBody createCompiledBlockBody(ThreadContext context, Object scriptObject, String closureMethod, int arity, 
-            String[] staticScopeNames, boolean hasMultipleArgsHead, int argsNodeType, boolean light) {
+            String[] staticScopeNames, boolean hasMultipleArgsHead, int argsNodeType, String file, int line, boolean light) {
         StaticScope staticScope = 
             new BlockStaticScope(context.getCurrentScope().getStaticScope(), staticScopeNames);
         staticScope.determineModule();
@@ -186,18 +186,18 @@ public class RuntimeHelpers {
         if (light) {
             return CompiledBlockLight.newCompiledBlockLight(
                     Arity.createArity(arity), staticScope,
-                    createBlockCallback(context.getRuntime(), scriptObject, closureMethod),
+                    createBlockCallback(context.getRuntime(), scriptObject, closureMethod, file, line),
                     hasMultipleArgsHead, argsNodeType);
         } else {
             return CompiledBlock.newCompiledBlock(
                     Arity.createArity(arity), staticScope,
-                    createBlockCallback(context.getRuntime(), scriptObject, closureMethod),
+                    createBlockCallback(context.getRuntime(), scriptObject, closureMethod, file, line),
                     hasMultipleArgsHead, argsNodeType);
         }
     }
 
     public static BlockBody createCompiledBlockBody19(ThreadContext context, Object scriptObject, String closureMethod, int arity,
-            String[] staticScopeNames, boolean hasMultipleArgsHead, int argsNodeType, boolean light) {
+            String[] staticScopeNames, boolean hasMultipleArgsHead, int argsNodeType, String file, int line, boolean light) {
         StaticScope staticScope =
             new BlockStaticScope(context.getCurrentScope().getStaticScope(), staticScopeNames);
         staticScope.determineModule();
@@ -205,12 +205,12 @@ public class RuntimeHelpers {
         if (light) {
             return CompiledBlockLight19.newCompiledBlockLight(
                     Arity.createArity(arity), staticScope,
-                    createBlockCallback19(context.getRuntime(), scriptObject, closureMethod),
+                    createBlockCallback19(context.getRuntime(), scriptObject, closureMethod, file, line),
                     hasMultipleArgsHead, argsNodeType);
         } else {
             return CompiledBlock19.newCompiledBlock(
                     Arity.createArity(arity), staticScope,
-                    createBlockCallback19(context.getRuntime(), scriptObject, closureMethod),
+                    createBlockCallback19(context.getRuntime(), scriptObject, closureMethod, file, line),
                     hasMultipleArgsHead, argsNodeType);
         }
     }

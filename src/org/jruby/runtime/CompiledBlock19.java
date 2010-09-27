@@ -269,4 +269,12 @@ public class CompiledBlock19 extends BlockBody {
     public Arity arity() {
         return arity;
     }
+
+    public String getFile() {
+        return callback.getFile();
+    }
+
+    public int getLine() {
+        return callback.getLine();
+    }
 }

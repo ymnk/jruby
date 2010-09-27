@@ -67,7 +67,6 @@ import org.jruby.runtime.marshal.DataType;
 public class RubyProc extends RubyObject implements DataType {
     private Block block = Block.NULL_BLOCK;
     private Block.Type type;
-    private ThreadContext.RubyStackTraceElement traceElement;
     private ISourcePosition sourcePosition;
 
     public RubyProc(Ruby runtime, RubyClass rubyClass, Block.Type type) {
@@ -172,9 +171,6 @@ public class RubyProc extends RubyObject implements DataType {
 
         block.type = type;
         block.setProcObject(this);
-
-        // FIXME: see comments in findFirstRubyBacktrace
-        traceElement = ThreadContext.findFirstRubyBacktrace(context);
         return this;
     }
     
@@ -183,7 +179,6 @@ public class RubyProc extends RubyObject implements DataType {
     public IRubyObject rbClone() {
     	RubyProc newProc = new RubyProc(getRuntime(), getRuntime().getProc(), type);
     	newProc.block = getBlock();
-    	newProc.traceElement = traceElement;
     	// TODO: CLONE_SETUP here
     	return newProc;
     }
@@ -193,7 +188,6 @@ public class RubyProc extends RubyObject implements DataType {
     public IRubyObject dup() {
         RubyProc newProc = new RubyProc(getRuntime(), getRuntime().getProc(), type);
         newProc.block = getBlock();
-    	newProc.traceElement = traceElement;
         return newProc;
     }
     
@@ -213,13 +207,13 @@ public class RubyProc extends RubyObject implements DataType {
     public IRubyObject to_s() {
         return RubyString.newString(
                 getRuntime(),"#<Proc:0x" + Integer.toString(block.hashCode(), 16) + "@" +
-                traceElement.getFileName() + ":" + traceElement.getLineNumber() + ">");
+                block.getBody().getFile() + ":" + (block.getBody().getLine() + 1) + ">");
     }
 
     @JRubyMethod(name = "to_s", compat = RUBY1_9)
     public IRubyObject to_s19() {
         StringBuilder sb = new StringBuilder("#<Proc:0x" + Integer.toString(block.hashCode(), 16) + "@" +
-                traceElement.getFileName() + ":" + traceElement.getLineNumber());
+                block.getBody().getFile() + ":" + (block.getBody().getLine() + 1));
         if (isLambda())
             sb.append(" (lambda)");
         sb.append(">");

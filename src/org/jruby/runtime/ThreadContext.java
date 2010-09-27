@@ -123,9 +123,11 @@ public final class ThreadContext {
                 this.line = position.getLine();
             }
         }
+        @Override
         public String toString() {
             return method + " at " + filename + ":" + line;
         }
+        @Override
         public Backtrace clone() {
             return new Backtrace(method, filename, line);
         }
@@ -1039,74 +1041,6 @@ public final class ThreadContext {
 
         RubyStackTraceElement[] rubyStackTrace = new RubyStackTraceElement[trace.size()];
         return (RubyStackTraceElement[])trace.toArray(rubyStackTrace);
-    }
-
-    /** Walk the current Java stack trace, looking for the first Ruby element.
-     *
-     * @param runtime
-     * @param fullTrace
-     * @return
-     */
-    public static RubyStackTraceElement findFirstRubyBacktrace(ThreadContext context) {
-        // The old logic was unacceptably slow; forcing Java to generate a
-        // backtrace for every proc killed performance. We'll need to do it
-        // the proper way (likely by having the compiled block save its position
-        // info for retrieval here)
-        Backtrace element = context.backtrace[context.backtraceIndex];
-        return new RubyStackTraceElement("RUBY", element.method, element.filename, element.line, false);
-//        // a running index into the Ruby backtrace stack, incremented for each
-//        // interpreter frame we encounter in the Java backtrace.
-//        int rubyFrameIndex = context.backtraceIndex;
-//
-//        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-//
-//        // FIXME duplication here with gatherHybridBacktrace
-//        for (int i = 0; i < stackTrace.length; i++) {
-//            StackTraceElement element = stackTrace[i];
-//
-//            if (element.getFileName() != null &&
-//                    (element.getFileName().endsWith(".rb") ||
-//                    element.getFileName().equals("-e")) ||
-//                    // FIXME: Formalize jitted method structure so this isn't quite as hacky
-//                    element.getClassName().indexOf("ruby.jit.") == 0) {
-//                if (element.getLineNumber() == -1) continue;
-//                String methodName = element.getMethodName();
-//
-//                String className = element.getClassName();
-//
-//                // FIXME: Formalize jitted method structure so this isn't quite as hacky
-//                int rubyJitIndex = className.indexOf("ruby.jit.");
-//                if (rubyJitIndex == 0) {
-//                    methodName = className.substring("ruby.jit.".length(), className.lastIndexOf("_"));
-//                    return new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false);
-//                }
-//
-//                // AOT formatted method names, need to be cleaned up
-//                int RUBYindex = methodName.indexOf("$RUBY$");
-//                if (RUBYindex >= 0) {
-//                    methodName = methodName.substring(RUBYindex + "$RUBY$".length());
-//                    // if it's a synthetic call, use it but gobble up parent calls
-//                    // TODO: need to formalize this better
-//                    if (methodName.startsWith("SYNTHETIC")) {
-//                        methodName = methodName.substring("SYNTHETIC".length());
-//                        return new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false);
-//                    }
-//                }
-//
-//                return new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false);
-//            }
-//
-//            // try to mine out a Ruby frame using our list of interpreter entry-point markers
-//            String classMethod = element.getClassName() + "." + element.getMethodName();
-//            FrameType frameType = INTERPRETED_FRAMES.get(classMethod);
-//            if (frameType != null && rubyFrameIndex >= 0) {
-//                // Frame matches one of our markers for "interpreted" calls
-//                Backtrace rubyElement = context.backtrace[rubyFrameIndex];
-//                return new RubyStackTraceElement("RUBY", rubyElement.method, rubyElement.filename, rubyElement.line + 1, false);
-//            }
-//        }
-//
-//        return new RubyStackTraceElement(UNKNOWN_NAME, UNKNOWN_NAME, UNKNOWN_NAME, -1, false);
     }
 
     public static IRubyObject renderBacktraceMRI(Ruby runtime, RubyStackTraceElement[] trace) {

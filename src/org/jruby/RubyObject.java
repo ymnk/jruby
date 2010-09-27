@@ -439,6 +439,7 @@ public class RubyObject extends RubyBasicObject {
         } else if (a instanceof RubySymbol) {
             return false;
         } else if (a instanceof RubyNumeric) {
+            if (a.getClass() != b.getClass()) return false;
             return equalInternal(context, a, b);
         } else {
             RubyClass metaclass = metaclass(a);

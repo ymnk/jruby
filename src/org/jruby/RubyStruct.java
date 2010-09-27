@@ -548,7 +548,7 @@ public class RubyStruct extends RubyObject {
 
     @JRubyMethod
     public IRubyObject each(final ThreadContext context, final Block block) {
-        return block.isGiven() ? each(context, block) : enumeratorize(context.getRuntime(), this, "each");
+        return block.isGiven() ? eachInternal(context, block) : enumeratorize(context.getRuntime(), this, "each");
     }
 
     public IRubyObject each_pairInternal(ThreadContext context, Block block) {
@@ -565,7 +565,7 @@ public class RubyStruct extends RubyObject {
 
     @JRubyMethod
     public IRubyObject each_pair(final ThreadContext context, final Block block) {
-        return block.isGiven() ? each_pair(context, block) : enumeratorize(context.getRuntime(), this, "each_pair");
+        return block.isGiven() ? each_pairInternal(context, block) : enumeratorize(context.getRuntime(), this, "each_pair");
     }
 
     @JRubyMethod(name = "[]", required = 1)

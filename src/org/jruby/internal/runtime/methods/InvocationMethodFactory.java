@@ -37,7 +37,6 @@ import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyKernel;
 import org.jruby.parser.StaticScope;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.jruby.RubyModule;
 import org.jruby.RubyString;
@@ -528,8 +527,9 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
             // rethrow exception
             mv.athrow(); // rethrow it
         }
+        mv.end();
 
-        return endCallOffline(cw,mv);
+        return endCallOffline(cw);
     }
     
     private static class DescriptorInfo {
@@ -772,7 +772,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         }
     }
 
-    public CompiledBlockCallback getBlockCallback(String method, Object scriptObject) {
+    public CompiledBlockCallback getBlockCallback(String method, String file, int line, Object scriptObject) {
         Class typeClass = scriptObject.getClass();
         String typePathString = p(typeClass);
         String mname = typeClass.getName() + "BlockCallback$" + method + "xx1";
@@ -783,7 +783,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
                     if (RubyInstanceConfig.JIT_LOADING_DEBUG) {
                         System.err.println("no generated handle in classloader for: " + mname);
                     }
-                    byte[] bytes = getBlockCallbackOffline(method, typePathString);
+                    byte[] bytes = getBlockCallbackOffline(method, file, line, typePathString);
                     c = endCallWithBytes(bytes, mname);
                 } else {
                     if (RubyInstanceConfig.JIT_LOADING_DEBUG) {
@@ -803,7 +803,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
     }
 
     @Override
-    public byte[] getBlockCallbackOffline(String method, String classname) {
+    public byte[] getBlockCallbackOffline(String method, String file, int line, String classname) {
         String mnamePath = classname + "BlockCallback$" + method + "xx1";
         ClassWriter cw = createBlockCtor(mnamePath, classname);
         SkinnyMethodAdapter mv = startBlockCall(cw);
@@ -815,12 +815,24 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
                 IRubyObject.class, "L" + classname + ";", ThreadContext.class,
                         IRubyObject.class, IRubyObject.class, Block.class));
         mv.areturn();
+        mv.end();
 
-        mv.visitMaxs(2, 3);
-        return endCallOffline(cw, mv);
+        mv = new SkinnyMethodAdapter(cw, ACC_PUBLIC, "getFile", sig(String.class), null, null);
+        mv.start();
+        mv.ldc(file);
+        mv.areturn();
+        mv.end();
+
+        mv = new SkinnyMethodAdapter(cw, ACC_PUBLIC, "getLine", sig(int.class), null, null);
+        mv.start();
+        mv.ldc(line);
+        mv.ireturn();
+        mv.end();
+
+        return endCallOffline(cw);
     }
 
-    public CompiledBlockCallback19 getBlockCallback19(String method, Object scriptObject) {
+    public CompiledBlockCallback19 getBlockCallback19(String method, String file, int line, Object scriptObject) {
         Class typeClass = scriptObject.getClass();
         String typePathString = p(typeClass);
         String mname = typeClass.getName() + "BlockCallback$" + method + "xx1";
@@ -831,7 +843,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
                     if (RubyInstanceConfig.JIT_LOADING_DEBUG) {
                         System.err.println("no generated handle in classloader for: " + mname);
                     }
-                    byte[] bytes = getBlockCallback19Offline(method, typePathString);
+                    byte[] bytes = getBlockCallback19Offline(method, file, line, typePathString);
                     c = endClassWithBytes(bytes, mname);
                 } else {
                     if (RubyInstanceConfig.JIT_LOADING_DEBUG) {
@@ -851,7 +863,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
     }
 
     @Override
-    public byte[] getBlockCallback19Offline(String method, String classname) {
+    public byte[] getBlockCallback19Offline(String method, String file, int line, String classname) {
         String mnamePath = classname + "BlockCallback$" + method + "xx1";
         ClassWriter cw = createBlockCtor19(mnamePath, classname);
         SkinnyMethodAdapter mv = startBlockCall19(cw);
@@ -863,9 +875,21 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
                 IRubyObject.class, "L" + classname + ";", ThreadContext.class,
                         IRubyObject.class, IRubyObject[].class, Block.class));
         mv.areturn();
+        mv.end();
 
-        mv.visitMaxs(2, 3);
-        return endCallOffline(cw, mv);
+        mv = new SkinnyMethodAdapter(cw, ACC_PUBLIC, "getFile", sig(String.class), null, null);
+        mv.start();
+        mv.ldc(file);
+        mv.areturn();
+        mv.end();
+
+        mv = new SkinnyMethodAdapter(cw, ACC_PUBLIC, "getLine", sig(int.class), null, null);
+        mv.start();
+        mv.ldc(line);
+        mv.ireturn();
+        mv.end();
+        
+        return endCallOffline(cw);
     }
 
     private SkinnyMethodAdapter startBlockCall(ClassWriter cw) {
@@ -1238,8 +1262,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         }
     }
 
-    protected Class endCall(ClassWriter cw, MethodVisitor mv, String name) {
-        endMethod(mv);
+    protected Class endCall(ClassWriter cw, String name) {
         return endClass(cw, name);
     }
 
@@ -1247,14 +1270,8 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         return endClassWithBytes(classBytes, name);
     }
 
-    protected byte[] endCallOffline(ClassWriter cw, MethodVisitor mv) {
-        endMethod(mv);
+    protected byte[] endCallOffline(ClassWriter cw) {
         return endClassOffline(cw);
-    }
-
-    protected void endMethod(MethodVisitor mv) {
-        mv.visitMaxs(0,0);
-        mv.visitEnd();
     }
 
     protected Class endClass(ClassWriter cw, String name) {
@@ -1337,7 +1354,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
 
             createAnnotatedMethodInvocation(desc, mv, superClass, specificArity, hasBlock);
 
-            endMethod(mv);
+            mv.end();
         }
     }
 

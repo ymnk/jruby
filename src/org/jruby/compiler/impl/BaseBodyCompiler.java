@@ -971,6 +971,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     }
 
     public void createNewClosure(
+            String file,
             int line,
             StaticScope scope,
             int arity,
@@ -993,15 +994,16 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
         loadThreadContext();
         loadSelf();
-        script.getCacheCompiler().cacheClosure(this, closureMethodName, arity, scope, hasMultipleArgsHead, argsNodeId, inspector);
+        script.getCacheCompiler().cacheClosure(this, closureMethodName, arity, scope, file, line, hasMultipleArgsHead, argsNodeId, inspector);
 
-        script.addBlockCallbackDescriptor(closureMethodName);
+        script.addBlockCallbackDescriptor(closureMethodName, file, line);
 
         invokeUtilityMethod("createBlock", sig(Block.class,
                 params(ThreadContext.class, IRubyObject.class, BlockBody.class)));
     }
 
     public void createNewClosure19(
+            String file,
             int line,
             StaticScope scope,
             int arity,
@@ -1024,9 +1026,9 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
         loadThreadContext();
         loadSelf();
-        script.getCacheCompiler().cacheClosure19(this, closureMethodName, arity, scope, hasMultipleArgsHead, argsNodeId, inspector);
+        script.getCacheCompiler().cacheClosure19(this, closureMethodName, arity, scope, file, line, hasMultipleArgsHead, argsNodeId, inspector);
 
-        script.addBlockCallback19Descriptor(closureMethodName);
+        script.addBlockCallback19Descriptor(closureMethodName, file, line);
 
         invokeUtilityMethod("createBlock19", sig(Block.class,
                 params(ThreadContext.class, IRubyObject.class, BlockBody.class)));
