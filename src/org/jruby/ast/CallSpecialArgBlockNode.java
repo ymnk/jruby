@@ -71,6 +71,6 @@ public final class CallSpecialArgBlockNode extends CallNode {
             }
         }
 
-        return callAdapter.call(context, self, receiver, arg, block);
+        return callAdapter.callIter(context, self, receiver, arg, block);
     }
 }

@@ -745,7 +745,7 @@ public final class ThreadContext {
         
         RubyArray backtrace = runtime.newArray(trace.length - level);
 
-        for (int i = 0; i < trace.length - level; i++) {
+        for (int i = level; i < trace.length; i++) {
             addBackTraceElement(runtime, backtrace, trace[i]);
         }
         

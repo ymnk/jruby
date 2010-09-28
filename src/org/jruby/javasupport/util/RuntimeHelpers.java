@@ -1318,23 +1318,30 @@ public class RuntimeHelpers {
     
     public static void preLoad(ThreadContext context, String[] varNames) {
         StaticScope staticScope = new LocalStaticScope(null, varNames);
-        staticScope.setModule(context.getRuntime().getObject());
+        RubyClass objectClass = context.getRuntime().getObject();
+        IRubyObject topLevel = context.getRuntime().getTopSelf();
+        staticScope.setModule(objectClass);
         DynamicScope scope = DynamicScope.newDynamicScope(staticScope);
         
         // Each root node has a top-level scope that we need to push
         context.preScopedBody(scope);
+        context.preNodeEval(objectClass, topLevel);
     }
 
     public static void preLoad(ThreadContext context, String scopeString) {
         StaticScope staticScope = decodeLocalScope(context, scopeString);
-        staticScope.setModule(context.getRuntime().getObject());
+        RubyClass objectClass = context.getRuntime().getObject();
+        IRubyObject topLevel = context.getRuntime().getTopSelf();
+        staticScope.setModule(objectClass);
         DynamicScope scope = DynamicScope.newDynamicScope(staticScope);
 
         // Each root node has a top-level scope that we need to push
         context.preScopedBody(scope);
+        context.preNodeEval(objectClass, topLevel);
     }
     
     public static void postLoad(ThreadContext context) {
+        context.postNodeEval();
         context.postScopedBody();
     }
     

@@ -2650,14 +2650,10 @@ public final class Ruby {
 
         try {
             secure(4); /* should alter global state */
-
-            context.preNodeEval(objectClass, self);
             
             script.load(context, self, IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return;
-        } finally {
-            context.postNodeEval();
         }
     }
 
