@@ -183,7 +183,7 @@ public abstract class CallSite {
      * @param self the target object to call against
      * @param arg0 the first argument to pass
      * @param arg1 the second argument to pass
-     * @param arg3 the third argument to pass
+     * @param arg2 the third argument to pass
      * @param block the block argument to pass
      * @return the result of the call
      */
@@ -224,11 +224,11 @@ public abstract class CallSite {
      * @param context the ThreadContext for the current thread
      * @param caller the caller, for visibility checks
      * @param self the target object to call against
-     * @param arg1 the argument to pass
+     * @param arg0 the argument to pass
      * @param block the literal block to pass
      * @return the result of the call
      */
-    public abstract IRubyObject callIter(ThreadContext context, IRubyObject caller, IRubyObject self, IRubyObject arg1, Block block);
+    public abstract IRubyObject callIter(ThreadContext context, IRubyObject caller, IRubyObject self, IRubyObject arg0, Block block);
 
     /**
      * Call the site's method against the target object passing two arguments and
@@ -238,12 +238,12 @@ public abstract class CallSite {
      * @param context the ThreadContext for the current thread
      * @param caller the caller, for visibility checks
      * @param self the target object to call against
-     * @param arg1 the first argument to pass
-     * @param arg2 the second argument to pass
+     * @param arg0 the first argument to pass
+     * @param arg1 the second argument to pass
      * @param block the literal block to pass
      * @return the result of the call
      */
-    public abstract IRubyObject callIter(ThreadContext context, IRubyObject caller, IRubyObject self, IRubyObject arg1, IRubyObject arg2, Block block);
+    public abstract IRubyObject callIter(ThreadContext context, IRubyObject caller, IRubyObject self, IRubyObject arg0, IRubyObject arg1, Block block);
 
     /**
      * Call the site's method against the target object passing three arguments and
@@ -253,13 +253,13 @@ public abstract class CallSite {
      * @param context the ThreadContext for the current thread
      * @param caller the caller, for visibility checks
      * @param self the target object to call against
-     * @param arg1 the first argument to pass
-     * @param arg2 the second argument to pass
-     * @param arg3 the third argument to pass
+     * @param arg0 the first argument to pass
+     * @param arg1 the second argument to pass
+     * @param arg2 the third argument to pass
      * @param block the literal block to pass
      * @return the result of the call
      */
-    public abstract IRubyObject callIter(ThreadContext context, IRubyObject caller, IRubyObject self, IRubyObject arg1, IRubyObject arg2, IRubyObject arg3, Block block);
+    public abstract IRubyObject callIter(ThreadContext context, IRubyObject caller, IRubyObject self, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, Block block);
 
     /**
      * Call the site's method against the target object passing arguments and
