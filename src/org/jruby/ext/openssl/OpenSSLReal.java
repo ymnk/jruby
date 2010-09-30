@@ -126,8 +126,6 @@ public class OpenSSLReal {
         HMAC.createHMAC(runtime, ossl);
         Config.createConfig(runtime, ossl);
 
-        runtime.getLoadService().require("opensslext");
-        
         ossl.setConstant("VERSION", runtime.newString("1.0.0"));
         ossl.setConstant("OPENSSL_VERSION", runtime.newString("jruby-ossl 1.0.0"));
         ossl.setConstant("OPENSSL_VERSION_NUMBER", runtime.newFixnum(9469999));

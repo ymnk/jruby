@@ -1,3 +1,6 @@
+warn "OpenSSL X509 implementation unavailable"
+warn "gem install bouncy-castle-java for full support."
+
 module OpenSSL
   module X509
     class Name; end

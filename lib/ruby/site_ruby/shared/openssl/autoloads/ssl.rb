@@ -1,3 +1,6 @@
+warn "OpenSSL SSL implementation unavailable"
+warn "gem install bouncy-castle-java for full support."
+
 module OpenSSL
   module SSL
     class SSLError < OpenSSLError; end

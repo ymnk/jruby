@@ -16,10 +16,26 @@
 
 require 'openssl.so'
 
+begin
+  # try to add BC jars from gem
+  require 'bouncy-castle-java'
+rescue LoadError
+  # runs under restricted mode.
+end
+
+require 'openssl/jruby-ossl-ext.jar'
+require 'opensslext'
+
 require 'openssl/bn'
 require 'openssl/cipher'
 require 'openssl/config'
 require 'openssl/digest'
-require 'openssl/pkcs7' unless OpenSSL.autoload? :PKCS7
-require 'openssl/ssl-internal' unless OpenSSL.autoload? :SSL
-require 'openssl/x509-internal' unless OpenSSL.autoload? :X509
+unless OpenSSL.autoload? :PKCS7
+  require 'openssl/pkcs7'
+end
+unless OpenSSL.autoload? :X509
+  require 'openssl/x509-internal'
+  unless OpenSSL.autoload? :SSL
+    require 'openssl/ssl-internal'
+  end
+end

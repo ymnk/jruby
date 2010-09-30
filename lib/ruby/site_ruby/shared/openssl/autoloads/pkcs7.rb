@@ -1,3 +1,6 @@
+warn "OpenSSL PKCS7 implementation unavailable"
+warn "gem install bouncy-castle-java for full support."
+
 module OpenSSL
   class PKCS7
     # this definition causes TypeError "superclass mismatch for class PKCS7"
