@@ -527,7 +527,7 @@ public class Cipher extends RubyObject {
         return this;
     }
 
-    javax.crypto.Cipher getCipher() {
+    public javax.crypto.Cipher getCipher() {
         try {
             return javax.crypto.Cipher.getInstance(realName);
         } catch (NoSuchAlgorithmException e) {
@@ -720,23 +720,23 @@ public class Cipher extends RubyObject {
         return padding;
     }
 
-    String getAlgorithm() {
+    public String getAlgorithm() {
         return this.ciph.getAlgorithm();
     }
 
-    String getName() {
+    public String getName() {
         return this.name;
     }
 
-    String getCryptoBase() {
+    public String getCryptoBase() {
         return this.cryptoBase;
     }
 
-    String getCryptoMode() {
+    public String getCryptoMode() {
         return this.cryptoMode;
     }
 
-    int getGenerateKeyLen() {
+    public int getGenerateKeyLen() {
         return (generateKeyLen == -1) ? keyLen : generateKeyLen;
     }
 
