@@ -1,0 +1,7 @@
+To run tests in this dir:
+
+ 1. prerequisite: install bouncy-castle-java gem
+    % bin/jruby -S gem install bouncy-castle-java
+
+ 2. run test_all.rb in this dir with rubygems
+    % bin/jruby -rubygems test/openssl/test_all.rb
