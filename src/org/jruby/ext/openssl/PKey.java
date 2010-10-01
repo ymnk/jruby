@@ -43,6 +43,7 @@ import org.jruby.RubyObject;
 import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -97,7 +98,7 @@ public abstract class PKey extends RubyObject {
 
     @JRubyMethod
     public IRubyObject sign(IRubyObject digest, IRubyObject data) {
-        if (!this.callMethod(getRuntime().getCurrentContext(), "private?").isTrue()) {
+        if (!RuntimeHelpers.invoke(getRuntime().getCurrentContext(), this, "private?").isTrue()) {
             throw getRuntime().newArgumentError("Private key is needed.");
         }
         String digAlg = ((Digest) digest).getShortAlgorithm();

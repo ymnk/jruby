@@ -31,6 +31,7 @@ import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyObject;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -83,15 +84,15 @@ public class Utils {
     }
 
     public static IRubyObject newRubyInstance(Ruby rt, String path) {
-        return rt.getClassFromPath(path).callMethod(rt.getCurrentContext(), "new");
+        return RuntimeHelpers.invoke(rt.getCurrentContext(), rt.getClassFromPath(path), "new");
     }
 
     public static IRubyObject newRubyInstance(Ruby rt, String path, IRubyObject arg) {
-        return rt.getClassFromPath(path).callMethod(rt.getCurrentContext(), "new", arg);
+        return RuntimeHelpers.invoke(rt.getCurrentContext(), rt.getClassFromPath(path), "new", arg);
     }
 
     public static IRubyObject newRubyInstance(Ruby rt, String path, IRubyObject[] args) {
-        return rt.getClassFromPath(path).callMethod(rt.getCurrentContext(), "new", args);
+        return RuntimeHelpers.invoke(rt.getCurrentContext(), rt.getClassFromPath(path), "new", args);
     }
     
 }// Utils

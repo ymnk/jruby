@@ -29,6 +29,7 @@ package org.jruby.ext.openssl;
 
 import java.security.MessageDigest;
 
+import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -44,7 +45,7 @@ public class OpenSSLImpl {
     private OpenSSLImpl() {}
 
     public static IRubyObject to_der(IRubyObject obj) {
-        return obj.callMethod(obj.getRuntime().getCurrentContext(),"to_der");
+        return RuntimeHelpers.invoke(obj.getRuntime().getCurrentContext(), obj, "to_der");
     }
 
     public static IRubyObject to_der_if_possible(IRubyObject obj) {
