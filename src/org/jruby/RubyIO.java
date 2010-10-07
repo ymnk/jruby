@@ -1099,11 +1099,25 @@ public class RubyIO extends RubyObject {
         return io;
     }
 
-    @JRubyMethod(required = 1, optional = 2, meta = true)
+    @JRubyMethod(required = 1, optional = 2, meta = true, compat = CompatVersion.RUBY1_8)
     public static IRubyObject sysopen(IRubyObject recv, IRubyObject[] args, Block block) {
-        Ruby runtime = recv.getRuntime();
-
         IRubyObject pathString = args[0].convertToString();
+        return sysopenCommon(recv, args, block, pathString);
+    }
+    
+    @JRubyMethod(name = "sysopen", required = 1, optional = 2, meta = true, compat = CompatVersion.RUBY1_9)
+    public static IRubyObject sysopen19(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
+        IRubyObject pathString;
+        if (!(args[0] instanceof RubyString) && args[0].respondsTo("to_path")) {
+            pathString = args[0].callMethod(context, "to_path");
+        } else {
+            pathString = args[0].convertToString();
+        }
+        return sysopenCommon(recv, args, block, pathString);
+    }
+
+    private static IRubyObject sysopenCommon(IRubyObject recv, IRubyObject[] args, Block block, IRubyObject pathString) {
+        Ruby runtime = recv.getRuntime();
         runtime.checkSafeString(pathString);
         String path = pathString.toString();
 
@@ -2388,16 +2402,31 @@ public class RubyIO extends RubyObject {
      * 
      * @param number to push back
      */
-    @JRubyMethod(name = "ungetc", required = 1)
+    @JRubyMethod(name = "ungetc", required = 1, compat = CompatVersion.RUBY1_8)
     public IRubyObject ungetc(IRubyObject number) {
-        int ch = RubyNumeric.fix2int(number);
-        
         OpenFile myOpenFile = getOpenFileChecked();
         
         if (!myOpenFile.isReadBuffered()) {
             throw getRuntime().newIOError("unread stream");
         }
-        
+
+        return ungetcCommon(number, myOpenFile);
+    }
+
+    @JRubyMethod(name = "ungetc", required = 1, compat = CompatVersion.RUBY1_9)
+    public IRubyObject ungetc19(IRubyObject number) {
+        OpenFile myOpenFile = getOpenFileChecked();
+
+        if (!myOpenFile.isReadBuffered()) {
+            return getRuntime().getNil();
+        }
+
+        return ungetcCommon(number, myOpenFile);
+    }
+
+    private IRubyObject ungetcCommon(IRubyObject number, OpenFile myOpenFile) {
+        int ch = RubyNumeric.fix2int(number);
+
         try {
             myOpenFile.checkReadable(getRuntime());
             myOpenFile.setReadBuffered();
@@ -2973,9 +3002,15 @@ public class RubyIO extends RubyObject {
         return enumeratorize(context.getRuntime(), this, "each_byte");
     }
 
-    @JRubyMethod(name = "lines")
-    public IRubyObject lines(final ThreadContext context) {
+    @JRubyMethod(name = "lines", compat = CompatVersion.RUBY1_8)
+    public IRubyObject lines(final ThreadContext context, Block block) {
         return enumeratorize(context.getRuntime(), this, "each_line");
+    }
+
+    @JRubyMethod(name = "lines", compat = CompatVersion.RUBY1_9)
+    public IRubyObject lines19(final ThreadContext context, Block block) {
+        if (!block.isGiven()) return enumeratorize(context.getRuntime(), this, "each_line");
+        return each_lineInternal(context, NULL_ARRAY, block);
     }
 
     public IRubyObject each_charInternal(final ThreadContext context, final Block block) {
@@ -3012,13 +3047,38 @@ public class RubyIO extends RubyObject {
         return block.isGiven() ? each_charInternal(context, block) : enumeratorize(context.getRuntime(), this, "chars");
     }
 
+    @JRubyMethod
+    public IRubyObject codepoints(final ThreadContext context, final Block block) {
+        return eachCodePointCommon(context, block, "codepoints");
+    }
+
+    @JRubyMethod
+    public IRubyObject each_codepoint(final ThreadContext context, final Block block) {
+        return eachCodePointCommon(context, block, "each_codepoint");
+    }
+
+    private IRubyObject eachCharCommon(final ThreadContext context, final Block block, final String methodName) {
+        return block.isGiven() ? each_char(context, block) : enumeratorize(context.getRuntime(), this, methodName);
+    }
+
+    private IRubyObject eachCodePointCommon(final ThreadContext context, final Block block, final String methodName) {
+        Ruby runtime = context.getRuntime();
+        if (!block.isGiven()) return enumeratorize(runtime, this, methodName);
+        IRubyObject ch;
+
+        while(!(ch = getc()).isNil()) {
+            block.yield(context, ch);
+        }
+        return this;
+    }
+
     /** 
      * <p>Invoke a block for each line.</p>
      */
     public RubyIO each_lineInternal(ThreadContext context, IRubyObject[] args, Block block) {
         Ruby runtime = context.getRuntime();
         ByteList separator = getSeparatorForGets(runtime, args);
-        
+
         ByteListCache cache = new ByteListCache();
         for (IRubyObject line = getline(runtime, separator); !line.isNil(); 
 		line = getline(runtime, separator, cache)) {
@@ -3069,21 +3129,22 @@ public class RubyIO extends RubyObject {
     */
     public static IRubyObject foreachInternal(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
         Ruby runtime = context.getRuntime();
-        int count = args.length;
         IRubyObject filename = args[0].convertToString();
         runtime.checkSafeString(filename);
-       
-        ByteList separator = getSeparatorFromArgs(runtime, args, 1);
 
         RubyIO io = (RubyIO)RubyFile.open(context, runtime.getFile(), new IRubyObject[] { filename }, Block.NULL_BLOCK);
         
         ByteListCache cache = new ByteListCache();
         if (!io.isNil()) {
             try {
+                ByteList separator = getSeparatorFromArgs(runtime, args, 1);
                 IRubyObject str = io.getline(runtime, separator, cache);
                 while (!str.isNil()) {
                     block.yield(context, str);
                     str = io.getline(runtime, separator, cache);
+                    if (runtime.is1_9()) {
+                        separator = getSeparatorFromArgs(runtime, args, 1);
+                    }
                 }
             } finally {
                 io.close();
@@ -3095,7 +3156,12 @@ public class RubyIO extends RubyObject {
     
     @JRubyMethod(required = 1, optional = 1, meta = true)
     public static IRubyObject foreach(final ThreadContext context, IRubyObject recv, IRubyObject[] args, final Block block) {
-        return block.isGiven() ? foreachInternal(context, recv, args, block) : enumeratorize(context.getRuntime(), recv, "foreach", args);
+        if (!block.isGiven()) return enumeratorize(context.getRuntime(), recv, "foreach", args);
+
+        if (!(args[0] instanceof RubyString) && args[0].respondsTo("to_path")) {
+            args[0] = args[0].callMethod(context, "to_path");
+        }
+        return foreachInternal(context, recv, args, block);
     }
 
     private static RubyIO convertToIO(ThreadContext context, IRubyObject obj) {
