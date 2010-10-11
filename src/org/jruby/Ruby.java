@@ -2572,7 +2572,6 @@ public final class Ruby {
     }
     
     public void compileAndLoadFile(String filename, InputStream in, boolean wrap) {
-        IRubyObject self = wrap ? TopSelfFactory.createTopSelf(this) : getTopSelf();
         ThreadContext context = getCurrentContext();
         String file = context.getFile();
         InputStream readStream = in;
@@ -2581,7 +2580,6 @@ public final class Ruby {
             secure(4); /* should alter global state */
 
             context.setFile(filename);
-            context.preNodeEval(objectClass, self, filename);
 
             Script script = null;
             String className = null;
@@ -2639,7 +2637,6 @@ public final class Ruby {
         } catch (JumpException.ReturnJump rj) {
             return;
         } finally {
-            context.postNodeEval();
             context.setFile(file);
         }
     }

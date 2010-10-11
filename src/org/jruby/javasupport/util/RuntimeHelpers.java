@@ -1318,18 +1318,15 @@ public class RuntimeHelpers {
     
     public static void preLoad(ThreadContext context, String[] varNames) {
         StaticScope staticScope = new LocalStaticScope(null, varNames);
-        RubyClass objectClass = context.getRuntime().getObject();
-        IRubyObject topLevel = context.getRuntime().getTopSelf();
-        staticScope.setModule(objectClass);
-        DynamicScope scope = DynamicScope.newDynamicScope(staticScope);
-        
-        // Each root node has a top-level scope that we need to push
-        context.preScopedBody(scope);
-        context.preNodeEval(objectClass, topLevel);
+        preLoadCommon(context, staticScope);
     }
 
     public static void preLoad(ThreadContext context, String scopeString) {
-        StaticScope staticScope = decodeLocalScope(context, scopeString);
+        StaticScope staticScope = decodeRootScope(context, scopeString);
+        preLoadCommon(context, staticScope);
+    }
+
+    private static void preLoadCommon(ThreadContext context, StaticScope staticScope) {
         RubyClass objectClass = context.getRuntime().getObject();
         IRubyObject topLevel = context.getRuntime().getTopSelf();
         staticScope.setModule(objectClass);
@@ -1605,20 +1602,35 @@ public class RuntimeHelpers {
         return namesBuilder.toString();
     }
 
+    public static LocalStaticScope decodeRootScope(ThreadContext context, String scopeString) {
+        String[][] decodedScope = decodeScopeDescriptor(scopeString);
+        LocalStaticScope scope = new LocalStaticScope(null, decodedScope[1]);
+        setAritiesFromDecodedScope(scope, decodedScope[0]);
+        return scope;
+    }
+
     public static LocalStaticScope decodeLocalScope(ThreadContext context, String scopeString) {
-        String[] scopeElements = scopeString.split(",");
-        String[] scopeNames = scopeElements[0].length() == 0 ? new String[0] : getScopeNames(scopeElements[0]);
-        LocalStaticScope scope = new LocalStaticScope(context.getCurrentScope().getStaticScope(), scopeNames);
-        scope.setArities(Integer.parseInt(scopeElements[1]), Integer.parseInt(scopeElements[2]), Integer.parseInt(scopeElements[3]));
+        String[][] decodedScope = decodeScopeDescriptor(scopeString);
+        LocalStaticScope scope = new LocalStaticScope(context.getCurrentScope().getStaticScope(), decodedScope[1]);
+        setAritiesFromDecodedScope(scope, decodedScope[0]);
         return scope;
     }
 
     public static BlockStaticScope decodeBlockScope(ThreadContext context, String scopeString) {
+        String[][] decodedScope = decodeScopeDescriptor(scopeString);
+        BlockStaticScope scope = new BlockStaticScope(context.getCurrentScope().getStaticScope(), decodedScope[1]);
+        setAritiesFromDecodedScope(scope, decodedScope[0]);
+        return scope;
+    }
+
+    private static String[][] decodeScopeDescriptor(String scopeString) {
         String[] scopeElements = scopeString.split(",");
         String[] scopeNames = scopeElements[0].length() == 0 ? new String[0] : getScopeNames(scopeElements[0]);
-        BlockStaticScope scope = new BlockStaticScope(context.getCurrentScope().getStaticScope(), scopeNames);
+        return new String[][] {scopeElements, scopeNames};
+    }
+
+    private static void setAritiesFromDecodedScope(StaticScope scope, String[] scopeElements) {
         scope.setArities(Integer.parseInt(scopeElements[1]), Integer.parseInt(scopeElements[2]), Integer.parseInt(scopeElements[3]));
-        return scope;
     }
 
     private static StaticScope createScopeForClass(ThreadContext context, String scopeString) {

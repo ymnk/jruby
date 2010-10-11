@@ -1558,7 +1558,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     }
 
     protected String getNewRescueName() {
-        return "rescue_" + (script.getAndIncrementRescueNumber()) + "$RUBY$SYNTHETIC" + getRubyName();
+        return "rescue_" + (script.getAndIncrementRescueNumber()) + "$RUBY$SYNTHETIC" + JavaNameMangler.mangleStringForCleanJavaIdentifier(getRubyName());
     }
 
     public void storeExceptionInErrorInfo() {
