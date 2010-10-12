@@ -1333,7 +1333,7 @@ public class RubyKernel {
     }
 
     @JRubyMethod(name = "loop", module = true, visibility = PRIVATE)
-    public static IRubyObject loop_1_9(ThreadContext context, IRubyObject recv, Block block) {
+    public static IRubyObject loop(ThreadContext context, IRubyObject recv, Block block) {
         IRubyObject nil = context.getRuntime().getNil();
         RubyClass stopIteration = context.getRuntime().getStopIteration();
         try {
