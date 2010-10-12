@@ -418,8 +418,8 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         Label catchReturnJump = new Label();
         Label catchRedoJump = new Label();
 
-        boolean heapScoped = callConfig.scoping() == Scoping.Full;
-        boolean framed = callConfig.framing() == Framing.Full;
+        boolean heapScoped = callConfig.scoping() != Scoping.None;
+        boolean framed = callConfig.framing() != Framing.None;
 
         if (framed || heapScoped)   mv.trycatch(tryBegin, tryEnd, catchReturnJump, p(JumpException.ReturnJump.class));
         if (framed)                 mv.trycatch(tryBegin, tryEnd, catchRedoJump, p(JumpException.RedoJump.class));

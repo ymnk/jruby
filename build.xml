@@ -861,7 +861,7 @@
 
         <!-- force client VM to improve test run times AND -->
         <!-- set a larger max permgen, since the tests load a lot of bytecode -->
-        <jvmarg line="-ea ${run.jvm.model} -client -XX:MaxPermSize=128M -XX:+UnlockExperimentalVMOptions -XX:+EnableMethodHandles -XX:+EnableInvokeDynamic"/>
+        <jvmarg line="-ea ${run.jvm.model} -client -XX:MaxPermSize=256M -XX:+UnlockExperimentalVMOptions -XX:+EnableMethodHandles -XX:+EnableInvokeDynamic"/>
 
 	<formatter type="xml"/>
 	<formatter type="brief" usefile="false" />
@@ -915,7 +915,8 @@
         <sysproperty key="file.encoding" value="UTF-8"/>
 
         <!-- force client VM to improve test run times AND -->
-        <!-- set a larger max permgen, since the tests load a lot of bytecode -->	<jvmarg line="-ea ${run.jvm.model} -client -XX:MaxPermSize=128M"/>
+        <!-- set a larger max permgen, since the tests load a lot of bytecode -->
+        <jvmarg line="-ea ${run.jvm.model} -client -XX:MaxPermSize=256M"/>
 
 	<formatter type="xml"/>
 	<formatter type="brief" usefile="false" />

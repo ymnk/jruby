@@ -64,10 +64,12 @@ public class StackBasedVariableCompiler extends AbstractVariableCompiler {
             // FIXME: only starting after required args, since opt args may access others
             // and rest args conflicts with compileRoot using "0" to indicate [] signature.
             int start = scope.getRequiredArgs();
-            methodCompiler.loadNil();
-            for (int i = start; i < scope.getNumberOfVariables(); i++) {
-                if (i + 1 < scope.getNumberOfVariables()) methodCompiler.method.dup();
-                assignLocalVariable(i, false);
+            if (start < scope.getNumberOfVariables()) {
+                methodCompiler.loadNil();
+                for (int i = start; i < scope.getNumberOfVariables(); i++) {
+                    if (i + 1 < scope.getNumberOfVariables()) methodCompiler.method.dup();
+                    assignLocalVariable(i, false);
+                }
             }
 
             // temp locals must start after last real local
