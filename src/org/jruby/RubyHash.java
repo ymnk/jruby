@@ -1536,8 +1536,9 @@ public class RubyHash extends RubyObject implements Map {
             public void visit(IRubyObject key, IRubyObject value) {
                 if (block.isGiven()) {
                     IRubyObject existing = self.internalGet(key);
-                    if (existing != null)
+                    if (existing != null) {
                         value = block.yield(context, RubyArray.newArrayNoCopy(runtime, new IRubyObject[]{key, existing, value}));
+                    }
                 }
                 self.op_aset(context, key, value);
             }
@@ -1564,8 +1565,9 @@ public class RubyHash extends RubyObject implements Map {
             public void visit(IRubyObject key, IRubyObject value) {
                 if (block.isGiven()) {
                     IRubyObject existing = self.internalGet(key);
-                    if (existing != null)
+                    if (existing != null) {
                         value = block.yield(context, RubyArray.newArrayNoCopy(runtime, new IRubyObject[]{key, existing, value}));
+                    }
                 }
                 self.op_aset(context, key, value);
             }

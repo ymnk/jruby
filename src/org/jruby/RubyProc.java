@@ -216,6 +216,7 @@ public class RubyProc extends RubyObject implements DataType {
                 block.getBody().getFile() + ":" + (block.getBody().getLine() + 1));
         if (isLambda())
             sb.append(" (lambda)");
+        }
         sb.append(">");
         return RubyString.newString(getRuntime(), sb.toString());
     }
@@ -236,8 +237,9 @@ public class RubyProc extends RubyObject implements DataType {
 
     @JRubyMethod(name = {"call", "[]", "yield"}, rest = true, compat = RUBY1_9)
     public IRubyObject call19(ThreadContext context, IRubyObject[] args, Block block) {
-        if (isLambda())
-           this.block.arity().checkArity(context.getRuntime(), args.length);
+        if (isLambda()) {
+            this.block.arity().checkArity(context.getRuntime(), args.length);
+        }
 
         if (isProc()) {
             List<IRubyObject> list = new ArrayList<IRubyObject>(Arrays.asList(args));
@@ -353,8 +355,9 @@ public class RubyProc extends RubyObject implements DataType {
         RubyArray parms = RubyArray.newEmptyArray(runtime);
         ArgsNode args;
 
-        if (!(this.getBlock().getBody() instanceof Interpreted19Block))
+        if (!(this.getBlock().getBody() instanceof Interpreted19Block)) {
             return parms;
+        }
 
         // argument names are easily accessible from interpreter
         RubyArray elem = RubyArray.newEmptyArray(runtime);

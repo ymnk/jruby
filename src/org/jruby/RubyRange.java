@@ -636,8 +636,9 @@ public class RubyRange extends RubyObject {
 
     @JRubyMethod(compat = RUBY1_9)
     public IRubyObject max(ThreadContext context, Block block) {
-        if (begin.callMethod(context, ">", end).isTrue())
+        if (begin.callMethod(context, ">", end).isTrue()) {
             return context.getRuntime().getNil();
+        }
         if (block.isGiven() || isExclusive && !(end instanceof RubyNumeric)) {
             return RuntimeHelpers.invokeSuper(context, this, block);
         } else {

@@ -1211,8 +1211,9 @@ public class Java implements Library {
     }
     
     private static int interfacesHashCode(Class[] a) {
-        if (a == null)
+        if (a == null) {
             return 0;
+        }
 
         int result = 1;
 

@@ -5195,7 +5195,6 @@ public class RubyString extends RubyObject implements EncodingCapable {
      * If args.length>0 and args[0] is "\n" then same behaviour as args.length==0 .
      * If args.length>0 and args[0] is "" then removes trailing multiple LF or CRLF (but no CRs at
      *   all(!)).
-     * @param args See method description.
      */
     @JRubyMethod(name = "chomp!", compat = RUBY1_8)
     public IRubyObject chomp_bang(ThreadContext context) {
