@@ -174,4 +174,8 @@ public class MethodBodyCompiler extends RootScopedBodyCompiler {
             invokeUtilityMethod("redoLocalJumpError", sig(IRubyObject.class, Ruby.class));
         }
     }
+
+    public boolean isSimpleRoot() {
+        return !inNestedMethod;
+    }
 }

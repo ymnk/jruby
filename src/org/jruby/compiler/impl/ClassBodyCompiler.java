@@ -30,4 +30,8 @@ public class ClassBodyCompiler extends RootScopedBodyCompiler {
         invokeUtilityMethod("returnJump", sig(JumpException.ReturnJump.class, IRubyObject.class, ThreadContext.class));
         method.athrow();
     }
+
+    public boolean isSimpleRoot() {
+        return false;
+    }
 }

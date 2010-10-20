@@ -924,7 +924,7 @@ public class ASTCompiler {
     }
 
     private boolean compileRecursiveCall(String name, int generation, CallType callType, boolean iterator, DynamicMethod method, BodyCompiler context, ArgumentsCallback argsCallback, CompilerCallback closure, boolean expr) {
-        if (currentBodyNode != null) {
+        if (currentBodyNode != null && context.isSimpleRoot()) {
             if (method instanceof InterpretedMethod) {
                 InterpretedMethod target = (InterpretedMethod)method;
                 if (target.getBodyNode() == currentBodyNode) {

@@ -19,4 +19,8 @@ public class ChainedRootBodyCompiler extends RootScopedBodyCompiler {
         super(scriptCompiler, methodName, rubyName, inspector, scope);
         this.inNestedMethod = true;
     }
+
+    public boolean isSimpleRoot() {
+        return false;
+    }
 }

@@ -139,4 +139,8 @@ public class ChildScopedBodyCompiler extends BaseBodyCompiler {
             method.go_to(scopeStart);
         }
     }
+
+    public boolean isSimpleRoot() {
+        return false;
+    }
 }

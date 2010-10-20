@@ -630,4 +630,12 @@ public interface BodyCompiler {
     public String getNativeMethodName();
 
     public void preMultiAssign(int head, boolean args);
+
+    /**
+     * Return true if this method compiled is a "simple" root compiler, i.e.
+     * not chained and not a block/closure.
+     * 
+     * @return
+     */
+    public boolean isSimpleRoot();
 }
