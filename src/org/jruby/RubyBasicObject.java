@@ -1066,7 +1066,7 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
 
     @JRubyMethod(name = "!=", required = 1, compat = RUBY1_9)
     public IRubyObject op_not_equal(ThreadContext context, IRubyObject other) {
-        return context.getRuntime().newBoolean(!op_equal(context, other).isTrue());
+        return context.getRuntime().newBoolean(!callMethod("==", other).isTrue());
     }
 
     public int compareTo(IRubyObject other) {
