@@ -214,7 +214,7 @@ public class RubyProc extends RubyObject implements DataType {
     public IRubyObject to_s19() {
         StringBuilder sb = new StringBuilder("#<Proc:0x" + Integer.toString(block.hashCode(), 16) + "@" +
                 block.getBody().getFile() + ":" + (block.getBody().getLine() + 1));
-        if (isLambda())
+        if (isLambda()) {
             sb.append(" (lambda)");
         }
         sb.append(">");
