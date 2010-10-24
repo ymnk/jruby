@@ -3071,6 +3071,10 @@ public final class Ruby {
         return newRaiseException(getErrno().fastGetClass("EADDRINUSE"), message);
     }
 
+    public RaiseException newErrnoEHOSTUNREACHError(String message) {
+        return newRaiseException(getErrno().fastGetClass("EHOSTUNREACH"), message);
+    }
+
     public RaiseException newErrnoEINVALError() {
         return newRaiseException(getErrno().fastGetClass("EINVAL"), "Invalid file");
     }

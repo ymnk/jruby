@@ -214,11 +214,13 @@ public class ASTInterpreter {
             if (bodyNode == null) return runtime.getNil();
             return INTERPRET_CLASS(runtime, context, bodyNode, type.getBaseName() == null ? "(anonymous)" : type.getBaseName(), type, block);
         } finally {
-            if (runtime.hasEventHooks()) {
-                callTraceFunction(runtime, context, RubyEvent.END);
+            try {
+                if (runtime.hasEventHooks()) {
+                    callTraceFunction(runtime, context, RubyEvent.END);
+                }
+            } finally {
+                context.postClassEval();
             }
-            
-            context.postClassEval();
         }
     }
 

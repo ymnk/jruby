@@ -61,6 +61,7 @@ import static org.jruby.runtime.Visibility.PRIVATE;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 import org.jruby.util.RubyDateFormat;
+import static org.jruby.CompatVersion.*;
 
 /** The Time class.
  * 
@@ -654,8 +655,9 @@ public class RubyTime extends RubyObject {
 
     public RubyObject mdump() {
         RubyTime obj = this;
-        DateTime dateTime = obj.dt;
+        DateTime dateTime = obj.dt.toDateTime(DateTimeZone.UTC);
         byte dumpValue[] = new byte[8];
+        
         int pe = 
             0x1                                 << 31 |
             ((obj.gmt().isTrue())? 0x1 : 0x0)   << 30 |
@@ -781,6 +783,14 @@ public class RubyTime extends RubyObject {
         return createTime(recv, args, false);
     }
 
+    @JRubyMethod(name = "new", optional = 10, meta = true, compat = RUBY1_9)
+    public static IRubyObject new19(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
+        if (args.length == 0) {
+            return newInstance(context, recv);
+        }
+        return createTime(recv, args, false);
+    }
+
     @JRubyMethod(name = {"utc", "gm"}, required = 1, optional = 9, meta = true)
     public static RubyTime new_utc(IRubyObject recv, IRubyObject[] args) {
         return createTime(recv, args, true);
@@ -817,7 +827,7 @@ public class RubyTime extends RubyObject {
     protected static RubyTime s_mload(IRubyObject recv, RubyTime time, IRubyObject from) {
         Ruby runtime = recv.getRuntime();
 
-        DateTime dt = new DateTime(getLocalTimeZone(runtime));
+        DateTime dt = new DateTime(DateTimeZone.UTC);
 
         byte[] fromAsBytes = null;
         fromAsBytes = from.convertToString().getBytes();
@@ -832,12 +842,13 @@ public class RubyTime extends RubyObject {
         for (int i = 4; i < 8; i++) {
             s |= ((int)fromAsBytes[i] & 0xFF) << (8 * (i - 4));
         }
+        boolean utc = false;
         if ((p & (1<<31)) == 0) {
             dt = dt.withMillis(p * 1000L);
             time.setUSec((s & 0xFFFFF) % 1000);
         } else {
             p &= ~(1<<31);
-            if((p >>> 30 & 0x1) == 0x1) dt = dt.withZone(DateTimeZone.UTC);
+            utc = ((p >>> 30 & 0x1) == 0x1);
             dt = dt.withYear(((p >>> 14) & 0xFFFF) + 1900);
             dt = dt.withMonthOfYear(((p >>> 10) & 0xF) + 1);
             dt = dt.withDayOfMonth(((p >>> 5)  & 0x1F));
@@ -849,6 +860,7 @@ public class RubyTime extends RubyObject {
             time.setUSec((s & 0xFFFFF) % 1000);
         }
         time.setDateTime(dt);
+        if (!utc) time.localtime();
 
         from.getInstanceVariables().copyInstanceVariablesInto(time);
         return time;
@@ -952,10 +964,12 @@ public class RubyTime extends RubyObject {
             }
         }
 
-        if (0 <= year && year < 39) {
-            year += 2000;
-        } else if (69 <= year && year < 139) {
-            year += 1900;
+        if (!runtime.is1_9()) {
+            if (0 <= year && year < 39) {
+                year += 2000;
+            } else if (69 <= year && year < 139) {
+                year += 1900;
+            }
         }
 
         DateTime dt;
