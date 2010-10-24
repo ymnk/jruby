@@ -1104,8 +1104,12 @@ public class RubyKernel {
             // -1 because parser uses zero offsets and other code compensates
             binding.setLine(((int) args[3].convertToInteger().getLongValue()) - 1);
         } else {
-            // no binding given, use 0 for both
-            binding.setLine(0);
+            if (bindingGiven) {
+                // binding given, use binding's line
+            } else {
+                // no binding given, use 0 for both
+                binding.setLine(0);
+            }
         }
 
         return ASTInterpreter.evalWithBinding(context, src, binding);

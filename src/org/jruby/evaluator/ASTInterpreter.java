@@ -79,6 +79,14 @@ public class ASTInterpreter {
             context.popBacktrace();
         }
     }
+    public static IRubyObject INTERPRET_EVAL(Ruby runtime, ThreadContext context, String file, int line, Node node, String name, IRubyObject self, Block block) {
+        try {
+            context.pushBacktrace(name, file, line);
+            return node.interpret(runtime, context, self, block);
+        } finally {
+            context.popBacktrace();
+        }
+    }
     public static IRubyObject INTERPRET_CLASS(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
             context.pushBacktrace(name, node.getPosition());
@@ -128,7 +136,7 @@ public class ASTInterpreter {
             RubyString source = src.convertToString();
             Node node = runtime.parseEval(source.getByteList(), binding.getFile(), evalScope, binding.getLine());
 
-            return INTERPRET_EVAL(runtime, context, node, binding.getMethod(), newSelf, binding.getFrame().getBlock());
+            return INTERPRET_EVAL(runtime, context, binding.getFile(), binding.getLine(), node, binding.getMethod(), newSelf, binding.getFrame().getBlock());
         } catch (JumpException.BreakJump bj) {
             throw runtime.newLocalJumpError(RubyLocalJumpError.Reason.BREAK, (IRubyObject)bj.getValue(), "unexpected break");
         } catch (JumpException.RedoJump rj) {
@@ -165,7 +173,7 @@ public class ASTInterpreter {
         try {
             Node node = runtime.parseEval(source.getByteList(), file, evalScope, lineNumber);
 
-            return INTERPRET_EVAL(runtime, context, node, "(eval)", self, Block.NULL_BLOCK);
+            return INTERPRET_EVAL(runtime, context, file, lineNumber, node, "(eval)", self, Block.NULL_BLOCK);
         } catch (JumpException.BreakJump bj) {
             throw runtime.newLocalJumpError(RubyLocalJumpError.Reason.BREAK, (IRubyObject)bj.getValue(), "unexpected break");
         } catch (StackOverflowError soe) {

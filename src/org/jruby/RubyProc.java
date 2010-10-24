@@ -169,6 +169,10 @@ public class RubyProc extends RubyObject implements DataType {
             block.getBody().setStaticScope(newScope);
         }
 
+        // force file/line info into the new block's binding
+        block.getBinding().setFile(block.getBody().getFile());
+        block.getBinding().setLine(block.getBody().getLine());
+
         block.type = type;
         block.setProcObject(this);
         return this;
