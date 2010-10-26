@@ -1486,7 +1486,6 @@ public final class ThreadContext {
      */
     public Binding previousBinding() {
         Frame frame = getPreviousFrame();
-        Frame current = getCurrentFrame();
         return new Binding(frame, getPreviousRubyClass(), getCurrentScope(), backtrace[backtraceIndex].clone());
     }
 
