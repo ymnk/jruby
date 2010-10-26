@@ -78,6 +78,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
         this.interpretedMethod = DynamicMethodFactory.newInterpretedMethod(
                 implementationClass.getRuntime(), implementationClass, staticScope,
                 body, name, argsNode, visibility, position);
+        this.interpretedMethod.serialNumber = this.serialNumber;
         this.box.actualMethod = interpretedMethod;
         this.argsNode = argsNode;
         this.body = body;
@@ -126,6 +127,7 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
                 getImplementationClass().getRuntime(), getImplementationClass(),
                 staticScope, jitCompiledScript, name, jitCallConfig, getVisibility(), argsNode.getArity(), position,
                 this);
+        this.box.actualMethod.serialNumber = this.serialNumber;
         this.box.callCount = -1;
         if (!RubyInstanceConfig.DYNOPT_COMPILE_ENABLED) {
             getImplementationClass().invalidateCacheDescendants();
