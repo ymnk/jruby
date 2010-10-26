@@ -241,6 +241,7 @@ public class RubyFixnum extends RubyInteger {
      *  ================ 
      */
     @Override
+    @JRubyMethod
     public IRubyObject times(ThreadContext context, Block block) {
         if (block.isGiven()) {
             Ruby runtime = context.getRuntime();

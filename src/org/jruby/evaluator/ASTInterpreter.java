@@ -59,7 +59,13 @@ import org.jruby.runtime.InterpretedBlock;
 public class ASTInterpreter {
     public static IRubyObject INTERPRET_METHOD(Ruby runtime, ThreadContext context, ISourcePosition position, RubyModule implClass, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.pushBacktrace(name, position);
+            String className;
+            if (implClass != self.getMetaClass().getRealClass()) {
+                className = implClass.getName() + "(" + self.getMetaClass().getName() + ")";
+            } else {
+                className = implClass.getName();
+            }
+            context.pushBacktrace(className, name, position);
             if (runtime.hasEventHooks()) context.trace(RubyEvent.CALL, name, implClass);
             return node.interpret(runtime, context, self, block);
         } finally {
@@ -73,7 +79,7 @@ public class ASTInterpreter {
     }
     public static IRubyObject INTERPRET_EVAL(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.pushBacktrace(name, node.getPosition());
+            context.pushBacktrace(self.getMetaClass().getName(), name, node.getPosition());
             return node.interpret(runtime, context, self, block);
         } finally {
             context.popBacktrace();
@@ -81,7 +87,7 @@ public class ASTInterpreter {
     }
     public static IRubyObject INTERPRET_EVAL(Ruby runtime, ThreadContext context, String file, int line, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.pushBacktrace(name, file, line);
+            context.pushBacktrace(self.getMetaClass().getName(), name, file, line);
             return node.interpret(runtime, context, self, block);
         } finally {
             context.popBacktrace();
@@ -89,7 +95,7 @@ public class ASTInterpreter {
     }
     public static IRubyObject INTERPRET_CLASS(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.pushBacktrace(name, node.getPosition());
+            context.pushBacktrace(self.getMetaClass().getName(), name, node.getPosition());
             return node.interpret(runtime, context, self, block);
         } finally {
             context.popBacktrace();
@@ -97,7 +103,7 @@ public class ASTInterpreter {
     }
     public static IRubyObject INTERPRET_BLOCK(Ruby runtime, ThreadContext context, Node node, String name, IRubyObject self, Block block) {
         try {
-            context.pushBacktrace(name, node.getPosition());
+            context.pushBacktrace(self.getMetaClass().getName(), name, node.getPosition());
             return node.interpret(runtime, context, self, block);
         } finally {
             context.popBacktrace();
@@ -105,7 +111,7 @@ public class ASTInterpreter {
     }
     public static IRubyObject INTERPRET_ROOT(Ruby runtime, ThreadContext context, Node node, IRubyObject self, Block block) {
         try {
-            context.pushBacktrace("(root)", node.getPosition());
+            context.pushBacktrace(self.getMetaClass().getName(), "(root)", node.getPosition());
             return node.interpret(runtime, context, self, block);
         } finally {
             context.popBacktrace();

@@ -2490,6 +2490,11 @@ public final class Ruby {
         excp.printBacktrace(errorStream);
     }
 
+    private static final String FIRST_COLOR = "\033[0;31m";
+    private static final String KERNEL_COLOR = "\033[0;36m";
+    private static final String EVAL_COLOR = "\033[0;33m";
+    private static final String CLEAR_COLOR = "\033[0m";
+
     private void printRubiniusTrace(RubyException exception) {
         ThreadContext.RubyStackTraceElement[] frames = exception.getBacktraceElements();
 
@@ -2528,6 +2533,13 @@ public final class Ruby {
             String firstPart = (String)firstParts.get(i);
             String secondPart = frame.getFileName() + ":" + frame.getLineNumber();
 
+            if (i == 0) {
+                buffer.append(FIRST_COLOR);
+            } else if (frame.isBinding() || frame.getFileName().equals("(eval)")) {
+                buffer.append(EVAL_COLOR);
+            } else if (frame.getFileName().indexOf(".java") != -1) {
+                buffer.append(KERNEL_COLOR);
+            }
             buffer.append("  ");
             for (int j = 0; j < center - firstPart.length(); j++) {
                 buffer.append(' ');
@@ -2535,6 +2547,7 @@ public final class Ruby {
             buffer.append(firstPart);
             buffer.append(" at ");
             buffer.append(secondPart);
+            buffer.append(CLEAR_COLOR);
             buffer.append('\n');
             i++;
         }

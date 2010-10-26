@@ -102,36 +102,23 @@ public final class ThreadContext {
         public T peek2() {return get(size() - 2);}
     }
     public static class Backtrace {
-        public String method;
-        public String filename;
-        public int line;
         public Backtrace() {
         }
-        public Backtrace(String method, String filename, int line) {
+        public Backtrace(String klass, String method, String filename, int line) {
             this.method = method;
             this.filename = filename;
             this.line = line;
-        }
-        public Backtrace(String method, ISourcePosition position) {
-            this.method = method;
-            if (position == ISourcePosition.INVALID_POSITION) {
-                // use dummy values; there's no need for a real position here anyway
-                this.filename = "dummy";
-                this.line = -1;
-            } else {
-                this.filename = position.getFile();
-                this.line = position.getLine();
-            }
+            this.klass = klass;
         }
         @Override
         public String toString() {
-            return method + " at " + filename + ":" + line;
+            return klass + "#" + method + " at " + filename + ":" + line;
         }
         @Override
         public Backtrace clone() {
-            return new Backtrace(method, filename, line);
+            return new Backtrace(klass, method, filename, line);
         }
-        public void update(String method, ISourcePosition position) {
+        public void update(String klass, String method, ISourcePosition position) {
             this.method = method;
             if (position == ISourcePosition.INVALID_POSITION) {
                 // use dummy values; there's no need for a real position here anyway
@@ -141,12 +128,50 @@ public final class ThreadContext {
                 this.filename = position.getFile();
                 this.line = position.getLine();
             }
+            this.klass = klass;
         }
-        public void update(String method, String file, int line) {
+        public void update(String klass, String method, String file, int line) {
             this.method = method;
             this.filename = file;
             this.line = line;
+            this.klass = klass;
         }
+        
+        public String getFilename() {
+            return filename;
+        }
+
+        public void setFilename(String filename) {
+            this.filename = filename;
+        }
+
+        public String getKlass() {
+            return klass;
+        }
+
+        public void setKlass(String klass) {
+            this.klass = klass;
+        }
+
+        public int getLine() {
+            return line;
+        }
+
+        public void setLine(int line) {
+            this.line = line;
+        }
+
+        public String getMethod() {
+            return method;
+        }
+
+        public void setMethod(String method) {
+            this.method = method;
+        }
+        public String klass;
+        public String method;
+        public String filename;
+        public int line;
     }
     
     // List of active dynamic scopes.  Each of these may have captured other dynamic scopes
@@ -195,8 +220,8 @@ public final class ThreadContext {
         for (int i = 0; i < length2; i++) {
             stack2[i] = new Backtrace();
         }
-        pushBacktrace("", "", 0);
-        pushBacktrace("", "", 0);
+        pushBacktrace("", "", "", 0);
+        pushBacktrace("", "", "", 0);
     }
 
     @Override
@@ -513,19 +538,19 @@ public final class ThreadContext {
         return newBacktrace;
     }
 
-    public void pushBacktrace(String method, ISourcePosition position) {
+    public void pushBacktrace(String klass, String method, ISourcePosition position) {
         int index = ++this.backtraceIndex;
         Backtrace[] stack = backtrace;
-        stack[index].update(method, position);
+        stack[index].update(klass, method, position);
         if (index + 1 == stack.length) {
             expandBacktraceIfNecessary();
         }
     }
 
-    public void pushBacktrace(String method, String file, int line) {
+    public void pushBacktrace(String klass, String method, String file, int line) {
         int index = ++this.backtraceIndex;
         Backtrace[] stack = backtrace;
-        stack[index].update(method, file, line);
+        stack[index].update(klass, method, file, line);
         if (index + 1 == stack.length) {
             expandBacktraceIfNecessary();
         }
@@ -1028,7 +1053,7 @@ public final class ThreadContext {
             if (frameType != null && rubyFrameIndex >= 0) {
                 // Frame matches one of our markers for "interpreted" calls
                 Backtrace rubyElement = backtraceFrames[rubyFrameIndex];
-                trace.add(new RubyStackTraceElement("RUBY", rubyElement.method, rubyElement.filename, rubyElement.line + 1, false));
+                trace.add(new RubyStackTraceElement(rubyElement.klass, rubyElement.method, rubyElement.filename, rubyElement.line + 1, false));
                 rubyFrameIndex--;
                 continue;
             } else {
