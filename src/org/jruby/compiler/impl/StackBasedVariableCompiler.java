@@ -63,8 +63,8 @@ public class StackBasedVariableCompiler extends AbstractVariableCompiler {
             // this is for crap like def foo(a = (b = true; 1)) which numbers b before a
             // FIXME: only starting after required args, since opt args may access others
             // and rest args conflicts with compileRoot using "0" to indicate [] signature.
-            int start = scope.getRequiredArgs();
-            if (start < scope.getNumberOfVariables()) {
+            if (scope.getRequiredArgs() < scope.getNumberOfVariables()) {
+                int start = scope.getRequiredArgs();
                 methodCompiler.loadNil();
                 for (int i = start; i < scope.getNumberOfVariables(); i++) {
                     if (i + 1 < scope.getNumberOfVariables()) methodCompiler.method.dup();

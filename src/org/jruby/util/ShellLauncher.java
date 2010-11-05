@@ -58,6 +58,7 @@ import org.jruby.RubyHash;
 import org.jruby.RubyIO;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyModule;
+import org.jruby.RubyString;
 import org.jruby.ext.posix.POSIX;
 import org.jruby.ext.posix.util.FieldAccess;
 import org.jruby.ext.posix.util.Platform;
@@ -331,7 +332,7 @@ public class ShellLauncher {
 
     private static File findPathExecutable(Ruby runtime, String fname) {
         RubyHash env = (RubyHash) runtime.getObject().fastGetConstant("ENV");
-        Object pathObject = env.get(PATH_ENV);
+        IRubyObject pathObject = env.op_aref(runtime.getCurrentContext(), RubyString.newString(runtime, PATH_ENV));
         String[] pathNodes = null;
         if (pathObject == null) {
             pathNodes = DEFAULT_PATH; // ASSUME: not modified by callee
@@ -536,18 +537,33 @@ public class ShellLauncher {
         File pwd = new File(runtime.getCurrentDirectory());
 
         try {
+            String[] args = parseCommandLine(runtime.getCurrentContext(), runtime, strings);
+            boolean useShell = false;
+            for (String arg : args) useShell |= shouldUseShell(arg);
+            
             // CON: popen is a case where I think we should just always shell out.
             if (strings.length == 1) {
-                // single string command, pass to sh to expand wildcards
-                String[] argArray = new String[3];
-                argArray[0] = shell;
-                argArray[1] = shell.endsWith("sh") ? "-c" : "/c";
-                argArray[2] = strings[0].asJavaString();
-                childProcess = Runtime.getRuntime().exec(argArray, getCurrentEnv(runtime), pwd);
+                if (useShell) {
+                    // single string command, pass to sh to expand wildcards
+                    String[] argArray = new String[3];
+                    argArray[0] = shell;
+                    argArray[1] = shell.endsWith("sh") ? "-c" : "/c";
+                    argArray[2] = strings[0].asJavaString();
+                    childProcess = Runtime.getRuntime().exec(argArray, getCurrentEnv(runtime), pwd);
+                } else {
+                    childProcess = Runtime.getRuntime().exec(args, getCurrentEnv(runtime), pwd);
+                }
             } else {
-                // direct invocation of the command
-                String[] args = parseCommandLine(runtime.getCurrentContext(), runtime, strings);
-                childProcess = Runtime.getRuntime().exec(args, getCurrentEnv(runtime), pwd);
+                if (useShell) {
+                    String[] argArray = new String[args.length + 2];
+                    argArray[0] = shell;
+                    argArray[1] = shell.endsWith("sh") ? "-c" : "/c";
+                    System.arraycopy(args, 0, argArray, 2, args.length);
+                    childProcess = Runtime.getRuntime().exec(argArray, getCurrentEnv(runtime), pwd);
+                } else {
+                    // direct invocation of the command
+                    childProcess = Runtime.getRuntime().exec(args, getCurrentEnv(runtime), pwd);
+                }
             }
         } catch (SecurityException se) {
             throw runtime.newSecurityError(se.getLocalizedMessage());
@@ -1297,6 +1313,16 @@ public class ShellLauncher {
 
     private static String getShell(Ruby runtime) {
         return RbConfigLibrary.jrubyShell();
+    }
+
+    private static boolean shouldUseShell(String command) {
+        boolean useShell = false;
+        for (char c : command.toCharArray()) {
+            if (c != ' ' && !Character.isLetter(c) && "*?{}[]<>()~&|\\$;'`\"\n".indexOf(c) != -1) {
+                useShell = true;
+            }
+        }
+        return useShell;
     }
 
     static void log(Ruby runtime, String msg) {

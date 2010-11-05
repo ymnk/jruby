@@ -1274,7 +1274,7 @@ public class RubyFile extends RubyIO implements EncodingCapable {
         
     }
 
-    private static String canonicalize(String path) {
+    public static String canonicalize(String path) {
         return canonicalize(null, path);
     }
 
