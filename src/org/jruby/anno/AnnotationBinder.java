@@ -239,7 +239,7 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
                     processMethodDeclarations(staticAnnotatedMethods);
                     for (Map.Entry<String, List<MethodDeclaration>> entry : staticAnnotatedMethods.entrySet()) {
                         MethodDeclaration decl = entry.getValue().get(0);
-                        if (!decl.getAnnotation(JRubyMethod.class).omit()) out.println("            runtime.coreMethods.add(\"" + decl.getDeclaringType().getQualifiedName() + "." + decl.getSimpleName() + "\");");
+                        if (!decl.getAnnotation(JRubyMethod.class).omit()) addCoreMethodMapping(entry.getKey(), decl, out);
                     }
 
                     if (!staticAnnotatedMethods1_8.isEmpty()) {
@@ -247,7 +247,7 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
                         processMethodDeclarations(staticAnnotatedMethods1_8);
                         for (Map.Entry<String, List<MethodDeclaration>> entry : staticAnnotatedMethods1_8.entrySet()) {
                             MethodDeclaration decl = entry.getValue().get(0);
-                            if (!decl.getAnnotation(JRubyMethod.class).omit()) out.println("            runtime.coreMethods.add(\"" + decl.getDeclaringType().getQualifiedName() + "." + decl.getSimpleName() + "\");");
+                            if (!decl.getAnnotation(JRubyMethod.class).omit()) addCoreMethodMapping(entry.getKey(), decl, out);
                         }
                         out.println("        }");
                     }
@@ -257,7 +257,7 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
                         processMethodDeclarations(staticAnnotatedMethods1_9);
                         for (Map.Entry<String, List<MethodDeclaration>> entry : staticAnnotatedMethods1_9.entrySet()) {
                             MethodDeclaration decl = entry.getValue().get(0);
-                            if (!decl.getAnnotation(JRubyMethod.class).omit()) out.println("            runtime.coreMethods.add(\"" + decl.getDeclaringType().getQualifiedName() + "." + decl.getSimpleName() + "\");");
+                            if (!decl.getAnnotation(JRubyMethod.class).omit()) addCoreMethodMapping(entry.getKey(), decl, out);
                         }
                         out.println("        }");
                     }
@@ -265,7 +265,7 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
                     processMethodDeclarations(annotatedMethods);
                     for (Map.Entry<String, List<MethodDeclaration>> entry : annotatedMethods.entrySet()) {
                         MethodDeclaration decl = entry.getValue().get(0);
-                        out.println("            runtime.coreMethods.add(\"" + decl.getDeclaringType().getQualifiedName() + "." + decl.getSimpleName() + "\");");
+                        if (!decl.getAnnotation(JRubyMethod.class).omit()) addCoreMethodMapping(entry.getKey(), decl, out);
                     }
 
                     if (!annotatedMethods1_8.isEmpty()) {
@@ -273,7 +273,7 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
                         processMethodDeclarations(annotatedMethods1_8);
                         for (Map.Entry<String, List<MethodDeclaration>> entry : annotatedMethods1_8.entrySet()) {
                             MethodDeclaration decl = entry.getValue().get(0);
-                            if (!decl.getAnnotation(JRubyMethod.class).omit()) out.println("            runtime.coreMethods.add(\"" + decl.getDeclaringType().getQualifiedName() + "." + decl.getSimpleName() + "\");");
+                            if (!decl.getAnnotation(JRubyMethod.class).omit()) addCoreMethodMapping(entry.getKey(), decl, out);
                         }
                         out.println("        }");
                     }
@@ -283,7 +283,7 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
                         processMethodDeclarations(annotatedMethods1_9);
                         for (Map.Entry<String, List<MethodDeclaration>> entry : annotatedMethods1_9.entrySet()) {
                             MethodDeclaration decl = entry.getValue().get(0);
-                            if (!decl.getAnnotation(JRubyMethod.class).omit()) out.println("            runtime.coreMethods.add(\"" + decl.getDeclaringType().getQualifiedName() + "." + decl.getSimpleName() + "\");");
+                            if (!decl.getAnnotation(JRubyMethod.class).omit()) addCoreMethodMapping(entry.getKey(), decl, out);
                         }
                         out.println("        }");
                     }
@@ -424,6 +424,17 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
                             "CallConfiguration." + getCallConfigNameByAnno(anno) + ");");
                     generateMethodAddCalls(md, anno);
                 }
+            }
+
+            private void addCoreMethodMapping(String rubyName, MethodDeclaration decl, PrintStream out) {
+                out.println(
+                        "        runtime.coreMethods.put(\""
+                        + decl.getDeclaringType().getQualifiedName()
+                        + "."
+                        + decl.getSimpleName()
+                        + "\", \""
+                        + rubyName
+                        + "\");");
             }
 
             private String getActualQualifiedName(TypeDeclaration td) {

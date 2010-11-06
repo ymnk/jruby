@@ -4042,7 +4042,7 @@ public final class Ruby {
     private final AtomicInteger moduleGeneration = new AtomicInteger(1);
 
     // A list of Java class+method names to include in backtraces
-    public final Set<String> coreMethods = new HashSet();
+    public final Map<String, String> coreMethods = new HashMap();
 
     // A soft pool of selectors for blocking IO operations
     private final SelectorPool selectorPool = new SelectorPool();

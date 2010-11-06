@@ -776,6 +776,33 @@ public final class ThreadContext {
                 copy,
                 Thread.currentThread().getStackTrace(),
                 false);
+
+        // scrub out .java core class names and replace with Ruby equivalents
+        OUTER: for (int i = 0; i < trace.length; i++) {
+            RubyStackTraceElement element = trace[i];
+            String classDotMethod = element.getClassName() + "." + element.getMethodName();
+            if (runtime.coreMethods.containsKey(classDotMethod)) {
+                String rubyName = runtime.coreMethods.get(classDotMethod);
+                // find first Ruby file+line
+                RubyStackTraceElement rubyElement = null;
+                int rubyIndex;
+                for (int j = i; j < trace.length; j++) {
+                    rubyElement = trace[j];
+                    if (!rubyElement.getFileName().endsWith(".java")) {
+                        trace[i] = new RubyStackTraceElement(
+                                element.getClassName(),
+                                rubyName,
+                                rubyElement.getFileName(),
+                                rubyElement.getLineNumber(),
+                                rubyElement.isBinding(),
+                                rubyElement.getFrameType());
+                        continue OUTER;
+                    }
+                }
+                // no match, leave it as is
+
+            }
+        }
         
         RubyArray backtrace = runtime.newArray(trace.length - level);
 
@@ -1042,7 +1069,8 @@ public final class ThreadContext {
                 continue;
             }
 
-            if (fullTrace || runtime.coreMethods.contains(element.getClassName() + "." + element.getMethodName())) {
+            String dotClassMethod = element.getClassName() + "." + element.getMethodName();
+            if (fullTrace || runtime.coreMethods.containsKey(dotClassMethod)) {
                 String filename = element.getFileName();
                 int lastDot = element.getClassName().lastIndexOf('.');
                 if (lastDot != -1) {
