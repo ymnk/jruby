@@ -1280,7 +1280,7 @@ public class RubyHash extends RubyObject implements Map {
         return key != null ? key : context.getRuntime().getNil();
     }
 
-    @JRubyMethod(compat = RUBY1_9)
+    @JRubyMethod(name = "index", compat = RUBY1_9)
     public IRubyObject index19(ThreadContext context, IRubyObject expected) {
         context.getRuntime().getWarnings().warn(ID.DEPRECATED_METHOD, "Hash#index is deprecated; use Hash#key");
         return key(context, expected);

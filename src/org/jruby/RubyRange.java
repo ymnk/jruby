@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.jcodings.Encoding;
+import org.jruby.anno.FrameField;
 import org.jruby.anno.JRubyClass;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.exceptions.JumpException;
@@ -623,7 +624,7 @@ public class RubyRange extends RubyObject {
         return include_p(context, obj); // 1.8 "include?"
     }
 
-    @JRubyMethod(compat = RUBY1_9)
+    @JRubyMethod(compat = RUBY1_9, frame = true)
     public IRubyObject min(ThreadContext context, Block block) {
         if (block.isGiven()) {
             return RuntimeHelpers.invokeSuper(context, this, block);
@@ -634,7 +635,7 @@ public class RubyRange extends RubyObject {
         }
     }
 
-    @JRubyMethod(compat = RUBY1_9)
+    @JRubyMethod(compat = RUBY1_9, frame = true)
     public IRubyObject max(ThreadContext context, Block block) {
         if (begin.callMethod(context, ">", end).isTrue()) {
             return context.getRuntime().getNil();
