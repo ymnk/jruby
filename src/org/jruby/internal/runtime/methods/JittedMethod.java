@@ -88,6 +88,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -106,6 +108,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime,context, name);
         }
@@ -124,6 +128,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -142,6 +148,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -160,6 +168,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -178,6 +188,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -196,6 +208,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -214,6 +228,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -232,6 +248,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }
@@ -250,6 +268,8 @@ public class JittedMethod extends DynamicMethod implements PositionAware {
             return handleReturn(context, rj, callNumber);
         } catch (JumpException.RedoJump rj) {
             return handleRedo(runtime);
+        } catch (JumpException.BreakJump bj) {
+            return handleBreak(context, runtime, bj, callNumber);
         } finally {
             post(runtime, context, name);
         }

@@ -806,7 +806,10 @@ public class ASTCompiler {
         String name = callNode.getName();
         CallType callType = CallType.NORMAL;
 
-        if (RubyInstanceConfig.DYNOPT_COMPILE_ENABLED) {
+        DYNOPT: if (RubyInstanceConfig.DYNOPT_COMPILE_ENABLED) {
+            // dynopt does not handle non-local block flow control yet, so we bail out
+            // if there's a closure.
+            if (callNode.getIterNode() != null) break DYNOPT;
             if (callNode.callAdapter instanceof CachingCallSite) {
                 CachingCallSite cacheSite = (CachingCallSite)callNode.callAdapter;
                 if (cacheSite.isOptimizable()) {
@@ -2410,7 +2413,9 @@ public class ASTCompiler {
         
         CompilerCallback closureArg = getBlock(fcallNode.getIterNode());
 
-        if (RubyInstanceConfig.DYNOPT_COMPILE_ENABLED) {
+        DYNOPT: if (RubyInstanceConfig.DYNOPT_COMPILE_ENABLED) {
+            // dynopt does not handle non-local block flow control yet, so we bail out
+            if (fcallNode.getIterNode() != null) break DYNOPT;
             if (fcallNode.callAdapter instanceof CachingCallSite) {
                 CachingCallSite cacheSite = (CachingCallSite)fcallNode.callAdapter;
                 if (cacheSite.isOptimizable()) {
