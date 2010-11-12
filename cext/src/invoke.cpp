@@ -98,11 +98,11 @@ Java_org_jruby_cext_Native_callInit(JNIEnv* env, jobject self, jobject jThreadCo
         ((void (*)(void)) address)();
 
     } catch (jruby::JavaException& ex) {
+        PRINT_STACK_TRACE
         env->Throw(ex.getCause());
-
     } catch (std::exception& ex) {
+        PRINT_STACK_TRACE
         jruby::throwExceptionByName(env, jruby::RuntimeException, "C runtime exception occurred: ", ex.what());
-
     }
 
     return 0;
@@ -134,10 +134,12 @@ Java_org_jruby_cext_Native_callMethod(JNIEnv* env, jobject nativeClass, jobject 
         return valueToObject(env, v);
 
     } catch (jruby::JavaException& ex) {
+        PRINT_STACK_TRACE
         env->Throw(ex.getCause());
         return NULL;
 
     } catch (std::exception& ex) {
+        PRINT_STACK_TRACE
         jruby::throwExceptionByName(env, jruby::RuntimeException, "C runtime exception occurred: ", ex.what());
         return NULL;
     }
@@ -159,10 +161,12 @@ Java_org_jruby_cext_Native_callMethod0(JNIEnv* env, jobject self, jlong fn, jlon
         return valueToObject(env, ((VALUE (*)(VALUE)) fn)((VALUE) recv));
 
     } catch (jruby::JavaException& ex) {
+        PRINT_STACK_TRACE
         env->Throw(ex.getCause());
         return NULL;
 
     } catch (std::exception& ex) {
+        PRINT_STACK_TRACE
         jruby::throwExceptionByName(env, jruby::RuntimeException, "C runtime exception occurred: ", ex.what());
         return NULL;
     }
@@ -183,10 +187,12 @@ Java_org_jruby_cext_Native_callMethod1(JNIEnv* env, jobject self, jlong fn, jlon
         return valueToObject(env, ((VALUE (*)(VALUE, VALUE)) fn)((VALUE) recv, (VALUE) arg1));
 
     } catch (jruby::JavaException& ex) {
+        PRINT_STACK_TRACE
         env->Throw(ex.getCause());
         return NULL;
 
     } catch (std::exception& ex) {
+        PRINT_STACK_TRACE
         jruby::throwExceptionByName(env, jruby::RuntimeException, "C runtime exception occurred: ", ex.what());
         return NULL;
     }
@@ -209,10 +215,12 @@ Java_org_jruby_cext_Native_callMethod2(JNIEnv* env, jobject self, jlong fn, jlon
         return valueToObject(env, ((VALUE (*)(VALUE, VALUE, VALUE)) fn)((VALUE) recv, (VALUE) arg1, (VALUE) arg2));
 
     } catch (jruby::JavaException& ex) {
+        PRINT_STACK_TRACE
         env->Throw(ex.getCause());
         return NULL;
 
     } catch (std::exception& ex) {
+        PRINT_STACK_TRACE
         jruby::throwExceptionByName(env, jruby::RuntimeException, "C runtime exception occurred: ", ex.what());
         return NULL;
     }
@@ -237,10 +245,12 @@ Java_org_jruby_cext_Native_callMethod3(JNIEnv* env, jobject self, jlong fn, jlon
         return valueToObject(env, ((VALUE (*)(VALUE, VALUE, VALUE, VALUE)) fn)((VALUE) recv, (VALUE) arg1, (VALUE) arg2, (VALUE) arg3));
 
     } catch (jruby::JavaException& ex) {
+        PRINT_STACK_TRACE
         env->Throw(ex.getCause());
         return NULL;
 
     } catch (std::exception& ex) {
+        PRINT_STACK_TRACE
         jruby::throwExceptionByName(env, jruby::RuntimeException, "C runtime exception occurred: ", ex.what());
         return NULL;
     }
@@ -300,10 +310,12 @@ Java_org_jruby_cext_Native_callFunction(JNIEnv* env, jobject, jlong function, jl
         return ((VALUE (*)(void*)) function)((void*) data);
 
     } catch (jruby::JavaException& ex) {
+        PRINT_STACK_TRACE
         env->Throw(ex.getCause());
         return 0x0;
 
     } catch (std::exception& ex) {
+        PRINT_STACK_TRACE
         jruby::throwExceptionByName(env, jruby::RuntimeException, "C runtime exception occurred: ", ex.what());
         return 0x0;
     }
@@ -324,10 +336,12 @@ Java_org_jruby_cext_Native_callProcMethod(JNIEnv* env, jobject, jlong fn, jlong 
         return valueToObject(env, ((VALUE (*)(VALUE)) fn)((VALUE) args_ary));
 
     } catch (jruby::JavaException& ex) {
+        PRINT_STACK_TRACE
         env->Throw(ex.getCause());
         return NULL;
 
     } catch (std::exception& ex) {
+        PRINT_STACK_TRACE
         jruby::throwExceptionByName(env, jruby::RuntimeException, "C runtime exception occurred: ", ex.what());
         return NULL;
     }

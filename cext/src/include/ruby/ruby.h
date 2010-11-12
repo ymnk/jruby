@@ -35,10 +35,23 @@
 // Some platform specific includes
 #if defined(__WIN32__) || defined(__MINGW32__)
 #   include "jruby_win32.h"
+#   define PRINT_STACK_TRACE
 #else
 #   define RUBY_DLLSPEC
-#	include <sys/select.h>
-#	include <pthread.h>
+#   include <sys/select.h>
+#   include <pthread.h>
+#   ifndef NDEBUG
+#     include <execinfo.h>
+#     define PRINT_STACK_TRACE                              \
+        void* callstack[256]                                \
+        int i, frames = backtrace(callstack, 256);          \
+        char** strs = backtrace_symbols(callstack, frames); \
+        for (i = 0; i < frames; ++i) {                      \
+          printf("%s\n", strs[i]);                          \
+        }                                                   \
+        free(strs);
+#
+# endif
 #endif
 
 #ifdef RUBY_EXTCONF_H
