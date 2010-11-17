@@ -777,8 +777,8 @@ public final class ThreadContext {
         OUTER: for (int i = 0; i < trace.length; i++) {
             RubyStackTraceElement element = trace[i];
             String classDotMethod = element.getClassName() + "." + element.getMethodName();
-            if (runtime.coreMethods.containsKey(classDotMethod)) {
-                String rubyName = runtime.coreMethods.get(classDotMethod);
+            if (runtime.getBoundMethods().containsKey(classDotMethod)) {
+                String rubyName = runtime.getBoundMethods().get(classDotMethod);
                 // find first Ruby file+line
                 RubyStackTraceElement rubyElement = null;
                 int rubyIndex;
@@ -1066,7 +1066,7 @@ public final class ThreadContext {
             }
 
             String dotClassMethod = element.getClassName() + "." + element.getMethodName();
-            if (fullTrace || runtime.coreMethods.containsKey(dotClassMethod)) {
+            if (fullTrace || runtime.getBoundMethods().containsKey(dotClassMethod)) {
                 String filename = element.getFileName();
                 int lastDot = element.getClassName().lastIndexOf('.');
                 if (lastDot != -1) {

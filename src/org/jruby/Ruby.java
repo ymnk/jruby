@@ -2678,6 +2678,14 @@ public final class Ruby {
         }
     }
 
+    public void addBoundMethod(String javaName, String rubyName) {
+        boundMethods.put(javaName, rubyName);
+    }
+
+    public Map<String, String> getBoundMethods() {
+        return boundMethods;
+    }
+
     public class CallTraceFuncHook extends EventHook {
         private RubyProc traceFunc;
         
@@ -4042,7 +4050,7 @@ public final class Ruby {
     private final AtomicInteger moduleGeneration = new AtomicInteger(1);
 
     // A list of Java class+method names to include in backtraces
-    public final Map<String, String> coreMethods = new HashMap();
+    private final Map<String, String> boundMethods = new HashMap();
 
     // A soft pool of selectors for blocking IO operations
     private final SelectorPool selectorPool = new SelectorPool();

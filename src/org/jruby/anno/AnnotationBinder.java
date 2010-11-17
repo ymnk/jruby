@@ -428,7 +428,7 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
 
             private void addCoreMethodMapping(String rubyName, MethodDeclaration decl, PrintStream out) {
                 out.println(
-                        "        runtime.coreMethods.put(\""
+                        "        runtime.addBoundMethod(\""
                         + decl.getDeclaringType().getQualifiedName()
                         + "."
                         + decl.getSimpleName()
