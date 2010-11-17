@@ -37,13 +37,9 @@ package org.jruby.runtime;
 
 import java.util.ArrayList;
 import org.jruby.runtime.profile.ProfileData;
-import java.io.PrintStream;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.jruby.IncludedModuleWrapper;
 import org.jruby.runtime.scope.ManyVarsDynamicScope;
 
 import org.jruby.Ruby;
@@ -56,7 +52,6 @@ import org.jruby.RubyThread;
 import org.jruby.ast.executable.RuntimeCache;
 import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.JumpException.ReturnJump;
-import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.internal.runtime.methods.InterpretedMethod;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.libraries.FiberLibrary.Fiber;
