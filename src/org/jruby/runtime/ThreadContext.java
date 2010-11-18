@@ -52,13 +52,13 @@ import org.jruby.RubyThread;
 import org.jruby.ast.executable.RuntimeCache;
 import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.JumpException.ReturnJump;
-import org.jruby.internal.runtime.methods.InterpretedMethod;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.libraries.FiberLibrary.Fiber;
 import org.jruby.parser.BlockStaticScope;
 import org.jruby.parser.LocalStaticScope;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.JavaNameMangler;
 
 public final class ThreadContext {
     public static ThreadContext newContext(Ruby runtime) {
@@ -72,7 +72,6 @@ public final class ThreadContext {
     
     /** The number of calls after which to do a thread event poll */
     private final static int CALL_POLL_COUNT = 0xFFF;
-    private final static String UNKNOWN_NAME = "(unknown)";
 
     // runtime, nil, and runtimeCache cached here for speed of access from any thread
     public final Ruby runtime;
@@ -97,12 +96,6 @@ public final class ThreadContext {
     private Backtrace[] backtrace = new Backtrace[1000];
     private int backtraceIndex = -1;
 
-    public static class Stack<T> extends ArrayList<T> {
-        public T pop() {return remove(size() - 1);}
-        public void push(T t) {add(t);}
-        public T peek() {return get(size() - 1);}
-        public T peek2() {return get(size() - 2);}
-    }
     public static class Backtrace {
         public Backtrace() {
         }
@@ -765,13 +758,7 @@ public final class ThreadContext {
      * @return an Array with the backtrace
      */
     public IRubyObject createCallerBacktrace(Ruby runtime, int level) {
-        Backtrace[] copy = new Backtrace[backtraceIndex + 1];
-        System.arraycopy(backtrace, 0, copy, 0, backtraceIndex + 1);
-        RubyStackTraceElement[] trace = gatherHybridBacktrace(
-                runtime,
-                copy,
-                Thread.currentThread().getStackTrace(),
-                false);
+        RubyStackTraceElement[] trace = gatherCallerBacktrace(level);
 
         // scrub out .java core class names and replace with Ruby equivalents
         OUTER: for (int i = 0; i < trace.length; i++) {
@@ -807,6 +794,18 @@ public final class ThreadContext {
         }
         
         return backtrace;
+    }
+    
+    public RubyStackTraceElement[] gatherCallerBacktrace(int level) {
+        Backtrace[] copy = new Backtrace[backtraceIndex + 1];
+        System.arraycopy(backtrace, 0, copy, 0, backtraceIndex + 1);
+        RubyStackTraceElement[] trace = gatherHybridBacktrace(
+                runtime,
+                copy,
+                Thread.currentThread().getStackTrace(),
+                false);
+
+        return trace;
     }
     
     /**
@@ -1025,9 +1024,11 @@ public final class ThreadContext {
                 String className = element.getClassName();
 
                 // FIXME: Formalize jitted method structure so this isn't quite as hacky
-                int rubyJitIndex = className.indexOf("ruby.jit.");
-                if (rubyJitIndex == 0) {
+                if (className.startsWith("ruby.jit.")) {
+                    // pull out and demangle the method name
                     methodName = className.substring("ruby.jit.".length(), className.lastIndexOf("_"));
+                    methodName = JavaNameMangler.demangleMethodName(methodName);
+                    
                     trace.add(new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false));
 
                     // if it's a synthetic call, use it but gobble up parent calls
@@ -1038,8 +1039,8 @@ public final class ThreadContext {
                             i++;
                             element = stackTrace[i];
                         }
-                        continue;
                     }
+                    continue;
                 }
 
                 // AOT formatted method names, need to be cleaned up
@@ -1057,8 +1058,8 @@ public final class ThreadContext {
                             i++;
                             element = stackTrace[i];
                         }
-                        continue;
                     }
+                    continue;
                 }
 
                 trace.add(new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false));
