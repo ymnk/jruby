@@ -1,16 +1,16 @@
 package org.jruby.compiler.ir.dataflow.analyses;
 
-import org.jruby.compiler.ir.IR_Closure;
-import org.jruby.compiler.ir.IR_ExecutionScope;
+import org.jruby.compiler.ir.IRClosure;
+import org.jruby.compiler.ir.IRExecutionScope;
 import org.jruby.compiler.ir.Operation;
 import org.jruby.compiler.ir.dataflow.DataFlowProblem;
 import org.jruby.compiler.ir.dataflow.DataFlowConstants;
 import org.jruby.compiler.ir.dataflow.FlowGraphNode;
-import org.jruby.compiler.ir.instructions.IR_Instr;
-import org.jruby.compiler.ir.instructions.CallInstruction;
-import org.jruby.compiler.ir.instructions.ALLOC_FRAME_Instr;
-import org.jruby.compiler.ir.instructions.STORE_TO_FRAME_Instr;
-import org.jruby.compiler.ir.instructions.CLOSURE_RETURN_Instr;
+import org.jruby.compiler.ir.instructions.Instr;
+import org.jruby.compiler.ir.instructions.CallInstr;
+import org.jruby.compiler.ir.instructions.AllocateFrameInstr;
+import org.jruby.compiler.ir.instructions.StoreToFrameInstr;
+import org.jruby.compiler.ir.instructions.ClosureReturnInstr;
 import org.jruby.compiler.ir.operands.Operand;
 import org.jruby.compiler.ir.operands.MetaObject;
 import org.jruby.compiler.ir.operands.Variable;
@@ -21,7 +21,6 @@ import org.jruby.compiler.ir.representations.CFG.CFG_Edge;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.ListIterator;
-import org.jruby.compiler.ir.operands.SelfVariable;
 import org.jruby.compiler.ir.operands.LocalVariable;
 
 public class FrameStorePlacementNode extends FlowGraphNode {
@@ -37,7 +36,7 @@ public class FrameStorePlacementNode extends FlowGraphNode {
 
         // For closure scopes, the heap frame will already have been allocated in the parent scope
         // So, don't even bother with the frame allocation in closures!
-        if (_prob.getCFG().getScope() instanceof IR_Closure) {
+        if (_prob.getCFG().getScope() instanceof IRClosure) {
             _inFrameAllocated = _outFrameAllocated = true;
         } else {
             _inFrameAllocated = _outFrameAllocated = false;
@@ -46,16 +45,16 @@ public class FrameStorePlacementNode extends FlowGraphNode {
 
     // Only ruby local variables are candidates for frame stores.  Ignore the rest!
     // SSS FIXME: What about self?
-    public void buildDataFlowVars(IR_Instr i) {
+    public void buildDataFlowVars(Instr i) {
         FrameStorePlacementProblem fsp = (FrameStorePlacementProblem) _prob;
         for (Variable v : i.getUsedVariables()) {
-            if ((v instanceof LocalVariable) || (v instanceof SelfVariable))
+            if (v instanceof LocalVariable)
                 fsp.recordUsedVar(v);
         }
 
         Variable v = i.getResult();
 
-        if ((v != null) && ((v instanceof LocalVariable) || (v instanceof SelfVariable))) fsp.recordDefVar(v);
+        if ((v != null) && (v instanceof LocalVariable)) fsp.recordDefVar(v);
     }
 
     public void initSolnForNode() {
@@ -76,18 +75,18 @@ public class FrameStorePlacementNode extends FlowGraphNode {
         FrameStorePlacementProblem fsp = (FrameStorePlacementProblem) _prob;
         Set<Variable> dirtyVars = new HashSet<Variable>(_inDirtyVars);
 
-        for (IR_Instr i : _bb.getInstrs()) {
-            if (i._op == Operation.FRAME_LOAD) continue;
+        for (Instr i : _bb.getInstrs()) {
+            if (i.operation == Operation.FRAME_LOAD) continue;
 
             // Process calls specially -- these are the sites of frame stores!
-            if (i instanceof CallInstruction) {
-                CallInstruction call = (CallInstruction) i;
+            if (i instanceof CallInstr) {
+                CallInstr call = (CallInstr) i;
                 Operand o = call.getClosureArg();
                 if ((o != null) && (o instanceof MetaObject)) {
                     // At this call site, a frame will get allocated if it has not been already!
                     frameAllocated = true;
 
-                    IR_Closure cl = (IR_Closure) ((MetaObject) o)._scope;
+                    IRClosure cl = (IRClosure) ((MetaObject) o).scope;
                     CFG cl_cfg = cl.getCFG();
                     FrameStorePlacementProblem cl_fsp = new FrameStorePlacementProblem();
                     cl_fsp.setup(cl_cfg);
@@ -118,8 +117,8 @@ public class FrameStorePlacementNode extends FlowGraphNode {
 
             Variable v = i.getResult();
 
-            if ((v != null) && ((v instanceof LocalVariable) || (v instanceof SelfVariable))) dirtyVars.add(v);
-            if (i._op.isReturn()) dirtyVars.clear();
+            if ((v != null) && (v instanceof LocalVariable)) dirtyVars.add(v);
+            if (i.operation.isReturn()) dirtyVars.clear();
         }
 
         // At the end of the scope, there are no more dirty vars!
@@ -142,26 +141,26 @@ public class FrameStorePlacementNode extends FlowGraphNode {
 
     public void addStoreAndFrameAllocInstructions() {
         FrameStorePlacementProblem fsp = (FrameStorePlacementProblem) _prob;
-        IR_ExecutionScope s = fsp.getCFG().getScope();
-        ListIterator<IR_Instr> instrs = _bb.getInstrs().listIterator();
+        IRExecutionScope s = fsp.getCFG().getScope();
+        ListIterator<Instr> instrs = _bb.getInstrs().listIterator();
         Set<Variable> dirtyVars = new HashSet<Variable>(_inDirtyVars);
         boolean frameAllocated = _inFrameAllocated;
 
         while (instrs.hasNext()) {
-            IR_Instr i = instrs.next();
-            if (i._op == Operation.FRAME_LOAD) continue;
+            Instr i = instrs.next();
+            if (i.operation == Operation.FRAME_LOAD) continue;
 
-            if (i instanceof CallInstruction) {
-                CallInstruction call = (CallInstruction) i;
+            if (i instanceof CallInstr) {
+                CallInstr call = (CallInstr) i;
                 Operand o = call.getClosureArg();
                 if ((o != null) && (o instanceof MetaObject)) {
-                    CFG cl_cfg = ((IR_Closure) ((MetaObject) o)._scope).getCFG();
+                    CFG cl_cfg = ((IRClosure) ((MetaObject) o).scope).getCFG();
                     FrameStorePlacementProblem cl_fsp = (FrameStorePlacementProblem) cl_cfg.getDataFlowSolution(fsp.getName());
 
                     // Add a frame allocation instruction, if necessary
                     instrs.previous();
                     if (!frameAllocated) {
-                        instrs.add(new ALLOC_FRAME_Instr(s));
+                        instrs.add(new AllocateFrameInstr(s));
                         frameAllocated = true;
                     }
 
@@ -175,7 +174,7 @@ public class FrameStorePlacementNode extends FlowGraphNode {
                     for (Variable v : dirtyVars) {
                         if (spillAllVars || cl_fsp.scopeUsesVariable(v)) {
                             // FIXME: This may not need check for local variable if it is guaranteed to only be local variables.
-                            instrs.add(new STORE_TO_FRAME_Instr(s, v.getName(), v));
+                            instrs.add(new StoreToFrameInstr(s, v.getName(), v));
                             newDirtyVars.remove(v);
                         } // These variables will be spilt inside the closure -- so they will no longer be dirty after the call site!
                         else if (cl_fsp.scopeDefinesVariable(v)) {
@@ -191,16 +190,16 @@ public class FrameStorePlacementNode extends FlowGraphNode {
                 else if (call.requiresFrame()) {
                     instrs.previous();
                     if (!frameAllocated) {
-                        instrs.add(new ALLOC_FRAME_Instr(s));
+                        instrs.add(new AllocateFrameInstr(s));
                         frameAllocated = true;
                     }
                     for (Variable v : dirtyVars) {
-                        instrs.add(new STORE_TO_FRAME_Instr(s, v.getName(), v));
+                        instrs.add(new StoreToFrameInstr(s, v.getName(), v));
                     }
                     instrs.next();
                     dirtyVars.clear();
                 }
-            } else if (i instanceof CLOSURE_RETURN_Instr) {
+            } else if (i instanceof ClosureReturnInstr) {
                 // At closure return instructions (which are closure exits), for all variables which are:
                 //
                 //   (a) dirty,
@@ -216,14 +215,14 @@ public class FrameStorePlacementNode extends FlowGraphNode {
 
                 instrs.previous();
                 for (Variable v : dirtyVars) {
-                    instrs.add(new STORE_TO_FRAME_Instr(s, v.getName(), v));
+                    instrs.add(new StoreToFrameInstr(s, v.getName(), v));
                 }
                 instrs.next();
             }
 
             Variable v = i.getResult();
             
-            if ((v != null) && ((v instanceof LocalVariable) || (v instanceof SelfVariable))) dirtyVars.add(v);
+            if ((v != null) && (v instanceof LocalVariable)) dirtyVars.add(v);
         }
     }
 

@@ -12,22 +12,22 @@ import java.util.Stack;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyObject;
 import org.jruby.compiler.ir.CompilerTarget;
-import org.jruby.compiler.ir.IR_Class;
+import org.jruby.compiler.ir.IRClass;
 import org.jruby.compiler.ir.IRMethod;
-import org.jruby.compiler.ir.IR_Scope;
-import org.jruby.compiler.ir.IR_Script;
-import org.jruby.compiler.ir.instructions.BEQ_Instr;
-import org.jruby.compiler.ir.instructions.CallInstruction;
-import org.jruby.compiler.ir.instructions.COPY_Instr;
-import org.jruby.compiler.ir.instructions.DEFINE_CLASS_METHOD_Instr;
-import org.jruby.compiler.ir.instructions.DEFINE_INSTANCE_METHOD_Instr;
-import org.jruby.compiler.ir.instructions.GET_FIELD_Instr;
-import org.jruby.compiler.ir.instructions.IR_Instr;
-import org.jruby.compiler.ir.instructions.JUMP_Instr;
+import org.jruby.compiler.ir.IRScope;
+import org.jruby.compiler.ir.IRScript;
+import org.jruby.compiler.ir.instructions.BEQInstr;
+import org.jruby.compiler.ir.instructions.CallInstr;
+import org.jruby.compiler.ir.instructions.CopyInstr;
+import org.jruby.compiler.ir.instructions.DefineClassMethodInstr;
+import org.jruby.compiler.ir.instructions.DefineInstanceMethodInstr;
+import org.jruby.compiler.ir.instructions.GetFieldInstr;
+import org.jruby.compiler.ir.instructions.Instr;
+import org.jruby.compiler.ir.instructions.JumpInstr;
 import org.jruby.compiler.ir.instructions.LABEL_Instr;
-import org.jruby.compiler.ir.instructions.PUT_FIELD_Instr;
+import org.jruby.compiler.ir.instructions.PutFieldInstr;
 import org.jruby.compiler.ir.instructions.ReceiveArgumentInstruction;
-import org.jruby.compiler.ir.instructions.RETURN_Instr;
+import org.jruby.compiler.ir.instructions.ReturnInstr;
 import org.jruby.compiler.ir.operands.FieldRef;
 import org.jruby.compiler.ir.operands.Fixnum;
 import org.jruby.compiler.ir.operands.Label;
@@ -50,7 +50,7 @@ public class JVM implements CompilerTarget {
     
     Stack<ClassData> clsStack = new Stack();
     List<ClassData> clsAccum = new ArrayList();
-    IR_Script script;
+    IRScript script;
 
     private static class ClassData {
         public ClassData(ClassVisitor cls) {
@@ -143,25 +143,25 @@ public class JVM implements CompilerTarget {
         clsData().popmethod();
     }
 
-    public void codegen(IR_Scope scope) {
-        if (scope instanceof IR_Script) {
-            codegen((IR_Script)scope);
+    public void codegen(IRScope scope) {
+        if (scope instanceof IRScript) {
+            codegen((IRScript)scope);
         }
     }
 
-    public void codegen(IR_Script script) {
+    public void codegen(IRScript script) {
         this.script = script;
         emit(script.getRootClass());
     }
 
-    public void emit(IR_Class cls) {
+    public void emit(IRClass cls) {
         pushclass();
         cls().visit(RubyInstanceConfig.JAVA_VERSION, ACC_PUBLIC + ACC_SUPER, cls.getName(), null, p(RubyObject.class), null);
         cls().visitSource(script.getFileName().toString(), null);
 
         // root-level logic
         pushmethod("__class__");
-        for (IR_Instr instr: cls.getInstrs()) {
+        for (Instr instr: cls.getInstrs()) {
             emit(instr);
         }
         popmethod();
@@ -172,7 +172,7 @@ public class JVM implements CompilerTarget {
         }
 
         // root-level classes
-        for (IR_Class cls2 : cls.classes) {
+        for (IRClass cls2 : cls.classes) {
             emit(cls2);
         }
 
@@ -183,43 +183,43 @@ public class JVM implements CompilerTarget {
     public void emit(IRMethod method) {
         pushmethod(method.getName());
 
-        for (IR_Instr instr: method.getInstrs()) {
+        for (Instr instr: method.getInstrs()) {
             emit(instr);
         }
         
         popmethod();
     }
 
-    public void emit(IR_Instr instr) {
-        switch (instr._op) {
+    public void emit(Instr instr) {
+        switch (instr.operation) {
         case BEQ:
-            emitBEQ((BEQ_Instr)instr); break;
+            emitBEQ((BEQInstr)instr); break;
         case CALL:
-            emitCALL((CallInstruction) instr); break;
+            emitCALL((CallInstr) instr); break;
         case COPY:
-            emitCOPY((COPY_Instr)instr); break;
+            emitCOPY((CopyInstr)instr); break;
         case DEF_INST_METH:
-            emitDEF_INST_METH((DEFINE_INSTANCE_METHOD_Instr)instr); break;
+            emitDEF_INST_METH((DefineInstanceMethodInstr)instr); break;
         case JUMP:
-            emitJUMP((JUMP_Instr)instr); break;
+            emitJUMP((JumpInstr)instr); break;
         case LABEL:
             emitLABEL((LABEL_Instr)instr); break;
         case PUT_FIELD:
-            emitPUT_FIELD((PUT_FIELD_Instr)instr); break;
+            emitPUT_FIELD((PutFieldInstr)instr); break;
         case GET_FIELD:
-            emitGET_FIELD((GET_FIELD_Instr)instr); break;
+            emitGET_FIELD((GetFieldInstr)instr); break;
         case RECV_ARG:
             emitRECV_ARG((ReceiveArgumentInstruction)instr); break;
         case RETURN:
-            emitRETURN((RETURN_Instr) instr); break;
+            emitRETURN((ReturnInstr) instr); break;
         default:
-            System.err.println("unsupported: " + instr._op);
+            System.err.println("unsupported: " + instr.operation);
         }
     }
 
     public void emit(Constant constant) {
         if (constant instanceof Fixnum) {
-            method().push(((Fixnum)constant)._value);
+            method().push(((Fixnum)constant).value);
         }
     }
 
@@ -236,28 +236,29 @@ public class JVM implements CompilerTarget {
         method().loadLocal(index);
     }
 
-    public void emitBEQ(BEQ_Instr beq) {
+    public void emitBEQ(BEQInstr beq) {
         Operand[] args = beq.getOperands();
         emit(args[0]);
         emit(args[1]);
         method().ifCmp(Type.getType(Object.class), EQ, getLabel(beq.getJumpTarget()));
     }
 
-    public void emitCOPY(COPY_Instr copy) {
-        int index = getVariableIndex(copy._result);
+    public void emitCOPY(CopyInstr copy) {
+        int index = getVariableIndex(copy.result);
         emit(copy.getOperands()[0]);
         method().storeLocal(index);
     }
 
-    public void emitCALL(CallInstruction call) {
+    public void emitCALL(CallInstr call) {
+        emit(call.getReceiver());
         for (Operand operand : call.getCallArgs()) {
             emit(operand);
         }
         method().invokeVirtual(Type.getType(Object.class), Method.getMethod("Object " + call.getMethodAddr() + " ()"));
     }
 
-    public void emitDEF_INST_METH(DEFINE_INSTANCE_METHOD_Instr instr) {
-        IRMethod irMethod = instr._method;
+    public void emitDEF_INST_METH(DefineInstanceMethodInstr instr) {
+        IRMethod irMethod = instr.method;
         GeneratorAdapter adapter = new GeneratorAdapter(ACC_PUBLIC, Method.getMethod("void " + irMethod.getName() + " ()"), null, null, cls());
         adapter.loadThis();
         adapter.loadArgs();
@@ -266,43 +267,43 @@ public class JVM implements CompilerTarget {
         adapter.endMethod();
     }
 
-    public void emitDEF_CLS_METH(DEFINE_CLASS_METHOD_Instr instr) {
-        IRMethod irMethod = instr._method;
+    public void emitDEF_CLS_METH(DefineClassMethodInstr instr) {
+        IRMethod irMethod = instr.method;
         GeneratorAdapter adapter = new GeneratorAdapter(ACC_PUBLIC | ACC_STATIC, Method.getMethod("void " + irMethod.getName() + " ()"), null, null, cls());
         adapter.returnValue();
         adapter.endMethod();
     }
 
-    public void emitJUMP(JUMP_Instr jump) {
-        method().goTo(getLabel(jump._target));
+    public void emitJUMP(JumpInstr jump) {
+        method().goTo(getLabel(jump.target));
     }
 
     public void emitLABEL(LABEL_Instr lbl) {
         method().mark(getLabel(lbl._lbl));
     }
 
-    public void emitPUT_FIELD(PUT_FIELD_Instr putField) {
-        String field = ((FieldRef)putField.getOperands()[1])._refName;
+    public void emitPUT_FIELD(PutFieldInstr putField) {
+        String field = ((FieldRef)putField.getOperands()[1]).getName();
         declareField(field);
         emit(putField.getOperands()[0]);
         emit(putField.getOperands()[2]);
         method().putField(Type.getType(Object.class), field, Type.getType(Object.class));
     }
 
-    public void emitGET_FIELD(GET_FIELD_Instr putField) {
-        String field = ((FieldRef)putField.getOperands()[1])._refName;
+    public void emitGET_FIELD(GetFieldInstr putField) {
+        String field = ((FieldRef)putField.getOperands()[1]).getName();
         declareField(field);
         emit(putField.getOperands()[0]);
         method().getField(Type.getType(Object.class), field, Type.getType(Object.class));
     }
 
-    public void emitRETURN(RETURN_Instr ret) {
+    public void emitRETURN(ReturnInstr ret) {
         emit(ret.getOperands()[0]);
         method().returnValue();
     }
 
     public void emitRECV_ARG(ReceiveArgumentInstruction recvArg) {
-        int index = getVariableIndex(recvArg._result);
+        int index = getVariableIndex(recvArg.result);
         // TODO: need to get this back into the method signature...now is too late...
     }
 

@@ -455,7 +455,7 @@ public final class ThreadContext {
         }
     }
     
-    private void pushFrame() {
+    public void pushFrame() {
         int index = ++this.frameIndex;
         Frame[] stack = frameStack;
         if (index + 1 == stack.length) {
@@ -463,7 +463,7 @@ public final class ThreadContext {
         }
     }
     
-    private void popFrame() {
+    public void popFrame() {
         Frame frame = frameStack[frameIndex--];
         
         frame.clear();
@@ -662,7 +662,6 @@ public final class ThreadContext {
         // FIXME: this seems like a good assertion, but it breaks compiled code and the code seems
         // to run without it...
         //assert currentModule != null : "Can't push null RubyClass";
-        
         int index = ++parentIndex;
         RubyModule[] stack = parentStack;
         stack[index] = currentModule;

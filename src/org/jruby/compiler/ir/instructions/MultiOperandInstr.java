@@ -11,12 +11,12 @@ import org.jruby.compiler.ir.representations.InlinerInfo;
 // This is of the form:
 //   v = OP(args, attribute_array); Ex: v = CALL(args, v2)
 
-public abstract class MultiOperandInstr extends IR_Instr {
+public abstract class MultiOperandInstr extends Instr {
     public Operand[] _args;
 
     public MultiOperandInstr(Operation opType, Variable result, Operand[] args) {
         super(opType, result);
-        
+
         _args = args;
     }
 
@@ -41,6 +41,6 @@ public abstract class MultiOperandInstr extends IR_Instr {
             newArgs[i] = _args[i].cloneForInlining(ii);
         }
 
-		  return newArgs;
+        return newArgs;
     }
 }

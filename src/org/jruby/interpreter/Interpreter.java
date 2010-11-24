@@ -5,29 +5,48 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Date;
 import org.jruby.Ruby;
+import org.jruby.RubyModule;
 import org.jruby.ast.Node;
-import org.jruby.compiler.ir.IR_Builder;
+import org.jruby.ast.RootNode;
+import org.jruby.compiler.ir.IRBuilder;
 import org.jruby.compiler.ir.IRMethod;
-import org.jruby.compiler.ir.IR_Scope;
-import org.jruby.compiler.ir.IR_Script;
+import org.jruby.compiler.ir.IRScope;
+import org.jruby.compiler.ir.IRScript;
 import org.jruby.compiler.ir.compiler_pass.AddFrameInstructions;
 import org.jruby.compiler.ir.compiler_pass.CFG_Builder;
-import org.jruby.compiler.ir.compiler_pass.DominatorTreeBuilder;
 import org.jruby.compiler.ir.compiler_pass.IR_Printer;
 import org.jruby.compiler.ir.compiler_pass.LiveVariableAnalysis;
 import org.jruby.compiler.ir.compiler_pass.opts.DeadCodeElimination;
 import org.jruby.compiler.ir.compiler_pass.opts.LocalOptimizationPass;
-import org.jruby.compiler.ir.instructions.BRANCH_Instr;
-import org.jruby.compiler.ir.instructions.CallInstruction;
-import org.jruby.compiler.ir.instructions.IR_Instr;
-import org.jruby.compiler.ir.instructions.JUMP_Instr;
+import org.jruby.compiler.ir.instructions.BranchInstr;
+import org.jruby.compiler.ir.instructions.CallInstr;
+import org.jruby.compiler.ir.instructions.DefineClassMethodInstr;
+import org.jruby.compiler.ir.instructions.DefineInstanceMethodInstr;
+import org.jruby.compiler.ir.instructions.Instr;
+import org.jruby.compiler.ir.instructions.JumpInstr;
+import org.jruby.compiler.ir.operands.Label;
 import org.jruby.compiler.ir.operands.Operand;
 import org.jruby.compiler.ir.representations.BasicBlock;
 import org.jruby.compiler.ir.representations.CFG;
+import org.jruby.internal.runtime.methods.InterpretedIRMethod;
+import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 
 
 public class Interpreter {
+    public static IRubyObject interpret(Ruby runtime, Node rootNode, IRubyObject self) {
+        IRScope scope = new IRBuilder().buildRoot((RootNode) rootNode);
+
+        scope.runCompilerPass(new LocalOptimizationPass());
+        scope.runCompilerPass(new CFG_Builder());
+        scope.runCompilerPass(new LiveVariableAnalysis());
+        scope.runCompilerPass(new DeadCodeElimination());
+        scope.runCompilerPass(new AddFrameInstructions());
+
+        return Interpreter.interpretTop(runtime, scope, self);
+    }
+
     public static void main(String[] args) {
         Ruby runtime = Ruby.getGlobalRuntime();
         boolean isDebug = args.length > 0 && args[0].equals("-debug");
@@ -38,7 +57,7 @@ public class Interpreter {
             long t1 = new Date().getTime();
             Node ast = buildAST(runtime, isCommandLineScript, args[i]);
             long t2 = new Date().getTime();
-            IR_Scope scope = new IR_Builder().buildRoot(ast);
+            IRScope scope = new IRBuilder().buildRoot((RootNode) ast);
             long t3 = new Date().getTime();
             if (isDebug) {
                 System.out.println("## Before local optimization pass");
@@ -52,8 +71,6 @@ public class Interpreter {
             }
             scope.runCompilerPass(new CFG_Builder());
             long t5 = new Date().getTime();
-            scope.runCompilerPass(new DominatorTreeBuilder());
-            long t6 = new Date().getTime();
             if (isDebug) System.out.println("## After dead code elimination");
             scope.runCompilerPass(new LiveVariableAnalysis());
             long t7 = new Date().getTime();
@@ -62,17 +79,17 @@ public class Interpreter {
             scope.runCompilerPass(new AddFrameInstructions());
             long t9 = new Date().getTime();
             if (isDebug) scope.runCompilerPass(new IR_Printer());
-            interpretTop(runtime, scope);
+            Interpreter.interpretTop(runtime, scope, runtime.getTopSelf());
             long t10 = new Date().getTime();
 
             System.out.println("Time to build AST         : " + (t2 - t1));
             System.out.println("Time to build IR          : " + (t3 - t2));
             System.out.println("Time to run local opts    : " + (t4 - t3));
             System.out.println("Time to run build cfg     : " + (t5 - t4));
-            System.out.println("Time to run build domtree : " + (t6 - t5));
-            System.out.println("Time to run lva           : " + (t7 - t6));
+            System.out.println("Time to run lva           : " + (t7 - t5));
             System.out.println("Time to run dead code elim: " + (t8 - t7));
             System.out.println("Time to add frame instrs  : " + (t9 - t8));
+            System.out.println("Time to interpret         : " + (t10 - t9));
             i++;
         }
     }
@@ -90,16 +107,47 @@ public class Interpreter {
         }
     }
 
-    public static void interpretTop(Ruby runtime, IR_Scope scope) {
+    private static int interpInstrsCount = 0;
+
+    public static IRubyObject interpretTop(Ruby runtime, IRScope scope, IRubyObject self) {
+        assert scope instanceof IRScript : "Must be an IRScript scope at Top!!!";
+
+        IRScript root = (IRScript) scope;
+
+        // We get the live object ball rolling here.  This give a valid value for the top
+        // of this lexical tree.  All new scope can then retrieve and set based on lexical
+        // parent.
+        if (root.getStaticScope().getModule() == null) { // If an eval this may already be setup.
+            root.getStaticScope().setModule(runtime.getObject());
+        }
+
+        IRMethod rootMethod = root.getRootClass().getRootMethod();
+        RubyModule metaclass = self.getMetaClass();
+
+        InterpretedIRMethod method = new InterpretedIRMethod(rootMethod, metaclass);
+
+        IRubyObject rv =  method.call(runtime.getCurrentContext(), self, metaclass, "", new IRubyObject[]{});
+        System.out.println("-- Interpreted " + interpInstrsCount + " instructions");
+        return rv;
+    }
+
+/*
+    public void interpretTop(IR_Scope scope) {
+        IRubyObject self = runtime.getTopSelf();
+
         if (scope instanceof IR_Script) {
-            interpretMethod(runtime, ((IR_Script) scope).getRootClass().getRootMethod());
+            interpretMethod(self, ((IR_Script) scope).getRootClass().getRootMethod());
         } else {
             System.out.println("BONED");
         }
     }
 
-    public static void interpretMethod(Ruby runtime, IRMethod method) {
-        System.out.print(method.toString() + "(");
+    public void interpretMethod(IRubyObject self, IRMethod method) {
+        if (method == null) {
+            System.out.println("Interpreting null method?");
+            return;
+        }
+        System.out.print(method + "(");
 
         Operand operands[] = method.getCallArgs();
         for (int i = 0; i < operands.length; i++) {
@@ -118,32 +166,41 @@ public class Interpreter {
         // Construct primitive array as simple store for temporary variables in method and pass along
 
         CFG cfg = method.getCFG();
- //       BasicBlock basicBlock = cfg.getEntryBB();
+
         for (BasicBlock basicBlock : cfg.getNodes()) {
-            for (IR_Instr i : basicBlock.getInstrs()) {
+            System.out.println("NEW BB");
+            for (Instr i : basicBlock.getInstrs()) {
                 // .. interpret i ..
-                if (i instanceof BRANCH_Instr) {
+                if (i instanceof BranchInstr) {
                     System.out.println("In branch");
-                    BRANCH_Instr branch = (BRANCH_Instr) i;
+                    BranchInstr branch = (BranchInstr) i;
                     boolean taken = false; // .. the interpreter will tell you whether the branch was taken or not ...
                     if (taken) {
                         basicBlock = cfg.getTargetBB(branch.getJumpTarget());
                     } else {
                         basicBlock = cfg.getFallThroughBB(basicBlock);
                     }
-                } else if (i instanceof JUMP_Instr) {
+                } else if (i instanceof JumpInstr) {
                     System.out.println("In jump");
-                    JUMP_Instr jump = (JUMP_Instr) i;
+                    JumpInstr jump = (JumpInstr) i;
                     basicBlock = cfg.getTargetBB(jump.getJumpTarget());
-                } else if (i instanceof CallInstruction) {
-                    CallInstruction callInstruction = (CallInstruction) i;
+                } else if (i instanceof CallInstr) {
+                    CallInstr callInstruction = (CallInstr) i;
 
                     System.out.println("Call: " + callInstruction);
 
                     // Does not need to be recursive...except for scope handling
-                    interpretMethod(runtime, callInstruction.getTargetMethod());
+                    interpretMethod(self, callInstruction.getTargetMethod());
+                } else if (i instanceof DefineClassMethodInstr) {
+                    if (((DefineClassMethodInstr) i).method.getCFG() != cfg) {
+                        System.out.println("def class method");
+//                        createClassMethod(self, (DefineClassMethodInstr) i);
+                    }
+                } else if (i instanceof DefineInstanceMethodInstr) {
+                    System.out.println("def instance method");
+//                    createInstanceMethod(self, (DefineInstanceMethodInstr) i);
                 } else {
-                    System.out.println("NOT HANDLING: " + i);
+                    System.out.println("NOT HANDLING: " + i + ", (" + i.getClass() + ")");
                 }
                 //... handle returns ..
             }
@@ -154,8 +211,30 @@ public class Interpreter {
             }
         }
     }
+*/
 
-    public static void interpret() {
+    public static IRubyObject interpret(ThreadContext context, CFG cfg, InterpreterContext interp) {
+        try {
+            BasicBlock basicBlock = cfg.getEntryBB();
+            while (basicBlock != null) {
+                Label jumpTarget = null;
+                for (Instr instruction : basicBlock.getInstrs()) {
+                    System.out.println("EXEC'ing: " + instruction);
+                    interpInstrsCount++;
+                    jumpTarget = instruction.interpret(interp, (IRubyObject) interp.getSelf());
+                }
 
+                // Explicit jump or implicit fall-through to next bb
+                basicBlock = (jumpTarget == null) ? cfg.getFallThroughBB(basicBlock) : cfg.getTargetBB(jumpTarget);
+            }
+
+            return (IRubyObject) interp.getReturnValue();
+        } finally {
+            if (interp.getFrame() != null) {
+                context.popFrame();
+                interp.setFrame(null);
+            }
+            context.postMethodScopeOnly();
+        }
     }
 }

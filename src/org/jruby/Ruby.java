@@ -125,16 +125,15 @@ import com.kenai.constantine.ConstantSet;
 import com.kenai.constantine.platform.Errno;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicLong;
+import org.jruby.RubyInstanceConfig.CompileMode;
 import org.jruby.ast.RootNode;
 import org.jruby.ast.executable.RuntimeCache;
 import org.jruby.evaluator.ASTInterpreter;
 import org.jruby.exceptions.Unrescuable;
 import org.jruby.internal.runtime.methods.DynamicMethod;
+import org.jruby.interpreter.Interpreter;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.management.BeanManager;
 import org.jruby.management.BeanManagerFactory;
@@ -716,17 +715,23 @@ public final class Ruby {
             return (IRubyObject) rj.getValue();
         }
     }
-    
-    public IRubyObject runInterpreter(Node scriptNode) {
-        ThreadContext context = getCurrentContext();
-        
-        assert scriptNode != null : "scriptNode is not null";
-        
+
+    public IRubyObject runInterpreter(ThreadContext context, Node rootNode, IRubyObject self) {
+        assert rootNode != null : "scriptNode is not null";
+
         try {
-            return ASTInterpreter.INTERPRET_ROOT(this, context, scriptNode, getTopSelf(), Block.NULL_BLOCK);
+            if (getInstanceConfig().getCompileMode() == CompileMode.OFFIR) {
+                return Interpreter.interpret(this, rootNode, self);
+            } else {
+                return ASTInterpreter.INTERPRET_ROOT(this, context, rootNode, getTopSelf(), Block.NULL_BLOCK);
+            }
         } catch (JumpException.ReturnJump rj) {
             return (IRubyObject) rj.getValue();
         }
+    }
+    
+    public IRubyObject runInterpreter(Node scriptNode) {
+        return runInterpreter(getCurrentContext(), scriptNode, getTopSelf());
     }
 
     /**
@@ -734,21 +739,10 @@ public final class Ruby {
      * already-prepared, already-pushed scope for the script body.
      */
     public IRubyObject runInterpreterBody(Node scriptNode) {
-        ThreadContext context = getCurrentContext();
-
         assert scriptNode != null : "scriptNode is not null";
         assert scriptNode instanceof RootNode : "scriptNode is not a RootNode";
 
-        try {
-            return ASTInterpreter.INTERPRET_ROOT(
-                    this,
-                    context,
-                    ((RootNode)scriptNode).getBodyNode(),
-                    getTopSelf(),
-                    Block.NULL_BLOCK);
-        } catch (JumpException.ReturnJump rj) {
-            return (IRubyObject) rj.getValue();
-        }
+        return runInterpreter(((RootNode) scriptNode).getBodyNode());
     }
 
     public Parser getParser() {
@@ -2585,8 +2579,7 @@ public final class Ruby {
             context.setFile(scriptName);
             context.preNodeEval(objectClass, self, scriptName);
 
-            Node node = parseFile(in, scriptName, null);
-            ASTInterpreter.INTERPRET_ROOT(this, context, node, self, Block.NULL_BLOCK);
+            runInterpreter(context, parseFile(in, scriptName, null), self);
         } catch (JumpException.ReturnJump rj) {
             return;
         } finally {
@@ -2865,7 +2858,11 @@ public final class Ruby {
                 for (Iterator<Finalizable> finalIter = new ArrayList<Finalizable>(finalizers.keySet()).iterator(); finalIter.hasNext();) {
                     Finalizable f = finalIter.next();
                     if (f != null) {
-                        f.finalize();
+                        try {
+                            f.finalize();
+                        } catch (Throwable t) {
+                            // ignore
+                        }
                     }
                     finalIter.remove();
                 }
@@ -2878,7 +2875,11 @@ public final class Ruby {
                         internalFinalizers.keySet()).iterator(); finalIter.hasNext();) {
                     Finalizable f = finalIter.next();
                     if (f != null) {
-                        f.finalize();
+                        try {
+                            f.finalize();
+                        } catch (Throwable t) {
+                            // ignore
+                        }
                     }
                     finalIter.remove();
                 }

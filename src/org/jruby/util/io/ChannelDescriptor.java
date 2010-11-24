@@ -117,12 +117,6 @@ public class ChannelDescriptor {
      * tell if a channel is "really" seekable.
      */
     private boolean canBeSeekable = true;
-
-    /**
-     * In order to avoid closing the JVM's stdio streams, we set a flag here to
-     * indicate that this ChannelDescriptor instance wraps one of those streams.
-     */
-    private final boolean stdio;
     
     /**
      * Construct a new ChannelDescriptor with the specified channel, file number,
@@ -144,11 +138,6 @@ public class ChannelDescriptor {
         this.originalModes = originalModes;
         this.fileDescriptor = fileDescriptor;
         this.canBeSeekable = canBeSeekable;
-        this.stdio = (
-                fileDescriptor == FileDescriptor.in ||
-                fileDescriptor == FileDescriptor.out ||
-                fileDescriptor == FileDescriptor.err
-                );
 
         registerDescriptor(this);
     }
@@ -794,6 +783,12 @@ public class ChannelDescriptor {
      * @throws java.io.IOException if there is an exception during IO
      */
     public void close() throws BadDescriptorException, IOException {
+        // tidy up
+        finish(true);
+
+    }
+
+    void finish(boolean close) throws BadDescriptorException, IOException {
         synchronized (refCounter) {
             // if refcount is at or below zero, we're no longer valid
             if (refCounter.get() <= 0) {
@@ -811,11 +806,9 @@ public class ChannelDescriptor {
             if (DEBUG) getLogger("ChannelDescriptor").info("Descriptor for fileno " + internalFileno + " refs: " + count);
 
             if (count <= 0) {
+                // if we're the last referrer, close the channel
                 try {
-                    // we should never close JVM's in, out, or err here
-                    if (!stdio) {
-                        channel.close();
-                    }
+                    if (close) channel.close();
                 } finally {
                     unregisterDescriptor(internalFileno);
                 }
