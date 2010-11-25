@@ -1016,6 +1016,38 @@ public class Java implements Library {
     public static IRubyObject wrap(Ruby runtime, IRubyObject java_object) {
         return getInstance(runtime, ((JavaObject) java_object).getValue());
     }
+    
+    /**
+     * High-level object conversion utility function 'java_to_primitive' is the low-level version
+     */
+    @Deprecated
+    @JRubyMethod(frame = true, module = true, visibility = PRIVATE)
+    public static IRubyObject java_to_ruby(IRubyObject recv, IRubyObject object, Block unusedBlock) {
+        try {
+            return JavaUtil.java_to_ruby(recv.getRuntime(), object);
+        } catch (RuntimeException e) {
+            recv.getRuntime().getJavaSupport().handleNativeException(e, null);
+            // This point is only reached if there was an exception handler installed.
+            return recv.getRuntime().getNil();
+        }
+    }
+
+    // TODO: Formalize conversion mechanisms between Java and Ruby
+    /**
+     * High-level object conversion utility.
+     */
+    @Deprecated
+    @JRubyMethod(frame = true, module = true, visibility = PRIVATE)
+    public static IRubyObject ruby_to_java(final IRubyObject recv, IRubyObject object, Block unusedBlock) {
+        return JavaUtil.ruby_to_java(recv, object, unusedBlock);
+    }
+
+    @Deprecated
+    @JRubyMethod(frame = true, module = true, visibility = PRIVATE)
+    public static IRubyObject java_to_primitive(IRubyObject recv, IRubyObject object, Block unusedBlock) {
+        return JavaUtil.java_to_primitive(recv, object, unusedBlock);
+    }
+
 
     // TODO: Formalize conversion mechanisms between Java and Ruby
     @JRubyMethod(required = 2, frame = true, module = true, visibility = PRIVATE)
