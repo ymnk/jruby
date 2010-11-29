@@ -1112,6 +1112,10 @@ public class RubyKernel {
             }
         }
 
+        // set method to current frame's, which should be caller's
+        String frameName = context.getFrameName();
+        if (frameName != null) binding.setMethod(frameName);
+
         if (bindingGiven) recv = binding.getSelf();
 
         return ASTInterpreter.evalWithBinding(context, recv, src, binding);
