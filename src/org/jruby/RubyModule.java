@@ -1437,6 +1437,7 @@ public class RubyModule extends RubyObject {
         Block block = proc.getBlock();
         block.getBinding().getFrame().setKlazz(this);
         block.getBinding().getFrame().setName(name);
+        block.getBinding().setMethod(name);
         
         StaticScope scope = block.getBody().getStaticScope();
 

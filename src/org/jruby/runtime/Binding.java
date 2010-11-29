@@ -158,6 +158,10 @@ public class Binding {
         return backtrace.method;
     }
 
+    public void setMethod(String method) {
+        backtrace.method = method;
+    }
+
     public boolean equals(Object other) {
         if(this == other) {
             return true;
