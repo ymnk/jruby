@@ -1733,10 +1733,13 @@ public class RubyKernel {
         }
     }
 
-    @JRubyMethod(name = { "__method__", "__callee__" }, module = true, visibility = PRIVATE, omit = true)
+    @JRubyMethod(name = { "__method__", "__callee__" }, module = true, visibility = PRIVATE, reads = METHODNAME, omit = true)
     public static IRubyObject __method__(ThreadContext context, IRubyObject recv) {
-        ThreadContext.RubyStackTraceElement[] trace = context.gatherCallerBacktrace(1);
-        return context.runtime.newSymbol(trace[0].getMethodName());
+        String frameName = context.getFrameName();
+        if (frameName == null) {
+            return context.nil;
+        }
+        return context.runtime.newSymbol(frameName);
     }
 
     @JRubyMethod(module = true, compat = RUBY1_9)

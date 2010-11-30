@@ -1046,10 +1046,12 @@ public final class ThreadContext {
                 int RUBYindex = methodName.indexOf("$RUBY$");
                 if (RUBYindex >= 0) {
                     methodName = methodName.substring(RUBYindex + "$RUBY$".length());
+
                     // if it's a synthetic call, use it but gobble up parent calls
                     // TODO: need to formalize this better
                     if (methodName.startsWith("SYNTHETIC")) {
                         methodName = methodName.substring("SYNTHETIC".length());
+                        methodName = JavaNameMangler.demangleMethodName(methodName);
                         trace.add(new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false));
 
                         // gobble up at least one parent, and keep going if there's more synthetic frames
@@ -1057,12 +1059,13 @@ public final class ThreadContext {
                             i++;
                             element = stackTrace[i];
                         }
+                        continue;
                     }
+
+                    methodName = JavaNameMangler.demangleMethodName(methodName);
+                    trace.add(new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false));
                     continue;
                 }
-
-                trace.add(new RubyStackTraceElement(className, methodName, element.getFileName(), element.getLineNumber(), false));
-                continue;
             }
 
             String dotClassMethod = element.getClassName() + "." + element.getMethodName();
