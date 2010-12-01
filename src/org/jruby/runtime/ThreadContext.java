@@ -1016,7 +1016,8 @@ public final class ThreadContext {
                     (element.getFileName().endsWith(".rb") ||
                     element.getFileName().equals("-e") ||
                     // FIXME: Formalize jitted method structure so this isn't quite as hacky
-                    element.getClassName().startsWith("ruby.jit."))) {
+                    element.getClassName().startsWith("ruby.jit.") ||
+                    element.getMethodName().contains("$RUBY$"))) {
                 if (element.getLineNumber() == -1) continue;
                 
                 String methodName = element.getMethodName();

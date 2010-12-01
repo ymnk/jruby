@@ -77,6 +77,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
     public static final String THREADCONTEXT = p(ThreadContext.class);
     public static final String RUBY = p(Ruby.class);
     public static final String IRUBYOBJECT = p(IRubyObject.class);
+    public static final boolean VERIFY_CLASSFILES = false;
 
     public static String getStaticMethodSignature(String classname, int args) {
         switch (args) {
@@ -232,7 +233,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
                     descriptor.getFile(),
                     descriptor.getLine());
 
-            CheckClassAdapter.verify(new ClassReader(invokerBytes), false, new PrintWriter(System.err));
+            if (VERIFY_CLASSFILES) CheckClassAdapter.verify(new ClassReader(invokerBytes), false, new PrintWriter(System.err));
 
             writeClassFile(destination, invokerBytes, descriptor.getInvokerName());
         }
@@ -244,7 +245,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
                     descriptor.getFile(),
                     descriptor.getLine());
 
-            CheckClassAdapter.verify(new ClassReader(callbackBytes), false, new PrintWriter(System.err));
+            if (VERIFY_CLASSFILES) CheckClassAdapter.verify(new ClassReader(callbackBytes), false, new PrintWriter(System.err));
 
             writeClassFile(destination, callbackBytes, descriptor.getCallbackName());
         }
@@ -256,7 +257,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
                     descriptor.getFile(),
                     descriptor.getLine());
 
-            CheckClassAdapter.verify(new ClassReader(callbackBytes), false, new PrintWriter(System.err));
+            if (VERIFY_CLASSFILES) CheckClassAdapter.verify(new ClassReader(callbackBytes), false, new PrintWriter(System.err));
 
             writeClassFile(destination, callbackBytes, descriptor.getCallbackName());
         }
@@ -265,7 +266,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
     private void writeClass(String classname, File destination, ClassWriter writer) throws IOException {
         // verify the class
         byte[] bytecode = writer.toByteArray();
-        CheckClassAdapter.verify(new ClassReader(bytecode), false, new PrintWriter(System.err));
+        if (VERIFY_CLASSFILES) CheckClassAdapter.verify(new ClassReader(bytecode), false, new PrintWriter(System.err));
 
         writeClassFile(destination, bytecode, classname);
     }
