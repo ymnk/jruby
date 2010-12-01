@@ -1018,8 +1018,8 @@ public final class ThreadContext {
                     // FIXME: Formalize jitted method structure so this isn't quite as hacky
                     element.getClassName().startsWith("ruby.jit."))) {
                 if (element.getLineNumber() == -1) continue;
+                
                 String methodName = element.getMethodName();
-
                 String className = element.getClassName();
 
                 // FIXME: Formalize jitted method structure so this isn't quite as hacky

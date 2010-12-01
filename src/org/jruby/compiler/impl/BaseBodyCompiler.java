@@ -980,7 +980,11 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
             boolean hasMultipleArgsHead,
             NodeType argsNodeId,
             ASTInspector inspector) {
-        String closureMethodName = "block_" + script.getAndIncrementInnerIndex() + "$RUBY$" + "__block__";
+        String blockInMethod = JavaNameMangler.mangleMethodName(rubyName);
+        if (rubyName == null || rubyName.length() == 0) {
+            blockInMethod = "__block__";
+        }
+        String closureMethodName = "block_" + script.getAndIncrementInnerIndex() + "$RUBY$" + blockInMethod;
 
         ChildScopedBodyCompiler closureCompiler = new ChildScopedBodyCompiler(script, closureMethodName, rubyName, inspector, scope);
 
@@ -1012,7 +1016,11 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
             boolean hasMultipleArgsHead,
             NodeType argsNodeId,
             ASTInspector inspector) {
-        String closureMethodName = "block_" + script.getAndIncrementInnerIndex() + "$RUBY$" + "__block__";
+        String blockInMethod = JavaNameMangler.mangleMethodName(rubyName);
+        if (rubyName == null || rubyName.length() == 0) {
+            blockInMethod = "__block__";
+        }
+        String closureMethodName = "block_" + script.getAndIncrementInnerIndex() + "$RUBY$" + blockInMethod;
 
         ChildScopedBodyCompiler19 closureCompiler = new ChildScopedBodyCompiler19(script, closureMethodName, rubyName, inspector, scope);
 
