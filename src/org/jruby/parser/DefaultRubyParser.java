@@ -278,6 +278,7 @@ public class DefaultRubyParser implements RubyParser {
   public static final int tFLOAT = 379;
   public static final int tREGEXP_END = 380;
   public static final int tLOWEST = 381;
+  public static final int tSP = 9999;
   public static final int yyErrorCode = 256;
 
   /** number of final state.

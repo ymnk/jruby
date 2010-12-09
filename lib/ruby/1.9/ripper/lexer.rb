@@ -39,7 +39,48 @@ class Ripper
     Lexer.new(src, filename, lineno).lex
   end
 
+  def parse
+    lexer = JRUBY_LEXER.new(false, true)
+    lexer.encoding = org.jcodings.specific.UTF8Encoding::INSTANCE
+    lexer.parser_support = org.jruby.parser.ParserSupport19.new
+    lexer.source = org.jruby.lexer.yacc.ByteArrayLexerSource.new(
+      @filename, @src.to_java_bytes, @src.split("\n"), @lineno, false)
+
+    while lexer.advance
+      if KEYWORDS[lexer.token]
+        send "on_kw", lexer.value.value.to_s
+      else
+        send "on_#{TOKENS[lexer.token]}", lexer.value.value.to_s
+      end
+    end
+  end
+
+  def column
+    0
+  end
+
+  # normalize some tokens
+  def on_integer(token)
+    on_int(token)
+  end
+
+  def on_assoc(token)
+    on_label(token)
+  end
+
+  def on_rcurly(token)
+    on_rbrace(token)
+  end
+
   class Lexer < ::Ripper   #:nodoc: internal use only
+    def initialize(src, filename, lineno)
+      @src = src
+      @filename = filename
+      @lineno = lineno
+    end
+
+    attr_accessor :src, :filename, :lineno
+    
     def tokenize
       lex().map {|pos, event, tok| tok }
     end

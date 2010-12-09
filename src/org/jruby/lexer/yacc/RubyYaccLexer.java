@@ -259,6 +259,8 @@ public class RubyYaccLexer {
     private int parenNest = 0;
     // 1.9 only
     private int leftParenBegin = 0;
+    // Ripper only
+    private boolean spaceTokens = false;
 
     public int incrementParenNest() {
         parenNest++;
@@ -281,6 +283,15 @@ public class RubyYaccLexer {
     public RubyYaccLexer(boolean isOneEight) {
     	reset();
         this.isOneEight = isOneEight;
+    }
+
+    /**
+     * Constructor for Ripper, which wants space tokens
+     */
+    public RubyYaccLexer(boolean isOneEight, boolean spaceTokens) {
+    	reset();
+        this.isOneEight = isOneEight;
+        this.spaceTokens = spaceTokens;
     }
     
     public final void reset() {
@@ -958,6 +969,11 @@ public class RubyYaccLexer {
             case ' ': case '\t': case '\f': case '\r':
             case '\13': /* '\v' */
                 getPosition();
+                if (spaceTokens && !spaceSeen) {
+                    // TODO: consume whitespace, return as a single string
+                    yaccValue = new Token(" ",getPosition());
+                    return Tokens.tSP;
+                }
                 spaceSeen = true;
                 continue;
             case '#':		/* it's a comment */
