@@ -39,6 +39,7 @@ import java.util.regex.Pattern;
 import org.jruby.CompatVersion;
 
 import org.jruby.Ruby;
+import org.jruby.RubyGlobal;
 import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.anno.JRubyMethod;
@@ -258,7 +259,7 @@ public class RbConfigLibrary implements Library {
     private static void setupMakefileConfig(RubyModule configModule, RubyHash mkmfHash) {
         Ruby ruby = configModule.getRuntime();
 
-        RubyHash envHash = (RubyHash) ruby.getObject().fastFetchConstant("ENV".intern());
+        RubyHash envHash = RubyGlobal.getEnvHash(ruby);
         String cc = getRubyEnv(envHash, "CC", "cc");
         String cpp = getRubyEnv(envHash, "CPP", "cc -E");
         String cxx = getRubyEnv(envHash, "CXX", "c++");

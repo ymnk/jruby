@@ -1726,7 +1726,7 @@ public final class Ruby {
     public RubyClass getHash() {
         return hashClass;
     }
-    void setHash(RubyClass hashClass) {
+    public void setHash(RubyClass hashClass) {
         this.hashClass = hashClass;
     }
 
@@ -3866,6 +3866,14 @@ public final class Ruby {
         return booting;
     }
 
+    public boolean isRubinius() {
+        return rubinius;
+    }
+
+    public void setRubinius(boolean rubinius) {
+        this.rubinius = rubinius;
+    }
+
     private volatile int constantGeneration = 1;
     private final ThreadService threadService;
     
@@ -4085,4 +4093,7 @@ public final class Ruby {
     private boolean fixnumReopened, floatReopened;
     
     private volatile boolean booting = true;
+
+    // If the Rubinius module is loaded, and we should be more "dynamic"
+    private boolean rubinius = false;
 }

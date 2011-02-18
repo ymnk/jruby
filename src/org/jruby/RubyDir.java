@@ -721,7 +721,7 @@ public class RubyDir extends RubyObject {
     public static RubyString getHomeDirectoryPath(ThreadContext context) {
         Ruby runtime = context.getRuntime();
         RubyHash systemHash = (RubyHash) runtime.getObject().fastGetConstant("ENV_JAVA");
-        RubyHash envHash = (RubyHash) runtime.getObject().fastGetConstant("ENV");
+        RubyHash envHash = RubyGlobal.getEnvHash(runtime);
         IRubyObject home = envHash.op_aref(context, runtime.newString("HOME"));
 
         if (home == null || home.isNil()) {

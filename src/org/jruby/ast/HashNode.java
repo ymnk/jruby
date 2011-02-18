@@ -79,23 +79,34 @@ public class HashNode extends Node {
     
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
-        RubyHash hash = RubyHash.newHash(runtime);
-        
+        RubyHash hash = null;
+        IRubyObject h;
+        boolean isRubinius = runtime.isRubinius();
+        if (isRubinius) {
+            h = runtime.getHash().callMethod(context, "new");
+        } else {
+            h = hash = RubyHash.newHash(runtime);
+        }
+
         ListNode list = this.listNode;
         if (list != null) {
             int size = list.size();
-   
+
             for (int i = 0; i < size;) {
                 // insert all nodes in sequence, hash them in the final instruction
                 // KEY
                 IRubyObject key = list.get(i++).interpret(runtime, context, self, aBlock);
                 IRubyObject value = list.get(i++).interpret(runtime, context, self, aBlock);
-   
-                aset(runtime, hash, key, value);
+
+                if (isRubinius) {
+                    h.callMethod(context, "[]=", key, value);
+                } else {
+                    aset(runtime, hash, key, value);
+                }
             }
         }
       
-        return hash;
+        return h;
     }
     
     protected void aset(Ruby runtime, RubyHash hash, IRubyObject key, IRubyObject value) {

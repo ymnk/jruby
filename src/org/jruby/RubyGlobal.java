@@ -698,6 +698,12 @@ public class RubyGlobal {
         }
     }
 
+    public static RubyHash getEnvHash(Ruby runtime) {
+        IRubyObject maybeEnv = runtime.getObject().fastFetchConstant("ENV".intern());
+        if (!(maybeEnv instanceof RubyHash)) maybeEnv = (IRubyObject)maybeEnv.getInternalVariables().getInternalVariable("env");
+        return (RubyHash) maybeEnv;
+    }
+
     private static class LoadPath extends ReadonlyGlobalVariable {
         public LoadPath(Ruby runtime, String name) {
             super(runtime, name, null);

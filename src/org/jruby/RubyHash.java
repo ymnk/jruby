@@ -203,7 +203,7 @@ public class RubyHash extends RubyObject implements Map {
      *
      */
     public static final RubyHash newHash(Ruby runtime) {
-        return new RubyHash(runtime);
+        return (RubyHash)runtime.getHash().callMethod(runtime.getCurrentContext(), "new");
     }
 
     /** rb_hash_new
