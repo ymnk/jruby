@@ -108,7 +108,7 @@ public class RubiniusLibrary implements Library {
     }
 
     public static class RubiniusRuby {
-        @JRubyMethod(singleton = true)
+        @JRubyMethod(meta = true)
         public static void check_frozen(ThreadContext context, IRubyObject self) {
             IRubyObject obj = context.getFrameSelf();
             if (obj.isFrozen()) {
@@ -125,7 +125,7 @@ public class RubiniusLibrary implements Library {
     }
 
     public static class RubiniusType {
-        @JRubyMethod(singleton = true, name = "obj_kind_of?")
+        @JRubyMethod(meta = true, name = "obj_kind_of?")
         public static IRubyObject obj_kind_of_p(ThreadContext context, IRubyObject self, IRubyObject obj, IRubyObject cls) {
             return context.runtime.newBoolean(((RubyModule)cls).isInstance(obj));
         }
