@@ -99,7 +99,7 @@ public class HashNode extends Node {
                 IRubyObject value = list.get(i++).interpret(runtime, context, self, aBlock);
 
                 if (isRubinius) {
-                    h.callMethod(context, "[]=", key, value);
+                    h.callMethod(context, "[]=", new IRubyObject[] {key, value});
                 } else {
                     aset(runtime, hash, key, value);
                 }
