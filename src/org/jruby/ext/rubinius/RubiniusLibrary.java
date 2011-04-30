@@ -125,7 +125,7 @@ public class RubiniusLibrary implements Library {
     }
 
     public static class RubiniusType {
-        @JRubyMethod(meta = true, name = "obj_kind_of?")
+        @JRubyMethod(meta = true, name = "object_kind_of?")
         public static IRubyObject obj_kind_of_p(ThreadContext context, IRubyObject self, IRubyObject obj, IRubyObject cls) {
             return context.runtime.newBoolean(((RubyModule)cls).isInstance(obj));
         }

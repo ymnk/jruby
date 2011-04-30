@@ -43,9 +43,13 @@ public class RubyTuple extends RubyObject {
     private IRubyObject[] ary;
 
     public RubyTuple(Ruby runtime, RubyClass metaclass, int size) {
-        super(runtime, metaclass);
-        this.ary = new IRubyObject[size];
+        this(runtime, metaclass, new IRubyObject[size]);
         RuntimeHelpers.fillNil(ary, runtime);
+    }
+
+    public RubyTuple(Ruby runtime, RubyClass metaclass, IRubyObject[] ary) {
+        super(runtime, metaclass);
+        this.ary = ary;
     }
 
     public static void createTupleClass(Ruby runtime) {
@@ -75,5 +79,10 @@ public class RubyTuple extends RubyObject {
             ary = ArraysUtil.copyOf(ary, ary.length * 3 / 2 + 1);
         }
         return ary[index] = val;
+    }
+    
+    @Override
+    public IRubyObject dup() {
+        return new RubyTuple(getRuntime(), metaClass, ary);
     }
 }
