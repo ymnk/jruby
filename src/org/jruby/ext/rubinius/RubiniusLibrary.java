@@ -86,6 +86,7 @@ public class RubiniusLibrary implements Library {
         runtime.getObject().deleteConstant("Hash");
         runtime.getLoadService().lockAndRequire(rbxHome + "/common/hash.rb");
         RubyClass hash = (RubyClass)runtime.getClass("Hash");
+        hash.defineAnnotatedMethods(RubiniusHash.class);
         runtime.setHash(hash);
 
         // LookupTable is just Hash for now
@@ -133,6 +134,15 @@ public class RubiniusLibrary implements Library {
         @JRubyMethod(meta = true, name = "object_kind_of?")
         public static IRubyObject obj_kind_of_p(ThreadContext context, IRubyObject self, IRubyObject obj, IRubyObject cls) {
             return context.runtime.newBoolean(((RubyModule)cls).isInstance(obj));
+        }
+    }
+    
+    public static class RubiniusHash {
+        @JRubyMethod(meta = true)
+        public static IRubyObject allocate(ThreadContext context, IRubyObject self) {
+            RubyHash hash = new RubyHash(context.runtime, (RubyClass)self);
+            hash.callMethod(context, "__setup__");
+            return hash;
         }
     }
 
