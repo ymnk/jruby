@@ -105,6 +105,11 @@ public class RubiniusLibrary implements Library {
         // More Rubinius core additions
         runtime.getThread().module_eval(context, runtime.newString(DETECT_RECURSION), Block.NULL_BLOCK);
         runtime.getKernel().defineAnnotatedMethods(RubiniusKernel.class);
+        
+		// Channel class; we require bootstrap, overwrite it, and then require common
+        runtime.getLoadService().lockAndRequire(rbxHome + "/bootstrap/channel.rb");
+        RubiniusChannel.createChannelClass(runtime);
+        runtime.getLoadService().lockAndRequire(rbxHome + "/common/channel.rb");
     }
 
     public static class RubiniusRuby {
