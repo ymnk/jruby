@@ -110,6 +110,7 @@ import org.jruby.compiler.ir.instructions.BNEInstr;
 import org.jruby.compiler.ir.instructions.BREAK_Instr;
 import org.jruby.compiler.ir.instructions.CallInstr;
 import org.jruby.compiler.ir.instructions.CaseInstr;
+import org.jruby.compiler.ir.instructions.ClassOf;
 import org.jruby.compiler.ir.instructions.ClosureReturnInstr;
 import org.jruby.compiler.ir.instructions.CopyInstr;
 import org.jruby.compiler.ir.instructions.DECLARE_LOCAL_TYPE_Instr;
@@ -985,20 +986,41 @@ public class IRBuilder {
 
     public Operand buildClassVar(ClassVarNode node, IRScope s) {
         Variable ret = s.getNewTemporaryVariable();
-        s.addInstr(new GetClassVariableInstr(ret, MetaObject.create(s).getNearestClass(), node.getName()));
+        Variable classFor = containingClassVariableFor(s);
+        s.addInstr(new GetClassVariableInstr(ret, classFor, node.getName()));
         return ret;
     }
 
     // SSS FIXME: Where is this set up?  How is this diff from ClassVarDeclNode??
     public Operand buildClassVarAsgn(final ClassVarAsgnNode classVarAsgnNode, IRScope s) {
         Operand val = build(classVarAsgnNode.getValueNode(), s);
-        s.addInstr(new PutClassVariableInstr(MetaObject.create(s).getNearestClass(), classVarAsgnNode.getName(), val));
+        Variable classFor = containingClassVariableFor(s);
+        s.addInstr(new PutClassVariableInstr(classFor, classVarAsgnNode.getName(), val));
         return val;
+    }
+    
+    /**
+     * We commonly have cases where we need either self or self's class.
+     * This method determines this based on whether we are in an instance
+     * variable scope or any other scope.  Note that for closures we just
+     * walk out until we find a method (class/modules scopes have a special
+     * method type so we are guaranteed to find it.
+     */
+    public Variable containingClassVariableFor(IRScope s) {
+        IRMethod containingMethod = s.getNearestMethod();
+
+        if (!containingMethod.isInstanceMethod) return getSelf(s); // %self
+        
+        Variable tmp = s.getNewTemporaryVariable();
+        s.addInstr(new ClassOf(tmp, getSelf(s)));   // %v_x = class_of %self
+
+        return tmp;
     }
 
     public Operand buildClassVarDecl(final ClassVarDeclNode classVarDeclNode, IRScope s) {
         Operand val = build(classVarDeclNode.getValueNode(), s);
-        s.addInstr(new PutClassVariableInstr(MetaObject.create(s).getNearestClass(), classVarDeclNode.getName(), val));
+        Variable classFor = containingClassVariableFor(s);        
+        s.addInstr(new PutClassVariableInstr(classFor, classVarDeclNode.getName(), val));
         return val;
     }
 
@@ -1026,7 +1048,7 @@ public class IRBuilder {
 
     private Operand searchConst(IRScope s, String name) {
         Variable v = s.getNewTemporaryVariable();
-        s.addInstr(new SearchConstInstr(v, s, name));
+        s.addInstr(new SearchConstInstr(v, MetaObject.create(s), name));
         return v;
     }
 
@@ -1060,8 +1082,8 @@ public class IRBuilder {
 
     public Operand buildColon3(Colon3Node node, IRScope s) {
         Variable cv = s.getNewTemporaryVariable();
-        // SSS FIXME: Is this correct?
-        s.addInstr(new SearchConstInstr(cv, getSelf(s), node.getName()));
+        MetaObject object = MetaObject.create(IRClass.getCoreClass("Object"));
+        s.addInstr(new SearchConstInstr(cv, object, node.getName()));
         return cv;
     }
 
@@ -1421,7 +1443,7 @@ public class IRBuilder {
                          *    1. r  = receiver
                          *    2. mc = r.metaClass
                          *    3. v  = mc.getVisibility(methodName)
-                         *    4. f  = v.isPrivate? || (v.isProtected? && receiver/self?.kindof(mc.getRealClass)
+                         *    4. f  = !v || v.isPrivate? || (v.isProtected? && receiver/self?.kindof(mc.getRealClass)
                          *    5. return f ? nil : --check args definition and return "method" or nil--
                          *
                          * Hide the complexity of instrs 2-4 into a verifyMethodIsPublicAccessible call
@@ -1486,8 +1508,8 @@ public class IRBuilder {
                          *    1. r  = receiver
                          *    2. mc = r.metaClass
                          *    3. v  = mc.getVisibility(methodName)
-                         *    4. f  = v.isPrivate? || (v.isProtected? && receiver/self?.kindof(mc.getRealClass))
-                         *    5. return f && mc.methodBound(attrmethod) ? buildGetArgumentDefn(..) : false
+                         *    4. f  = !v || v.isPrivate? || (v.isProtected? && receiver/self?.kindof(mc.getRealClass))
+                         *    5. return !f && mc.methodBound(attrmethod) ? buildGetArgumentDefn(..) : false
                          *
                          * Hide the complexity of instrs 2-4 into a verifyMethodIsPublicAccessible call
                          * which can executely entirely in Java-land.  No reason to expose the guts in IR.
@@ -2183,8 +2205,12 @@ public class IRBuilder {
         if (cpath instanceof Colon2Node) {
             Node leftNode = ((Colon2Node) cpath).getLeftNode();
             
-            if (leftNode != null) container = build(leftNode, s);
-        } else {
+            if (leftNode != null) { // Foo::Bar
+                container = build(leftNode, s);
+            } else { // Only name with no left-side Bar <- Note no :: on left
+                container = MetaObject.create(s);
+            }
+        } else { //::Bar
             container = MetaObject.create(IRClass.getCoreClass("Object"));
         }
 

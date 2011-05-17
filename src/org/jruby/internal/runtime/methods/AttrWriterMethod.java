@@ -1,5 +1,5 @@
 /*
- ***** BEGIN LICENSE BLOCK *****
+ **** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -12,10 +12,7 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
- * Copyright (C) 2001-2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
- * Copyright (C) 2001-2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
- * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
- * Copyright (C) 2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
+ * Copyright (C) 2011 Charles O Nutter <headius@headius.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -29,58 +26,39 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.ast;
+package org.jruby.internal.runtime.methods;
 
-import java.util.List;
-
-import org.jruby.Ruby;
-import org.jruby.ast.types.INameNode;
-import org.jruby.ast.visitor.NodeVisitor;
-import org.jruby.evaluator.ASTInterpreter;
-import org.jruby.lexer.yacc.ISourcePosition;
-import org.jruby.runtime.Block;
+import org.jruby.RubyClass;
+import org.jruby.RubyModule;
+import org.jruby.internal.runtime.methods.JavaMethod.JavaMethodOne;
 import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.ByteList;
 
 /**
- * Represents 'self' keyword
+ * A method type for attribute writers (as created by attr_writer or attr_accessor).
  */
-public class SelfNode extends Node implements INameNode {
-    public SelfNode(ISourcePosition position) {
-        super(position);
+public class AttrWriterMethod extends JavaMethodOne {
+    private final String variableName;
+    private RubyClass.VariableAccessor accessor = RubyClass.VariableAccessor.DUMMY_ACCESSOR;
+
+    public AttrWriterMethod(RubyModule implementationClass, Visibility visibility, CallConfiguration callConfig, String variableName) {
+        super(implementationClass, visibility, callConfig);
+        this.variableName = variableName;
     }
 
-    public NodeType getNodeType() {
-        return NodeType.SELFNODE;
+    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg1) {
+        verifyAccessor(self.getMetaClass().getRealClass()).set(self, arg1);
+        return arg1;
     }
 
-    /**
-     * Accept for the visitor pattern.
-     * @param iVisitor the visitor
-     **/
-    public Object accept(NodeVisitor iVisitor) {
-        return iVisitor.visitSelfNode(this);
+    private RubyClass.VariableAccessor verifyAccessor(RubyClass cls) {
+        RubyClass.VariableAccessor localAccessor = accessor;
+        if (localAccessor.getClassId() != cls.id) {
+            localAccessor = cls.getVariableAccessorForWrite(variableName);
+            accessor = localAccessor;
+        }
+        return localAccessor;
     }
     
-    /**
-     * Get name of self node.
-     */
-    public String getName() {
-        return "self";
-    }
-    
-    public List<Node> childNodes() {
-        return EMPTY_LIST;
-    }
-    
-    @Override
-    public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
-        return ASTInterpreter.pollAndReturn(context, self);
-    }
-    
-    @Override
-    public ByteList definition(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
-        return SELF_BYTELIST;
-    }
 }

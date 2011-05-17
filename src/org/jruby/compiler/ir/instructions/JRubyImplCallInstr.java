@@ -10,6 +10,7 @@ import org.jruby.compiler.ir.Operation;
 import org.jruby.compiler.ir.operands.BooleanLiteral;
 import org.jruby.compiler.ir.operands.Label;
 import org.jruby.compiler.ir.operands.MethAddr;
+import org.jruby.compiler.ir.operands.Nil;
 import org.jruby.compiler.ir.operands.Operand;
 import org.jruby.compiler.ir.operands.StringLiteral;
 import org.jruby.compiler.ir.operands.Variable;
@@ -19,6 +20,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
+import org.jruby.util.ByteList;
 
 public class JRubyImplCallInstr extends CallInstr {
     public enum JRubyImplementationMethod {
@@ -145,7 +147,8 @@ public class JRubyImplCallInstr extends CallInstr {
             {
                 IRubyObject v = (IRubyObject)getCallArgs()[0].retrieve(interp);
                 name = ((StringLiteral)getCallArgs()[1])._str_value;
-                rVal = (new StringLiteral(RuntimeHelpers.getDefinedConstantOrBoundMethod(v, name))).retrieve(interp);
+					 ByteList definedType = RuntimeHelpers.getDefinedConstantOrBoundMethod(v, name);
+                rVal = (definedType == null ? Nil.NIL : (new StringLiteral(definedType))).retrieve(interp);
                 break;
             }
             case BLOCK_GIVEN:
@@ -217,7 +220,7 @@ public class JRubyImplCallInstr extends CallInstr {
                 RubyClass   mc  = r.getMetaClass();
                 String      arg = ((StringLiteral)getCallArgs()[0])._str_value;
                 Visibility  v   = mc.searchMethod(arg).getVisibility();
-                rVal = rt.newBoolean(v.isPrivate() || (v.isProtected() && mc.getRealClass().isInstance(r)));
+                rVal = rt.newBoolean((v != null) && !v.isPrivate() && !(v.isProtected() && mc.getRealClass().isInstance(r)));
                 break;
             }
             case CLASS_VAR_DEFINED:
