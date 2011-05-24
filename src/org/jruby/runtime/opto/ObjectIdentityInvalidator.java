@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -10,8 +11,6 @@
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *
- * Copyright (C) 2002-2011 JRuby Community
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -25,30 +24,21 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.embed.osgi.internal;
+package org.jruby.runtime.opto;
 
-import org.jruby.runtime.load.LoadService.LoadSearcher;
-import org.jruby.runtime.load.LoadService.SearchState;
-
-/**
- * @author hmalphettes
- * 
- * TODO: something nice with this?
- */
-public class OSGiBundlesSearcher implements LoadSearcher {
-
-    /* (non-Javadoc)
-     * @see org.jruby.runtime.load.LoadService.LoadSearcher#shouldTrySearch(org.jruby.runtime.load.LoadService.SearchState)
-     */
-    public boolean shouldTrySearch(SearchState state) {
-        return false;
+public class ObjectIdentityInvalidator implements Invalidator {
+    private volatile Object generation;
+    
+    public ObjectIdentityInvalidator() {
+        generation = new Object();
+    }
+    
+    public synchronized void invalidate() {
+        generation = new Object();
     }
 
-    /* (non-Javadoc)
-     * @see org.jruby.runtime.load.LoadService.LoadSearcher#trySearch(org.jruby.runtime.load.LoadService.SearchState)
-     */
-    public boolean trySearch(SearchState state) {
-        return true;
+    public Object getData() {
+        return generation;
     }
-
+    
 }

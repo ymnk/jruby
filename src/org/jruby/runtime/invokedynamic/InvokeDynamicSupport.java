@@ -5,7 +5,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.MutableCallSite;
-import java.util.Arrays;
+import java.lang.invoke.SwitchPoint;
 import java.util.Comparator;
 import org.jruby.RubyBasicObject;
 import org.jruby.RubyClass;
@@ -31,8 +31,9 @@ import org.objectweb.asm.Opcodes;
 
 @SuppressWarnings("deprecation")
 public class InvokeDynamicSupport {
-    private static final int MAX_FAIL_COUNT = SafePropertyAccessor.getInt("jruby.compile.invokedynamic.maxfail", 2);
+    private static final int MAX_FAIL_COUNT = SafePropertyAccessor.getInt("jruby.invokedynamic.maxfail", 2);
     private static final boolean LOG_INDY_BINDINGS = SafePropertyAccessor.getBoolean("jruby.invokedynamic.log.binding");
+    private static final boolean LOG_INDY_CONSTANTS = SafePropertyAccessor.getBoolean("jruby.invokedynamic.log.constants");
     
     public static class JRubyCallSite extends MutableCallSite {
         private final CallType callType;
@@ -48,6 +49,19 @@ public class InvokeDynamicSupport {
 
         public CallType callType() {
             return callType;
+        }
+    }
+    
+    public static class RubyConstantCallSite extends MutableCallSite {
+        private final String name;
+
+        public RubyConstantCallSite(MethodType type, String name) {
+            super(type);
+            this.name = name;
+        }
+        
+        public String name() {
+            return name;
         }
     }
 
@@ -69,12 +83,59 @@ public class InvokeDynamicSupport {
         site.setTarget(myFallback);
         return site;
     }
+
+    public static CallSite getConstantBootstrap(MethodHandles.Lookup lookup, String name, MethodType type) throws NoSuchMethodException, IllegalAccessException {
+        RubyConstantCallSite site;
+
+        site = new RubyConstantCallSite(type, name);
+        
+        MethodType fallbackType = type.insertParameterTypes(0, RubyConstantCallSite.class);
+        MethodHandle myFallback = MethodHandles.insertArguments(
+                lookup.findStatic(InvokeDynamicSupport.class, "constantFallback",
+                fallbackType),
+                0,
+                site);
+        site.setTarget(myFallback);
+        return site;
+    }
+
+    public static IRubyObject constantFallback(RubyConstantCallSite site, 
+            ThreadContext context) {
+        IRubyObject value = context.getConstant(site.name());
+        
+        if (value != null) {
+            if (LOG_INDY_CONSTANTS) System.out.println("binding constant " + site.name() + " with invokedynamic");
+            
+            MethodHandle valueHandle = MethodHandles.constant(IRubyObject.class, value);
+            valueHandle = MethodHandles.dropArguments(valueHandle, 0, ThreadContext.class);
+
+            MethodHandle fallback = MethodHandles.insertArguments(
+                    findStatic(InvokeDynamicSupport.class, "constantFallback",
+                    MethodType.methodType(IRubyObject.class, RubyConstantCallSite.class, ThreadContext.class)),
+                    0,
+                    site);
+
+            SwitchPoint switchPoint = (SwitchPoint)context.runtime.getConstantInvalidator().getData();
+            MethodHandle gwt = switchPoint.guardWithTest(valueHandle, fallback);
+            site.setTarget(gwt);
+        } else {
+            value = context.getCurrentScope().getStaticScope().getModule()
+                    .callMethod(context, "const_missing", context.getRuntime().fastNewSymbol(site.name()));
+        }
+        
+        return value;
+    }
     
     public final static MethodType BOOTSTRAP_SIGNATURE      = MethodType.methodType(CallSite.class, MethodHandles.Lookup.class, String.class, MethodType.class);
     public final static String     BOOTSTRAP_SIGNATURE_DESC = sig(CallSite.class, MethodHandles.Lookup.class, String.class, MethodType.class);
+    public final static String     GETCONSTANT_SIGNATURE_DESC = sig(CallSite.class, MethodHandles.Lookup.class, String.class, MethodType.class);
     
     public static org.objectweb.asm.MethodHandle bootstrapHandle() {
         return new org.objectweb.asm.MethodHandle(Opcodes.MH_INVOKESTATIC, p(InvokeDynamicSupport.class), "bootstrap", BOOTSTRAP_SIGNATURE_DESC);
+    }
+    
+    public static org.objectweb.asm.MethodHandle getConstantHandle() {
+        return new org.objectweb.asm.MethodHandle(Opcodes.MH_INVOKESTATIC, p(InvokeDynamicSupport.class), "getConstantBootstrap", GETCONSTANT_SIGNATURE_DESC);
     }
 
     private static MethodHandle createGWT(String name, MethodHandle test, MethodHandle target, MethodHandle fallback, CacheEntry entry, JRubyCallSite site) {
@@ -668,7 +729,6 @@ public class InvokeDynamicSupport {
 //        if (LOG_INDY_BINDINGS) System.out.println("binding attr target: " + site.name());
         
         MethodHandle target = creatAttrHandle(entry.method);
-        System.out.println(target);
         
         MethodHandle myTest = MethodHandles.insertArguments(test, 0, entry.token);
         MethodHandle myTarget = target;
@@ -803,7 +863,8 @@ public class InvokeDynamicSupport {
             return callMethodMissing(entry, site.callType(), context, self, name);
         }
         
-        if (site.failCount++ > MAX_FAIL_COUNT) {
+        if (++site.failCount > MAX_FAIL_COUNT) {
+            if (LOG_INDY_BINDINGS) System.out.println("failing over to inline cache for '" + name + "' call");
             site.setTarget(createFail(FAIL_0, site));
         } else {
 //            if (entry.method instanceof AttrReaderMethod) {
@@ -838,7 +899,7 @@ public class InvokeDynamicSupport {
         if (methodMissing(entry, site.callType(), name, caller)) {
             return callMethodMissing(entry, site.callType(), context, self, name, arg0);
         }
-        if (site.failCount++ > MAX_FAIL_COUNT) {
+        if (++site.failCount > MAX_FAIL_COUNT) {
             site.setTarget(createFail(FAIL_1, site));
         } else {
             if (site.getTarget() != null) {
@@ -857,7 +918,7 @@ public class InvokeDynamicSupport {
         if (methodMissing(entry, site.callType(), name, caller)) {
             return callMethodMissing(entry, site.callType(), context, self, name, arg0, arg1);
         }
-        if (site.failCount++ > MAX_FAIL_COUNT) {
+        if (++site.failCount > MAX_FAIL_COUNT) {
             site.setTarget(createFail(FAIL_2, site));
         } else {
             if (site.getTarget() != null) {
@@ -876,7 +937,7 @@ public class InvokeDynamicSupport {
         if (methodMissing(entry, site.callType(), name, caller)) {
             return callMethodMissing(entry, site.callType(), context, self, name, arg0, arg1, arg2);
         }
-        if (site.failCount++ > MAX_FAIL_COUNT) {
+        if (++site.failCount > MAX_FAIL_COUNT) {
             site.setTarget(createFail(FAIL_3, site));
         } else {
             if (site.getTarget() != null) {
@@ -895,7 +956,7 @@ public class InvokeDynamicSupport {
         if (methodMissing(entry, site.callType(), name, caller)) {
             return callMethodMissing(entry, site.callType(), context, self, name, args);
         }
-        if (site.failCount++ > MAX_FAIL_COUNT) {
+        if (++site.failCount > MAX_FAIL_COUNT) {
             site.setTarget(createFail(FAIL_N, site));
         } else {
             if (site.getTarget() != null) {
@@ -916,7 +977,7 @@ public class InvokeDynamicSupport {
             if (methodMissing(entry, site.callType(), name, caller)) {
                 return callMethodMissing(entry, site.callType(), context, self, name, block);
             }
-            if (site.failCount++ > MAX_FAIL_COUNT) {
+            if (++site.failCount > MAX_FAIL_COUNT) {
                 site.setTarget(createFail(FAIL_0_B, site));
             } else {
                 if (site.getTarget() != null) {
@@ -943,7 +1004,7 @@ public class InvokeDynamicSupport {
             if (methodMissing(entry, site.callType(), name, caller)) {
                 return callMethodMissing(entry, site.callType(), context, self, name, arg0, block);
             }
-            if (site.failCount++ > MAX_FAIL_COUNT) {
+            if (++site.failCount > MAX_FAIL_COUNT) {
                 site.setTarget(createFail(FAIL_1_B, site));
             } else {
                 if (site.getTarget() != null) {
@@ -970,7 +1031,7 @@ public class InvokeDynamicSupport {
             if (methodMissing(entry, site.callType(), name, caller)) {
                 return callMethodMissing(entry, site.callType(), context, self, name, arg0, arg1, block);
             }
-            if (site.failCount++ > MAX_FAIL_COUNT) {
+            if (++site.failCount > MAX_FAIL_COUNT) {
                 site.setTarget(createFail(FAIL_2_B, site));
             } else {
                 if (site.getTarget() != null) {
@@ -997,7 +1058,7 @@ public class InvokeDynamicSupport {
             if (methodMissing(entry, site.callType(), name, caller)) {
                 return callMethodMissing(entry, site.callType(), context, self, name, arg0, arg1, arg2, block);
             }
-            if (site.failCount++ > MAX_FAIL_COUNT) {
+            if (++site.failCount > MAX_FAIL_COUNT) {
                 site.setTarget(createFail(FAIL_3_B, site));
             } else {
                 if (site.getTarget() != null) {
@@ -1024,7 +1085,7 @@ public class InvokeDynamicSupport {
             if (methodMissing(entry, site.callType(), name, caller)) {
                 return callMethodMissing(entry, site.callType(), context, self, name, args, block);
             }
-            if (site.failCount++ >= MAX_FAIL_COUNT) {
+            if (++site.failCount >= MAX_FAIL_COUNT) {
                 site.setTarget(createFail(FAIL_N_B, site));
             } else {
                 if (site.getTarget() != null) {

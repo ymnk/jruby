@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -10,8 +11,6 @@
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *
- * Copyright (C) 2002-2011 JRuby Community
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -25,30 +24,19 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.embed.osgi.internal;
-
-import org.jruby.runtime.load.LoadService.LoadSearcher;
-import org.jruby.runtime.load.LoadService.SearchState;
+package org.jruby.runtime.opto;
 
 /**
- * @author hmalphettes
+ * Abstract invalidator of "something". An example would be a global invalidator
+ * for cached constants.
  * 
- * TODO: something nice with this?
+ * How invalidation is performed is considered to be opaque. To invalidate, call
+ * #invalidate. To get data associated with the invalidation, use getData; the
+ * meaning of this data is Invalidator-implementation-specific. In the case of
+ * JSR-292's SwitchPoint, this would return a SwitchPoint to be used for guarding
+ * e.g. a cached constant value.
  */
-public class OSGiBundlesSearcher implements LoadSearcher {
-
-    /* (non-Javadoc)
-     * @see org.jruby.runtime.load.LoadService.LoadSearcher#shouldTrySearch(org.jruby.runtime.load.LoadService.SearchState)
-     */
-    public boolean shouldTrySearch(SearchState state) {
-        return false;
-    }
-
-    /* (non-Javadoc)
-     * @see org.jruby.runtime.load.LoadService.LoadSearcher#trySearch(org.jruby.runtime.load.LoadService.SearchState)
-     */
-    public boolean trySearch(SearchState state) {
-        return true;
-    }
-
+public interface Invalidator {
+    public void invalidate();
+    public Object getData();
 }

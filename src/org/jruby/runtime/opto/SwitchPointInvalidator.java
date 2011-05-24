@@ -1,4 +1,5 @@
-/***** BEGIN LICENSE BLOCK *****
+/*
+ ***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
  * The contents of this file are subject to the Common Public
@@ -10,8 +11,6 @@
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *
- * Copyright (C) 2002-2011 JRuby Community
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -25,30 +24,23 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the CPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.embed.osgi.internal;
+package org.jruby.runtime.opto;
 
-import org.jruby.runtime.load.LoadService.LoadSearcher;
-import org.jruby.runtime.load.LoadService.SearchState;
+import java.lang.invoke.SwitchPoint;
 
-/**
- * @author hmalphettes
- * 
- * TODO: something nice with this?
- */
-public class OSGiBundlesSearcher implements LoadSearcher {
-
-    /* (non-Javadoc)
-     * @see org.jruby.runtime.load.LoadService.LoadSearcher#shouldTrySearch(org.jruby.runtime.load.LoadService.SearchState)
-     */
-    public boolean shouldTrySearch(SearchState state) {
-        return false;
+public class SwitchPointInvalidator implements Invalidator {
+    private volatile SwitchPoint[] switchPoints;
+    
+    public SwitchPointInvalidator() {
+        switchPoints = new SwitchPoint[] {new SwitchPoint()};
     }
-
-    /* (non-Javadoc)
-     * @see org.jruby.runtime.load.LoadService.LoadSearcher#trySearch(org.jruby.runtime.load.LoadService.SearchState)
-     */
-    public boolean trySearch(SearchState state) {
-        return true;
+    
+    public synchronized void invalidate() {
+        SwitchPoint.invalidateAll(switchPoints);
+        switchPoints = new SwitchPoint[] {new SwitchPoint()};
     }
-
+    
+    public Object getData() {
+        return switchPoints[0];
+    }
 }
