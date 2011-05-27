@@ -30,7 +30,8 @@
 package org.jruby;
 
 import com.kenai.constantine.platform.Signal;
-import java.util.EnumSet;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import org.jruby.anno.JRubyClass;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyModule;
@@ -925,12 +926,34 @@ public class RubyProcess {
     public static IRubyObject times(ThreadContext context, IRubyObject recv, Block unusedBlock) {
         return times(context.getRuntime());
     }
+
     public static IRubyObject times(Ruby runtime) {
-        double currentTime = System.currentTimeMillis() / 1000.0;
-        double startTime = runtime.getStartTime() / 1000.0;
+        double system_d, user_d;
+        ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+        if (threadBean.isCurrentThreadCpuTimeSupported()) {
+            long cpu = 0;
+            long user = 0;
+            for (long idx : threadBean.getAllThreadIds()) {
+                long v = threadBean.getThreadCpuTime(idx);
+                if (v != -1) {
+                    cpu += v;
+                }
+                v = threadBean.getThreadUserTime(idx);
+                if (v != -1) {
+                    user += v;
+                }
+            }
+            system_d = (cpu - user) / 1000000000.0;
+            user_d = user / 1000000000.0;
+        } else {
+            double currentTime = System.currentTimeMillis() / 1000.0;
+            double startTime = runtime.getStartTime() / 1000.0;
+            system_d = 0.0;
+            user_d = currentTime - startTime;
+        }
         RubyFloat zero = runtime.newFloat(0.0);
-        return RubyStruct.newStruct(runtime.getTmsStruct(), 
-                new IRubyObject[] { runtime.newFloat(currentTime - startTime), zero, zero, zero }, 
+        return RubyStruct.newStruct(runtime.getTmsStruct(),
+                new IRubyObject[] { RubyFloat.newFloat(runtime, user_d), RubyFloat.newFloat(runtime, system_d), zero, zero },
                 Block.NULL_BLOCK);
     }
 
