@@ -123,6 +123,8 @@
 
 module Benchmark
 
+  Time.now
+
   BENCHMARK_VERSION = "2002-04-25" #:nodoc"
 
   def Benchmark::times() # :nodoc:
