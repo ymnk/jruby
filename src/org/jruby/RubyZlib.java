@@ -33,19 +33,15 @@
 package org.jruby;
 
 import java.io.BufferedInputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
-import java.util.zip.InflaterInputStream;
 
 import org.joda.time.DateTime;
 
@@ -55,6 +51,9 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyModule;
 
 import org.jruby.exceptions.RaiseException;
+import org.jruby.ext.zlib.CountingIOInputStream;
+import org.jruby.ext.zlib.ZlibCustomDeflaterOutputStream;
+import org.jruby.ext.zlib.ZlibCustomInflaterInputStream;
 import org.jruby.javasupport.util.RuntimeHelpers;
 
 import org.jruby.runtime.Arity;
@@ -64,11 +63,11 @@ import org.jruby.runtime.ThreadContext;
 import static org.jruby.runtime.Visibility.*;
 import org.jruby.runtime.builtin.IRubyObject;
 
+import static org.jruby.ext.zlib.Zlib.*;
+
 import org.jruby.util.Adler32Ext;
 import org.jruby.util.ByteList;
 import org.jruby.util.CRC32Ext;
-import org.jruby.util.IOInputStream;
-import org.jruby.util.IOOutputStream;
 import org.jruby.util.io.Stream;
 
 import static org.jruby.CompatVersion.*;
@@ -78,45 +77,6 @@ public class RubyZlib {
     // version
     public final static String ZLIB_VERSION = "1.2.3.3";
     public final static String VERSION = "0.6.0";
-    // wbits
-    public final static int MIN_WBITS = 8;
-    public final static int MAX_WBITS = 15;
-    // flush
-    public static final byte Z_NO_FLUSH = (byte) 0;
-    public static final byte Z_SYNC_FLUSH = (byte) 2;
-    public static final byte Z_FULL_FLUSH = (byte) 3;
-    public static final byte Z_FINISH = (byte) 4;
-    // compression level
-    public static final byte Z_NO_COMPRESSION = (byte) 0x0;
-    public static final byte Z_BEST_SPEED = (byte) 0x1;
-    public static final byte Z_BEST_COMPRESSION = (byte) 0x9;
-    public static final byte Z_DEFAULT_COMPRESSION = (byte) -1;
-    // os_code
-    public static final byte OS_MSDOS = (byte) 0x00;
-    public static final byte OS_AMIGA = (byte) 0x01;
-    public static final byte OS_VMS = (byte) 0x02;
-    public static final byte OS_UNIX = (byte) 0x03;
-    public static final byte OS_ATARI = (byte) 0x05;
-    public static final byte OS_OS2 = (byte) 0x06;
-    public static final byte OS_MACOS = (byte) 0x07;
-    public static final byte OS_TOPS20 = (byte) 0x0a;
-    public static final byte OS_WIN32 = (byte) 0x0b;
-    public static final byte OS_VMCMS = (byte) 0x04;
-    public static final byte OS_ZSYSTEM = (byte) 0x08;
-    public static final byte OS_CPM = (byte) 0x09;
-    public static final byte OS_QDOS = (byte) 0x0c;
-    public static final byte OS_RISCOS = (byte) 0x0d;
-    public static final byte OS_UNKNOWN = (byte) 0xff;
-    public static final byte OS_CODE = OS_WIN32; // TODO: why we define OS_CODE to OS_WIN32?
-    // strategy
-    public static final byte Z_FILTERED = (byte) 1;
-    public static final byte Z_HUFFMAN_ONLY = (byte) 2;
-    public static final byte Z_DEFAULT_STRATEGY = (byte) 0;
-    // data_type
-    public static final byte Z_BINARY = (byte) 0;
-    public static final byte Z_ASCII = (byte) 1;
-    public static final byte Z_UNKNOWN = (byte) 2;
-
     
     /** Create the Zlib module and add it to the Ruby runtime.
      * 
@@ -673,30 +633,37 @@ public class RubyZlib {
             }
         }
 
+        @Override
         protected int internalTotalIn() {
             return flater.getTotalIn();
         }
 
+        @Override
         protected int internalTotalOut() {
             return flater.getTotalOut();
         }
 
+        @Override
         protected boolean internalStreamEndP() {
             return flater.finished();
         }
 
+        @Override
         protected void internalReset() {
             flater.reset();
         }
 
+        @Override
         protected boolean internalFinished() {
             return flater.finished();
         }
 
+        @Override
         protected int internalAdler() {
             return flater.getAdler();
         }
 
+        @Override
         protected IRubyObject internalFinish() {
             run(true);
             flater.end();
@@ -704,6 +671,7 @@ public class RubyZlib {
             return flushOutput(getRuntime());
         }
 
+        @Override
         protected void internalClose() {
             flater.end();
         }
@@ -752,7 +720,7 @@ public class RubyZlib {
         @JRubyMethod(name = "initialize", optional = 4, visibility = PRIVATE, backtrace = true)
         public IRubyObject _initialize(IRubyObject[] args) {
             args = Arity.scanArgs(getRuntime(), args, 0, 4);
-            int level = -1;
+            int level = Z_DEFAULT_COMPRESSION;
             int window_bits = MAX_WBITS;
             int memlevel = 8;
             int strategy = 0;
@@ -858,35 +826,43 @@ public class RubyZlib {
             }
         }
 
+        @Override
         protected int internalTotalIn() {
             return flater.getTotalIn();
         }
 
+        @Override
         protected int internalTotalOut() {
             return flater.getTotalOut();
         }
 
+        @Override
         protected boolean internalStreamEndP() {
             return flater.finished();
         }
 
+        @Override
         protected void internalReset() {
             flater.reset();
             collected = new ByteList(BASE_SIZE);
         }
 
+        @Override
         public boolean internalFinished() {
             return flater.finished();
         }
 
+        @Override
         protected int internalAdler() {
             return flater.getAdler();
         }
 
+        @Override
         protected IRubyObject internalFinish() {
             return finish();
         }
 
+        @Override
         protected void internalClose() {
             flater.end();
         }
@@ -949,20 +925,7 @@ public class RubyZlib {
         @JRubyClass(name="Zlib::GzipFile::LengthError", parent="Zlib::GzipFile::Error")
         public static class LengthError extends Error {}
 
-        // from zlib.c in ruby
-        final static byte GZ_MAGIC_ID_1 = (byte) 0x1f;
-        final static byte GZ_MAGIC_ID_2 = (byte) 0x8b;
-        final static byte GZ_METHOD_DEFLATE = (byte) 8;
-        final static byte GZ_FLAG_MULTIPART = (byte) 0x2;
-        final static byte GZ_FLAG_EXTRA = (byte) 0x4;
-        final static byte GZ_FLAG_ORIG_NAME = (byte) 0x8;
-        final static byte GZ_FLAG_COMMENT = (byte) 0x10;
-        final static byte GZ_FLAG_ENCRYPT = (byte) 0x20;
-        final static byte GZ_FLAG_UNKNOWN_MASK = (byte) 0xc0;
-        final static byte GZ_EXTRAFLAG_FAST = (byte) 0x4;
-        final static byte GZ_EXTRAFLAG_SLOW = (byte) 0x2;
- 
-        private static IRubyObject wrapBlock(ThreadContext context, RubyGzipFile instance, Block block) {
+        static IRubyObject wrapBlock(ThreadContext context, RubyGzipFile instance, Block block) {
             if (block.isGiven()) {
                 try {
                     return block.yield(context, instance);
@@ -1010,7 +973,7 @@ public class RubyZlib {
         protected boolean closed = false;
         protected boolean finished = false;
         protected byte osCode = OS_UNKNOWN;
-        protected int level = -1;
+        protected int level = Z_DEFAULT_COMPRESSION;
         protected RubyString nullFreeOrigName;
         protected RubyString nullFreeComment;
         protected IRubyObject realIo;
@@ -1104,20 +1067,8 @@ public class RubyZlib {
         static RaiseException newGzipFileError(Ruby runtime, String message) {
             return newGzipFileError(runtime, "Error", message);
         }
-
-        static RaiseException newCRCError(Ruby runtime, String message) {
-            return newGzipFileError(runtime, "CRCError", message);
-        }
-
-        static RaiseException newNoFooter(Ruby runtime, String message) {
-            return newGzipFileError(runtime, "NoFooter", message);
-        }
-
-        static RaiseException newLengthError(Ruby runtime, String message) {
-            return newGzipFileError(runtime, "LengthError", message);
-        }
         
-        private static RaiseException newGzipFileError(Ruby runtime, String klass, String message) {
+        public static RaiseException newGzipFileError(Ruby runtime, String klass, String message) {
             RubyClass errorClass = runtime.getModule("Zlib").getClass("GzipFile").getClass(klass);
             return new RaiseException(RubyException.newException(runtime, errorClass, message), true);
         }
@@ -1157,300 +1108,34 @@ public class RubyZlib {
 
         private int line;
         private long position;
-        private HeaderReadableGZIPInputStream io;
+        private ZlibCustomInflaterInputStream io;
         private InputStream bufferedStream;
-
-        /**
-         * IOInputStream wrapper for counting and keeping reading position.
-         */
-        private static class CountingIOInputStream extends IOInputStream {
-
-            private int position;
-            private IRubyObject io;
-
-            public CountingIOInputStream(IRubyObject io) {
-                super(io);
-                this.io = io;
-                position = 0;
-            }
-
-            @Override
-            public int read() throws IOException {
-                int ret = super.read();
-                if (ret != -1) {
-                    position++;
-                }
-                return ret;
-            }
-
-            @Override
-            public int read(byte[] b) throws IOException {
-                int ret = super.read(b);
-                if (ret != -1) {
-                    position += ret;
-                }
-                return ret;
-            }
-
-            @Override
-            public int read(byte[] b, int off, int len) throws IOException {
-                int ret = super.read(b, off, len);
-                if (ret != -1) {
-                    position += ret;
-                }
-                return ret;
-            }
-
-            int pos() {
-                return position;
-            }
-
-            Ruby getRuntime() {
-                return io.getRuntime();
-            }
-        }
-
-        private class HeaderReadableGZIPInputStream extends InflaterInputStream {
-
-            private final static int DEFAULT_BUFFER_SIZE = 512;
-            // saame as InputStream#in
-            private CountingIOInputStream countingStream;
-            private CRC32 checksum = new CRC32();
-            private boolean eof = false;
-
-            /**
-             * Offers header property in addition to GZIPInputStream.
-             */
-            public HeaderReadableGZIPInputStream(CountingIOInputStream io) {
-                super(new BufferedInputStream(io), new Inflater(true), DEFAULT_BUFFER_SIZE);
-                this.countingStream = io;
-                readHeader();
-                eof = false;
-                checksum.reset();
-            }
-
-            @Override
-            public int read() throws IOException {
-                if (eof) {
-                    return -1;
-                }
-                int ret = super.read();
-                if (ret == -1) {
-                    readTrailer();
-                } else {
-                    checksum.update((byte) (ret & 0xff));
-                }
-                return ret;
-            }
-
-            @Override
-            public int read(byte[] b) throws IOException {
-                if (eof) {
-                    return -1;
-                }
-                int ret = super.read(b);
-                if (ret == -1) {
-                    readTrailer();
-                } else {
-                    checksum.update(b, 0, ret);
-                }
-                return ret;
-            }
-
-            @Override
-            public int read(byte[] b, int off, int len) throws IOException {
-                if (eof) {
-                    return -1;
-                }
-                int ret = super.read(b, off, len);
-                if (ret == -1) {
-                    readTrailer();
-                } else {
-                    checksum.update(b, off, ret);
-                }
-                return ret;
-            }
-
-            /**
-             * We call internal IO#close directly, not via IOInputStream#close.
-             * IOInputStream#close directly invoke IO.getOutputStream().close()
-             * for IO object instead of just calling IO#cloase of Ruby.
-             * It causes EBADF at OpenFile#finalize.
-             *
-             * CAUTION: CountingIOInputStream#close does not called even if it exists.
-             *
-             * TODO: implement this without IOInputStream? Not so hard.
-             */
-            @Override
-            public void close() throws IOException {
-                // Do not invoke DeflaterOutputStream#close here.
-                // following works as same as DeflaterOutputStream#close.
-                //super.close();
-                if (!closed) {
-                    // we don't want to invoke IOInputStream#close for now.
-                    // in.close();
-                    closed = true;
-                }
-                // call IO#close instead.
-                if (countingStream.io.respondsTo("close")) {
-                    countingStream.io.callMethod(countingStream.getRuntime().getCurrentContext(), "close");
-                }
-                eof = true;
-            }
-
-            public int pos() {
-                return countingStream.pos();
-            }
-
-            public long crc() {
-                return checksum.getValue();
-            }
-
-            private void readHeader() {
-                checksum.reset();
-                try {
-                    if ((byte) readUByte() != GZ_MAGIC_ID_1) {
-                        throw newGzipFileError(countingStream.getRuntime(), "not in gzip format");
-                    }
-                    if ((byte) readUByte() != GZ_MAGIC_ID_2) {
-                        throw newGzipFileError(countingStream.getRuntime(), "not in gzip format");
-                    }
-                    byte b = (byte) readUByte();
-                    if ((byte) b != GZ_METHOD_DEFLATE) {
-                        throw newGzipFileError(countingStream.getRuntime(), "unsupported compression method " + b);
-                    }
-                    int flags = readUByte();
-                    if ((flags & GZ_FLAG_MULTIPART) != 0) {
-                        throw newGzipFileError(countingStream.getRuntime(), "multi-part gzip file is not supported");
-                    } else if ((flags & GZ_FLAG_ENCRYPT) != 0) {
-                        throw newGzipFileError(countingStream.getRuntime(), "encrypted gzip file is not supported");
-                    } else if ((flags & GZ_FLAG_UNKNOWN_MASK) != 0) {
-                        throw newGzipFileError(countingStream.getRuntime(), "unknown flags " + flags);
-                    }
-                    mtime.setDateTime(new DateTime(readUInt() * 1000));
-                    int extraflags = readUByte();
-                    if ((extraflags & GZ_EXTRAFLAG_FAST) != 0) {
-                        level = Z_BEST_SPEED;
-                    } else if ((extraflags & GZ_EXTRAFLAG_SLOW) != 0) {
-                        level = Z_BEST_COMPRESSION;
-                    } else {
-                        level = Z_DEFAULT_COMPRESSION;
-                    }
-                    osCode = (byte) readUByte();
-                    if ((flags & GZ_FLAG_EXTRA) != 0) {
-                        int size = readUShort();
-                        byte[] extra = new byte[2 + size];
-                        // just discard it
-                        readBytes(extra);
-                    }
-                    if ((flags & GZ_FLAG_ORIG_NAME) != 0) {
-                        nullFreeOrigName = countingStream.getRuntime().newString(readNullTerminateString());
-                        nullFreeOrigName.setTaint(true);   // for safe
-                    }
-                    if ((flags & GZ_FLAG_COMMENT) != 0) {
-                        nullFreeComment = countingStream.getRuntime().newString(readNullTerminateString());
-                        nullFreeComment.setTaint(true);
-                    }
-                } catch (IOException ioe) {
-                    throw newGzipFileError(countingStream.getRuntime(), ioe.getMessage());
-                }
-                // TODO: should check header CRC (cruby-zlib doesn't do for now)
-            }
-
-            private int readUByte() throws IOException {
-                int ret = in.read();
-                if (ret == -1) {
-                    throw new EOFException();
-                } else {
-                    checksum.update((byte) (ret & 0xff));
-                }
-                return ret & 0xff;
-            }
-
-            private int readUShort() throws IOException {
-                return (readUByte() | (readUByte() << 8)) & 0xffff;
-            }
-
-            private long readUInt() throws IOException {
-                return (readUShort() | (readUShort() << 16)) & 0xffffffffL;
-            }
-
-            private void readBytes(byte[] bytes) throws IOException {
-                readBytes(bytes, 0, bytes.length, true);
-            }
-
-            private void readBytes(byte[] bytes, int pos, int len, boolean updateChecksum) throws IOException {
-                if (bytes.length < pos + len) {
-                    throw new IllegalArgumentException();
-                }
-                while (len > 0) {
-                    int ret = in.read(bytes, pos, len);
-                    if (ret == -1) {
-                        throw new EOFException();
-                    } else {
-                        if (updateChecksum) {
-                            checksum.update(bytes, pos, ret);
-                        }
-                    }
-                    pos += ret;
-                    len -= ret;
-                }
-            }
-
-            private String readNullTerminateString() throws IOException {
-                StringBuilder builder = new StringBuilder();
-                int c;
-                while ((c = readUByte()) != '\0') {
-                    builder.append((char) c);
-                }
-                return builder.toString();
-            }
-
-            private void readTrailer() throws IOException {
-                try {
-                    eof = true;
-                    int rest = 8;
-                    byte[] trailer = new byte[8];
-                    int remaining = super.inf.getRemaining();
-                    if (remaining > 0) {
-                        System.arraycopy(super.buf, super.len - remaining, trailer, 0, (remaining > 8) ? 8 : remaining);
-                        rest -= remaining;
-                    }
-                    if (rest > 0) {
-                        // Do not update checksum for trailer
-                        readBytes(trailer, 8 - rest, rest, false);
-                    }
-                    long uint = bytesToUInt(trailer, 0);
-                    if (uint != checksum.getValue()) {
-                        throw newCRCError(countingStream.getRuntime(), "invalid compressed data -- crc error");
-                    }
-                    uint = bytesToUInt(trailer, 4);
-                    if (uint != (super.inf.getBytesWritten() & 0xffffffffL)) {
-                        throw newLengthError(countingStream.getRuntime(), "invalid compressed data -- length error");
-                    }
-                } catch (IOException ignored) {
-                    throw newNoFooter(countingStream.getRuntime(), "footer is not found");
-                }
-            }
-
-            private long bytesToUInt(byte[] bytes, int pos) {
-                if (bytes.length < pos + 4) {
-                    throw new IllegalArgumentException();
-                }
-                return (bytes[pos++] & 0xff
-                        | (bytes[pos++] & 0xff) << 8
-                        | (bytes[pos++] & 0xff) << 16
-                        | (bytes[pos++] & 0xff) << 24)
-                        & 0xffffffffL;
-            }
-        }
 
         @JRubyMethod(visibility = PRIVATE)
         public IRubyObject initialize(IRubyObject stream) {
             realIo = stream;
             line = 0;
             position = 0;
-            io = new HeaderReadableGZIPInputStream(new CountingIOInputStream(realIo));
+            io = new ZlibCustomInflaterInputStream(new CountingIOInputStream(realIo),
+                    new ZlibCustomInflaterInputStream.Callback() {
+                        public void onReadHeaderComplete(ZlibCustomInflaterInputStream stream) {
+                            if (stream.getOrigName() != null) {
+                                nullFreeOrigName = realIo.getRuntime().newString(
+                                        stream.getOrigName());
+                                nullFreeOrigName.setTaint(true);
+                            }
+                            if (stream.getComment() != null) {
+                                nullFreeComment = realIo.getRuntime()
+                                        .newString(stream.getComment());
+                                nullFreeComment.setTaint(true);
+                            }
+                            level = stream.getLevel();
+                            osCode = stream.getOsCode();
+                            if (stream.getModifiedTime() != null) {
+                                mtime.setDateTime(stream.getModifiedTime());
+                            }
+                        }
+                    });
             bufferedStream = new BufferedInputStream(io);
             return this;
         }
@@ -1585,7 +1270,7 @@ public class RubyZlib {
 
         @JRubyMethod(name = {"pos", "tell"})
         public IRubyObject pos() {
-            return RubyFixnum.int2fix(getRuntime(), position);
+            return RubyNumeric.int2fix(getRuntime(), position);
         }
 
         @JRubyMethod(name = "readchar")
@@ -1774,136 +1459,7 @@ public class RubyZlib {
             super(runtime, type);
         }
 
-        public class HeaderModifyableGZIPOutputStream extends DeflaterOutputStream {
-
-            private IRubyObject io;
-            private long position;
-            private CRC32 checksum = new CRC32();
-            private boolean headerIsWritten = false;
-            private long modifiedTime = System.currentTimeMillis();
-            private final static int DEFAULT_BUFFER_SIZE = 512;
-
-            public HeaderModifyableGZIPOutputStream(IRubyObject io) throws IOException {
-                super(new IOOutputStream(io, false, false), new Deflater(Deflater.DEFAULT_COMPRESSION, true), DEFAULT_BUFFER_SIZE);
-                this.io = io;
-                position = 0;
-            }
-
-            /**
-             * We call internal IO#close directly, not via IOOutputStream#close.
-             * IOInputStream#close directly invoke IO.getOutputStream().close()
-             * for IO object instead of just calling IO#cloase of Ruby.
-             * It causes EBADF at OpenFile#finalize.
-             * TODO: implement this without IOOutputStream? Not so hard.
-             */
-            @Override
-            public void close() throws IOException {
-                // Do not invoke DeflaterOutputStream#close here.
-                // following works as same as DeflaterOutputStream#close.
-                //super.close();
-                if (!closed) {
-                    finish();
-                    // out.close(); // we don't want to invoke IOInputStream#close for now.
-                    closed = true;
-                }
-                // call IO#close instead.
-                if (io.respondsTo("close")) {
-                    io.callMethod(io.getRuntime().getCurrentContext(), "close");
-                }
-            }
-
-            @Override
-            public synchronized void write(byte bytes[], int offset, int length) throws IOException {
-                writeHeaderIfNeeded();
-                super.write(bytes, offset, length);
-                checksum.update(bytes, offset, length);
-                position += length;
-            }
-
-            @Override
-            public void finish() throws IOException {
-                writeHeaderIfNeeded();
-                super.finish();
-                writeTrailer();
-            }
-
-            public void setModifiedTime(long newModifiedTime) {
-                modifiedTime = newModifiedTime;
-            }
-
-            public boolean headerIsWritten() {
-                return headerIsWritten;
-            }
-
-            public long crc() {
-                return checksum.getValue();
-            }
-
-            public long pos() {
-                return position;
-            }
-
-            // Called before any write to make sure the
-            // header is always written before the first bytes
-            private void writeHeaderIfNeeded() throws IOException {
-                if (headerIsWritten == false) {
-                    writeHeader();
-                    headerIsWritten = true;
-                }
-            }
-
-            private void writeHeader() throws IOException {
-                //  See http://www.gzip.org/zlib/rfc-gzip.html
-                byte flags = 0, extraflags = 0;
-                if (nullFreeOrigName != null) {
-                    flags |= GZ_FLAG_ORIG_NAME;
-                }
-                if (nullFreeComment != null) {
-                    flags |= GZ_FLAG_COMMENT;
-                }
-                if (level == Z_BEST_SPEED) {
-                    extraflags |= GZ_EXTRAFLAG_FAST;
-                } else if (level == Z_BEST_COMPRESSION) {
-                    extraflags |= GZ_EXTRAFLAG_SLOW;
-                }
-                final byte header[] = {
-                    GZ_MAGIC_ID_1,
-                    GZ_MAGIC_ID_2,
-                    GZ_METHOD_DEFLATE,
-                    flags,
-                    (byte) (modifiedTime), (byte) (modifiedTime >> 8), // 4 bytes of modified time
-                    (byte) (modifiedTime >> 16), (byte) (modifiedTime >> 24),
-                    extraflags,
-                    OS_CODE
-                };
-                out.write(header);
-                if (nullFreeOrigName != null) {
-                    out.write(nullFreeOrigName.toString().getBytes());
-                    out.write('\0');
-                }
-                if (nullFreeComment != null) {
-                    out.write(nullFreeComment.toString().getBytes());
-                    out.write('\0');
-                }
-            }
-
-            private void writeTrailer() throws IOException {
-                final int originalDataSize = def.getTotalIn();
-                final int checksumInt = (int) checksum.getValue();
-
-                final byte[] trailer = {
-                    (byte) (checksumInt), (byte)(checksumInt >> 8),
-                    (byte) (checksumInt >> 16), (byte)(checksumInt >> 24),
-
-                    (byte) (originalDataSize), (byte)(originalDataSize >> 8),
-                    (byte) (originalDataSize >> 16), (byte)(originalDataSize >> 24)
-                };
-
-                out.write(trailer);
-            }
-        }
-
-        private HeaderModifyableGZIPOutputStream io;
+        private ZlibCustomDeflaterOutputStream io;
         
         @JRubyMethod(required = 1, rest = true, visibility = PRIVATE)
         public IRubyObject initialize(IRubyObject[] args) {
@@ -1914,7 +1470,7 @@ public class RubyZlib {
         public IRubyObject initialize(IRubyObject arg) {
             realIo = (RubyObject) arg;
             try {
-                io = new HeaderModifyableGZIPOutputStream(realIo);
+                io = new ZlibCustomDeflaterOutputStream(realIo);
                 return this;
             } catch (IOException ioe) {
                 throw getRuntime().newIOErrorFromException(ioe);
@@ -1976,7 +1532,7 @@ public class RubyZlib {
 
         @JRubyMethod(name = {"pos", "tell"})
         public IRubyObject pos() {
-            return RubyFixnum.int2fix(getRuntime(), io.pos());
+            return RubyNumeric.int2fix(getRuntime(), io.pos());
         }
 
         @JRubyMethod(name = "orig_name=", required = 1)
@@ -1986,6 +1542,7 @@ public class RubyZlib {
             }
             nullFreeOrigName = obj.convertToString();
             ensureNonNull(nullFreeOrigName);
+            io.setOrigName(nullFreeOrigName.toString());
             return obj;
         }
 
@@ -1996,6 +1553,7 @@ public class RubyZlib {
             }
             nullFreeComment = obj.convertToString();
             ensureNonNull(nullFreeComment);
+            io.setComment(nullFreeComment.toString());
             return obj;
         }
 
