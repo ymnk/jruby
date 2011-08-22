@@ -33,6 +33,7 @@
 package org.jruby;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -51,7 +52,6 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyModule;
 
 import org.jruby.exceptions.RaiseException;
-import org.jruby.ext.zlib.CountingIOInputStream;
 import org.jruby.ext.zlib.ZlibCustomDeflaterOutputStream;
 import org.jruby.ext.zlib.ZlibCustomInflaterInputStream;
 import org.jruby.javasupport.util.RuntimeHelpers;
@@ -681,8 +681,13 @@ public class RubyZlib {
     public static class Deflate extends ZStream {
 
         public static final int BASE_SIZE = 100;
-        private Deflater flater;
-        private ByteList collected;
+        private ZlibCustomDeflaterOutputStream flater;
+        private ByteArrayOutputStream collected;
+        private int level;
+        private int windowBits;
+        private int memLevel;
+        private int strategy;
+        
         protected static final ObjectAllocator DEFLATE_ALLOCATOR = new ObjectAllocator() {
 
             public IRubyObject allocate(Ruby runtime, RubyClass klass) {
@@ -721,33 +726,37 @@ public class RubyZlib {
         public IRubyObject _initialize(IRubyObject[] args) {
             args = Arity.scanArgs(getRuntime(), args, 0, 4);
             int level = Z_DEFAULT_COMPRESSION;
-            int window_bits = MAX_WBITS;
-            int memlevel = 8;
+            int windowBits = MAX_WBITS;
+            int memLevel = 8;
             int strategy = 0;
             if (!args[0].isNil()) {
                 level = RubyNumeric.fix2int(args[0]);
                 checkLevel(getRuntime(), level);
             }
             if (!args[1].isNil()) {
-                window_bits = RubyNumeric.fix2int(args[1]);
-                checkWindowBits(getRuntime(), window_bits, false);
+                windowBits = RubyNumeric.fix2int(args[1]);
+                checkWindowBits(getRuntime(), windowBits, false);
             }
             if (!args[2].isNil()) {
-                memlevel = RubyNumeric.fix2int(args[2]);
+                memLevel = RubyNumeric.fix2int(args[2]);
                 // We accepts any memlevel and ignores it. Memory setting means nothing on Java platform.
             }
             if (!args[3].isNil()) {
                 strategy = RubyNumeric.fix2int(args[3]);
             }
-            init(level, window_bits, memlevel, strategy);
+            init(level, windowBits, memLevel, strategy);
             return this;
         }
 
-        private void init(int level, int win_bits, int memlevel, int strategy) {
+        private void init(int level, int windowBits, int memLevel, int strategy) {
             // Zlib behavior: negative win_bits means no header and no checksum.
-            flater = new Deflater(level, win_bits < 0);
+            this.level = level;
+            this.windowBits = windowBits;
+            this.memLevel = memLevel;
+            this.strategy = strategy;
+            collected = new ByteArrayOutputStream(BASE_SIZE);
+            flater = ZlibCustomDeflaterOutputStream.getInstance(collected, level, windowBits < 0);
             flater.setStrategy(strategy);
-            collected = new ByteList(BASE_SIZE);
         }
 
         @Override
@@ -779,7 +788,6 @@ public class RubyZlib {
             checkStrategy(getRuntime(), s);
             flater.setLevel(l);
             flater.setStrategy(s);
-            run();
             return getRuntime().getNil();
         }
 
@@ -787,7 +795,6 @@ public class RubyZlib {
         public IRubyObject set_dictionary(ThreadContext context, IRubyObject arg) {
             try {
                 flater.setDictionary(arg.convertToString().getBytes());
-                run();
                 return arg;
             } catch (IllegalArgumentException iae) {
                 throw newStreamError(context.getRuntime(), "stream error: " + iae.getMessage());
@@ -843,8 +850,8 @@ public class RubyZlib {
 
         @Override
         protected void internalReset() {
-            flater.reset();
-            collected = new ByteList(BASE_SIZE);
+            // TODO: recreate flater with the same option
+            init(level, windowBits, memLevel, strategy);
         }
 
         @Override
@@ -864,12 +871,15 @@ public class RubyZlib {
 
         @Override
         protected void internalClose() {
-            flater.end();
+            try {
+                flater.close();
+            } catch (IOException ioe) {
+                // ignored
+            }
         }
 
         private void append(ByteList obj) throws IOException {
-            flater.setInput(obj.getUnsafeBytes(), obj.getBegin(), obj.getRealSize());
-            run();
+            flater.write(obj.getUnsafeBytes(), obj.getBegin(), obj.getRealSize());
         }
 
         private IRubyObject flush(int flush) {
@@ -877,11 +887,14 @@ public class RubyZlib {
                 return RubyString.newEmptyString(getRuntime());
             }
             if (flush == Z_FINISH) {
-                flater.finish();
+                try {
+                    flater.finish();
+                } catch (IOException ioe) {
+                    // ignored
+                }
             }
-            run();
-            IRubyObject obj = RubyString.newString(getRuntime(), collected);
-            collected = new ByteList(BASE_SIZE);
+            IRubyObject obj = RubyString.newString(getRuntime(), collected.toByteArray());
+            collected = new ByteArrayOutputStream(BASE_SIZE);
             return obj;
         }
 
@@ -894,23 +907,6 @@ public class RubyZlib {
 
         private IRubyObject finish() {
             return flush(Z_FINISH);
-        }
-
-        private void run() {
-            if (flater.finished()) {
-                return;
-            }
-            byte[] outp = new byte[1024];
-            while (!flater.finished()) {
-                int resultLength = flater.deflate(outp);
-                if (resultLength == 0) {
-                    break;
-                }
-                collected.append(outp, 0, resultLength);
-                if (resultLength == outp.length) {
-                    outp = new byte[outp.length * 2];
-                }
-            }
         }
     }
 
@@ -1116,26 +1112,24 @@ public class RubyZlib {
             realIo = stream;
             line = 0;
             position = 0;
-            io = new ZlibCustomInflaterInputStream(new CountingIOInputStream(realIo),
-                    new ZlibCustomInflaterInputStream.Callback() {
-                        public void onReadHeaderComplete(ZlibCustomInflaterInputStream stream) {
-                            if (stream.getOrigName() != null) {
-                                nullFreeOrigName = realIo.getRuntime().newString(
-                                        stream.getOrigName());
-                                nullFreeOrigName.setTaint(true);
-                            }
-                            if (stream.getComment() != null) {
-                                nullFreeComment = realIo.getRuntime()
-                                        .newString(stream.getComment());
-                                nullFreeComment.setTaint(true);
-                            }
-                            level = stream.getLevel();
-                            osCode = stream.getOsCode();
-                            if (stream.getModifiedTime() != null) {
-                                mtime.setDateTime(stream.getModifiedTime());
-                            }
-                        }
-                    });
+            ZlibCustomInflaterInputStream.Callback callback = new ZlibCustomInflaterInputStream.Callback() {
+                public void onReadHeaderComplete(ZlibCustomInflaterInputStream stream) {
+                    if (stream.getOrigName() != null) {
+                        nullFreeOrigName = realIo.getRuntime().newString(stream.getOrigName());
+                        nullFreeOrigName.setTaint(true);
+                    }
+                    if (stream.getComment() != null) {
+                        nullFreeComment = realIo.getRuntime().newString(stream.getComment());
+                        nullFreeComment.setTaint(true);
+                    }
+                    level = stream.getLevel();
+                    osCode = stream.getOsCode();
+                    if (stream.getModifiedTime() != null) {
+                        mtime.setDateTime(stream.getModifiedTime());
+                    }
+                }
+            };
+            io = ZlibCustomInflaterInputStream.getInstance(realIo, true, callback);
             bufferedStream = new BufferedInputStream(io);
             return this;
         }
@@ -1469,12 +1463,9 @@ public class RubyZlib {
         @JRubyMethod(visibility = PRIVATE)
         public IRubyObject initialize(IRubyObject arg) {
             realIo = (RubyObject) arg;
-            try {
-                io = new ZlibCustomDeflaterOutputStream(realIo);
-                return this;
-            } catch (IOException ioe) {
-                throw getRuntime().newIOErrorFromException(ioe);
-            }
+            io = ZlibCustomDeflaterOutputStream.getInstance(realIo, Deflater.DEFAULT_COMPRESSION,
+                    true);
+            return this;
         }
 
         @JRubyMethod(visibility = PRIVATE, compat = RUBY1_9)

@@ -1,6 +1,7 @@
 package org.jruby.ext.zlib;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -17,19 +18,42 @@ public class ZlibCustomDeflaterOutputStream extends DeflaterOutputStream {
     private long modifiedTime = System.currentTimeMillis();
 
     private IRubyObject io;
+    private Deflater deflater;
+    private boolean nowrap;
 
     private long position;
     private CRC32 checksum = new CRC32();
     private boolean headerIsWritten = false;
     private final static int DEFAULT_BUFFER_SIZE = 512;
 
-    public ZlibCustomDeflaterOutputStream(IRubyObject io) throws IOException {
-        super(new IOOutputStream(io, false, false),
-                new Deflater(Deflater.DEFAULT_COMPRESSION, true), DEFAULT_BUFFER_SIZE);
-        this.io = io;
-        position = 0;
+    public static ZlibCustomDeflaterOutputStream getInstance(IRubyObject io, int level,
+            boolean nowrap) {
+        Deflater deflater = new Deflater(level, nowrap);
+        return new ZlibCustomDeflaterOutputStream(io, deflater, nowrap);
     }
 
+    public static ZlibCustomDeflaterOutputStream getInstance(OutputStream out, int level,
+            boolean nowrap) {
+        Deflater deflater = new Deflater(level, nowrap);
+        return new ZlibCustomDeflaterOutputStream(out, deflater, nowrap);
+    }
+    
+    private ZlibCustomDeflaterOutputStream(IRubyObject io, Deflater deflater, boolean nowrap) {
+        super(new IOOutputStream(io, false, false), deflater, DEFAULT_BUFFER_SIZE);
+        this.io = io;
+        this.deflater = deflater;
+        this.nowrap = nowrap;
+        position = 0;
+    }
+    
+    private ZlibCustomDeflaterOutputStream(OutputStream out, Deflater deflater, boolean nowrap) {
+        super(out, deflater, DEFAULT_BUFFER_SIZE);
+        this.io = null;
+        this.deflater = deflater;
+        this.nowrap = nowrap;
+        position = 0;
+    }
+    
     /**
      * We call internal IO#close directly, not via IOOutputStream#close.
      * IOInputStream#close directly invoke IO.getOutputStream().close() for IO
@@ -39,41 +63,62 @@ public class ZlibCustomDeflaterOutputStream extends DeflaterOutputStream {
      */
     @Override
     public void close() throws IOException {
-        // Do not invoke DeflaterOutputStream#close here.
-        // super.close();
-        // following should work as same as DeflaterOutputStream#close.
-        finish();
-        // call IO#close instead.
-        if (io.respondsTo("close")) {
-            io.callMethod(io.getRuntime().getCurrentContext(), "close");
+        if (io == null) {
+            super.close();
+        } else {
+            // Do not invoke DeflaterOutputStream#close here.
+            // super.close();
+            // following should work as same as DeflaterOutputStream#close.
+            finish();
+            // call IO#close instead.
+            if (io.respondsTo("close")) {
+                io.callMethod(io.getRuntime().getCurrentContext(), "close");
+            }
         }
     }
 
     @Override
     public synchronized void write(byte bytes[], int offset, int length) throws IOException {
-        writeHeaderIfNeeded();
+        if (nowrap) {
+            writeHeaderIfNeeded();
+        }
         super.write(bytes, offset, length);
-        checksum.update(bytes, offset, length);
+        if (nowrap) {
+            checksum.update(bytes, offset, length);
+        }
         position += length;
     }
 
     @Override
     public void finish() throws IOException {
-        writeHeaderIfNeeded();
+        if (nowrap) {
+            writeHeaderIfNeeded();
+        }
         super.finish();
-        writeTrailer();
+        if (nowrap) {
+            writeTrailer();
+        }
     }
-    
+
     public void setOrigName(String origName) {
         this.origName = origName;
     }
-    
+
     public void setComment(String comment) {
         this.comment = comment;
     }
-    
+
     public void setLevel(int level) {
         this.level = level;
+        deflater.setLevel(level);
+    }
+    
+    public void setStrategy(int strategy) {
+        deflater.setStrategy(strategy);
+    }
+    
+    public void setDictionary(byte[] dictionary) {
+        deflater.setDictionary(dictionary);
     }
 
     public void setModifiedTime(long newModifiedTime) {
@@ -90,6 +135,22 @@ public class ZlibCustomDeflaterOutputStream extends DeflaterOutputStream {
 
     public long pos() {
         return position;
+    }
+    
+    public int getTotalIn() {
+        return deflater.getTotalIn();
+    }
+    
+    public int getTotalOut() {
+        return deflater.getTotalOut();
+    }
+    
+    public boolean finished() {
+        return deflater.finished();
+    }
+    
+    public int getAdler() {
+        return deflater.getAdler();
     }
 
     // Called before any write to make sure the
@@ -131,7 +192,7 @@ public class ZlibCustomDeflaterOutputStream extends DeflaterOutputStream {
     }
 
     private void writeTrailer() throws IOException {
-        final int originalDataSize = def.getTotalIn();
+        final int originalDataSize = deflater.getTotalIn();
         final int checksumInt = (int) checksum.getValue();
 
         final byte[] trailer = { (byte) (checksumInt), (byte) (checksumInt >> 8),

@@ -13,6 +13,7 @@ import org.joda.time.DateTime;
 import org.jruby.Ruby;
 import org.jruby.RubyZlib;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.runtime.builtin.IRubyObject;
 
 public class ZlibCustomInflaterInputStream extends InflaterInputStream {
 
@@ -26,20 +27,30 @@ public class ZlibCustomInflaterInputStream extends InflaterInputStream {
     private DateTime modifiedTime = null;
 
     private CountingIOInputStream countingStream;
+    private Inflater inflater;
+    private boolean nowrap;
     private Callback callback;
     private CRC32 checksum = new CRC32();
     private boolean eof = false;
-    
+
     public interface Callback {
         void onReadHeaderComplete(ZlibCustomInflaterInputStream stream);
     }
 
+    public static ZlibCustomInflaterInputStream getInstance(IRubyObject obj, boolean nowrap, Callback callback) {
+        CountingIOInputStream io = new CountingIOInputStream(obj);
+        Inflater inflater = new Inflater(nowrap);
+        return new ZlibCustomInflaterInputStream(io, inflater, nowrap, callback);
+    }
+    
     /**
      * Offers header property in addition to GZIPInputStream.
      */
-    public ZlibCustomInflaterInputStream(CountingIOInputStream io, Callback callback) {
-        super(new BufferedInputStream(io), new Inflater(true), DEFAULT_BUFFER_SIZE);
+    private ZlibCustomInflaterInputStream(CountingIOInputStream io, Inflater inflater, boolean nowrap, Callback callback) {
+        super(new BufferedInputStream(io), inflater, DEFAULT_BUFFER_SIZE);
         this.countingStream = io;
+        this.inflater = inflater;
+        this.nowrap = nowrap;
         this.callback = callback;
         readHeader();
         eof = false;
@@ -131,6 +142,10 @@ public class ZlibCustomInflaterInputStream extends InflaterInputStream {
 
     public long crc() {
         return checksum.getValue();
+    }
+    
+    public Inflater getInflater() {
+        return inflater;
     }
 
     private void readHeader() {
