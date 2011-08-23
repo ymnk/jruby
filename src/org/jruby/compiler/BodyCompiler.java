@@ -655,4 +655,9 @@ public interface BodyCompiler {
      * @stack: String defined for contained expression
      */
     public void definedNot();
+    
+    /**
+     * Get the caching index currently used for this body's scope
+     */
+    public int getScopeIndex();
 }

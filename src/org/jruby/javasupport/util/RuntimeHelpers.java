@@ -32,6 +32,7 @@ import org.jruby.ast.Node;
 import org.jruby.ast.NodeType;
 import org.jruby.ast.OptArgNode;
 import org.jruby.ast.UnnamedRestArgNode;
+import org.jruby.ast.executable.AbstractScript;
 import org.jruby.ast.util.ArgsUtil;
 import org.jruby.common.IRubyWarnings.ID;
 import org.jruby.compiler.ASTInspector;
@@ -1211,8 +1212,8 @@ public class RuntimeHelpers {
         return context.setConstantInModule(name, module, value);
     }
 
-    public static IRubyObject setConstantInCurrent(IRubyObject value, ThreadContext context, String name) {
-        return context.setConstantInCurrent(name, value);
+    public static IRubyObject setConstantInCurrent(IRubyObject value, ThreadContext context, StaticScope staticScope, String name) {
+        return context.setConstantInCurrent(staticScope, name, value);
     }
     
     public static IRubyObject retryJump() {
@@ -1549,8 +1550,8 @@ public class RuntimeHelpers {
         preLoadCommon(context, staticScope, false);
     }
 
-    public static void preLoad(ThreadContext context, String scopeString, boolean wrap) {
-        StaticScope staticScope = decodeRootScope(context, scopeString);
+    public static void preLoad(ThreadContext context, AbstractScript script, int scopeIndex, String scopeString, boolean wrap) {
+        StaticScope staticScope = script.getScope(context, scopeString, scopeIndex);
         preLoadCommon(context, staticScope, wrap);
     }
 

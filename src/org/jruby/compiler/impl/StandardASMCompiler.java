@@ -492,10 +492,12 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
 
             method.label(tryBegin);
             method.aload(THREADCONTEXT_INDEX);
+            method.aload(THIS);
+            method.ldc(0); // __file__ always gets the zero scope
             String scopeNames = RuntimeHelpers.encodeScope(topLevelScope);
             method.ldc(scopeNames);
             method.iload(SELF_INDEX + 1);
-            method.invokestatic(p(RuntimeHelpers.class), "preLoad", sig(void.class, ThreadContext.class, String.class, boolean.class));
+            method.invokestatic(p(RuntimeHelpers.class), "preLoad", sig(void.class, ThreadContext.class, AbstractScript.class, int.class, String.class, boolean.class));
 
             method.aload(THIS);
             method.aload(THREADCONTEXT_INDEX);

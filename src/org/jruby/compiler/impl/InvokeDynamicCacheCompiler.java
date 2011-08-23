@@ -70,17 +70,19 @@ public class InvokeDynamicCacheCompiler extends InheritedCacheCompiler {
      * @param constantName the name of the constant to look up
      */
     @Override
-    public void cacheConstant(BaseBodyCompiler method, String constantName) {
+    public void cacheConstant(BaseBodyCompiler method, String constantName, int scopeIndex) {
         if (!RubyInstanceConfig.INVOKEDYNAMIC_CONSTANTS) {
-            super.cacheConstant(method, constantName);
+            super.cacheConstant(method, constantName, scopeIndex);
             return;
         }
         
+        method.loadThis();
         method.loadThreadContext();
         method.method.invokedynamic(
                 constantName,
-                sig(IRubyObject.class, ThreadContext.class),
-                InvokeDynamicSupport.getConstantHandle());
+                sig(IRubyObject.class, AbstractScript.class, ThreadContext.class),
+                InvokeDynamicSupport.getConstantHandle(),
+                scopeIndex);
     }
 
     /**
@@ -265,17 +267,14 @@ public class InvokeDynamicCacheCompiler extends InheritedCacheCompiler {
     }
 
     /**
-     * Cache a StaticScope using invokedynamic.
+     * Init a StaticScope using invokedynamic.
      * 
      * @param method the method compiler with which bytecode is emitted
      * @param scope the original scope to base the new one on
      */
     @Override
-    public int cacheStaticScope(BaseBodyCompiler method, StaticScope scope) {
+    public int initStaticScope(BaseBodyCompiler method, int index, StaticScope scope) {
         String scopeString = RuntimeHelpers.encodeScope(scope);
-        
-        int index = scopeCount;
-        scopeCount++;
         
         method.loadThis();
         method.loadThreadContext();
@@ -290,6 +289,12 @@ public class InvokeDynamicCacheCompiler extends InheritedCacheCompiler {
         return index;
     }
     
+    /**
+     * Load the scope associated with the given index.
+     * 
+     * @param method the BodyCompiler to use for emitting code
+     * @param index index of the scope
+     */
     public void loadStaticScope(BaseBodyCompiler method, int index) {
         method.loadThis();
         

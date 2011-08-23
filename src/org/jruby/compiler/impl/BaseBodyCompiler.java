@@ -336,8 +336,9 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
     public void assignConstantInCurrent(String name) {
         loadThreadContext();
+        script.getCacheCompiler().loadStaticScope(this, scopeIndex);
         method.ldc(name);
-        invokeUtilityMethod("setConstantInCurrent", sig(IRubyObject.class, params(IRubyObject.class, ThreadContext.class, String.class)));
+        invokeUtilityMethod("setConstantInCurrent", sig(IRubyObject.class, params(IRubyObject.class, ThreadContext.class, StaticScope.class, String.class)));
     }
 
     public void assignConstantInModule(String name) {
@@ -355,7 +356,7 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     }
 
     public void retrieveConstant(String name) {
-        script.getCacheCompiler().cacheConstant(this, name);
+        script.getCacheCompiler().cacheConstant(this, name, scopeIndex);
     }
 
     public void retrieveConstantFromModule(String name) {
@@ -1902,7 +1903,8 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
     public void isConstantDefined(String name, BranchCallback trueBranch, BranchCallback falseBranch) {
         loadThreadContext();
         method.ldc(name);
-        invokeThreadContext("getConstantDefined", sig(boolean.class, params(String.class)));
+        script.getCacheCompiler().loadStaticScope(this, scopeIndex);
+        invokeThreadContext("getConstantDefined", sig(boolean.class, params(String.class, StaticScope.class)));
         Label falseLabel = new Label();
         Label exitLabel = new Label();
         method.ifeq(falseLabel); // EQ == 0 (i.e. false)
@@ -2906,5 +2908,9 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
         loadRuntime();
         method.swap();
         invokeUtilityMethod("getDefinedNot", sig(ByteList.class, Ruby.class, ByteList.class));
+    }
+    
+    public int getScopeIndex() {
+        return scopeIndex;
     }
 }

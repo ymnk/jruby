@@ -131,6 +131,7 @@ import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jruby.RubyInstanceConfig.CompileMode;
 import org.jruby.ast.RootNode;
+import org.jruby.ast.executable.AbstractScript;
 import org.jruby.ast.executable.RuntimeCache;
 import org.jruby.runtime.opto.ObjectIdentityInvalidator;
 import org.jruby.runtime.opto.Invalidator;
@@ -142,6 +143,7 @@ import org.jruby.interpreter.Interpreter;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.management.BeanManager;
 import org.jruby.management.BeanManagerFactory;
+import org.jruby.parser.StaticScope;
 import org.jruby.platform.Platform;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.MethodIndex;
@@ -530,7 +532,7 @@ public final class Ruby {
                         }
 
                         if (script != null) {
-                            runScriptBody(script);
+                            runScriptBody(script, ((RootNode)scriptNode).getStaticScope());
                         } else {
                             runInterpreterBody(scriptNode);
                         }
@@ -698,10 +700,11 @@ public final class Ruby {
      * This is used for the "gets" loop, and we bypass 'load' to use an
      * already-prepared, already-pushed scope for the script body.
      */
-    public IRubyObject runScriptBody(Script script) {
+    public IRubyObject runScriptBody(Script script, StaticScope staticScope) {
         ThreadContext context = getCurrentContext();
 
         try {
+            ((AbstractScript)script).runtimeCache.scopes[0] = staticScope;
             return script.__file__(context, getTopSelf(), Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return (IRubyObject) rj.getValue();

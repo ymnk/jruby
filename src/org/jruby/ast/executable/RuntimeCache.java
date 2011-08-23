@@ -382,24 +382,29 @@ public class RuntimeCache {
         Arrays.fill(methodCache, CacheEntry.NULL_CACHE);
     }
 
-    public final IRubyObject getConstant(ThreadContext context, String name, int index) {
-        IRubyObject value = getValue(context, name, index);
+    public final IRubyObject getConstant(ThreadContext context, String name, int scopeIndex, int index) {
+        IRubyObject value = getValue(context, name, scopeIndex, index);
         // We can callsite cache const_missing if we want
-        return value != null ? value : context.getCurrentScope().getStaticScope().getModule().callMethod(context, "const_missing", context.getRuntime().fastNewSymbol(name));
+        if (value != null) {
+            return value;
+        } else {
+            StaticScope scope = getScope(scopeIndex);
+            return scope.getModule().callMethod(context, "const_missing", context.getRuntime().fastNewSymbol(name));
+        }
     }
 
-    public IRubyObject getValue(ThreadContext context, String name, int index) {
+    public IRubyObject getValue(ThreadContext context, String name, int scopeIndex, int index) {
         IRubyObject value = constants[index]; // Store to temp so it does null out on us mid-stream
-        return isCached(context, value, index) ? value : reCache(context, name, index);
+        return isCached(context, value, index) ? value : reCache(context, name, scopeIndex, index);
     }
 
     private boolean isCached(ThreadContext context, IRubyObject value, int index) {
         return value != null && constantGenerations[index] == context.getRuntime().getConstantInvalidator().getData();
     }
 
-    public IRubyObject reCache(ThreadContext context, String name, int index) {
+    public IRubyObject reCache(ThreadContext context, String name, int scopeIndex, int index) {
         Object newGeneration = context.getRuntime().getConstantInvalidator().getData();
-        IRubyObject value = context.getConstant(name);
+        IRubyObject value = getScope(scopeIndex).getConstant(context.runtime, name, context.runtime.getObject());
         constants[index] = value;
         if (value != null) {
             constantGenerations[index] = newGeneration;

@@ -212,6 +212,7 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
                             switch (read) {
                             case BACKREF:
                             case LASTLINE:
+                            case CREF:
                                 if (DEBUG) LOG.debug("Method reads scope field {}: {}: {}", read, methodDescs.get(0).getDeclaringType(), methodDescs);
                                 scope = true;
                                 break;
@@ -224,6 +225,7 @@ public class AnnotationBinder implements AnnotationProcessorFactory {
                             switch (write) {
                             case BACKREF:
                             case LASTLINE:
+                            case CREF:
                                 if (DEBUG) LOG.debug("Method writes scope field {}: {}: {}", write, methodDescs.get(0).getDeclaringType(), methodDescs);
                                 scope = true;
                                 break;

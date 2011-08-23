@@ -628,6 +628,12 @@ public final class ThreadContext {
         return value != null;
     }
     
+    public boolean getConstantDefined(String internedName, StaticScope staticScope) {
+        IRubyObject value = staticScope.getConstant(runtime, internedName, runtime.getObject());
+
+        return value != null;
+    }
+    
     /**
      * Used by the evaluator and the compiler to look up a constant by name
      */
@@ -640,9 +646,17 @@ public final class ThreadContext {
      * This is for a null const decl
      */
     public IRubyObject setConstantInCurrent(String internedName, IRubyObject result) {
+        return setConstantInCurrent(getCurrentScope().getStaticScope(), internedName, result);
+    }
+    
+    /**
+     * Used by the evaluator and the compiler to set a constant by name
+     * This is for a null const decl
+     */
+    public IRubyObject setConstantInCurrent(StaticScope staticScope, String internedName, IRubyObject result) {
         RubyModule module;
 
-        if ((module = getCurrentScope().getStaticScope().getModule()) != null) {
+        if ((module = staticScope.getModule()) != null) {
             module.setConstant(internedName, result);
             return result;
         }

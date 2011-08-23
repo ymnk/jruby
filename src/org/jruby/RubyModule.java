@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jruby.anno.FrameField;
 
 import org.jruby.anno.JRubyClass;
 import org.jruby.anno.JRubyConstant;
@@ -2267,7 +2268,7 @@ public class RubyModule extends RubyObject {
     /** 
      * Return an array of nested modules or classes.
      */
-    @JRubyMethod(name = "nesting", frame = true, meta = true)
+    @JRubyMethod(name = "nesting", frame = true, meta = true, reads = FrameField.CREF)
     public static RubyArray nesting(ThreadContext context, IRubyObject recv, Block block) {
         Ruby runtime = context.getRuntime();
         RubyModule object = runtime.getObject();

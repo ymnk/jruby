@@ -94,6 +94,7 @@ public class InvokeDynamicSupport {
     public final static String BOOTSTRAP_STRING_STRING_SIG = sig(CallSite.class, Lookup.class, String.class, MethodType.class, String.class, String.class);
     public final static String BOOTSTRAP_STRING_STRING_INT_SIG = sig(CallSite.class, Lookup.class, String.class, MethodType.class, String.class, String.class, int.class);
     public final static String BOOTSTRAP_STRING_SIG = sig(CallSite.class, Lookup.class, String.class, MethodType.class, String.class);
+    public final static String BOOTSTRAP_INT_SIG = sig(CallSite.class, Lookup.class, String.class, MethodType.class, int.class);
     public final static String BOOTSTRAP_STRING_CALLTYPE_SIG = sig(CallSite.class, Lookup.class, String.class, MethodType.class, String.class, CallType.class);
     public final static String BOOTSTRAP_LONG_SIG = sig(CallSite.class, Lookup.class, String.class, MethodType.class, long.class);
     public final static String BOOTSTRAP_DOUBLE_SIG = sig(CallSite.class, Lookup.class, String.class, MethodType.class, double.class);
@@ -109,7 +110,7 @@ public class InvokeDynamicSupport {
     }
     
     public static org.objectweb.asm.MethodHandle getConstantHandle() {
-        return getBootstrapHandle("getConstantBootstrap", BOOTSTRAP_BARE_SIG);
+        return getBootstrapHandle("getConstantBootstrap", BOOTSTRAP_INT_SIG);
     }
     
     public static org.objectweb.asm.MethodHandle getByteListHandle() {
@@ -137,7 +138,7 @@ public class InvokeDynamicSupport {
     }
     
     public static org.objectweb.asm.MethodHandle getLoadStaticScopeHandle() {
-        return getBootstrapHandle("getLoadStaticScopeBootstrap", BOOTSTRAP_BARE_SIG);
+        return getBootstrapHandle("getLoadStaticScopeBootstrap", BOOTSTRAP_INT_SIG);
     }
     
     public static org.objectweb.asm.MethodHandle getCallSiteHandle() {
@@ -237,15 +238,18 @@ public class InvokeDynamicSupport {
         return site;
     }
 
-    public static CallSite getConstantBootstrap(Lookup lookup, String name, MethodType type) throws NoSuchMethodException, IllegalAccessException {
+    public static CallSite getConstantBootstrap(Lookup lookup, String name, MethodType type, int scopeIndex) throws NoSuchMethodException, IllegalAccessException {
         RubyConstantCallSite site;
 
         site = new RubyConstantCallSite(type, name);
         
         MethodType fallbackType = type.insertParameterTypes(0, RubyConstantCallSite.class);
-        MethodHandle myFallback = insertArguments(
-                lookup.findStatic(InvokeDynamicSupport.class, "constantFallback",
-                fallbackType),
+        fallbackType = fallbackType.insertParameterTypes(fallbackType.parameterCount(), int.class);
+        
+        MethodHandle myFallback = lookup.findStatic(InvokeDynamicSupport.class, "constantFallback", fallbackType);
+        myFallback = insertArguments(myFallback, fallbackType.parameterCount() - 1, scopeIndex);
+        myFallback = insertArguments(
+                myFallback,
                 0,
                 site);
         site.setTarget(myFallback);
@@ -899,18 +903,22 @@ public class InvokeDynamicSupport {
     }
 
     public static IRubyObject constantFallback(RubyConstantCallSite site, 
-            ThreadContext context) {
-        IRubyObject value = context.getConstant(site.name());
+            AbstractScript script, ThreadContext context, int scopeIndex) {
+        IRubyObject value = script.getScope(scopeIndex).getConstant(context.runtime, site.name(), context.runtime.getObject());
         
         if (value != null) {
             if (RubyInstanceConfig.LOG_INDY_CONSTANTS) LOG.info("constant " + site.name() + " bound directly");
             
             MethodHandle valueHandle = constant(IRubyObject.class, value);
-            valueHandle = dropArguments(valueHandle, 0, ThreadContext.class);
+            valueHandle = dropArguments(valueHandle, 0, AbstractScript.class, ThreadContext.class);
+        
+            MethodType fallbackType = site.type().insertParameterTypes(0, RubyConstantCallSite.class);
+            fallbackType = fallbackType.insertParameterTypes(fallbackType.parameterCount(), int.class);
 
-            MethodHandle fallback = insertArguments(
-                    findStatic(InvokeDynamicSupport.class, "constantFallback",
-                    methodType(IRubyObject.class, RubyConstantCallSite.class, ThreadContext.class)),
+            MethodHandle fallback = findStatic(InvokeDynamicSupport.class, "constantFallback", fallbackType);
+            fallback = insertArguments(fallback, fallbackType.parameterCount() - 1, scopeIndex);
+            fallback = insertArguments(
+                    fallback,
                     0,
                     site);
 
@@ -918,7 +926,7 @@ public class InvokeDynamicSupport {
             MethodHandle gwt = switchPoint.guardWithTest(valueHandle, fallback);
             site.setTarget(gwt);
         } else {
-            value = context.getCurrentScope().getStaticScope().getModule()
+            value = script.getScope(scopeIndex).getModule()
                     .callMethod(context, "const_missing", context.getRuntime().fastNewSymbol(site.name()));
         }
         

@@ -40,7 +40,9 @@ import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyModule;
 import org.jruby.ast.ArgsNode;
 import org.jruby.ast.Node;
+import org.jruby.ast.executable.AbstractScript;
 import org.jruby.ast.executable.Script;
+import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
@@ -123,6 +125,15 @@ public class DefaultMethod extends DynamicMethod implements MethodArgs, Position
     }
 
     public void switchToJitted(Script jitCompiledScript, CallConfiguration jitCallConfig) {
+        // initialize scope 0, used for the body of the method
+        StaticScope scope = ((AbstractScript)jitCompiledScript).getScope(
+                implementationClass.getRuntime().getCurrentContext(),
+                RuntimeHelpers.encodeScope(staticScope),
+                0);
+
+        scope.setModule(staticScope.getModule());
+        scope.setPreviousCRefScope(staticScope.getPreviousCRefScope());
+        
         this.box.actualMethod = DynamicMethodFactory.newJittedMethod(
                 getImplementationClass().getRuntime(), getImplementationClass(),
                 staticScope, jitCompiledScript, name, jitCallConfig, getVisibility(), argsNode.getArity(), position,

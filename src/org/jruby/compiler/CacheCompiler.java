@@ -58,11 +58,13 @@ public interface CacheCompiler {
     
     public void cacheSpecialClosure(BaseBodyCompiler method, String closureMethod);
 
-    public void cacheConstant(BaseBodyCompiler method, String constantName);
+    public void cacheConstant(BaseBodyCompiler method, String constantName, int scopeIndex);
 
     public void cacheConstantFrom(BaseBodyCompiler method, String constantName);
 
     public int cacheStaticScope(BaseBodyCompiler method, StaticScope scope);
+    
+    public int reserveStaticScope();
     
     public void loadStaticScope(BaseBodyCompiler method, int index);
 

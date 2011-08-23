@@ -97,10 +97,11 @@ public class InheritedCacheCompiler implements CacheCompiler {
     }
 
     public int cacheStaticScope(BaseBodyCompiler method, StaticScope scope) {
+        return initStaticScope(method, reserveStaticScope(), scope);
+    }
+
+    public int initStaticScope(BaseBodyCompiler method, int index, StaticScope scope) {
         String scopeString = RuntimeHelpers.encodeScope(scope);
-        
-        int index = scopeCount;
-        scopeCount++;
 
         // retrieve scope from scopes array
         method.loadThis();
@@ -115,6 +116,10 @@ public class InheritedCacheCompiler implements CacheCompiler {
         }
 
         return index;
+    }
+    
+    public int reserveStaticScope() {
+        return scopeCount++;
     }
     
     public void loadStaticScope(BaseBodyCompiler method, int index) {
@@ -275,15 +280,16 @@ public class InheritedCacheCompiler implements CacheCompiler {
         }
     }
 
-    public void cacheConstant(BaseBodyCompiler method, String constantName) {
+    public void cacheConstant(BaseBodyCompiler method, String constantName, int scopeIndex) {
         method.loadThis();
         method.loadThreadContext();
         method.method.ldc(constantName);
+        method.method.ldc(scopeIndex);
         if (inheritedConstantCount < AbstractScript.NUMBERED_CONSTANT_COUNT) {
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getConstant" + inheritedConstantCount, sig(IRubyObject.class, ThreadContext.class, String.class));
+            method.method.invokevirtual(scriptCompiler.getClassname(), "getConstant" + inheritedConstantCount, sig(IRubyObject.class, ThreadContext.class, String.class, int.class));
         } else {
             method.method.pushInt(inheritedConstantCount);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getConstant", sig(IRubyObject.class, ThreadContext.class, String.class, int.class));
+            method.method.invokevirtual(scriptCompiler.getClassname(), "getConstant", sig(IRubyObject.class, ThreadContext.class, String.class, int.class, int.class));
         }
 
         inheritedConstantCount++;
