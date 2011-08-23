@@ -114,7 +114,7 @@ public class EmbedEvalUnitImpl implements EmbedEvalUnit {
             IRubyObject ret;
             CompileMode mode = runtime.getInstanceConfig().getCompileMode();
             if (mode == CompileMode.FORCE) {
-                ret = runtime.runScriptBody(script);
+                ret = runtime.runScriptBody(script, scope.getStaticScope());
             } else {
                 ret = runtime.runInterpreter(node);
             }
