@@ -118,12 +118,13 @@ public class InheritedCacheCompiler implements CacheCompiler {
     }
     
     public void loadStaticScope(BaseBodyCompiler method, int index) {
+        method.loadThis();
         if (scopeCount < AbstractScript.NUMBERED_SCOPE_COUNT) {
             // use numbered access method
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getScope" + index, sig(StaticScope.class, ThreadContext.class, String.class));
+            method.method.invokevirtual(scriptCompiler.getClassname(), "getScope" + index, sig(StaticScope.class));
         } else {
             method.method.pushInt(index);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getScope", sig(StaticScope.class, ThreadContext.class, String.class, int.class));
+            method.method.invokevirtual(scriptCompiler.getClassname(), "getScope", sig(StaticScope.class, int.class));
         }
     }
     
@@ -426,7 +427,7 @@ public class InheritedCacheCompiler implements CacheCompiler {
         }
     }
 
-    public void cacheClosure(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector) {
+    public int cacheClosure(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector) {
         String descriptor = RuntimeHelpers.buildBlockDescriptor(
                 closureMethod,
                 arity,
@@ -439,20 +440,23 @@ public class InheritedCacheCompiler implements CacheCompiler {
 
         method.loadThis();
         method.loadThreadContext();
+        int scopeIndex = cacheStaticScope(method, scope);
 
         if (inheritedBlockBodyCount < AbstractScript.NUMBERED_BLOCKBODY_COUNT) {
             method.method.ldc(descriptor);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getBlockBody" + inheritedBlockBodyCount, sig(BlockBody.class, ThreadContext.class, String.class));
+            method.method.invokevirtual(scriptCompiler.getClassname(), "getBlockBody" + inheritedBlockBodyCount, sig(BlockBody.class, ThreadContext.class, StaticScope.class, String.class));
         } else {
             method.method.pushInt(inheritedBlockBodyCount);
             method.method.ldc(descriptor);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getBlockBody", sig(BlockBody.class, ThreadContext.class, int.class, String.class));
+            method.method.invokevirtual(scriptCompiler.getClassname(), "getBlockBody", sig(BlockBody.class, ThreadContext.class, StaticScope.class, int.class, String.class));
         }
 
         inheritedBlockBodyCount++;
+        
+        return scopeIndex;
     }
 
-    public void cacheClosure19(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, String parameterList, ASTInspector inspector) {
+    public int cacheClosure19(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, String parameterList, ASTInspector inspector) {
         String descriptor = RuntimeHelpers.buildBlockDescriptor19(
                 closureMethod,
                 arity,
@@ -466,17 +470,20 @@ public class InheritedCacheCompiler implements CacheCompiler {
 
         method.loadThis();
         method.loadThreadContext();
+        int scopeIndex = cacheStaticScope(method, scope);
 
         if (inheritedBlockBodyCount < AbstractScript.NUMBERED_BLOCKBODY_COUNT) {
             method.method.ldc(descriptor);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getBlockBody19" + inheritedBlockBodyCount, sig(BlockBody.class, ThreadContext.class, String.class));
+            method.method.invokevirtual(scriptCompiler.getClassname(), "getBlockBody19" + inheritedBlockBodyCount, sig(BlockBody.class, ThreadContext.class, StaticScope.class, String.class));
         } else {
             method.method.pushInt(inheritedBlockBodyCount);
             method.method.ldc(descriptor);
-            method.method.invokevirtual(scriptCompiler.getClassname(), "getBlockBody19", sig(BlockBody.class, ThreadContext.class, int.class, String.class));
+            method.method.invokevirtual(scriptCompiler.getClassname(), "getBlockBody19", sig(BlockBody.class, ThreadContext.class, StaticScope.class, int.class, String.class));
         }
 
         inheritedBlockBodyCount++;
+        
+        return scopeIndex;
     }
 
     public void cacheSpecialClosure(BaseBodyCompiler method, String closureMethod) {

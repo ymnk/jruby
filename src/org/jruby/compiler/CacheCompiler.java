@@ -42,9 +42,19 @@ public interface CacheCompiler {
 
     public void cacheDRegexp(BaseBodyCompiler method, CompilerCallback createStringCallback, int options);
 
-    public void cacheClosure(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector);
+    /**
+     * Construct and cache a closure body, using the given parameters.
+     * 
+     * @return index of the cached StaticScope for the closure
+     */
+    public int cacheClosure(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, ASTInspector inspector);
 
-    public void cacheClosure19(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, String parameterList, ASTInspector inspector);
+    /**
+     * Construct and cache a closure body, using the given parameters.
+     * 
+     * @return index of the cached StaticScope for the closure
+     */
+    public int cacheClosure19(BaseBodyCompiler method, String closureMethod, int arity, StaticScope scope, String file, int line, boolean hasMultipleArgsHead, NodeType argsNodeId, String parameterList, ASTInspector inspector);
     
     public void cacheSpecialClosure(BaseBodyCompiler method, String closureMethod);
 

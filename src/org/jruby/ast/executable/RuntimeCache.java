@@ -60,10 +60,10 @@ public class RuntimeCache {
      * @param descriptor
      * @return
      */
-    public final BlockBody getBlockBody(Object scriptObject, ThreadContext context, int index, String descriptor) {
+    public final BlockBody getBlockBody(Object scriptObject, ThreadContext context, StaticScope staticScope, int index, String descriptor) {
         BlockBody body = blockBodies[index];
         if (body == null) {
-            return createBlockBody(scriptObject, context, index, descriptor);
+            return createBlockBody(scriptObject, context, index, staticScope, descriptor);
         }
         return body;
     }
@@ -78,10 +78,10 @@ public class RuntimeCache {
      * @param descriptor
      * @return
      */
-    public final BlockBody getBlockBody19(Object scriptObject, ThreadContext context, int index, String descriptor) {
+    public final BlockBody getBlockBody19(Object scriptObject, ThreadContext context, int index, StaticScope staticScope, String descriptor) {
         BlockBody body = blockBodies[index];
         if (body == null) {
-            return createBlockBody19(scriptObject, context, index, descriptor);
+            return createBlockBody19(scriptObject, context, index, staticScope, descriptor);
         }
         return body;
     }
@@ -433,13 +433,13 @@ public class RuntimeCache {
         return value;
     }
 
-    private BlockBody createBlockBody(Object scriptObject, ThreadContext context, int index, String descriptor) throws NumberFormatException {
-        BlockBody body = RuntimeHelpers.createCompiledBlockBody(context, scriptObject, descriptor);
+    private BlockBody createBlockBody(Object scriptObject, ThreadContext context, int index, StaticScope staticScope, String descriptor) throws NumberFormatException {
+        BlockBody body = RuntimeHelpers.createCompiledBlockBody(context, scriptObject, staticScope, descriptor);
         return blockBodies[index] = body;
     }
 
-    private BlockBody createBlockBody19(Object scriptObject, ThreadContext context, int index, String descriptor) throws NumberFormatException {
-        BlockBody body = RuntimeHelpers.createCompiledBlockBody19(context, scriptObject, descriptor);
+    private BlockBody createBlockBody19(Object scriptObject, ThreadContext context, int index, StaticScope staticScope, String descriptor) throws NumberFormatException {
+        BlockBody body = RuntimeHelpers.createCompiledBlockBody19(context, scriptObject, staticScope, descriptor);
         return blockBodies[index] = body;
     }
 

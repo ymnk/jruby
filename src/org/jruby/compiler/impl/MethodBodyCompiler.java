@@ -4,7 +4,6 @@ import org.jruby.Ruby;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.compiler.ASTInspector;
 import org.jruby.compiler.CompilerCallback;
-import org.jruby.exceptions.JumpException;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -18,8 +17,8 @@ import static org.objectweb.asm.Opcodes.*;
 public class MethodBodyCompiler extends RootScopedBodyCompiler {
     protected boolean specificArity;
 
-    public MethodBodyCompiler(StandardASMCompiler scriptCompiler, String rubyName, String javaName, ASTInspector inspector, StaticScope scope) {
-        super(scriptCompiler, javaName, rubyName, inspector, scope);
+    public MethodBodyCompiler(StandardASMCompiler scriptCompiler, String rubyName, String javaName, ASTInspector inspector, StaticScope scope, int scopeIndex) {
+        super(scriptCompiler, javaName, rubyName, inspector, scope, scopeIndex);
     }
 
     public boolean isSpecificArity() {

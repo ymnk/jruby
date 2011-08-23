@@ -3,7 +3,6 @@ package org.jruby.compiler.impl;
 import org.jruby.Ruby;
 import org.jruby.compiler.ASTInspector;
 import org.jruby.compiler.CompilerCallback;
-import org.jruby.exceptions.JumpException;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.ThreadContext;
@@ -19,8 +18,8 @@ import static org.objectweb.asm.Opcodes.*;
 public abstract class RootScopedBodyCompiler extends BaseBodyCompiler {
     private boolean specificArity;
 
-    protected RootScopedBodyCompiler(StandardASMCompiler scriptCompiler, String friendlyName, String rubyName, ASTInspector inspector, StaticScope scope) {
-        super(scriptCompiler, friendlyName, rubyName, inspector, scope);
+    protected RootScopedBodyCompiler(StandardASMCompiler scriptCompiler, String friendlyName, String rubyName, ASTInspector inspector, StaticScope scope, int scopeIndex) {
+        super(scriptCompiler, friendlyName, rubyName, inspector, scope, scopeIndex);
     }
 
     public String getSignature() {
@@ -64,7 +63,7 @@ public abstract class RootScopedBodyCompiler extends BaseBodyCompiler {
         methodName = "chained_" + script.getAndIncrementMethodIndex() + "_" + methodName;
         method.invokestatic(script.getClassname(), methodName, getSignature());
 
-        ChainedRootBodyCompiler methodCompiler = new ChainedRootBodyCompiler(script, methodName, rubyName, inspector, scope, this);
+        ChainedRootBodyCompiler methodCompiler = new ChainedRootBodyCompiler(script, methodName, rubyName, inspector, scope, this, scopeIndex);
 
         methodCompiler.beginChainedMethod();
 

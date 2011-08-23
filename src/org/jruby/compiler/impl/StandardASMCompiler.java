@@ -629,8 +629,18 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
         return cacheCompiler;
     }
     
-    public BodyCompiler startMethod(String rubyName, String javaName, CompilerCallback args, StaticScope scope, ASTInspector inspector) {
-        RootScopedBodyCompiler methodCompiler = new MethodBodyCompiler(this, rubyName, javaName, inspector, scope);
+    /**
+     * Begin compilation for a method that has the specified number of local variables.
+     * The returned value is a token that can be used to end the method later.
+     * 
+     * @param javaName The outward user-readable name of the method. A unique name will be generated based on this.
+     * @param arity The arity of the method's argument list
+     * @param localVarCount The number of local variables that will be used by the method.
+     * @return An Object that represents the method within this compiler. Used in calls to
+     * endMethod once compilation for this method is completed.
+     */
+    public BodyCompiler startMethod(String rubyName, String javaName, CompilerCallback args, StaticScope scope, int scopeIndex, ASTInspector inspector) {
+        RootScopedBodyCompiler methodCompiler = new MethodBodyCompiler(this, rubyName, javaName, inspector, scope, scopeIndex);
         
         methodCompiler.beginMethod(args, scope);
         
@@ -638,7 +648,7 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
     }
 
     public BodyCompiler startFileMethod(CompilerCallback args, StaticScope scope, ASTInspector inspector) {
-        MethodBodyCompiler methodCompiler = new MethodBodyCompiler(this, "__file__", "__file__", inspector, scope);
+        MethodBodyCompiler methodCompiler = new FileMethodBodyCompiler(this, "__file__", "__file__", inspector, scope);
         
         methodCompiler.beginMethod(args, scope);
         
@@ -675,14 +685,6 @@ public class StandardASMCompiler implements ScriptCompiler, Opcodes {
             method.areturn();
             method.end();
         }
-
-        return methodCompiler;
-    }
-
-    public BodyCompiler startRoot(String rubyName, String javaName, StaticScope scope, ASTInspector inspector) {
-        RootScopedBodyCompiler methodCompiler = new MethodBodyCompiler(this, rubyName, javaName, inspector, scope);
-
-        methodCompiler.beginMethod(null, scope);
 
         return methodCompiler;
     }

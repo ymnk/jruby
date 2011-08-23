@@ -15,8 +15,8 @@ public class ChainedRootBodyCompiler extends RootScopedBodyCompiler {
         method.end();
     }
 
-    public ChainedRootBodyCompiler(StandardASMCompiler scriptCompiler, String methodName, String rubyName, ASTInspector inspector, StaticScope scope, RootScopedBodyCompiler parent) {
-        super(scriptCompiler, methodName, rubyName, inspector, scope);
+    public ChainedRootBodyCompiler(StandardASMCompiler scriptCompiler, String methodName, String rubyName, ASTInspector inspector, StaticScope scope, RootScopedBodyCompiler parent, int scopeIndex) {
+        super(scriptCompiler, methodName, rubyName, inspector, scope, scopeIndex);
         this.inNestedMethod = true;
     }
 
