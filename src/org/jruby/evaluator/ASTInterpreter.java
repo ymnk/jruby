@@ -321,15 +321,21 @@ public class ASTInterpreter {
      * of all the classvar-related node evaluations */
     public static RubyModule getClassVariableBase(ThreadContext context, Ruby runtime) {
         StaticScope scope = context.getCurrentScope().getStaticScope();
+        return getClassVariableBase(context, scope);
+    }
+
+    /* Something like cvar_cbase() from eval.c, factored out for the benefit
+     * of all the classvar-related node evaluations */
+    public static RubyModule getClassVariableBase(ThreadContext context, StaticScope scope) {
         RubyModule rubyClass = scope.getModule();
-        while (rubyClass.isSingleton() || rubyClass == runtime.getDummy()) {
+        while (rubyClass.isSingleton() || rubyClass == context.runtime.getDummy()) {
             // We ran out of scopes to check
             if (scope == null) return null;
 
             scope = scope.getPreviousCRefScope();
             rubyClass = scope.getModule();
             if (scope.getPreviousCRefScope() == null) {
-                runtime.getWarnings().warn(ID.CVAR_FROM_TOPLEVEL_SINGLETON_METHOD, "class variable access from toplevel singleton method");
+                context.runtime.getWarnings().warn(ID.CVAR_FROM_TOPLEVEL_SINGLETON_METHOD, "class variable access from toplevel singleton method");
             }            
         }
         return rubyClass;

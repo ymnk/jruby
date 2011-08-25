@@ -37,7 +37,7 @@ public class RuntimeCache {
     public final StaticScope getScope(ThreadContext context, String varNamesDescriptor, int index) {
         StaticScope scope = scopes[index];
         if (scope == null) {
-            scopes[index] = scope = RuntimeHelpers.createScopeForClass(context, varNamesDescriptor);
+            scopes[index] = scope = RuntimeHelpers.decodeScope(context, varNamesDescriptor);
         }
         return scope;
     }

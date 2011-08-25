@@ -52,6 +52,7 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.GlobalVariables;
 import org.jruby.internal.runtime.methods.CallConfiguration;
 import org.jruby.internal.runtime.methods.DynamicMethod;
+import org.jruby.internal.runtime.methods.Scoping;
 import org.jruby.javasupport.JavaUtil;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -372,57 +373,49 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
     public void retrieveClassVariable(String name) {
         loadThreadContext();
-        loadRuntime();
+        script.getCacheCompiler().loadStaticScope(this, scopeIndex);
         loadSelf();
         method.ldc(name);
 
-        invokeUtilityMethod("fastFetchClassVariable", sig(IRubyObject.class, params(ThreadContext.class, Ruby.class, IRubyObject.class, String.class)));
+        invokeUtilityMethod("fetchClassVariable", sig(IRubyObject.class, params(ThreadContext.class, StaticScope.class, IRubyObject.class, String.class)));
     }
 
     public void assignClassVariable(String name) {
         loadThreadContext();
-        method.swap();
-        loadRuntime();
-        method.swap();
+        script.getCacheCompiler().loadStaticScope(this, scopeIndex);
         loadSelf();
-        method.swap();
         method.ldc(name);
-        method.swap();
 
-        invokeUtilityMethod("fastSetClassVariable", sig(IRubyObject.class, params(ThreadContext.class, Ruby.class, IRubyObject.class, String.class, IRubyObject.class)));
+        invokeUtilityMethod("setClassVariable", sig(IRubyObject.class, params(IRubyObject.class, ThreadContext.class, StaticScope.class, IRubyObject.class, String.class)));
     }
 
     public void assignClassVariable(String name, CompilerCallback value) {
         loadThreadContext();
-        loadRuntime();
+        script.getCacheCompiler().loadStaticScope(this, scopeIndex);
         loadSelf();
         method.ldc(name);
         value.call(this);
 
-        invokeUtilityMethod("fastSetClassVariable", sig(IRubyObject.class, params(ThreadContext.class, Ruby.class, IRubyObject.class, String.class, IRubyObject.class)));
+        invokeUtilityMethod("setClassVariable", sig(IRubyObject.class, params(ThreadContext.class, StaticScope.class, IRubyObject.class, String.class, IRubyObject.class)));
     }
 
     public void declareClassVariable(String name) {
         loadThreadContext();
-        method.swap();
-        loadRuntime();
-        method.swap();
+        script.getCacheCompiler().loadStaticScope(this, scopeIndex);
         loadSelf();
-        method.swap();
         method.ldc(name);
-        method.swap();
 
-        invokeUtilityMethod("fastDeclareClassVariable", sig(IRubyObject.class, params(ThreadContext.class, Ruby.class, IRubyObject.class, String.class, IRubyObject.class)));
+        invokeUtilityMethod("declareClassVariable", sig(IRubyObject.class, params(IRubyObject.class, ThreadContext.class, Ruby.class, IRubyObject.class, String.class)));
     }
 
     public void declareClassVariable(String name, CompilerCallback value) {
         loadThreadContext();
-        loadRuntime();
+        script.getCacheCompiler().loadStaticScope(this, scopeIndex);
         loadSelf();
         method.ldc(name);
         value.call(this);
 
-        invokeUtilityMethod("fastDeclareClassVariable", sig(IRubyObject.class, params(ThreadContext.class, Ruby.class, IRubyObject.class, String.class, IRubyObject.class)));
+        invokeUtilityMethod("declareClassVariable", sig(IRubyObject.class, params(ThreadContext.class, StaticScope.class, IRubyObject.class, String.class, IRubyObject.class)));
     }
 
     public void createNewFloat(double value) {
@@ -2333,7 +2326,8 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
                 // static scope
                 script.getCacheCompiler().loadStaticScope(classBody, scopeIndex);
                 
-                if (inspector.hasClosure() || inspector.hasScopeAwareMethods()) {
+                CallConfiguration callConfig = inspector.getCallConfig();
+                if (callConfig.scoping() == Scoping.Full) {
                     classBody.invokeThreadContext("preCompiledClass", sig(Void.TYPE, params(RubyModule.class, StaticScope.class)));
                 } else {
                     classBody.invokeThreadContext("preCompiledClassDummyScope", sig(Void.TYPE, params(RubyModule.class, StaticScope.class)));
@@ -2626,9 +2620,9 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
         method.pushInt(methodArity);
 
-        // arities
         method.ldc(filename);
         method.ldc(line);
+        
         method.getstatic(p(CallConfiguration.class), inspector.getCallConfig().name(), ci(CallConfiguration.class));
         method.ldc(parameterDesc);
 

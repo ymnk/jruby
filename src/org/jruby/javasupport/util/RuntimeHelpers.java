@@ -259,6 +259,7 @@ public class RuntimeHelpers {
     
     public static BlockBody createCompiledBlockBody(ThreadContext context, Object scriptObject, String closureMethod, int arity, 
             StaticScope staticScope, boolean hasMultipleArgsHead, int argsNodeType, String file, int line, boolean light) {
+        staticScope.determineModule();
         
         if (light) {
             return CompiledBlockLight.newCompiledBlockLight(
@@ -282,6 +283,7 @@ public class RuntimeHelpers {
 
     public static BlockBody createCompiledBlockBody19(ThreadContext context, Object scriptObject, String closureMethod, int arity,
             StaticScope staticScope, boolean hasMultipleArgsHead, int argsNodeType, String file, int line, boolean light, String parameterList) {
+        staticScope.determineModule();
 
         if (light) {
             return CompiledBlockLight19.newCompiledBlockLight(
@@ -311,6 +313,7 @@ public class RuntimeHelpers {
     }
     
     public static IRubyObject runBeginBlock(ThreadContext context, IRubyObject self, StaticScope staticScope, CompiledBlockCallback callback) {
+        staticScope.determineModule();
         context.preScopedBody(DynamicScope.newDynamicScope(staticScope, context.getCurrentScope()));
         
         Block block = CompiledBlock.newCompiledClosure(context, self, Arity.createArity(0), staticScope, callback, false, BlockBody.ZERO_ARGS);
@@ -339,6 +342,8 @@ public class RuntimeHelpers {
         RubyModule containingClass = context.getRubyClass();
         Visibility visibility = context.getCurrentVisibility();
         
+        scope.determineModule();
+        
         performNormalMethodChecks(containingClass, runtime, name);
         
         MethodFactory factory = MethodFactory.createFactory(compiledClass.getClassLoader());
@@ -357,6 +362,8 @@ public class RuntimeHelpers {
             int arity, String filename, int line, CallConfiguration callConfig, String parameterDesc) {
         Class compiledClass = scriptObject.getClass();
         Ruby runtime = context.getRuntime();
+        
+        scope.determineModule();
 
         RubyClass rubyClass = performSingletonMethodChecks(runtime, receiver, name);
         
@@ -673,19 +680,13 @@ public class RuntimeHelpers {
         return (RubyArray) value;
     }
     
-    public static IRubyObject fetchClassVariable(ThreadContext context, Ruby runtime, 
-            IRubyObject self, String name) {
-        RubyModule rubyClass = ASTInterpreter.getClassVariableBase(context, runtime);
+    public static IRubyObject fetchClassVariable(
+            ThreadContext context, StaticScope staticScope, IRubyObject self, String name) {
+        RubyModule rubyClass = ASTInterpreter.getClassVariableBase(context, staticScope);
    
         if (rubyClass == null) rubyClass = self.getMetaClass();
 
         return rubyClass.getClassVar(name);
-    }
-    
-    @Deprecated
-    public static IRubyObject fastFetchClassVariable(ThreadContext context, Ruby runtime, 
-            IRubyObject self, String internedName) {
-        return fetchClassVariable(context, runtime, self, internedName);
     }
     
     public static IRubyObject getConstant(ThreadContext context, String internedName) {
@@ -719,9 +720,9 @@ public class RuntimeHelpers {
         }
     }
     
-    public static IRubyObject setClassVariable(ThreadContext context, Ruby runtime, 
+    public static IRubyObject setClassVariable(ThreadContext context, StaticScope staticScope, 
             IRubyObject self, String name, IRubyObject value) {
-        RubyModule rubyClass = ASTInterpreter.getClassVariableBase(context, runtime);
+        RubyModule rubyClass = ASTInterpreter.getClassVariableBase(context, staticScope);
    
         if (rubyClass == null) rubyClass = self.getMetaClass();
 
@@ -730,26 +731,24 @@ public class RuntimeHelpers {
         return value;
     }
     
-    @Deprecated
-    public static IRubyObject fastSetClassVariable(ThreadContext context, Ruby runtime, 
-            IRubyObject self, String internedName, IRubyObject value) {
-        return setClassVariable(context, runtime, self, internedName, value);
+    public static IRubyObject setClassVariable(IRubyObject value, ThreadContext context, StaticScope staticScope, 
+            IRubyObject self, String name) {
+        return setClassVariable(context, staticScope, self, name, value);
     }
     
-    public static IRubyObject declareClassVariable(ThreadContext context, Ruby runtime, IRubyObject self, String name, IRubyObject value) {
+    public static IRubyObject declareClassVariable(ThreadContext context, StaticScope staticScope, IRubyObject self, String name, IRubyObject value) {
         // FIXME: This isn't quite right; it shouldn't evaluate the value if it's going to throw the error
-        RubyModule rubyClass = ASTInterpreter.getClassVariableBase(context, runtime);
+        RubyModule rubyClass = ASTInterpreter.getClassVariableBase(context, staticScope);
    
-        if (rubyClass == null) throw runtime.newTypeError("no class/module to define class variable");
+        if (rubyClass == null) throw context.runtime.newTypeError("no class/module to define class variable");
         
         rubyClass.setClassVar(name, value);
    
         return value;
     }
     
-    @Deprecated
-    public static IRubyObject fastDeclareClassVariable(ThreadContext context, Ruby runtime, IRubyObject self, String internedName, IRubyObject value) {
-        return declareClassVariable(context, runtime, self, internedName, value);
+    public static IRubyObject declareClassVariable(IRubyObject value, ThreadContext context, StaticScope staticScope, IRubyObject self, String name) {
+        return declareClassVariable(context, staticScope, self, name, value);
     }
     
     public static void handleArgumentSizes(ThreadContext context, Ruby runtime, int given, int required, int opt, int rest) {
