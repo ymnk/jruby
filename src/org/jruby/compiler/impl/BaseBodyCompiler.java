@@ -70,6 +70,7 @@ import org.jruby.runtime.opto.OptoFactory;
 import org.jruby.util.ByteList;
 import org.jruby.util.JavaNameMangler;
 import org.jruby.util.SafePropertyAccessor;
+import org.jruby.util.StringSupport;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import static org.objectweb.asm.Opcodes.*;
@@ -440,15 +441,17 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
     public void createNewString(ArrayCallback callback, int count, Encoding encoding) {
         loadRuntime();
-
         ByteList startingDstr = new ByteList(StandardASMCompiler.STARTING_DSTR_SIZE);
+
         if (encoding != null) {
             startingDstr.setEncoding(encoding);
         }
+        
         script.getCacheCompiler().cacheByteList(this, startingDstr);
         method.invokevirtual(p(ByteList.class), "dup", sig(ByteList.class));
+        method.ldc(StringSupport.CR_7BIT);
+        method.invokestatic(p(RubyString.class), "newStringShared", sig(RubyString.class, Ruby.class, ByteList.class, int.class));
 
-        method.invokestatic(p(RubyString.class), "newStringLight", sig(RubyString.class, Ruby.class, ByteList.class));
         for (int i = 0; i < count; i++) {
             callback.nextValue(this, null, i);
             if (encoding != null) {
