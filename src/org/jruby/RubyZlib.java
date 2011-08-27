@@ -750,6 +750,17 @@ public class RubyZlib {
                         checksum.getValue());
                 input.view(8, input.getRealSize() - 8);
             }
+            if(jzlib){
+                if(!finished){
+                    int err=flater2.inflate(com.jcraft.jzlib.JZlib.Z_FINISH);
+                    if(err!=com.jcraft.jzlib.JZlib.Z_OK){
+                      throw Util.newBufError(runtime, "buffer error");
+                    }
+                    finished =true;
+                }
+                flater2.inflateEnd();
+            }
+            else
             flater.end();
             // MRI behavior: in finished mode, we work as pass-through
             if (internalFinished()) {
@@ -764,8 +775,17 @@ public class RubyZlib {
 
         @Override
         protected void internalClose() {
-            if(jzlib)
+            if(jzlib){
+                if(!finished){
+                    int err=flater2.inflate(com.jcraft.jzlib.JZlib.Z_FINISH);
+                    if(err!=com.jcraft.jzlib.JZlib.Z_OK){
+                        Ruby runtime = getRuntime();
+                        throw Util.newBufError(runtime, "buffer error");
+                    }
+                    finished =true;
+                }
                 flater2.inflateEnd();
+            }
             else
             flater.end();
         }
