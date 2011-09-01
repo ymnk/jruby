@@ -516,10 +516,6 @@ public class RubyZlib {
 
         private RubyString flushOutput(Ruby runtime) {
             if (collected.getRealSize() > 0) {
-                if (checksum != null) {
-                    checksum.update(collected.getUnsafeBytes(), collected.getBegin(),
-                            collected.getRealSize());
-                }
                 RubyString res = RubyString.newString(runtime, collected.getUnsafeBytes(),
                         collected.getBegin(), collected.getRealSize());
                 Util.resetBuffer(collected);
@@ -573,10 +569,10 @@ public class RubyZlib {
                     input = new ByteList(bytes, false);
                     }
                 }
-                run(false);
             } else {
                 input.append(obj);
             }
+            run(false);
         }
 
         @JRubyMethod(name = "sync_point?")
@@ -685,10 +681,9 @@ public class RubyZlib {
         private void run(boolean finish) {
             byte[] outp = new byte[1024];
             int resultLength = -1;
+            Ruby runtime = getRuntime();
 
             while (!internalFinished() && resultLength != 0) {
-                Ruby runtime = getRuntime();
-
                 // MRI behavior
                 boolean  needsInput = jzlib ? flater2.avail_in<0 : flater.needsInput();
                 if (finish && needsInput) {
@@ -734,11 +729,38 @@ public class RubyZlib {
                     throw Util.newDataError(runtime, "data error: " + ex.getMessage());
                 }
 
+                if (checksum != null) {
+                    checksum.update(outp, 0, resultLength);
+                }
                 collected.append(outp, 0, resultLength);
                 if (resultLength == outp.length) {
                     outp = new byte[outp.length * 2];
                 }
             }
+            // process trailer if needed
+            if (internalFinished() && readTrailerNeeded) {
+                if (input.getRealSize() >= 8) {
+                    readTrailer(input.bytes(), flater.getBytesWritten() & 0xffffffffL,
+                            checksum.getValue());
+                    input.view(8, input.getRealSize() - 8);
+                } else if (finish) {
+                    throw Util.newBufError(runtime, "buffer error");
+                }
+            }
+            if(jzlib){
+                if(finish){
+                if(!finished){
+                    int err=flater2.inflate(com.jcraft.jzlib.JZlib.Z_FINISH);
+                    if(err!=com.jcraft.jzlib.JZlib.Z_OK){
+                      throw Util.newBufError(runtime, "buffer error");
+                    }
+                    finished =true;
+                }
+                flater2.inflateEnd();
+                }
+            }
+            else
+            if (finish) flater.end();
         }
 
         @Override
@@ -789,39 +811,14 @@ public class RubyZlib {
         @Override
         protected IRubyObject internalFinish() {
             run(true);
-            Ruby runtime = getRuntime();
-            // Need to process buffer first for calculating checksum
-            RubyString str = flushOutput(runtime);
-            // process trailer if needed
-            if (internalFinished() && readTrailerNeeded) {
-                if (input.getRealSize() < 8) {
-                    throw Util.newBufError(runtime, "buffer error");
-                }
-                readTrailer(input.bytes(), (flater.getBytesWritten() & 0xffffffffL),
-                        checksum.getValue());
-                input.view(8, input.getRealSize() - 8);
-            }
-            if(jzlib){
-                if(!finished){
-                    int err=flater2.inflate(com.jcraft.jzlib.JZlib.Z_FINISH);
-                    if(err!=com.jcraft.jzlib.JZlib.Z_OK){
-                      throw Util.newBufError(runtime, "buffer error");
-                    }
-                    finished =true;
-                }
-                flater2.inflateEnd();
-            }
-            else
-            flater.end();
             // MRI behavior: in finished mode, we work as pass-through
             if (internalFinished()) {
                 if (input.getRealSize() > 0) {
                     collected.append(input);
                     Util.resetBuffer(input);
-                    str.append(flushOutput(runtime));
                 }
             }
-            return str;
+            return flushOutput(getRuntime());
         }
 
         @Override
@@ -859,8 +856,20 @@ public class RubyZlib {
         }
 
         private void readTrailer(byte[] trailer, long bytesWritten, long checksum) {
-            Util.checkTrailer(getRuntime(), trailer, bytesWritten, checksum);
-            readTrailerNeeded = false;
+            Ruby runtime = getRuntime();
+            try {
+                Util.checkTrailer(runtime, trailer, bytesWritten, checksum);
+                readTrailerNeeded = false;
+            } catch (RaiseException re) {
+                /*
+                 * uglish exception conversion. zlib.c returns Z_DATA_ERROR for
+                 * gzip footer error so Zlib::Inflate raises DataError for any
+                 * footer error. Unlike Zlib::Inflate, GZipReader raises
+                 * NoFooter, CRCError or LengthError for footer error (ext/zlib
+                 * parses by itself.)
+                 */
+                throw Util.newDataError(runtime, re.getMessage());
+            }
         }
     }
 
