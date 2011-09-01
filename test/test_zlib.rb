@@ -587,6 +587,14 @@ class TestZlibInflateGzip < Test::Unit::TestCase
       z.finish
     end
   end
+
+  def test_wrong_length
+    gzip = "\x1f\x8b\x08\x00\x1a\x96\xe0\x4c\x00\x03\xcb\x48\xcd\xc9\xc9\x07\x00\x86\xa6\x10\x36\x04\x00\x00\x00"
+    z = Zlib::Inflate.new(Zlib::MAX_WBITS + 16)
+    assert_raise(Zlib::DataError) do
+      z.inflate(gzip)
+    end
+  end
 end
 
 # Test for MAX_WBITS + 32
@@ -669,5 +677,36 @@ class TestZlibInflateAuto < Test::Unit::TestCase
     assert_raise(Zlib::BufError) do
       z.finish
     end
+  end
+
+  def test_wrong_length
+    gzip = "\x1f\x8b\x08\x00\x1a\x96\xe0\x4c\x00\x03\xcb\x48\xcd\xc9\xc9\x07\x00\x86\xa6\x10\x36\x04\x00\x00\x00"
+    z = Zlib::Inflate.new(Zlib::MAX_WBITS + 32)
+    assert_raise(Zlib::DataError) do
+      z.inflate(gzip)
+    end
+  end
+
+  def test_dictionary
+    dict = "hello"
+    str = "hello, hello!"
+
+    d = Zlib::Deflate.new
+    d.set_dictionary(dict)
+    comp_str = d.deflate(str)
+    comp_str << d.finish
+    comp_str.size
+
+    i = Zlib::Inflate.new(Zlib::MAX_WBITS + 32)
+
+    begin
+      i.inflate(comp_str)
+      rescue Zlib::NeedDict
+    end
+    i.reset
+
+    i.set_dictionary(dict)
+    i << comp_str
+    assert_equal(str, i.finish)
   end
 end
