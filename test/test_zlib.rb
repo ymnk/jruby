@@ -703,10 +703,10 @@ class TestZlibInflateAuto < Test::Unit::TestCase
       i.inflate(comp_str)
       rescue Zlib::NeedDict
     end
-    i.reset
+    #i.reset
 
     i.set_dictionary(dict)
-    i << comp_str
+    i << ""
     assert_equal(str, i.finish)
   end
 end
