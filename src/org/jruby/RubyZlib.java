@@ -1715,8 +1715,8 @@ public class RubyZlib {
         // c: gzfile_newstr
         protected RubyString newStr(Ruby runtime, ByteList value) {
             if (runtime.is1_9()) {
-                if (internalEncoding == null) {
-                    return RubyString.newString(runtime, value, externalEncoding);
+                if (externalEncoding == null) {
+                    return RubyString.newString(runtime, value, internalEncoding);
                 }
                 return RubyString.newStringNoCopy(runtime, RubyString.transcode(
                         runtime.getCurrentContext(), value, externalEncoding, internalEncoding,
@@ -1922,7 +1922,7 @@ public class RubyZlib {
                 }
                 extEncoding = null;
             }
-            return new EncodingOption(intEncoding, extEncoding, isBom);
+            return new EncodingOption(extEncoding, intEncoding, isBom);
         }
     }
 
@@ -2700,6 +2700,7 @@ public class RubyZlib {
         
         @JRubyMethod(name = "initialize", required = 1, rest = true, visibility = PRIVATE, compat = RUBY1_8)
         public IRubyObject initialize(IRubyObject[] args) {
+            // args: recv, path, opts = {}
             if (args.length > 2) {
                 checkLevel(getRuntime(), RubyNumeric.fix2int(args[2]));
             }
@@ -2718,8 +2719,9 @@ public class RubyZlib {
 
         @JRubyMethod(name = "initialize", rest = true, visibility = PRIVATE, compat = RUBY1_9)
         public IRubyObject initialize19(IRubyObject[] args, Block unused) {
+            // args: recv, path, level = nil, strategy = nil, opts = {}
             IRubyObject obj = initializeCommon(args[0]);
-            if (args.length > 1) {
+            if (args.length > 2) {
                 IRubyObject opt = TypeConverter.checkHashType(getRuntime(), args[args.length - 1]);
                 if (!opt.isNil()) {
                     EncodingOption enc = extractEncodingOptions(opt);
@@ -2899,6 +2901,16 @@ public class RubyZlib {
         @JRubyMethod(name = "write", required = 1)
         public IRubyObject write(IRubyObject p1) {
             ByteList bytes = p1.asString().getByteList();
+            Ruby runtime = getRuntime();
+            if (runtime.is1_9()) {
+                // TODO: move to Ruby.java?
+                Encoding ascii8bit = runtime.getEncodingService().getEncodings()
+                        .get("ASCII-8BIT".getBytes()).getEncoding();
+                if (externalEncoding != null && externalEncoding != ascii8bit) {
+                    bytes = RubyString.transcode(runtime.getCurrentContext(), bytes, null,
+                            externalEncoding, runtime.getNil());
+                }
+            }
             try {
                 io.write(bytes.getUnsafeBytes(), bytes.begin(), bytes.length());
                 return getRuntime().newFixnum(bytes.length());
