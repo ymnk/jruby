@@ -2700,6 +2700,9 @@ public class RubyZlib {
         
         @JRubyMethod(name = "initialize", required = 1, rest = true, visibility = PRIVATE, compat = RUBY1_8)
         public IRubyObject initialize(IRubyObject[] args) {
+            if (args.length > 2) {
+                checkLevel(getRuntime(), RubyNumeric.fix2int(args[2]));
+            }
             return initializeCommon(args[0]);
         }
 
@@ -2722,7 +2725,13 @@ public class RubyZlib {
                     EncodingOption enc = extractEncodingOptions(opt);
                     externalEncoding = enc.getExternalEncoding();
                     internalEncoding = enc.getInternalEncoding();
+                    IRubyObject[] newArgs = new IRubyObject[args.length - 1];
+                    System.arraycopy(args, 0, newArgs, 0, args.length - 1);
+                    args = newArgs;
                 }
+            }
+            if (args.length > 2) {
+                checkLevel(getRuntime(), RubyNumeric.fix2int(args[2]));
             }
             if (realIo.respondsTo("path")) {
                 obj.getSingletonClass().defineMethod("path", new Callback() {
@@ -2738,6 +2747,12 @@ public class RubyZlib {
                 });
             }
             return obj;
+        }
+
+        private static void checkLevel(Ruby runtime, int level) {
+            if (level < 0 || level > 9) {
+                throw Util.newStreamError(runtime, "stream error: invalid level");
+            }
         }
 
         @Override
