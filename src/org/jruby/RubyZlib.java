@@ -1030,7 +1030,6 @@ public class RubyZlib {
         private ByteList input;
 
         private com.jcraft.jzlib.Inflater flater = null;
-        private boolean finished = false;
 
         protected static final ObjectAllocator INFLATE_ALLOCATOR = new ObjectAllocator() {
 
@@ -1073,11 +1072,8 @@ public class RubyZlib {
         }
 
         private void init(int windowBits) {
-            finished = false;
-
             flater = new com.jcraft.jzlib.Inflater();
             flater.init(windowBits);
-
             collected = new ByteList(BASE_SIZE);
             input = new ByteList();
         }
@@ -1227,8 +1223,6 @@ public class RubyZlib {
                          throw Util.newDictError(runtime, "need dictionary");
                     case com.jcraft.jzlib.JZlib.Z_OK:
                     case com.jcraft.jzlib.JZlib.Z_STREAM_END:
-                        if(ret == com.jcraft.jzlib.JZlib.Z_STREAM_END)
-                            finished = true;
                         resultLength = flater.next_out_index;
                         break;
                     default:
@@ -1257,7 +1251,7 @@ public class RubyZlib {
 
         @Override
         protected boolean internalStreamEndP() {
-            return finished;
+            return flater.finished();
         }
 
         @Override
@@ -1267,7 +1261,7 @@ public class RubyZlib {
 
         @Override
         protected boolean internalFinished() {
-            return finished;
+            return flater.finished();
         }
 
         @Override
@@ -1290,13 +1284,12 @@ public class RubyZlib {
 
         @Override
         protected void internalClose() {
-            if(!finished){
+            if(!internalFinished()){
                 int err = flater.inflate(com.jcraft.jzlib.JZlib.Z_FINISH);
                 if(err!=com.jcraft.jzlib.JZlib.Z_OK){
                     Ruby runtime = getRuntime();
                     throw Util.newBufError(runtime, "buffer error");
                 }
-                finished = true;
             }
             flater.end();
         }
@@ -1318,7 +1311,6 @@ public class RubyZlib {
         };
 
         private com.jcraft.jzlib.Deflater flater = null;
-        private boolean finished = false;
         private int flush = Z_NO_FLUSH;
 
         @JRubyMethod(name = "deflate", required = 1, optional = 1, meta = true, backtrace = true)
@@ -1375,7 +1367,6 @@ public class RubyZlib {
         }
 
         private void init(int level, int windowBits, int memlevel, int strategy) {
-            finished = false;
             flush = Z_NO_FLUSH;
             flater = new com.jcraft.jzlib.Deflater();
 
@@ -1482,7 +1473,7 @@ public class RubyZlib {
 
         @Override
         protected boolean internalStreamEndP() {
-            return finished;
+            return flater.finished();
         }
 
         @Override
@@ -1492,7 +1483,7 @@ public class RubyZlib {
 
         @Override
         public boolean internalFinished() {
-            return finished;
+            return flater.finished();
         }
 
         @Override
@@ -1542,22 +1533,19 @@ public class RubyZlib {
         }
 
         private void run() {
-            if(finished)
+            if(internalFinished())
                 return;
             byte[] outp = new byte[1024];
-            while (!finished){
+            while (!internalFinished()){
                 flater.next_out = outp;
                 flater.next_out_index = 0;
                 flater.avail_out = flater.next_out.length;
-                int err = flater.deflate(flush);
-                if(err == com.jcraft.jzlib.JZlib.Z_STREAM_END){
-                    finished=true;
-                }
+                int err = flater.deflate(flush); // TODO
                 int resultLength = flater.next_out_index;
                 if(resultLength == 0)
                     break;
                 collected.append(flater.next_out, 0, resultLength);
-                if (resultLength == flater.next_out.length && !finished) {
+                if (resultLength == flater.next_out.length && !internalFinished()) {
                     outp = new byte[flater.next_out.length * 2];
                 }
             }
