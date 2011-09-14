@@ -13,6 +13,7 @@ import org.jruby.compiler.ir.instructions.DefineModuleInstr;
 import org.jruby.compiler.ir.instructions.Instr;
 import org.jruby.compiler.ir.instructions.PutConstInstr;
 import org.jruby.compiler.ir.instructions.ReceiveSelfInstruction;
+import org.jruby.compiler.ir.instructions.ReceiveClosureInstr;
 import org.jruby.compiler.ir.operands.ClassMetaObject;
 import org.jruby.compiler.ir.operands.LocalVariable;
 import org.jruby.compiler.ir.operands.Operand;
@@ -24,7 +25,7 @@ import org.jruby.parser.StaticScope;
 
 public class IRModule extends IRScopeImpl {
     // The "root" method of a class -- the scope in which all definitions, and class code executes, equivalent to java clinit
-    private final static String ROOT_METHOD_PREFIX = "<ROOT>";
+    private final static String ROOT_METHOD_PREFIX = "[root]:";
     private static Map<String, IRClass> coreClasses;
 
     private IRMethod rootMethod; // Dummy top-level method for the class
@@ -65,22 +66,24 @@ public class IRModule extends IRScopeImpl {
     // These are just placeholders for now .. this needs to be updated with *real* class objects later!
     static public void bootStrap() {
         coreClasses = new HashMap<String, IRClass>();
-        IRClass obj = addCoreClass("Object", null, null, null);
-        addCoreClass("Class", addCoreClass("Module", obj, null, null), null, null);
-        addCoreClass("Fixnum", obj, new String[]{"+", "-", "/", "*"}, null);
-        addCoreClass("Float", obj, new String[]{"+", "-", "/", "*"}, null);
-        addCoreClass("Array", obj, new String[]{"[]", "each", "inject"}, null);
-        addCoreClass("Range", obj, new String[]{"each"}, null);
-        addCoreClass("Hash", obj, new String[]{"each"}, null);
-        addCoreClass("String", obj, null, null);
-        addCoreClass("Proc", obj, null, null);
+        IRScript boostrapScript = new IRScript("[bootstrap]", "[bootstrap]", null);
+        addCoreClass("Object", boostrapScript, null, null);
+        addCoreClass("Module", boostrapScript, null, null);
+        addCoreClass("Class", boostrapScript, null, null);
+        addCoreClass("Fixnum", boostrapScript, new String[]{"+", "-", "/", "*"}, null);
+        addCoreClass("Float", boostrapScript, new String[]{"+", "-", "/", "*"}, null);
+        addCoreClass("Array", boostrapScript, new String[]{"[]", "each", "inject"}, null);
+        addCoreClass("Range", boostrapScript, new String[]{"each"}, null);
+        addCoreClass("Hash", boostrapScript, new String[]{"each"}, null);
+        addCoreClass("String", boostrapScript, null, null);
+        addCoreClass("Proc", boostrapScript, null, null);
     }
 
     public static IRClass getCoreClass(String n) {
         return coreClasses.get(n);
     }
 
-    public static boolean isAClassRootMethod(IRMethod m) {
+    public static boolean isAModuleRootMethod(IRMethod m) {
         return m.getName().startsWith(ROOT_METHOD_PREFIX);
     }
 
@@ -99,6 +102,7 @@ public class IRModule extends IRScopeImpl {
         String n = ROOT_METHOD_PREFIX + getName();
         rootMethod = new IRMethod(this, MetaObject.create(this), n, false, new LocalStaticScope(null));
         rootMethod.addInstr(new ReceiveSelfInstruction(rootMethod.getSelf()));   // Set up self!
+        rootMethod.addInstr(new ReceiveClosureInstr(rootMethod.getImplicitBlockArg()));
     }
 
     public List<IRModule> getModules() {
@@ -179,7 +183,7 @@ used, we are now forced to be conservative.
     }
 
     public void addMethod(IRMethod method) {
-        assert !IRModule.isAClassRootMethod(method);
+        assert !IRModule.isAModuleRootMethod(method);
 
         methods.add(method);
     }

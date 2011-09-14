@@ -8,7 +8,9 @@ package org.jruby.runtime;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyModule;
+import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.ast.util.ArgsUtil;
+import org.jruby.parser.StaticScope;
 import org.jruby.common.IRubyWarnings.ID;
 import org.jruby.compiler.ir.IRClosure;
 import org.jruby.exceptions.JumpException;
@@ -41,83 +43,65 @@ public class InterpretedIRBlockBody extends ContextAwareBlockBody {
         return self;
     }
 
-    public IRubyObject commonCallPath(ThreadContext context, IRubyObject[] args, IRubyObject self, RubyModule klass, boolean isArray, Binding binding, Type type, Block block) {
-        // SSS FIXME: Is this correct?
-        // isArray is not used??
-        if (klass == null) {
-            self = prepareSelf(binding);
-        }
-
-        // SSS FIXME: Can it happen that (type != block.type)?
-        // if (type != block.type) System.out.println("incoming block type is different from block.type");
-
+    public IRubyObject commonCallPath(ThreadContext context, IRubyObject[] args, IRubyObject self, RubyModule klass, Binding binding, Type type, Block block) {
+        Visibility oldVis = binding.getFrame().getVisibility();
         RubyModule currentModule = closure.getStaticScope().getModule();
         context.getCurrentScope().getStaticScope().setModule(currentModule);
 
-        InterpreterContext interp = new NaiveInterpreterContext(context, currentModule, self, null, closure.getLocalVariablesCount(), closure.getTemporaryVariableSize(), args, block, type);
+        Frame prevFrame = context.preYieldNoScope(binding, klass);
+        if (klass == null) self = prepareSelf(binding);
+        InterpreterContext interp = new NaiveInterpreterContext(context, closure, currentModule, self, null, args, block, type);
         interp.setDynamicScope(binding.getDynamicScope());
 
-        return Interpreter.interpret(context, self, closure.getCFG(), interp);
+        try {
+            return Interpreter.interpret(context, self, closure, interp);
+        }
+        finally {
+            binding.getFrame().setVisibility(oldVis);
+            context.postYieldNoScope(prevFrame);
+        }
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject[] args, Binding binding, Block.Type type) {
-        // SSS FIXME: Is this correct?
-        IRubyObject self = prepareSelf(binding);
         args = prepareArgumentsForCall(context, args, type);
-        // SSS FIXME: isArray is false here -- rest of them below are true
-        return commonCallPath(context, args, self, null, false, binding, type, Block.NULL_BLOCK);
-    }
-
-    @Override
-    public IRubyObject call(ThreadContext context, IRubyObject[] args, Binding binding, Block.Type type, Block block) {
-        args = prepareArgumentsForCall(context, args, type);
-        return commonCallPath(context, args, null, null, true, binding, type, block);
+        return commonCallPath(context, args, null, null, binding, type, Block.NULL_BLOCK);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, Binding binding, Block.Type type) {
         IRubyObject[] args = prepareArgumentsForCall(context, IRubyObject.NULL_ARRAY, type);
-        return commonCallPath(context, args, null, null, true, binding, type, Block.NULL_BLOCK);
+        return commonCallPath(context, args, null, null, binding, type, Block.NULL_BLOCK);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject arg0, Binding binding, Block.Type type) {
-        IRubyObject[] args = new IRubyObject[] {arg0};
-        args = prepareArgumentsForCall(context, args, type);
-        return commonCallPath(context, args, null, null, true, binding, type, Block.NULL_BLOCK);
+        IRubyObject[] args = prepareArgumentsForCall(context, new IRubyObject[] {arg0}, type);
+        return commonCallPath(context, args, null, null, binding, type, Block.NULL_BLOCK);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject arg0, IRubyObject arg1, Binding binding, Block.Type type) {
-        IRubyObject[] args = new IRubyObject[] {arg0, arg1};
-        args = prepareArgumentsForCall(context, args, type);
-        return commonCallPath(context, args, null, null, true, binding, type, Block.NULL_BLOCK);
+        IRubyObject[] args = prepareArgumentsForCall(context, new IRubyObject[] {arg0, arg1}, type);
+        return commonCallPath(context, args, null, null, binding, type, Block.NULL_BLOCK);
     }
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, Binding binding, Block.Type type) {
-        IRubyObject[] args = new IRubyObject[] {arg0, arg1, arg2};
+        IRubyObject[] args = prepareArgumentsForCall(context, new IRubyObject[] {arg0, arg1, arg2}, type);
+        return commonCallPath(context, args, null, null, binding, type, Block.NULL_BLOCK);
+    }
+
+    @Override
+    public IRubyObject call(ThreadContext context, IRubyObject[] args, Binding binding, Block.Type type, Block block) {
         args = prepareArgumentsForCall(context, args, type);
-        return commonCallPath(context, args, null, null, true, binding, type, Block.NULL_BLOCK);
-    }
-
-    @Override
-    public IRubyObject yieldSpecific(ThreadContext context, IRubyObject arg0, IRubyObject arg1, Binding binding, Block.Type type) {
-        return commonCallPath(context, new IRubyObject[] {arg0, arg1}, null, null, true, binding, type, Block.NULL_BLOCK);
-    }
-
-    @Override
-    public IRubyObject yieldSpecific(ThreadContext context, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, Binding binding, Block.Type type) {
-        return commonCallPath(context, new IRubyObject[] {arg0, arg1, arg2}, null, null, true, binding, type, Block.NULL_BLOCK);
+        return commonCallPath(context, args, null, null, binding, type, block);
     }
 
     @Override
     public IRubyObject yield(ThreadContext context, IRubyObject value, Binding binding, Type type) {
-        // SSS FIXME: Is this correct?
-        IRubyObject self = prepareSelf(binding);
         IRubyObject[] args = prepareArgumentsForCall(context, new IRubyObject[] { value }, type);
-        return commonCallPath(context, args, self, null, false, binding, type, Block.NULL_BLOCK);
+        return commonCallPath(context, args, null, null, binding, type, Block.NULL_BLOCK);
     }
 
     @Override
@@ -135,7 +119,7 @@ public class InterpretedIRBlockBody extends ContextAwareBlockBody {
             args = prepareArgumentsForCall(context, value == null ? new IRubyObject[] {} : new IRubyObject[] { value }, type);
         }
 
-        return commonCallPath(context, args, self, klass, isArray, binding, type, Block.NULL_BLOCK);
+        return commonCallPath(context, args, self, klass, binding, type, Block.NULL_BLOCK);
     }
 
     private IRubyObject handleNextJump(ThreadContext context, JumpException.NextJump nj, Block.Type type) {
@@ -180,21 +164,30 @@ public class InterpretedIRBlockBody extends ContextAwareBlockBody {
 
     @Override
     public IRubyObject[] prepareArgumentsForCall(ThreadContext context, IRubyObject[] args, Block.Type type) {
+        int blockArity = arity().getValue();
         switch (type) {
         // SSS FIXME: this is different from how regular interpreter does it .. it treats PROC & NORMAL blocks differently
         // But, without this fix, {:a=>:b}.each { |*x| puts a.inspect } outputs [:a,:b] instead of [[:a, :b]]
         case PROC:
         case NORMAL: {
-            if (args.length == 1 && args[0] instanceof RubyArray) {
-                if (argumentType == MULTIPLE_ASSIGNMENT) {
-                    args = ((RubyArray) args[0]).toJavaArray();
+            if (args.length == 1) {
+                IRubyObject soleArg = args[0];
+                if (soleArg instanceof RubyArray) {
+                    if (argumentType == MULTIPLE_ASSIGNMENT) {
+                        args = ((RubyArray) soleArg).toJavaArray();
+                    }
+                }
+                else if (blockArity > 1) {
+                    IRubyObject toAryArg = RuntimeHelpers.aryToAry(soleArg);
+                    if (toAryArg instanceof RubyArray) args = ((RubyArray)toAryArg).toJavaArray();
+                    else throw context.getRuntime().newTypeError(soleArg.getType().getName() + "#to_ary should return Array");
                 }
             }
             break;
         }
         case LAMBDA:
             if (argumentType == ARRAY && args.length != 1) {
-                context.getRuntime().getWarnings().warn(ID.MULTIPLE_VALUES_FOR_BLOCK, "multiple values for a block parameter (" + args.length + " for " + arity().getValue() + ")");
+                context.getRuntime().getWarnings().warn(ID.MULTIPLE_VALUES_FOR_BLOCK, "multiple values for a block parameter (" + args.length + " for " + blockArity + ")");
                 if (args.length == 0) {
                     args = context.getRuntime().getSingleNilArray();
                 } else {

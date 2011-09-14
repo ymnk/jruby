@@ -44,6 +44,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Properties;
 import org.jruby.exceptions.MainExitException;
 import org.jruby.exceptions.RaiseException;
@@ -53,6 +54,8 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.SafePropertyAccessor;
 import org.jruby.util.SimpleSampler;
+import org.jruby.util.log.Logger;
+import org.jruby.util.log.LoggerFactory;
 
 /**
  * Class used to launch the interpreter.
@@ -64,6 +67,8 @@ import org.jruby.util.SimpleSampler;
  * @author  jpetersen
  */
 public class Main {
+    private static final Logger LOG = LoggerFactory.getLogger("Main");
+    
     public Main(RubyInstanceConfig config) {
         this(config, false);
     }
@@ -93,23 +98,40 @@ public class Main {
     }
     
     public void processDotfile() {
-        String home = SafePropertyAccessor.getProperty("user.home");
-        if (home != null) {
+        // try current dir, then home dir
+        String home = SafePropertyAccessor.getProperty("user.dir");
+        FileInputStream fis = null;
+        
+        try {
             File dotfile = new File(home + "/.jrubyrc");
-            if (!dotfile.exists()) return;
-            
-            // process properties into system
-            Properties props = System.getProperties();
-            FileInputStream fis = null;
-            try {
-                fis = new FileInputStream(dotfile);
-                props.load(fis);
-                System.setProperties(props);
-            } catch (IOException ioe) {
-                // do anything?
-            } finally {
-                if (fis != null) try {fis.close();} catch (Exception e) {}
+            if (!dotfile.exists()) {
+                home = SafePropertyAccessor.getProperty("user.home");
+                dotfile = new File(home + "/.jrubyrc");
             }
+
+            // no dotfile!
+            if (!dotfile.exists()) return;
+
+            // update system properties with long form jruby properties from .jrubyrc
+            Properties sysProps = System.getProperties();
+            Properties newProps = new Properties();
+
+            // load properties and re-set as jruby.*
+            fis = new FileInputStream(dotfile);
+            newProps.load(fis);
+            for (Map.Entry entry : newProps.entrySet()) {
+                sysProps.put("jruby." + entry.getKey(), entry.getValue());
+            }
+
+            // replace system properties
+            System.setProperties(sysProps);
+        } catch (IOException ioe) {
+            // do anything else?
+            LOG.debug("exception loading .jrubyrc", ioe);
+        } catch (SecurityException se) {
+            LOG.debug("exception loading .jrubyrc", se);
+        } finally {
+            if (fis != null) try {fis.close();} catch (Exception e) {}
         }
     }
 

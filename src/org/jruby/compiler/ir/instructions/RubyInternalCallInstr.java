@@ -2,7 +2,9 @@ package org.jruby.compiler.ir.instructions;
 
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
+import org.jruby.RubyFixnum;
 import org.jruby.RubyModule;
+import org.jruby.RubySymbol;
 
 import org.jruby.compiler.ir.Operation;
 import org.jruby.compiler.ir.operands.Label;
@@ -29,8 +31,6 @@ public class RubyInternalCallInstr extends CallInstr {
        TO_ARY("to_ary"),
        DEFINE_ALIAS("defineAlias"),
        GVAR_ALIAS("aliasGlobalVariable"),
-       SUPER("super"),
-       ZSUPER("super"),
        FOR_EACH("each"),
        //CHECK_ARITY("checkArity"),
        UNDEF_METHOD("undefMethod");
@@ -92,22 +92,27 @@ public class RubyInternalCallInstr extends CallInstr {
             {
                 Operand[] args = getCallArgs(); // Guaranteed 2 args by parser
                 IRubyObject object = (IRubyObject)getReceiver().retrieve(interp, context, self);
-                RuntimeHelpers.defineAlias(context, object, 
-                        args[0].retrieve(interp, context, self).toString(), 
-                        (String) args[1].retrieve(interp, context, self).toString());
+                
+                if (object == null || object instanceof RubyFixnum || object instanceof RubySymbol){
+                    throw runtime.newTypeError("no class to make alias");
+                }
+
+                String newName = args[0].retrieve(interp, context, self).toString();
+                String oldName = args[1].retrieve(interp, context, self).toString();
+
+                // FIXME: should be classFor instruction in temp var, but it broke a few cases
+                RubyModule module;
+                if (object instanceof RubyModule) {
+                    module = (RubyModule) object;
+                } else {
+                    module = object.getMetaClass();
+                }
+
+                module.defineAlias(newName, oldName);
                 break;
             }
             case GVAR_ALIAS:
                 throw new RuntimeException("GVAR_ALIAS: Not implemented yet!");
-            case SUPER:
-            case ZSUPER:
-            {
-                IRubyObject   object = (IRubyObject)getReceiver().retrieve(interp, context, self);
-                IRubyObject[] args = prepareArguments(interp, context, self, getCallArgs());
-                // SSS FIXME: Do we need to set up the frame in some way so this doesn't bomb?
-                rVal = RuntimeHelpers.invokeSuper(context, object, args, prepareBlock(interp, context, self));
-                break;
-            }
             case UNDEF_METHOD:
                 rVal = RuntimeHelpers.undefMethod(context, getReceiver().retrieve(interp, context, self));
                 break;
@@ -131,16 +136,5 @@ public class RubyInternalCallInstr extends CallInstr {
         if (rVal != null) getResult().store(interp, context, self, rVal);
 
         return null;
-    }
-
-    // SSS FIXME: Copied from runtime/callsite/SuperCallSite!  Probably worth putting in a library
-    protected static void checkSuperDisabledOrOutOfMethod(ThreadContext context, RubyModule frameClass, String frameName) {
-        if (frameClass == null) {
-            if (frameName != null) {
-                throw context.getRuntime().newNameError("superclass method '" + frameName + "' disabled", frameName);
-            } else {
-                throw context.getRuntime().newNoMethodError("super called outside of method", null, context.getRuntime().getNil());
-            }
-        }
     }
 }

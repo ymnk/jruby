@@ -159,6 +159,7 @@ import org.jruby.compiler.ir.instructions.RubyInternalCallInstr.RubyInternalsMet
 import org.jruby.compiler.ir.instructions.SET_RETADDR_Instr;
 import org.jruby.compiler.ir.instructions.SetArgumentsInstr;
 import org.jruby.compiler.ir.instructions.SearchConstInstr;
+import org.jruby.compiler.ir.instructions.SuperInstr;
 import org.jruby.compiler.ir.instructions.ThreadPollInstr;
 import org.jruby.compiler.ir.instructions.THROW_EXCEPTION_Instr;
 import org.jruby.compiler.ir.instructions.YieldInstr;
@@ -174,6 +175,7 @@ import org.jruby.compiler.ir.operands.DynamicSymbol;
 import org.jruby.compiler.ir.operands.Fixnum;
 import org.jruby.compiler.ir.operands.Float;
 import org.jruby.compiler.ir.operands.Hash;
+import org.jruby.compiler.ir.operands.IRException;
 import org.jruby.compiler.ir.operands.KeyValuePair;
 import org.jruby.compiler.ir.operands.Label;
 import org.jruby.compiler.ir.operands.MetaObject;
@@ -831,16 +833,16 @@ public class IRBuilder {
     }
 
     private Operand buildAttrAssign(final AttrAssignNode attrAssignNode, IRScope s) {
-        List<Operand> args = setupCallArgs(attrAssignNode.getArgsNode(), s);
         Operand obj = build(attrAssignNode.getReceiverNode(), s);
+        List<Operand> args = setupCallArgs(attrAssignNode.getArgsNode(), s);
         s.addInstr(new AttrAssignInstr(obj, new StringLiteral(attrAssignNode.getName()), args.toArray(new Operand[args.size()])));
         return args.get(args.size()-1);
     }
 
     public Operand buildAttrAssignAssignment(Node node, IRScope s, Operand value) {
         final AttrAssignNode attrAssignNode = (AttrAssignNode) node;
-        List<Operand> args = setupCallArgs(attrAssignNode.getArgsNode(), s);
         Operand obj = build(attrAssignNode.getReceiverNode(), s);
+        List<Operand> args = setupCallArgs(attrAssignNode.getArgsNode(), s);
         s.addInstr(new AttrAssignInstr(obj, new StringLiteral(attrAssignNode.getName()), args.toArray(new Operand[args.size()]), value));
         return value;
     }
@@ -872,20 +874,25 @@ public class IRBuilder {
 
     public Operand buildBreak(BreakNode breakNode, IRExecutionScope s) {
         Operand rv = build(breakNode.getValueNode(), s);
+        // If we have ensure blocks, have to run those first!
+        if (!_ensureBlockStack.empty()) EnsureBlockInfo.emitJumpChain(s, _ensureBlockStack);
+
         IRLoop currLoop = s.getCurrentLoop();
         if (currLoop != null) {
             s.addInstr(new CopyInstr(currLoop.loopResult, rv));
             s.addInstr(new JumpInstr(currLoop.loopEndLabel));
         }
-        else if (s instanceof IRClosure) {
-            // This lexical scope value is only used (and valid) in regular block contexts.
-            // If this instruction is executed in a Proc or Lambda context, the lexical scope value is useless.
-            s.addInstr(new BREAK_Instr(rv, (IRExecutionScope)(s.getLexicalParent())));
-        }
         else {
-            // SSS FIXME: If we are not in a closure or a loop, the break instruction will throw a runtime exception
-            // Since we know this right now, should we build an exception instruction here?
-            s.addInstr(new BREAK_Instr(rv, null));
+            if (s instanceof IRClosure) {
+                // This lexical scope value is only used (and valid) in regular block contexts.
+                // If this instruction is executed in a Proc or Lambda context, the lexical scope value is useless.
+                s.addInstr(new BREAK_Instr(rv, (IRExecutionScope)(s.getLexicalParent())));
+            }
+            else {
+                // SSS FIXME: If we are not in a closure or a loop, the break instruction will throw a runtime exception
+                // Since we know this right now, should we build an exception instruction here?
+                s.addInstr(new BREAK_Instr(rv, null));
+            }
         }
         return rv;
     }
@@ -1237,10 +1244,10 @@ public class IRBuilder {
         // Verify that the exception is of type 'JumpException'.
         // Since this is JRuby implementation Java code, we dont need EQQ here.
         // SSS FIXME: Hardcoded exception class name!
-        m.addInstr(new InstanceOfInstr(eqqResult, exc, "org.jruby.exceptions.JumpException")); 
+        m.addInstr(new InstanceOfInstr(eqqResult, exc, "org.jruby.RubyException")); 
         m.addInstr(new BEQInstr(eqqResult, BooleanLiteral.FALSE, uncaughtLabel));
         Object v2 = rescueBlock.run(rescueBlockArgs); // YIELD: Run the protected code block
-        if (v2 != null) m.addInstr(new CopyInstr(rv, (Operand)v1));
+        if (v2 != null) m.addInstr(new CopyInstr(rv, Nil.NIL));
         m.addInstr(new JumpInstr(rEndLabel));
         m.addInstr(new LABEL_Instr(uncaughtLabel));
         m.addInstr(new THROW_EXCEPTION_Instr(exc));
@@ -1251,7 +1258,8 @@ public class IRBuilder {
         return rv;
     }
 
-    public Operand buildGetDefinitionBase(final Node node, IRScope m) {
+    public Operand buildGetDefinitionBase(Node node, IRScope m) {
+        node = skipOverNewlines(m, node);
         switch (node.getNodeType()) {
         case CLASSVARASGNNODE:
         case CLASSVARDECLNODE:
@@ -1356,7 +1364,8 @@ public class IRBuilder {
         }
     }
 
-    public Operand buildGetDefinition(final Node node, IRScope s) {
+    public Operand buildGetDefinition(Node defnNode, IRScope s) {
+        final Node node = skipOverNewlines(s, defnNode);
         switch (node.getNodeType()) {
             case CLASSVARASGNNODE:
             case CLASSVARDECLNODE:
@@ -1559,7 +1568,7 @@ public class IRBuilder {
                 s.addInstr(new BNEInstr(cm, Nil.NIL, l));
                 s.addInstr(new JRubyImplCallInstr(cm, JRubyImplementationMethod.SELF_METACLASS, getSelf(s), NO_ARGS));
                 s.addInstr(new LABEL_Instr(l));
-                return buildDefinitionCheck(s, JRubyImplementationMethod.CLASS_VAR_DEFINED, cm, iVisited.getName(), "class-variable");
+                return buildDefinitionCheck(s, JRubyImplementationMethod.CLASS_VAR_DEFINED, cm, iVisited.getName(), "class variable");
             }
             case ATTRASSIGNNODE:
             {
@@ -1624,7 +1633,8 @@ public class IRBuilder {
                 CodeBlock protectedCode = new CodeBlock() {
                     public Operand run(Object[] args) { 
                         build((Node)args[0], (IRScope)args[1]);
-                        return Nil.NIL; 
+                        // always an expression as long as we get through here without an exception!
+                        return new StringLiteral("expression");
                     }
                 };
                 // rescue block
@@ -1633,10 +1643,7 @@ public class IRBuilder {
                 };
 
                 // Try verifying definition, and if we get an JumpException exception, process it with the rescue block above
-                protectCodeWithRescue(s, protectedCode, new Object[]{node, s}, rescueBlock, null);
-
-                // always an expression as long as we didn't get an exception in the code above
-                return new StringLiteral("expression");
+                return protectCodeWithRescue(s, protectedCode, new Object[]{node, s}, rescueBlock, null);
         }
     }
 
@@ -1648,8 +1655,31 @@ public class IRBuilder {
         int depth = dasgnNode.getDepth();
         // SSS FIXME: Isn't it sufficient to use "getLocalVariable(variable.getName())"?
         Variable arg = getScopeNDown(s, depth).getLocalVariable(dasgnNode.getName());
-        s.addInstr(new CopyInstr(arg, build(dasgnNode.getValueNode(), s)));
-        return arg;
+        Operand  value = build(dasgnNode.getValueNode(), s);
+        s.addInstr(new CopyInstr(arg, value));
+        return value;
+
+        // IMPORTANT: The return value of this method is value, not arg!
+        //
+        // Consider this Ruby code: foo((a = 1), (a = 2))
+        //
+        // If we return 'value' this will get translated to:
+        //    a = 1
+        //    a = 2
+        //    call("foo", [1,2]) <---- CORRECT
+        //
+        // If we return 'arg' this will get translated to:
+        //    a = 1
+        //    a = 2
+        //    call("foo", [a,a]) <---- BUGGY
+        //
+        // This technique only works if 'value' is an immutable value (ex: fixnum) or a variable
+        // So, for Ruby code like this:   
+        //     def foo(x); x << 5; end; 
+        //     foo(a=[1,2]); 
+        //     p a
+        // we are guaranteed that the value passed into foo and 'a' point to the same object
+        // because of the use of copyAndReturnValue method for literal objects.
     }
     
     // ENEBO: On IRScope?
@@ -1687,7 +1717,7 @@ public class IRBuilder {
 
         // statically determine container where possible?
         // DefineIstanceMethod IR interpretation currently relies on this static determination for handling top-level methods
-        if ((s instanceof IRMethod) && ((IRMethod)s).isAClassRootMethod()) {
+        if ((s instanceof IRMethod) && ((IRMethod)s).isAModuleRootMethod()) {
             container =  MetaObject.create(s.getNearestModule());
             method = defineNewMethod(node, s, container, true);
             s.getNearestModule().addMethod(method);
@@ -1800,27 +1830,36 @@ public class IRBuilder {
     public Operand buildDot(final DotNode dotNode, IRScope s) {
         return copyAndReturnValue(s, new Range(build(dotNode.getBeginNode(), s), build(dotNode.getEndNode(), s), dotNode.isExclusive()));
     }
+    
+    private Operand dynamicPiece(Node pieceNode, IRScope s) {
+        Operand piece = build(pieceNode, s);
+        
+        return piece == null ? Nil.NIL : piece;
+    }
 
     public Operand buildDRegexp(DRegexpNode dregexpNode, IRScope s) {
         List<Operand> strPieces = new ArrayList<Operand>();
-        for (Node n : dregexpNode.childNodes())
-            strPieces.add(build(n, s));
+        for (Node n : dregexpNode.childNodes()) {
+            strPieces.add(dynamicPiece(n, s));
+        }
 
         return copyAndReturnValue(s, new Regexp(new CompoundString(strPieces), dregexpNode.getOptions()));
     }
 
     public Operand buildDStr(DStrNode dstrNode, IRScope s) {
         List<Operand> strPieces = new ArrayList<Operand>();
-        for (Node n : dstrNode.childNodes())
-            strPieces.add(build(n, s));
-
+        for (Node n : dstrNode.childNodes()) {
+            strPieces.add(dynamicPiece(n, s));
+        }
+        
         return copyAndReturnValue(s, new CompoundString(strPieces));
     }
 
     public Operand buildDSymbol(Node node, IRScope s) {
         List<Operand> strPieces = new ArrayList<Operand>();
-        for (Node n : node.childNodes())
-            strPieces.add(build(n, s));
+        for (Node n : node.childNodes()) {
+            strPieces.add(dynamicPiece(n, s));
+        }
 
         return copyAndReturnValue(s, new DynamicSymbol(new CompoundString(strPieces)));
     }
@@ -1831,8 +1870,9 @@ public class IRBuilder {
 
     public Operand buildDXStr(final DXStrNode dstrNode, IRScope m) {
         List<Operand> strPieces = new ArrayList<Operand>();
-        for (Node nextNode : dstrNode.childNodes())
-            strPieces.add(build(nextNode, m));
+        for (Node nextNode : dstrNode.childNodes()) {
+            strPieces.add(dynamicPiece(nextNode, m));
+        }
 
         return copyAndReturnValue(m, new BacktickString(strPieces));
     }
@@ -2258,19 +2298,23 @@ public class IRBuilder {
         IRClosure closure = new IRClosure(s, false, iterNode.getScope(), Arity.procArityOf(iterNode.getVarNode()), iterNode.getArgumentType());
         s.addClosure(closure);
 
+        // Create a new nested builder to ensure this gets its own IR builder state 
+        // like the ensure block stack
+        IRBuilder closureBuilder = new IRBuilder();
+
             // Receive self
         closure.addInstr(new ReceiveSelfInstruction(getSelf(closure)));
 
             // Build args
         NodeType argsNodeId = BlockBody.getArgumentTypeWackyHack(iterNode);
         if ((iterNode.getVarNode() != null) && (argsNodeId != null))
-            buildBlockArgsAssignment(iterNode.getVarNode(), closure, 0, true, false);  // SSS: Changed this from 1 to 0
+            closureBuilder.buildBlockArgsAssignment(iterNode.getVarNode(), closure, 0, true, false);  // SSS: Changed this from 1 to 0
 
             // start label -- used by redo!
         closure.addInstr(new LABEL_Instr(closure.startLabel));
 
             // Build closure body and return the result of the closure
-        Operand closureRetVal = iterNode.getBodyNode() == null ? Nil.NIL : build(iterNode.getBodyNode(), closure);
+        Operand closureRetVal = iterNode.getBodyNode() == null ? Nil.NIL : closureBuilder.build(iterNode.getBodyNode(), closure);
         if (closureRetVal != U_NIL)  // can be U_NIL if the node is an if node with returns in both branches.
             closure.addInstr(new ClosureReturnInstr(closureRetVal));
 
@@ -2282,10 +2326,32 @@ public class IRBuilder {
     }
 
     public Operand buildLocalAsgn(LocalAsgnNode localAsgnNode, IRScope s) {
+        Variable var  = s.getLocalVariable(localAsgnNode.getName());
         Operand value = build(localAsgnNode.getValueNode(), s);
-        s.addInstr(new CopyInstr(s.getLocalVariable(localAsgnNode.getName()), value));
+        s.addInstr(new CopyInstr(var, value));
+        return value;  
 
-        return value;
+        // IMPORTANT: The return value of this method is value, not var!
+        //
+        // Consider this Ruby code: foo((a = 1), (a = 2))
+        //
+        // If we return 'value' this will get translated to:
+        //    a = 1
+        //    a = 2
+        //    call("foo", [1,2]) <---- CORRECT
+        //
+        // If we return 'var' this will get translated to:
+        //    a = 1
+        //    a = 2
+        //    call("foo", [a,a]) <---- BUGGY
+        //
+        // This technique only works if 'value' is an immutable value (ex: fixnum) or a variable
+        // So, for Ruby code like this:   
+        //     def foo(x); x << 5; end; 
+        //     foo(a=[1,2]); 
+        //     p a
+        // we are guaranteed that the value passed into foo and 'a' point to the same object
+        // because of the use of copyAndReturnValue method for literal objects.
     }
 
     public Operand buildLocalVar(LocalVarNode node, IRScope s) {
@@ -2397,11 +2463,19 @@ public class IRBuilder {
 
     public Operand buildNext(final NextNode nextNode, IRExecutionScope s) {
         Operand rv = (nextNode.getValueNode() == null) ? Nil.NIL : build(nextNode.getValueNode(), s);
-        // SSS FIXME: 1. Is the ordering correct? (poll before next)
-        s.addInstr(new ThreadPollInstr());
-        // If a closure, the next is simply a return from the closure!
-        // If a regular loop, the next is simply a jump to the end of the iteration
-        s.addInstr((s.getCurrentLoop() != null) ?  new JumpInstr(s.getCurrentLoop().iterEndLabel) : new ClosureReturnInstr(rv));
+        s.addInstr(new ThreadPollInstr()); // SSS FIXME: Is the ordering correct? (poll before next)
+
+        // If we have ensure blocks, have to run those first!
+        if (!_ensureBlockStack.empty()) EnsureBlockInfo.emitJumpChain(s, _ensureBlockStack);
+        if (s.getCurrentLoop() != null) {
+            // If a regular loop, the next is simply a jump to the end of the iteration
+            s.addInstr(new JumpInstr(s.getCurrentLoop().iterEndLabel));
+        }
+        else {
+            // If a closure, the next is simply a return from the closure!
+            if (s instanceof IRClosure) s.addInstr(new ClosureReturnInstr(rv));
+            else s.addInstr(new THROW_EXCEPTION_Instr(IRException.NEXT_LocalJumpError));
+        }
         return rv;
     }
 
@@ -2881,18 +2955,29 @@ public class IRBuilder {
         Operand retVal = (returnNode.getValueNode() == null) ? Nil.NIL : build(returnNode.getValueNode(), m);
 
         // Before we return, have to go execute all the ensure blocks
-        if (!_ensureBlockStack.empty())
-            EnsureBlockInfo.emitJumpChain(m, _ensureBlockStack);
+        if (!_ensureBlockStack.empty()) EnsureBlockInfo.emitJumpChain(m, _ensureBlockStack);
 
         // If 'm' is a block scope, a return returns from the closest enclosing method.
         // The runtime takes care of lambdas
-        if (m instanceof IRClosure)
+        if (m instanceof IRClosure) {
             m.addInstr(new ReturnInstr(retVal, ((IRExecutionScope) m).getClosestMethodAncestor()));
-        else
+        } else if (!((IRMethod)m).isAModuleRootMethod()) {
             m.addInstr(new ReturnInstr(retVal));
+        } else {
+            // If 'm' is a root method, find the nearest regular non-root (root methods are synthetic, JRuby-generated) 
+            // method that 'm' is embedded in.  The return will have to snap out of that method.  If there is no such
+            // method, this is a local jump error!
+            IRScope sm = (IRMethod)m;
+            while ((sm != null) && (!(sm instanceof IRMethod) || ((IRMethod)sm).isAModuleRootMethod())) {
+                sm = sm.getLexicalParent();
+            }
+
+            if (sm == null) m.addInstr(new THROW_EXCEPTION_Instr(IRException.RETURN_LocalJumpError));
+            else m.addInstr(new ReturnInstr(retVal, (IRMethod)sm));
+        }
 
         // The value of the return itself in the containing expression can never be used because of control-flow reasons.
-        // The expression that uses this result can never be executed beyond this point and hence the value itself is just
+        // The expression that uses this result can never be executed beyond the return and hence the value itself is just
         // a placeholder operand. 
         return UnexecutableNil.U_NIL;
     }
@@ -2933,13 +3018,30 @@ public class IRBuilder {
         return copyAndReturnValue(s, new StringLiteral(strNode.getValue()));
     }
 
-    public Operand buildSuper(SuperNode superNode, IRScope s) {
-        List<Operand> args  = setupCallArgs(superNode.getArgsNode(), s);
-        Operand       block = setupCallClosure(superNode.getIterNode(), s);
-        Variable      ret   = s.getNewTemporaryVariable();
-        s.addInstr(new RubyInternalCallInstr(ret, RubyInternalsMethod.SUPER, getSelf(s),
-                args.toArray(new Operand[args.size()]), block));
+    private Operand buildSuperInstr(IRScope s, Node iterNode, Operand[] args) {
+        MethAddr maddr;
+        if (s instanceof IRClosure) {
+            // We dont always know the method name we are going to be invoking if the super occurs in a closure.
+            // This is because the super can be part of a block that will be used by 'define_method' to define
+            // a new method.  In that case, the method called by super will be determined by the 'name' argument
+            // to 'define_method'.
+            maddr = MethAddr.UNKNOWN_SUPER_TARGET;
+        }
+        else {
+            // The case where the method is a class root method is an error in the Ruby code.
+            // SSS FIXME: Should we insert an exception instruction here since we know this lexically?
+            IRMethod method = (IRMethod) s;
+            maddr = IRModule.isAModuleRootMethod(method) ? MethAddr.NO_METHOD : new MethAddr(method.getName());
+        }
+        Operand  block = setupCallClosure(iterNode, s);
+        Variable ret   = s.getNewTemporaryVariable();
+        s.addInstr(new SuperInstr(ret, getSelf(s), maddr, args, block));
         return ret;
+    }
+
+    public Operand buildSuper(SuperNode superNode, IRScope s) {
+        List<Operand> args = setupCallArgs(superNode.getArgsNode(), s);
+        return buildSuperInstr(s, superNode.getIterNode(), args.toArray(new Operand[args.size()]));
     }
 
     public Operand buildSValue(SValueNode node, IRScope s) {
@@ -3070,7 +3172,7 @@ public class IRBuilder {
 
     public Operand buildYield(YieldNode node, IRScope s) {
         Variable ret = s.getNewTemporaryVariable();
-        s.addInstr(new YieldInstr(ret, ((IRExecutionScope)s).getImplicitBlockArg(), build(node.getArgsNode(), s), !node.getExpandArguments()));
+        s.addInstr(new YieldInstr(ret, ((IRExecutionScope)s).getImplicitBlockArg(), build(node.getArgsNode(), s), node.getExpandArguments()));
         return ret;
     }
 
@@ -3079,11 +3181,8 @@ public class IRBuilder {
     }
 
     public Operand buildZSuper(ZSuperNode zsuperNode, IRScope s) {
-        Operand    block = setupCallClosure(zsuperNode.getIterNode(), s);
-        Variable   ret   = s.getNewTemporaryVariable();
-        s.addInstr(new RubyInternalCallInstr(ret, RubyInternalsMethod.ZSUPER, getSelf(s),
-                ((IRExecutionScope) s).getClosestMethodAncestor().getCallArgs(), block));
-        return ret;
+        Operand[] args = (s instanceof IRClosure) ? ((IRClosure)s).getBlockArgs() : ((IRMethod)s).getCallArgs();
+        return buildSuperInstr(s, zsuperNode.getIterNode(), args);
     }
 
     public void buildArgsCatArguments(List<Operand> args, ArgsCatNode argsCatNode, IRScope s) {

@@ -14,20 +14,17 @@ import org.jruby.runtime.builtin.IRubyObject;
 
 public class InterpretedIRMethod extends DynamicMethod {
     public final IRMethod method;
-    private final int temporaryVariableSize;
     boolean displayedCFG = false; // FIXME: Remove when we find nicer way of logging CFG
 
     // We can probably use IRMethod callArgs for something (at least arity)
     public InterpretedIRMethod(IRMethod method, RubyModule implementationClass) {
         super(implementationClass, Visibility.PRIVATE, CallConfiguration.FrameNoneScopeNone);
-        this.temporaryVariableSize = method.getTemporaryVariableSize();
         this.method = method;
     }
 
     // We can probably use IRMethod callArgs for something (at least arity)
     public InterpretedIRMethod(IRMethod method, Visibility visibility, RubyModule implementationClass) {
         super(implementationClass, visibility, CallConfiguration.FrameNoneScopeNone);
-        this.temporaryVariableSize = method.getTemporaryVariableSize();
         this.method = method;
     }
     
@@ -38,31 +35,37 @@ public class InterpretedIRMethod extends DynamicMethod {
 
     @Override
     public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args, Block block) {
-        InterpreterContext interp = new NaiveInterpreterContext(context, getImplementationClass(), self, name, method.getLocalVariablesCount(),
-                temporaryVariableSize, args, block, null);
-//        Arity.checkArgumentCount(context.getRuntime(), args.length, requiredArgsCount, method.get???);
+        RubyModule currentModule = getImplementationClass();
+        context.preMethodFrameOnly(currentModule, name, self, block);
+        InterpreterContext interp = new NaiveInterpreterContext(context, method, currentModule, self, name, args, block, null);
         if (Interpreter.isDebug()) {
             // FIXME: name should probably not be "" ever.
             String realName = name == null || "".equals(name) ? method.getName() : name;
             System.out.println("Executing '" + realName + "'");
         }
 
-        CFG c = method.getCFG();
-        if (c == null) {
+        CFG cfg = method.getCFG();
+        if (cfg == null) {
             // The base IR may not have been processed yet because the method is added dynamically.
             method.prepareForInterpretation();
-            c = method.getCFG();
+            cfg = method.getCFG();
         }
-		  // Do this *after* the method has been prepared!
-		  interp.allocateSharedBindingScope(context, method);
+        // Do this *after* the method has been prepared!
+        interp.allocateSharedBindingScope(context, method);
         if (Interpreter.isDebug() && displayedCFG == false) {
-            System.out.println("CFG:\n" + c.getGraph());
-            System.out.println("\nInstructions:\n" + c.toStringInstrs());
+            System.out.println("CFG:\n" + cfg.getGraph());
+            System.out.println("\nInstructions:\n" + cfg.toStringInstrs());
             displayedCFG = true;
         }
 
         context.getCurrentScope().getStaticScope().setModule(clazz);
-        return Interpreter.INTERPRET_METHOD(context, c, interp, self, name, getImplementationClass(), false);
+        try {
+            return Interpreter.INTERPRET_METHOD(context, method, interp, self, name, getImplementationClass(), false);
+        } finally {
+            context.popFrame();
+            interp.setFrame(null);
+            if (interp.hasAllocatedDynamicScope()) context.postMethodScopeOnly();
+        }
     }
 
     @Override

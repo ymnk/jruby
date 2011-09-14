@@ -695,6 +695,7 @@ public class RubyZlib {
                     throw Util.newBufError(runtime, "buffer error");
                 }
             }
+            
             if (finish) flater.end();
         }
 
@@ -731,6 +732,7 @@ public class RubyZlib {
         @Override
         protected IRubyObject internalFinish() {
             run(true);
+
             // MRI behavior: in finished mode, we work as pass-through
             if (internalFinished()) {
                 if (input.getRealSize() > 0) {
@@ -2136,6 +2138,7 @@ public class RubyZlib {
             ByteList result = new ByteList();
             if (sep.getRealSize() == 0) sep = Stream.PARAGRAPH_SEPARATOR;
             int ce = -1;
+
             // TODO: CRuby does encoding aware 'gets'. Not yet implemented.
             // StringIO.new("あいう").gets(0) => ""
             // StringIO.new("あいう").gets(1) => "あ"
@@ -2145,6 +2148,7 @@ public class RubyZlib {
             // StringIO.new("あいう").gets(5) => "あい"
             // StringIO.new("あいう").gets(6) => "あい"
             // StringIO.new("あいう").gets(7) => "あいう"
+
             while (result.indexOf(sep) == -1) {
                 ce = bufferedStream.read();
                 if (ce == -1) break;
@@ -2158,6 +2162,7 @@ public class RubyZlib {
             }
             line++;
             this.position = result.length();
+
             return newStr(getRuntime(), result);
         }
 
@@ -2250,6 +2255,7 @@ public class RubyZlib {
                 if (limit != -1) rest -= read;
             }
             this.position += val.length();
+
             return newStr(getRuntime(), val);
         }
 
@@ -2271,6 +2277,7 @@ public class RubyZlib {
                 offset += read;
             } // hmm...
             this.position += buffer.length;
+
             return newStr(getRuntime(), new ByteList(buffer, 0, len - toRead, false));
         }
 

@@ -414,6 +414,11 @@ public class RubyString extends RubyObject implements EncodingCapable {
         this.value = value;
     }
 
+    public RubyString(Ruby runtime, RubyClass rubyClass, ByteList value, Encoding encoding, boolean objectSpace) {
+        this(runtime, rubyClass, value, objectSpace);
+        value.setEncoding(encoding);
+    }
+
     protected RubyString(Ruby runtime, RubyClass rubyClass, ByteList value, Encoding enc, int cr) {
         this(runtime, rubyClass, value);
         value.setEncoding(enc);
@@ -464,6 +469,10 @@ public class RubyString extends RubyObject implements EncodingCapable {
 
     public static RubyString newStringLight(Ruby runtime, int size) {
         return new RubyString(runtime, runtime.getString(), new ByteList(size), false);
+    }
+
+    public static RubyString newStringLight(Ruby runtime, int size, Encoding encoding) {
+        return new RubyString(runtime, runtime.getString(), new ByteList(size), encoding, false);
     }
   
     public static RubyString newString(Ruby runtime, CharSequence str) {
@@ -1015,26 +1024,22 @@ public class RubyString extends RubyObject implements EncodingCapable {
         return invokedynamic(context, other, OP_EQUAL, this).isTrue() ? runtime.getTrue() : runtime.getFalse();
     }
 
-    @JRubyMethod(name = "+", required = 1, compat = RUBY1_8, argTypes = RubyString.class)
-    public IRubyObject op_plus(ThreadContext context, RubyString str) {
+    @JRubyMethod(name = "+", required = 1, compat = RUBY1_8)
+    public IRubyObject op_plus(ThreadContext context, IRubyObject _str) {
+        RubyString str = _str.convertToString();
         RubyString resultStr = newString(context.getRuntime(), addByteLists(value, str.value));
         resultStr.infectBy(flags | str.flags);
         return resultStr;
     }
-    public IRubyObject op_plus(ThreadContext context, IRubyObject other) {
-        return op_plus(context, other.convertToString());
-    }
 
     @JRubyMethod(name = "+", required = 1, compat = RUBY1_9)
-    public IRubyObject op_plus19(ThreadContext context, RubyString str) {
+    public IRubyObject op_plus19(ThreadContext context, IRubyObject _str) {
+        RubyString str = _str.convertToString();
         Encoding enc = checkEncoding(str);
         RubyString resultStr = newStringNoCopy(context.getRuntime(), addByteLists(value, str.value),
                                     enc, codeRangeAnd(getCodeRange(), str.getCodeRange()));
         resultStr.infectBy(flags | str.flags);
         return resultStr;
-    }
-    public IRubyObject op_plus19(ThreadContext context, IRubyObject other) {
-        return op_plus19(context, other.convertToString());
     }
 
     private ByteList addByteLists(ByteList value1, ByteList value2) {
@@ -1272,7 +1277,7 @@ public class RubyString extends RubyObject implements EncodingCapable {
             resCr = CR_UNKNOWN;
         } else if (toCr == CR_7BIT) {
             if (cr == CR_7BIT) {
-                resEnc = toEnc == ASCIIEncoding.INSTANCE ? toEnc : enc;
+                resEnc = toEnc != ASCIIEncoding.INSTANCE ? toEnc : enc;
                 resCr = CR_7BIT;
             } else {
                 resEnc = enc;
@@ -6038,6 +6043,8 @@ public class RubyString extends RubyObject implements EncodingCapable {
 
     @JRubyMethod(name = "squeeze!", rest = true, compat = RUBY1_8)
     public IRubyObject squeeze_bang(ThreadContext context, IRubyObject[] args) {
+        if (args.length == 0) return squeeze_bang(context);
+        
         Ruby runtime = context.getRuntime();
         if (value.getRealSize() == 0) {
             modifyCheck();
