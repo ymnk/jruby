@@ -58,6 +58,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 import org.jruby.util.KCode;
 import org.jruby.util.RegexpOptions;
+import org.jruby.util.cli.OutputStrings;
 import org.jruby.util.io.BadDescriptorException;
 
 /** This class initializes global variables and constants.
@@ -256,10 +257,10 @@ public class RubyGlobal {
         runtime.defineGlobalConstant("RUBY_PLATFORM", platform);
         runtime.defineGlobalConstant("RUBY_ENGINE", engine);
 
-        IRubyObject description = runtime.newString(runtime.getInstanceConfig().getVersionString()).freeze(context);
+        IRubyObject description = runtime.newString(OutputStrings.getVersionString(runtime.getInstanceConfig().getCompatVersion())).freeze(context);
         runtime.defineGlobalConstant("RUBY_DESCRIPTION", description);
 
-        IRubyObject copyright = runtime.newString(runtime.getInstanceConfig().getCopyrightString()).freeze(context);
+        IRubyObject copyright = runtime.newString(OutputStrings.getCopyrightString()).freeze(context);
         runtime.defineGlobalConstant("RUBY_COPYRIGHT", copyright);
 
         runtime.defineGlobalConstant("VERSION", version);
@@ -300,11 +301,11 @@ public class RubyGlobal {
             runtime.defineVariable(new GlobalVariable(runtime, "$;", RubyRegexp.newRegexp(runtime, runtime.getInstanceConfig().getInputFieldSeparator(), new RegexpOptions())));
         }
         
-        Boolean verbose = runtime.getInstanceConfig().getVerbose();
+        RubyInstanceConfig.Verbosity verbose = runtime.getInstanceConfig().getVerbosity();
         IRubyObject verboseValue = null;
-        if (verbose == null) {
+        if (verbose == RubyInstanceConfig.Verbosity.NIL) {
             verboseValue = runtime.getNil();
-        } else if(verbose == Boolean.TRUE) {
+        } else if(verbose == RubyInstanceConfig.Verbosity.TRUE) {
             verboseValue = runtime.getTrue();
         } else {
             verboseValue = runtime.getFalse();
@@ -386,7 +387,7 @@ public class RubyGlobal {
     	CaseInsensitiveStringOnlyRubyHash env = new CaseInsensitiveStringOnlyRubyHash(runtime,
                                                        environmentVariableMap, 
                                                        runtime.getNil(),
-                                                       RubyInstanceConfig.nativeEnabled && 
+                                                       runtime.getInstanceConfig().isNativeEnabled() && 
                                                            runtime.getInstanceConfig().isUpdateNativeENVEnabled() );
         env.getSingletonClass().defineAnnotatedMethods(CaseInsensitiveStringOnlyRubyHash.class);
         runtime.defineGlobalConstant("ENV", env);

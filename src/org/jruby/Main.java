@@ -54,6 +54,7 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.SafePropertyAccessor;
 import org.jruby.util.SimpleSampler;
+import org.jruby.util.cli.OutputStrings;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
 
@@ -97,7 +98,7 @@ public class Main {
         config.setHardExit(hardExit);
     }
     
-    public void processDotfile() {
+    public static void processDotfile() {
         // try current dir, then home dir
         String home = SafePropertyAccessor.getProperty("user.dir");
         FileInputStream fis = null;
@@ -216,7 +217,7 @@ public class Main {
         doShowVersion();
         doShowCopyright();
 
-        if (!config.shouldRunInterpreter() ) {
+        if (!config.getShouldRunInterpreter() ) {
             doPrintUsage(false);
             doPrintProperties();
             return new Status();
@@ -235,10 +236,10 @@ public class Main {
             if (in == null) {
                 // no script to run, return success
                 return new Status();
-            } else if (config.isxFlag() && !config.hasShebangLine()) {
+            } else if (config.isXFlag() && !config.hasShebangLine()) {
                 // no shebang was found and x option is set
                 throw new MainExitException(1, "jruby: no Ruby script found in input (LoadError)");
-            } else if (config.isShouldCheckSyntax()) {
+            } else if (config.getShouldCheckSyntax()) {
                 // check syntax only and exit
                 return doCheckSyntax(runtime, in, filename);
             } else {
@@ -398,26 +399,26 @@ public class Main {
     }
 
     private void doPrintProperties() {
-        if (config.shouldPrintProperties()) {
-            config.getOutput().print(config.getPropertyHelp());
+        if (config.getShouldPrintProperties()) {
+            config.getOutput().print(OutputStrings.getPropertyHelp());
         }
     }
 
     private void doPrintUsage(boolean force) {
-        if (config.shouldPrintUsage() || force) {
-            config.getOutput().print(config.getBasicUsageHelp());
+        if (config.getShouldPrintUsage() || force) {
+            config.getOutput().print(OutputStrings.getBasicUsageHelp());
         }
     }
 
     private void doShowCopyright() {
         if (config.isShowCopyright()) {
-            config.getOutput().println(config.getCopyrightString());
+            config.getOutput().println(OutputStrings.getCopyrightString());
         }
     }
 
     private void doShowVersion() {
         if (config.isShowVersion()) {
-            config.getOutput().println(config.getVersionString());
+            config.getOutput().println(OutputStrings.getVersionString(config.getCompatVersion()));
         }
     }
 
