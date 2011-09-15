@@ -442,6 +442,54 @@ class TestZlib < Test::Unit::TestCase
     end
   end
 
+  def test_writer_sync
+    marker = "\x00\x00\xff\xff"
+
+    sio = StringIO.new("")
+    Zlib::GzipWriter.wrap(sio) { |z|
+      z.write 'a'
+      z.sync = true
+      z.write 'b'           # marker
+      z.write 'c'           # marker
+      z.sync = false
+      z.write 'd'
+      z.write 'e'
+      assert_equal(false, z.sync);
+    }
+
+    data = sio.string
+
+    i = Zlib::Inflate.new(Zlib::MAX_WBITS + 16)
+
+    assert_equal("ab", i.inflate(data.slice!(0, data.index(marker)+4)))
+    assert_equal("c", i.inflate(data.slice!(0, data.index(marker)+4)))
+    assert_equal("de", i.inflate(data))
+  end
+
+  def test_writer_flush
+    marker = "\x00\x00\xff\xff"
+
+    sio = StringIO.new("")
+    Zlib::GzipWriter.wrap(sio) { |z|
+      z.write 'a'
+      z.write 'b'           # marker
+      z.flush
+      z.write 'c'           # marker
+      z.flush
+      z.write 'd'
+      z.write 'e'
+      assert_equal(false, z.sync);
+    }
+
+    data = sio.string
+
+    i = Zlib::Inflate.new(Zlib::MAX_WBITS + 16)
+
+    assert_equal("ab", i.inflate(data.slice!(0, data.index(marker)+4)))
+    assert_equal("c", i.inflate(data.slice!(0, data.index(marker)+4)))
+    assert_equal("de", i.inflate(data))
+  end
+
 end
 
 # Test for MAX_WBITS + 16
