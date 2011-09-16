@@ -63,6 +63,7 @@ import org.jruby.RubyString;
 import org.jruby.ext.stringio.RubyStringIO;
 import org.jruby.RubyTime;
 import org.jruby.RubyBoolean;
+import org.jruby.RubyException;
 
 import org.jruby.anno.FrameField;
 import org.jruby.anno.JRubyClass;
@@ -2874,15 +2875,26 @@ public class RubyZlib {
             line = 0;
             position = 0;
             try {
-              io = new com.jcraft.jzlib.GZIPInputStream(new IOInputStream(realIo),
-                                                        512,
-                                                        false); // don't close realIO
-              // JRUBY-4502
-              // CRuby expects to parse gzip header in 'new'.
-              io.readHeader();
+                io = new com.jcraft.jzlib.GZIPInputStream(new IOInputStream(realIo),
+                                                          512,
+                                                          false); // don't close realIO
+                // JRUBY-4502
+                // CRuby expects to parse gzip header in 'new'.
+                io.readHeader();
             }
             catch(IOException e){
-              throw Util.newGzipFileError(getRuntime(), "not in gzip format");
+                RaiseException re = Util.newGzipFileError(getRuntime(),
+                                                          "not in gzip format");
+                if (getRuntime().is1_9()) {
+                    byte[] input = io.getAvailIn();  
+                    if(input!=null && input.length>0){
+                      ByteList i = new ByteList(input, 0, input.length);
+                      RubyException rubye = re.getException();
+                      rubye.setInstanceVariable("@input", 
+                                                RubyString.newString(getRuntime(), i));
+                    }
+                }
+                throw re;
             }
             bufferedStream = new BufferedInputStream(io);
             return this;
@@ -3315,7 +3327,7 @@ public class RubyZlib {
 
         @JRubyMethod(optional = 1)
         public IRubyObject each_line(ThreadContext context, IRubyObject[] args, Block block) {
-          return each(context, args, block);
+            return each(context, args, block);
         }
 
         @JRubyMethod
@@ -3462,7 +3474,7 @@ public class RubyZlib {
         public IRubyObject close() {
             if (!closed) {
                 try {
-		    io.close();
+                    io.close();
                     if (realIo.respondsTo("close")) {
                         realIo.callMethod(realIo.getRuntime().getCurrentContext(), "close");
                     }
@@ -3512,7 +3524,7 @@ public class RubyZlib {
             nullFreeOrigName = obj.convertToString();
             ensureNonNull(nullFreeOrigName);
             try{
-              io.setName(nullFreeOrigName.toString());
+                io.setName(nullFreeOrigName.toString());
             }
             catch(com.jcraft.jzlib.GZIPException e){
                throw Util.newGzipFileError(getRuntime(), "header is already written");
@@ -3525,7 +3537,7 @@ public class RubyZlib {
             nullFreeComment = obj.convertToString();
             ensureNonNull(nullFreeComment);
             try{
-		io.setComment(nullFreeComment.toString());
+                io.setComment(nullFreeComment.toString());
             }
             catch(com.jcraft.jzlib.GZIPException e){
                 throw Util.newGzipFileError(getRuntime(), "header is already written");
@@ -3581,8 +3593,8 @@ public class RubyZlib {
 	    }
             boolean tmp = io.getSyncFlush();
             try {
-		if(flush!=0 /*NO_FLUSH*/){
-                  io.setSyncFlush(true);
+                if(flush!=0 /*NO_FLUSH*/){
+                    io.setSyncFlush(true);
                 }
                 io.flush();
             } catch (IOException ioe) {
@@ -3604,7 +3616,7 @@ public class RubyZlib {
                 this.mtime.setDateTime(new DateTime(RubyNumeric.fix2long(arg) * 1000));
             }
             try{
-		io.setModifiedTime(this.mtime.to_i().getLongValue());
+                io.setModifiedTime(this.mtime.to_i().getLongValue());
             }
             catch(com.jcraft.jzlib.GZIPException e){
                 throw Util.newGzipFileError(getRuntime(), "header is already written");
@@ -3620,7 +3632,7 @@ public class RubyZlib {
                 crc = io.getCRC();
             }
             catch(com.jcraft.jzlib.GZIPException e){
-		// not calculated yet
+                // not calculated yet
             }
             return getRuntime().newFixnum(crc);
         }
