@@ -1300,7 +1300,12 @@ public class RubyZlib {
                 }
             }
             if(finish){
-                internalClose();
+                if(!internalFinished()){
+                    int err = flater.inflate(com.jcraft.jzlib.JZlib.Z_FINISH);
+                    if(err != com.jcraft.jzlib.JZlib.Z_OK){
+                        throw Util.newBufError(getRuntime(), "buffer error");
+                    }
+                }
             }
         }
 
@@ -1349,13 +1354,6 @@ public class RubyZlib {
 
         @Override
         protected void internalClose() {
-            if(!internalFinished()){
-                int err = flater.inflate(com.jcraft.jzlib.JZlib.Z_FINISH);
-                if(err != com.jcraft.jzlib.JZlib.Z_OK){
-                    Ruby runtime = getRuntime();
-                    throw Util.newBufError(runtime, "buffer error");
-                }
-            }
             flater.end();
         }
 
