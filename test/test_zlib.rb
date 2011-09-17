@@ -303,20 +303,15 @@ class TestZlib < Test::Unit::TestCase
 
   # JRUBY-4502: 1.4 raises native exception at gz.read
   def test_corrupted_data
-    data = '12345abcde'
     zip = "\037\213\b\000,\334\321G\000\005\000\235\005\000$\n\000\000"
     io = StringIO.new(zip)
     # JRuby cannot check corrupted data format at GzipReader.new for now
     # because of different input buffer handling.
-    if defined?(JRUBY_VERSION)
-      assert_raise(IOError) do
-        gz = Zlib::GzipReader.new(io)     # CRuby raises here
-        gz.read                           # JRuby raises here
-      end
-    else
-      assert_raise(Zlib::DataError) do
-        gz = Zlib::GzipReader.new(io)     # CRuby raises here
-      end
+    assert_raise(Zlib::DataError) do
+      gz = Zlib::GzipReader.new(io)     # CRuby raises here
+                                        # if size of input is less that 2048
+
+      gz.read                           # JRuby raises here
     end
   end
 
@@ -389,6 +384,44 @@ class TestZlib < Test::Unit::TestCase
       called = true
     }
     assert(called)
+  end
+
+  def test_gzip_reader_check_corrupted_trailer
+
+    data = TestZlib.create_gzip_stream("hello")
+
+    assert_raise(Zlib::GzipFile::CRCError) do
+      _data = data.dup
+      _data[_data.size-5] = 'X'  # checksum
+      gz = Zlib::GzipReader.new(StringIO.new(_data))
+      gz.read
+      gz.finish
+    end
+
+    assert_raise(Zlib::GzipFile::LengthError) do
+      _data = data.dup
+      _data[_data.size-4] = 'X'  # length
+      gz = Zlib::GzipReader.new(StringIO.new(_data))
+      gz.read
+      gz.finish
+    end
+
+    assert_raise(Zlib::GzipFile::NoFooter) do
+      _data = data.dup
+      _data = _data.slice!(0, _data.size-1)
+      gz = Zlib::GzipReader.new(StringIO.new(_data))
+      gz.read
+      gz.finish
+    end
+
+    assert_raise(Zlib::GzipFile::NoFooter) do
+      _data = data.dup
+      _data[_data.size-5] = 'X'  # checksum
+      _data = _data.slice!(0, _data.size-1)
+      gz = Zlib::GzipReader.new(StringIO.new(_data))
+      gz.read
+      gz.finish
+    end
   end
 
   def self.create_gzip_stream(string)

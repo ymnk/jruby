@@ -1277,7 +1277,7 @@ public class RubyZlib {
                             // but some data has been inflated successfully.
                             collected.append(outp, 0, resultLength);
                         }
-                        throw Util.newDataError(runtime, flater.msg);
+                        throw Util.newDataError(runtime, flater.getMessage());
                     case com.jcraft.jzlib.JZlib.Z_NEED_DICT:
                          throw Util.newDictError(runtime, "need dictionary");
                     case com.jcraft.jzlib.JZlib.Z_STREAM_END:
@@ -3047,19 +3047,19 @@ public class RubyZlib {
                 return RubyString.newEmptyString(getRuntime());
            }
            catch (IOException ioe) {
-               /* TODO
-                - In this case, CRuby expects Zlib::DataError,
-                  but some JRuby's test expects IOError.
-                  Refer to 'test_corrupted_data' in test_zlib.rb
-
-                - Accroding to some test[1] in CRuby, it seems Zlib::GzipFile:Error
-                  is expected rather than Zlib::DataError.
-
-                  [1] https://github.com/ruby/ruby/blob/trunk/test/zlib/test_zlib.rb#L713
-                */
-
-               //throw Util.newGzipFileError(getRuntime(), ioe.getMessage());
-               throw getRuntime().newIOErrorFromException(ioe);
+               String m = ioe.getMessage();
+               if (m.startsWith("Unexpected end of ZLIB input stream"))
+                 throw Util.newGzipFileError(getRuntime(), ioe.getMessage());
+               else if (m.startsWith("footer is not found"))
+                 throw Util.newNoFooter(getRuntime(), "footer is not found");
+               else if (m.startsWith("incorrect data check"))
+                 throw Util.newCRCError(getRuntime(),
+                                        "invalid compressed data -- crc error");
+               else if (m.startsWith("incorrect length check"))
+                 throw Util.newLengthError(getRuntime(),
+                                           "invalid compressed data -- length error");
+               else
+                 throw Util.newDataError(getRuntime(), ioe.getMessage());
            }
         }
 
