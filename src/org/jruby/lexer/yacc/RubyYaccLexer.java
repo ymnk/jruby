@@ -533,6 +533,7 @@ public class RubyYaccLexer {
             } else if (getEncoding() == RubyYaccLexer.USASCII_ENCODING &&
                     bufferEncoding != RubyYaccLexer.UTF8_ENCODING) {
                 buffer.setEncoding(RubyYaccLexer.ASCII8BIT_ENCODING);
+                codeRange = StringSupport.codeRangeScan(RubyYaccLexer.ASCII8BIT_ENCODING, buffer);
             }
         }
 
