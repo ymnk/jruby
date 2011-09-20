@@ -479,6 +479,11 @@ class TestZlib < Test::Unit::TestCase
     marker = "\x00\x00\xff\xff"
 
     sio = StringIO.new("")
+
+    if RUBY_VERSION >= '1.9.0'
+      sio.set_encoding "ASCII-8BIT"
+    end
+
     Zlib::GzipWriter.wrap(sio) { |z|
       z.write 'a'
       z.sync = true
@@ -495,13 +500,16 @@ class TestZlib < Test::Unit::TestCase
     i = Zlib::Inflate.new(Zlib::MAX_WBITS + 16)
 
     if RUBY_VERSION >= '1.9.0'
-      #TODO
-      #data.index(marker) will return nil
-    else
-      assert_equal("ab", i.inflate(data.slice!(0, data.index(marker)+4)))
-      assert_equal("c", i.inflate(data.slice!(0, data.index(marker)+4)))
-      assert_equal("de", i.inflate(data))
+      #TODO working around JRUBY-6073
+      if((marker.encoding == Encoding.find("ASCII-8BIT")) &&
+         !marker.valid_encoding?)
+        marker.encode!("ASCII-8BIT")
+      end
     end
+
+    assert_equal("ab", i.inflate(data.slice!(0, data.index(marker)+4)))
+    assert_equal("c", i.inflate(data.slice!(0, data.index(marker)+4)))
+    assert_equal("de", i.inflate(data))
   end
 
   def test_writer_flush
